@@ -1010,5 +1010,76 @@
     "valid": false,
     "surface": "settings",
     "direction": "server"
+  },
+  {
+    "name": "chat scan",
+    "message": {
+      "type": "chatRequest",
+      "data": {
+        "action": "scan",
+        "requestId": "c1"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat cannot send",
+    "message": {
+      "type": "chatRequest",
+      "data": {
+        "action": "send",
+        "requestId": "c1"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat cannot inject snapshot",
+    "message": {
+      "type": "chatRequest",
+      "data": {
+        "action": "poll",
+        "requestId": "c1",
+        "windows": []
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat model isolated origin",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "action": "generate",
+        "requestId": "c1",
+        "origin": "chat",
+        "mode": "high_eq",
+        "incoming": "hello",
+        "count": 3
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat scan response",
+    "message": {
+      "type": "chatResponse",
+      "requestId": "c1",
+      "action": "scan",
+      "ok": true,
+      "message": "done",
+      "windows": []
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
   }
 ]

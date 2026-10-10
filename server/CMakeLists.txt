@@ -238,6 +238,7 @@ set(SRC_FILES
     "./src/assistant/protocol.cpp"
     "./src/assistant/context_store.cpp"
     "./src/assistant/service.cpp"
+    "./src/assistant/chat_reader.cpp"
 
     "./src/statistics/stats_store.cpp"
     "./src/statistics/stats_store.h"
@@ -470,6 +471,7 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/assistant/protocol.cpp"
     "./src/assistant/context_store.cpp"
     "./src/assistant/service.cpp"
+    "./src/assistant/chat_reader.cpp"
 
     "./src/statistics/stats_store.cpp"
     "./src/statistics/stats_store.h"
@@ -576,4 +578,19 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
+endif()
+
+# Isolated read-only UI Automation collector. No input or messaging APIs.
+add_executable(MetasequoiaImeChatCapture "src/assistant/chat_capture.cpp" "src/assistant/chat_reader.cpp")
+target_link_libraries(MetasequoiaImeChatCapture PRIVATE nlohmann_json::nlohmann_json ole32 oleaut32 user32 uiautomationcore gdi32 windowsapp)
+target_compile_features(MetasequoiaImeChatCapture PRIVATE cxx_std_17)
+target_compile_definitions(MetasequoiaImeChatCapture PRIVATE NOMINMAX)
+target_compile_options(MetasequoiaImeChatCapture PRIVATE /utf-8)
+set_target_properties(MetasequoiaImeChatCapture PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+add_dependencies(${PROJECT_NAME} MetasequoiaImeChatCapture)
+add_dependencies(${SETTINGS_EXECUTABLE_NAME} MetasequoiaImeChatCapture)
+
+
+if(TARGET MetasequoiaImeServerTests)
+    add_dependencies(MetasequoiaImeServerTests MetasequoiaImeChatCapture)
 endif()

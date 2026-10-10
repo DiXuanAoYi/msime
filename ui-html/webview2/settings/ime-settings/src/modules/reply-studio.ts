@@ -1,3 +1,4 @@
+import { setupChatReader } from "./chat-reader";
 import { onHostMessage } from "../utils/host-messages";
 import {
   serializeHostMessage,
@@ -23,6 +24,7 @@ export function setupReplyStudio(): void {
   const root = document.getElementById("replyStudio");
   if (!root || root.dataset.initialized) return;
   root.dataset.initialized = "true";
+  setupChatReader();
   const el = <T extends HTMLElement>(id: string) =>
     document.getElementById(id) as T;
   const value = (id: string) => el<HTMLInputElement>(id)?.value ?? "";

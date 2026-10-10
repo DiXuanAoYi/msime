@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
+vi.mock("./chat-reader", () => ({ setupChatReader: vi.fn() }));
 const handlers = vi.hoisted(() => new Set<(m: any) => void>());
 vi.mock("../utils/host-messages", () => ({
   onHostMessage: (_t: string, h: (m: any) => void) => handlers.add(h),

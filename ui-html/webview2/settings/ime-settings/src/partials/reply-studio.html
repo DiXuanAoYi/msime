@@ -12,6 +12,91 @@
       语音填写：先配置语音识别，把光标放入原文框，按住 RAlt
       说话或使用已设置的录音快捷键。语音润色也支持下方同名风格。
     </p>
+
+    <details id="chatReader" class="studio-monitor">
+      <summary>聊天窗口只读监测 · 微信 / QQ / 企业微信 / 钉钉 / 飞书</summary>
+      <p class="studio-note">
+        读取当前已加载的聊天文本；微信昵称、企业微信标准浅色窗口使用本机
+        OCR，可能识别有误，请先核对预览。不点击、不切换聊天、不发送。关闭设置窗口会停止。首次读取只保存基线，新消息确认后才准备回复。图片、语音和未加载内容不转写。OCR
+        不支持的主题或布局会暂停；QQ 旧版可能只提供已加载的历史。
+      </p>
+      <div class="studio-toolbar">
+        <button id="crScan" type="button">扫描聊天窗口</button
+        ><button id="crStart" type="button">开始只读监测</button>
+      </div>
+      <pre id="crCapabilities" class="studio-chat-preview">
+尚未扫描。请打开已登录客户端的聊天窗口。</pre
+      >
+      <label
+        >识别到的联系人 / 群聊<select id="crWindows">
+          <option value="">先扫描窗口</option>
+        </select></label
+      >
+      <details>
+        <summary>读取预览（最近 5 条）</summary>
+        <pre id="crPreview" class="studio-chat-preview"></pre>
+      </details>
+      <div class="studio-grid">
+        <label
+          >当前账户标识<input
+            id="crAccount"
+            maxlength="60"
+            placeholder="例如：工作微信；切换账户后请重新绑定" /></label
+        ><label
+          >我在此会话的昵称<input
+            id="crSelf"
+            maxlength="50"
+            placeholder="用于排除自己发出的消息"
+        /></label>
+      </div>
+      <div class="studio-grid">
+        <label
+          >独立会话编号<input
+            id="crKey"
+            maxlength="64"
+            placeholder="例如 work-alice / family-group" /></label
+        ><label
+          >会话类型<select id="crKind">
+            <option value="person">联系人</option>
+            <option value="group">群聊</option>
+          </select></label
+        >
+      </div>
+      <p class="studio-note">
+        首次绑定用于确认身份：客户端通常不提供稳定账户 / 联系人
+        ID。不同账号、同名聊天请用不同编号；切换账户或重启客户端后重新绑定，不会按显示名合并旧记录。类型无法识别时请手动选择。
+      </p>
+      <button id="crBind" type="button">绑定此聊天</button>
+      <div id="crBindings"></div>
+      <label class="studio-check"
+        ><input
+          id="crAuto"
+          type="checkbox"
+        />新消息自动准备回复（会将该会话近期上下文发送到“语音与模型配置”中的模型）</label
+      >
+      <p class="studio-note">
+        沿用下方表达模式与 3 / 5
+        条设置。未识别发言人、自发消息和读取中断不会触发自动回复。每次开启从后续新消息开始。
+      </p>
+      <p id="crStatus" role="status" aria-live="polite">监测尚未开启。</p>
+      <div id="crReplies"></div>
+      <details>
+        <summary>按会话保存的发言记录 · 导出 / 删除</summary>
+        <div class="studio-toolbar">
+          <select id="crHistory">
+            <option value="">选择已记录会话</option></select
+          ><button id="crHistoryRefresh" type="button">刷新记录列表</button
+          ><button id="crExport" type="button">导出完整 JSON</button
+          ><button id="crDelete" type="button">删除记录</button>
+        </div>
+        <p class="studio-note">
+          本机 Windows 账户加密保存，记录采集时间及客户端提供的原始时间。保留 90
+          天；每会话最多 10000 条、总文件约 30
+          MB，满后停止并提示。导出文件为明文。
+        </p>
+        <pre id="crHistoryText" class="studio-chat-preview"></pre>
+      </details>
+    </details>
     <div class="studio-toolbar">
       <label
         >当前会话<select id="rsSessions">

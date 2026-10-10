@@ -852,6 +852,85 @@
           },
           "platform": {
             "type": "string"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "chat"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "chatRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "scan",
+              "poll",
+              "load",
+              "delete",
+              "reset",
+              "cancel"
+            ]
+          },
+          "key": {
+            "type": "string"
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "window": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "account": {
+                  "type": "string"
+                },
+                "self": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "window",
+                "platform",
+                "title",
+                "account",
+                "self",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -1374,6 +1453,273 @@
             "required": [
               "label",
               "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "requestId",
+        "action",
+        "ok",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "chatResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "window": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "speaker": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "time": {
+                      "type": "string"
+                    },
+                    "self": {
+                      "type": "boolean"
+                    },
+                    "observedAt": {
+                      "type": "integer"
+                    },
+                    "historical": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "speaker",
+                    "text",
+                    "time",
+                    "self"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "readable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "window",
+              "platform",
+              "title",
+              "kind",
+              "status",
+              "messages",
+              "readable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "account": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "title",
+              "kind",
+              "platform",
+              "account",
+              "count"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "session": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string"
+            },
+            "account": {
+              "type": "string"
+            },
+            "messages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "speaker": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "time": {
+                    "type": "string"
+                  },
+                  "self": {
+                    "type": "boolean"
+                  },
+                  "observedAt": {
+                    "type": "integer"
+                  },
+                  "historical": {
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "speaker",
+                  "text",
+                  "time",
+                  "self"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "key",
+            "title",
+            "kind",
+            "platform",
+            "account",
+            "messages"
+          ],
+          "additionalProperties": false
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "incoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "speaker": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "time": {
+                      "type": "string"
+                    },
+                    "self": {
+                      "type": "boolean"
+                    },
+                    "observedAt": {
+                      "type": "integer"
+                    },
+                    "historical": {
+                      "type": "boolean"
+                    },
+                    "source": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "speaker",
+                    "text",
+                    "time",
+                    "self"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "revision": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "key",
+              "title",
+              "incoming",
+              "revision"
             ],
             "additionalProperties": false
           }

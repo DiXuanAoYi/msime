@@ -85,6 +85,8 @@ std::optional<CandidateSkinCatalog::ScanResult> g_candidate_skin_catalog;
 uint64_t g_candidate_skin_catalog_revision = 0;
 std::unique_ptr<SerialTaskQueue> g_worker;
 std::unique_ptr<ReplyStudio::Host> g_reply_studio;
+std::unique_ptr<ReplyStudio::Host> g_chat_model;
+std::unique_ptr<ReplyStudio::Host> g_chat_reader;
 bool g_closing = false;
 bool g_lingering = false;
 bool g_reload_pending = false;
@@ -1535,16 +1537,33 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 };
             });
         }
+        else if (type == "chatRequest")
+        {
+            const auto action = json::value_to<std::string>(value.at("data").at("action"));
+            if ((action == "scan" || action == "poll") && !IsWindowVisible(hwnd))
+                return;
+            if (!g_chat_reader)
+                g_chat_reader =
+                    std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); }, true);
+            g_chat_reader->Submit(nlohmann::json::parse(json::serialize(value.at("data"))),
+                                  [](const nlohmann::json &response) {
+                                      if (g_webview)
+                                          g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                                  });
+        }
         else if (type == "assistantRequest")
         {
-            if (!g_reply_studio)
-                g_reply_studio =
-                    std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); });
-            g_reply_studio->Submit(nlohmann::json::parse(json::serialize(value.at("data"))),
-                                   [](const nlohmann::json &response) {
-                                       if (g_webview)
-                                           g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
-                                   });
+            auto request = nlohmann::json::parse(json::serialize(value.at("data")));
+            if (request.value("origin", "") == "chat" && request.value("action", "") != "cancel" &&
+                !IsWindowVisible(hwnd))
+                return;
+            auto &host = request.value("origin", "") == "chat" ? g_chat_model : g_reply_studio;
+            if (!host)
+                host = std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); });
+            host->Submit(std::move(request), [](const nlohmann::json &response) {
+                if (g_webview)
+                    g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+            });
         }
         else if (type == "vocabularyRequest")
         {
@@ -1940,6 +1959,12 @@ void HideSettings(HWND hwnd)
 {
     if (g_closing)
         return;
+    if (g_chat_reader)
+        g_chat_reader->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
+    if (g_chat_model)
+        g_chat_model->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
+    if (g_webview)
+        g_webview->ExecuteScript(L"window.dispatchEvent(new Event('msime-chat-hidden'));", nullptr);
     const std::optional<UINT> linger_ms = SettingsLingerTimeoutMs(g_settings_window_linger);
     if (!g_webview_content_started || linger_ms == 0u)
     {
@@ -1983,6 +2008,10 @@ void CloseSettings(HWND hwnd)
     ShowWindow(hwnd, SW_HIDE);
     if (g_reply_studio)
         g_reply_studio->Stop();
+    if (g_chat_model)
+        g_chat_model->Stop();
+    if (g_chat_reader)
+        g_chat_reader->Stop();
     if (g_worker)
         g_worker->Stop();
     else
@@ -2169,7 +2198,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
             g_worker->Drain(!g_closing);
         if (g_reply_studio)
             g_reply_studio->Drain(!g_closing);
-        if (g_closing && (!g_worker || g_worker->Stopped()) && (!g_reply_studio || g_reply_studio->Stopped()))
+        if (g_chat_model)
+            g_chat_model->Drain(!g_closing);
+        if (g_chat_reader)
+            g_chat_reader->Drain(!g_closing);
+        if (g_closing && (!g_worker || g_worker->Stopped()) && (!g_reply_studio || g_reply_studio->Stopped()) &&
+            (!g_chat_reader || g_chat_reader->Stopped()) && (!g_chat_model || g_chat_model->Stopped()))
             DestroyWindow(hwnd);
         return 0;
     case WM_CLOSE:
@@ -2181,6 +2215,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
     case WM_DESTROY:
         if (g_reply_studio)
             g_reply_studio->Stop();
+        if (g_chat_model)
+            g_chat_model->Stop();
+        if (g_chat_reader)
+            g_chat_reader->Stop();
         g_closing = true;
         g_lingering = false;
         if (g_worker)

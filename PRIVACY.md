@@ -38,10 +38,18 @@ All of these files sit in the current user's profile and are protected only by t
 
 ## Uninstall
 
-Uninstalling deletes `%LOCALAPPDATA%\metasequoiaime` and `%PROGRAMDATA%\metasequoiaime` in full, including the user dictionary, settings and any installed skins. Back up `msime_user.db` first if you want to keep learned words. An in-place upgrade behaves differently: it preserves `msime_user.db`, `config.toml`, `config.base.toml` and the `skins` directory, and replaces everything else.
+Uninstalling deletes `%LOCALAPPDATA%\metasequoiaime` and `%PROGRAMDATA%\metasequoiaime` in full, including the user dictionary, settings and any installed skins. Back up `msime_user.db` first if you want to keep learned words. An in-place upgrade behaves differently: it preserves `msime_user.db`, `config.toml`, `config.base.toml` and the `skins` directory, and also preserves local statistics, vocabulary data and encrypted reply/chat records according to the installer preservation lists.
 
 ## General
 
 Metasequoia IME does not sell or share personal data, and installing or using it does not create an account. If a future release adds another network-backed feature, this notice must be updated before that feature ships.
 
 Security or privacy concerns should be reported privately as described in the organisation [SECURITY.md](https://github.com/metasequoiaime/.github/blob/main/SECURITY.md).
+
+## Optional reply studio and chat window reader (fork feature)
+
+The reply studio sends the text/context selected by the user to the configured voice-polish model endpoint for rewriting, summaries and draft replies. It does not send chat messages. Manually saved conversations use current-user Windows DPAPI in `reply-contexts.dat`.
+
+Chat monitoring is off by default. After the user scans, binds an account/conversation and starts it, an isolated read-only helper examines open WeChat, QQ, WeCom, DingTalk and Feishu windows. WeChat sender labels and supported WeCom windows use Windows local OCR; captured pixels stay in the helper process and are not saved or uploaded. Client databases and credentials are not read. Only loaded, accessible text is available; version/layout limitations are described in `docs/chat-window-reader.txt`.
+
+Attributed observations are stored locally in current-user DPAPI-encrypted `chat-records.dat`, separately for each bound account/conversation key. Records expire after 90 days on the next operation; users can export plaintext JSON or delete an individual conversation. In-place upgrades preserve this file. Automatic draft generation is a separate, default-off control: enabling it sends only the triggering messages and that conversation's recent context to the configured model. Closing/hiding Settings or stopping monitoring cancels further reading and requests. Drafts require manual copying and sending.

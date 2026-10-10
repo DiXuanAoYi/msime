@@ -1,5 +1,7 @@
 #pragma once
 #include "settings/serial_task_queue.h"
+#include "chat_reader.h"
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <atomic>
 #include <functional>
@@ -11,7 +13,7 @@ using Reply = std::function<void(const nlohmann::json &)>;
 class Host
 {
   public:
-    explicit Host(std::function<void()> notify);
+    explicit Host(std::function<void()> notify, bool chat = false);
     ~Host();
     void Submit(nlohmann::json request, Reply reply);
     void Drain(bool deliver = true);
@@ -19,6 +21,7 @@ class Host
     bool Stopped();
 
   private:
+    std::unique_ptr<ChatReader> chat_;
     std::atomic<uint64_t> generation_{0};
     bool busy_{false};
     std::optional<std::pair<nlohmann::json, Reply>> pending_;

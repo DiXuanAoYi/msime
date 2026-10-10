@@ -29,9 +29,23 @@
 namespace
 {
 std::unique_ptr<ReplyStudio::Host> g_legacy_reply_studio;
-}
+std::unique_ptr<ReplyStudio::Host> g_legacy_chat_model;
+std::unique_ptr<ReplyStudio::Host> g_legacy_chat_reader;
+} // namespace
 void DrainReplyStudioSettings(bool stop)
 {
+    if (g_legacy_chat_model)
+    {
+        if (stop)
+            g_legacy_chat_model->Stop();
+        g_legacy_chat_model->Drain(!stop);
+    }
+    if (g_legacy_chat_reader)
+    {
+        if (stop)
+            g_legacy_chat_reader->Stop();
+        g_legacy_chat_reader->Drain(!stop);
+    }
     if (g_legacy_reply_studio)
     {
         if (stop)
@@ -1409,6 +1423,13 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         }
                         else if (value == "close")
                         {
+                            if (g_legacy_chat_reader)
+                                g_legacy_chat_reader->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
+                            if (g_legacy_chat_model)
+                                g_legacy_chat_model->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
+                            if (webviewSettingsWnd)
+                                webviewSettingsWnd->ExecuteScript(
+                                    L"window.dispatchEvent(new Event('msime-chat-hidden'));", nullptr);
                             ShowWindow(hwnd, SW_HIDE);
                         }
                         else if (value == "restore")
@@ -1502,17 +1523,36 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                             ShellExecuteW(hwnd, L"open", string_to_wstring(url).c_str(), nullptr, nullptr,
                                           SW_SHOWNORMAL);
                     }
+                    else if (type == "chatRequest")
+                    {
+                        const auto action = json::value_to<std::string>(val.at("data").at("action"));
+                        if ((action == "scan" || action == "poll") && !IsWindowVisible(hwnd))
+                            return S_OK;
+                        if (!g_legacy_chat_reader)
+                            g_legacy_chat_reader = std::make_unique<ReplyStudio::Host>(
+                                [hwnd] { PostMessageW(hwnd, WM_APP + 60, 0, 0); }, true);
+                        g_legacy_chat_reader->Submit(nlohmann::json::parse(json::serialize(val.at("data"))),
+                                                     [](const nlohmann::json &response) {
+                                                         if (::webviewSettingsWnd)
+                                                             ::webviewSettingsWnd->PostWebMessageAsJson(
+                                                                 string_to_wstring(response.dump()).c_str());
+                                                     });
+                    }
                     else if (type == "assistantRequest")
                     {
-                        if (!g_legacy_reply_studio)
-                            g_legacy_reply_studio =
+                        auto request = nlohmann::json::parse(json::serialize(val.at("data")));
+                        if (request.value("origin", "") == "chat" && request.value("action", "") != "cancel" &&
+                            !IsWindowVisible(hwnd))
+                            return S_OK;
+                        auto &host =
+                            request.value("origin", "") == "chat" ? g_legacy_chat_model : g_legacy_reply_studio;
+                        if (!host)
+                            host =
                                 std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, WM_APP + 60, 0, 0); });
-                        g_legacy_reply_studio->Submit(nlohmann::json::parse(json::serialize(val.at("data"))),
-                                                      [](const nlohmann::json &response) {
-                                                          if (::webviewSettingsWnd)
-                                                              ::webviewSettingsWnd->PostWebMessageAsJson(
-                                                                  string_to_wstring(response.dump()).c_str());
-                                                      });
+                        host->Submit(std::move(request), [](const nlohmann::json &response) {
+                            if (::webviewSettingsWnd)
+                                ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                        });
                     }
                     else if (type == "vocabularyRequest")
                     {

@@ -47,6 +47,8 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/assistant/protocol.cpp"
     "${CMAKE_SOURCE_DIR}/src/assistant/context_store.cpp"
     "${CMAKE_SOURCE_DIR}/src/assistant/service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/assistant/chat_reader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_chat_reader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_reply_studio.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vocabulary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/english/vocabulary_store.cpp"

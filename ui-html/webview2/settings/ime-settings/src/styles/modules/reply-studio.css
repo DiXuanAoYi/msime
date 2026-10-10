@@ -172,3 +172,32 @@
     flex-grow: 1;
   }
 }
+
+.studio-chat-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 20rem;
+  overflow: auto;
+  font: inherit;
+}
+.studio-monitor {
+  margin-block: 1rem;
+}
+.studio-monitor select {
+  max-width: 100%;
+}
+.studio-stale {
+  opacity: 0.75;
+  border-style: dashed;
+}
+.studio label.studio-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  line-height: 1.6;
+}
+.studio label.studio-check input[type="checkbox"] {
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 0.3rem;
+}

@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.7"
+#define MyAppVersion   "0.9.8"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -795,6 +795,7 @@ begin
     最后一次写入。这个库默认不建（统计开关关闭），建了之后就只有用户自己能重建它的内容。}
   Result :=
     (CompareText(FileName, 'reply-contexts.dat') = 0) or
+    (CompareText(FileName, 'chat-records.dat') = 0) or
     (CompareText(FileName, 'vocabulary.db') = 0) or
     (CompareText(FileName, 'vocabulary.db-wal') = 0) or
     (CompareText(FileName, 'vocabulary.db-shm') = 0) or
@@ -1356,7 +1357,7 @@ begin
     ExpandConstant('{sys}\robocopy.exe'),
     '"' + RemoveBackslashUnlessRoot(OldDir) + '" "' + RemoveBackslashUnlessRoot(NewDir) + '" ' +
     'msime_user.db msime_user.db-wal msime_user.db-shm msime_user.db-journal ' +
-    'reply-contexts.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
+    'reply-contexts.dat chat-records.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
     'stats.db stats.db-wal stats.db-shm stats.db-journal ' +
     'config.toml config.base.toml /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
     '',

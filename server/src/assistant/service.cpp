@@ -106,8 +106,11 @@ json Run(const json &request, const std::function<bool()> &cancelled)
     }
 }
 } // namespace
-Host::Host(std::function<void()> notify) : queue_(std::move(notify), {})
+Host::Host(std::function<void()> notify, bool chat) : queue_(std::move(notify), {})
 {
+    if (chat)
+        chat_ = std::make_unique<ChatReader>(std::filesystem::path(CommonUtils::get_ime_data_path_w()) /
+                                             L"chat-records.dat");
 }
 Host::~Host()
 {
@@ -115,9 +118,12 @@ Host::~Host()
 }
 void Host::Submit(json request, Reply reply)
 {
-    json response = {
-        {"type", "assistantResponse"},           {"protocolVersion", 1}, {"requestId", request.value("requestId", "")},
-        {"action", request.value("action", "")}, {"ok", true},           {"message", "完成"}};
+    json response = {{"type", chat_ ? "chatResponse" : "assistantResponse"},
+                     {"protocolVersion", 1},
+                     {"requestId", request.value("requestId", "")},
+                     {"action", request.value("action", "")},
+                     {"ok", true},
+                     {"message", "完成"}};
     if (request.value("action", "") == "cancel")
     {
         ++generation_;
@@ -138,7 +144,8 @@ void Host::Submit(json request, Reply reply)
                         generation]() mutable -> SerialTaskQueue::Completion {
             try
             {
-                response.update(Run(request, [this, generation] { return generation_.load() != generation; }));
+                auto cancelled = [this, generation] { return generation_.load() != generation; };
+                response.update(chat_ ? chat_->Apply(request, cancelled) : Run(request, cancelled));
             }
             catch (const std::exception &e)
             {
