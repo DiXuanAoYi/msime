@@ -35,8 +35,8 @@ IDI_PUNCTUATION_OFF     ICON                    "..\\..\\image\\PunctuationOff.i
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,9,6,0
- PRODUCTVERSION 0,9,6,0
+ FILEVERSION 0,9,7,0
+ PRODUCTVERSION 0,9,7,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -53,12 +53,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "MSFT"
             VALUE "FileDescription", "The Metasequoia code of Windows 11 IME"
-            VALUE "FileVersion", "0.9.6.0"
+            VALUE "FileVersion", "0.9.7.0"
             VALUE "InternalName", "MetasequoiaImeTsf.dll"
             VALUE "LegalCopyright", "Copyright (C)"
             VALUE "OriginalFilename", "MetasequoiaImeTsf.dll"
             VALUE "ProductName", "MetasequoiaIME"
-            VALUE "ProductVersion", "0.9.6.0"
+            VALUE "ProductVersion", "0.9.7.0"
         END
     END
     BLOCK "VarFileInfo"

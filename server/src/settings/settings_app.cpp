@@ -1,3 +1,4 @@
+#include "assistant/service.h"
 #include "english/vocabulary_service.h"
 #include "engine/contracts/webview/validator.h"
 #include "config/ime_config.h"
@@ -83,6 +84,7 @@ HWND g_settings_hwnd = nullptr;
 std::optional<CandidateSkinCatalog::ScanResult> g_candidate_skin_catalog;
 uint64_t g_candidate_skin_catalog_revision = 0;
 std::unique_ptr<SerialTaskQueue> g_worker;
+std::unique_ptr<ReplyStudio::Host> g_reply_studio;
 bool g_closing = false;
 bool g_lingering = false;
 bool g_reload_pending = false;
@@ -1533,6 +1535,17 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 };
             });
         }
+        else if (type == "assistantRequest")
+        {
+            if (!g_reply_studio)
+                g_reply_studio =
+                    std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); });
+            g_reply_studio->Submit(nlohmann::json::parse(json::serialize(value.at("data"))),
+                                   [](const nlohmann::json &response) {
+                                       if (g_webview)
+                                           g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                                   });
+        }
         else if (type == "vocabularyRequest")
         {
             const auto data = value.at("data").as_object();
@@ -1968,6 +1981,8 @@ void CloseSettings(HWND hwnd)
     KillTimer(hwnd, kConfigReloadTimer);
     SettingsSplash::Dismiss();
     ShowWindow(hwnd, SW_HIDE);
+    if (g_reply_studio)
+        g_reply_studio->Stop();
     if (g_worker)
         g_worker->Stop();
     else
@@ -2151,11 +2166,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
         return 0;
     case kWorkerCompleted:
         if (g_worker)
-        {
             g_worker->Drain(!g_closing);
-            if (g_closing && g_worker->Stopped())
-                DestroyWindow(hwnd);
-        }
+        if (g_reply_studio)
+            g_reply_studio->Drain(!g_closing);
+        if (g_closing && (!g_worker || g_worker->Stopped()) && (!g_reply_studio || g_reply_studio->Stopped()))
+            DestroyWindow(hwnd);
         return 0;
     case WM_CLOSE:
         HideSettings(hwnd);
@@ -2164,6 +2179,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
         CloseSettings(hwnd);
         return 0;
     case WM_DESTROY:
+        if (g_reply_studio)
+            g_reply_studio->Stop();
         g_closing = true;
         g_lingering = false;
         if (g_worker)

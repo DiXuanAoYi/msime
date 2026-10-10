@@ -899,5 +899,116 @@
     },
     "direction": "server",
     "valid": true
+  },
+  {
+    "name": "reply generate scoped payload",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "generate",
+        "mode": "high_eq",
+        "incoming": "hello",
+        "count": 3
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply invalid action",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply invalid count",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "generate",
+        "count": 4
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply group context save",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "save",
+        "sessionId": "g1",
+        "kind": "group",
+        "platform": "WeChat",
+        "context": "Alice: hello"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply invalid session kind",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "save",
+        "kind": "unknown"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply results",
+    "message": {
+      "type": "assistantResponse",
+      "requestId": "r1",
+      "action": "generate",
+      "ok": true,
+      "message": "done",
+      "replies": [
+        {
+          "label": "friendly",
+          "text": "hello"
+        }
+      ]
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "reply result missing text",
+    "message": {
+      "type": "assistantResponse",
+      "requestId": "r1",
+      "action": "generate",
+      "ok": true,
+      "message": "done",
+      "replies": [
+        {
+          "label": "friendly"
+        }
+      ]
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
   }
 ]

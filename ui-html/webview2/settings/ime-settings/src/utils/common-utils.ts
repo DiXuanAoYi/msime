@@ -33,6 +33,7 @@ const MODULE_IDS = [
   'handwriting-settings',
   'tools-settings',
   'ai-settings',
+  'reply-studio',
   'shortcut',
   'help-settings',
   'about-settings',

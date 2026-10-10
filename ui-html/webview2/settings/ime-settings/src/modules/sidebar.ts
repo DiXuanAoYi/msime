@@ -49,6 +49,7 @@ const setupLoaders: Record<string, () => Promise<void>> = {
   'tools-settings': async () => {
     (await import('./tools-settings')).setupToolsSettings();
   },
+  'reply-studio': async () => { (await import('./reply-studio')).setupReplyStudio(); },
   'ai-settings': async () => {
     (await import('./ai-settings')).setupAiSettings();
   },

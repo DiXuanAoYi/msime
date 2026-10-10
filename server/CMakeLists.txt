@@ -234,6 +234,11 @@ set(SRC_FILES
     "./src/statistics/stats_pipe.h"
     "./src/english/vocabulary_store.cpp"
     "./src/english/vocabulary_service.cpp"
+    "./src/assistant/modes.cpp"
+    "./src/assistant/protocol.cpp"
+    "./src/assistant/context_store.cpp"
+    "./src/assistant/service.cpp"
+
     "./src/statistics/stats_store.cpp"
     "./src/statistics/stats_store.h"
     "./src/statistics/stats_types.h"
@@ -461,6 +466,11 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/statistics/stats_overview.h"
     "./src/english/vocabulary_store.cpp"
     "./src/english/vocabulary_service.cpp"
+    "./src/assistant/modes.cpp"
+    "./src/assistant/protocol.cpp"
+    "./src/assistant/context_store.cpp"
+    "./src/assistant/service.cpp"
+
     "./src/statistics/stats_store.cpp"
     "./src/statistics/stats_store.h"
     "./src/config/ime_config.cpp"

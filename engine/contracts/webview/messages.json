@@ -784,6 +784,82 @@
         ],
         "additionalProperties": false
       }
+    },
+    "assistantRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "context": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "incoming": {
+            "type": "string"
+          },
+          "intent": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "load",
+              "save",
+              "delete",
+              "generate",
+              "summarize",
+              "cancel"
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "enum": [
+              3,
+              5
+            ]
+          },
+          "retentionDays": {
+            "type": "integer",
+            "enum": [
+              30,
+              90,
+              365
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "person",
+              "group"
+            ]
+          },
+          "platform": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "server": {
@@ -1165,6 +1241,149 @@
         "ok",
         "message",
         "rows"
+      ],
+      "additionalProperties": false
+    },
+    "assistantResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "updated": {
+                "type": "integer"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "person",
+                  "group"
+                ]
+              },
+              "platform": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "sessionId",
+              "title",
+              "updated"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "session": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "context": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "updated": {
+              "type": "integer"
+            },
+            "retentionDays": {
+              "type": "integer"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "person",
+                "group"
+              ]
+            },
+            "platform": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sessionId",
+            "title",
+            "context",
+            "summary",
+            "updated",
+            "retentionDays"
+          ],
+          "additionalProperties": false
+        },
+        "summary": {
+          "type": "string"
+        },
+        "replies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "requestId",
+        "action",
+        "ok",
+        "message"
       ],
       "additionalProperties": false
     }

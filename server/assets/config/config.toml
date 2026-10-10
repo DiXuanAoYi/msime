@@ -431,6 +431,7 @@ polish_endpoint = "https://api.siliconflow.cn/v1/chat/completions"
 # 留空则按提供商填默认值，例如 Qwen/Qwen3-8B、gpt-4o-mini。
 polish_model = ""
 # 润色提示词: cleanup | faithful | zh2en | casual | custom_1 | custom_2 | custom_3
+# 还可选择嘴替、润色、外卖好评、恋爱军师、高情商回复、淬毒之嘴、回怼王等内置模式。
 polish_prompt_id = "cleanup"
 # 旧版单槽位提示词，升级时作为“自定义一”的回退值。
 polish_prompt = ""

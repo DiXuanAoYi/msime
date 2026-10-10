@@ -267,6 +267,12 @@ LRESULT CALLBACK WndProcSettingsWindow(HWND hwnd, UINT message, WPARAM wParam, L
 {
     switch (message)
     {
+    case WM_APP + 60:
+        DrainReplyStudioSettings();
+        return 0;
+    case WM_DESTROY:
+        DrainReplyStudioSettings(true);
+        break;
     case WM_ACTIVATE_SETTINGS_WINDOW:
         if (!IsWindowVisible(hwnd) || IsIconic(hwnd))
         {

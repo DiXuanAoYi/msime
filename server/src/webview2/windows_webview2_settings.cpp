@@ -1,3 +1,4 @@
+#include "assistant/service.h"
 #include "english/vocabulary_service.h"
 // 设置窗口 WebView：DirectComposition 视觉树、composition controller 的创建、设置页消息与
 // configUpdate 分发，以及 PostSettingsWindowState / PostSettingsConfig / InitWebviewSettingsWnd。
@@ -24,6 +25,20 @@
 // settings 窗口 webview
 //
 //
+
+namespace
+{
+std::unique_ptr<ReplyStudio::Host> g_legacy_reply_studio;
+}
+void DrainReplyStudioSettings(bool stop)
+{
+    if (g_legacy_reply_studio)
+    {
+        if (stop)
+            g_legacy_reply_studio->Stop();
+        g_legacy_reply_studio->Drain(!stop);
+    }
+}
 
 HRESULT EnsureCompositionVisualTreeSettingsWnd(HWND hwnd)
 {
@@ -1486,6 +1501,18 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         if (url.rfind("https://", 0) == 0)
                             ShellExecuteW(hwnd, L"open", string_to_wstring(url).c_str(), nullptr, nullptr,
                                           SW_SHOWNORMAL);
+                    }
+                    else if (type == "assistantRequest")
+                    {
+                        if (!g_legacy_reply_studio)
+                            g_legacy_reply_studio =
+                                std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, WM_APP + 60, 0, 0); });
+                        g_legacy_reply_studio->Submit(nlohmann::json::parse(json::serialize(val.at("data"))),
+                                                      [](const nlohmann::json &response) {
+                                                          if (::webviewSettingsWnd)
+                                                              ::webviewSettingsWnd->PostWebMessageAsJson(
+                                                                  string_to_wstring(response.dump()).c_str());
+                                                      });
                     }
                     else if (type == "vocabularyRequest")
                     {

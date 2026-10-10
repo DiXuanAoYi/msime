@@ -768,10 +768,7 @@ bool LoadImeConfig()
         voice.polish_prompt_id = tbl["voice_input"]["polish_prompt_id"].value_or(std::string("cleanup"));
         if (voice.polish_prompt_id == "custom")
             voice.polish_prompt_id = "custom_1";
-        if (voice.polish_prompt_id != "cleanup" && voice.polish_prompt_id != "faithful" &&
-            voice.polish_prompt_id != "zh2en" && voice.polish_prompt_id != "casual" &&
-            voice.polish_prompt_id != "custom_1" && voice.polish_prompt_id != "custom_2" &&
-            voice.polish_prompt_id != "custom_3")
+        if (!VoiceInput::IsPolishPromptId(voice.polish_prompt_id))
         {
             voice.polish_prompt_id = "cleanup";
         }

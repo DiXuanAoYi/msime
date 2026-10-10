@@ -227,3 +227,4 @@ void UpdateFtbCharacterSetState(ComPtr<ICoreWebView2> webview);
 void UpdateFtbInputModeState(ComPtr<ICoreWebView2> webview, int japaneseMode);
 // Reapply configured optional buttons to the live toolbar and resize its host.
 void ApplyConfiguredFloatingToolbarItems();
+void DrainReplyStudioSettings(bool stop = false);

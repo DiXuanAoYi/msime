@@ -21,8 +21,7 @@ bool SetConfiguredVoiceInputString(const std::string &key, const std::string &va
         return false;
     if (key == "commit_mode" && value != "tsf" && value != "sendinput" && value != "ctrl_v")
         return false;
-    if (key == "polish_prompt_id" && value != "cleanup" && value != "faithful" && value != "zh2en" &&
-        value != "casual" && value != "custom_1" && value != "custom_2" && value != "custom_3")
+    if (key == "polish_prompt_id" && !VoiceInput::IsPolishPromptId(value))
         return false;
 
     // Fields are addressed by pointer-to-member rather than by a bare reference because the store has to happen under

@@ -48,6 +48,7 @@ std::string DefaultPolishModel(std::string_view provider);
 std::string ResolveAsrModel(const VoiceInputConfig &config);
 std::string ResolvePolishModel(const VoiceInputConfig &config);
 const std::vector<PolishPromptPreset> &BuiltinPolishPromptPresets();
+bool IsPolishPromptId(std::string_view id);
 std::string ResolvePolishSystemPrompt(const VoiceInputConfig &config);
 std::string WrapAsrUserMessage(const std::string &asr_text);
 } // namespace VoiceInput

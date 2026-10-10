@@ -1,0 +1,189 @@
+<div class="content" id="reply-studio-settings">
+  <div class="content-header"><span>嘴替 · 回复工作台</span></div>
+  <section class="section studio" id="replyStudio">
+    <div class="studio-heading">
+      <div>
+        <h2>这句话，换个说法</h2>
+        <p>口述、粘贴或输入，准备几种合适的表达。你挑选，你发送。</p>
+      </div>
+      <button id="rsVoiceSettings" type="button">语音与模型配置 ↗</button>
+    </div>
+    <p class="studio-note">
+      语音填写：先配置语音识别，把光标放入原文框，按住 RAlt
+      说话或使用已设置的录音快捷键。语音润色也支持下方同名风格。
+    </p>
+    <div class="studio-toolbar">
+      <label
+        >当前会话<select id="rsSessions">
+          <option value="">未保存的临时会话</option>
+        </select></label
+      ><button id="rsNew" type="button">新会话</button
+      ><button id="rsReload" type="button">读取会话列表</button>
+    </div>
+    <details>
+      <summary>联系人 / 群聊管理 · 保存与导出</summary>
+      <div class="studio-grid">
+        <label
+          >会话类型<select id="rsKind">
+            <option value="person">联系人 · 一人一份记忆</option>
+            <option value="group">群聊 · 一群一份记忆</option>
+          </select></label
+        ><label
+          >聊天软件 / 来源<input
+            id="rsPlatform"
+            maxlength="40"
+            placeholder="微信、QQ、企业微信、钉钉、飞书或其他"
+        /></label>
+      </div>
+      <div class="studio-grid">
+        <label
+          >会话名称<input
+            id="rsTitle"
+            maxlength="50"
+            placeholder="例如：同事小林 / 外卖评价" /></label
+        ><label
+          >保存期限<select id="rsRetention">
+            <option value="30">30 天</option>
+            <option value="90" selected>90 天</option>
+            <option value="365">365 天</option>
+          </select></label
+        >
+      </div>
+      <div class="studio-toolbar">
+        <button id="rsSave" type="button">保存上下文</button
+        ><button id="rsExport" type="button">导出文本</button
+        ><button id="rsDelete" type="button">删除此会话</button>
+      </div>
+      <div id="rsDeleteConfirm" class="studio-confirm" hidden>
+        只删除本会话的本地记忆，不影响聊天软件。<button
+          id="rsDeleteYes"
+          type="button"
+        >
+          确认删除</button
+        ><button id="rsDeleteNo" type="button">保留</button>
+      </div>
+      <p class="studio-note">
+        仅主动保存的上下文和摘要落盘，使用当前 Windows
+        账户加密。到期自动清理；最多 50 个会话。导出文件是明文，请自行保管。
+      </p>
+    </details>
+    <details>
+      <summary>发言记录与上下文 <span id="rsContextSize"></span></summary>
+      <p class="studio-note">
+        粘贴完整记录会原样保留，也可按发言人逐条追加；群聊请填写实际发言人。同名联系人可用软件、账号或备注区分。每个会话原文最多
+        48 KB。
+      </p>
+      <div class="studio-grid">
+        <label
+          >发言人<input
+            id="rsSpeaker"
+            maxlength="40"
+            placeholder="我 / 联系人姓名 / 群成员昵称" /></label
+        ><label
+          >发言时间（可选）<input id="rsMessageTime" type="datetime-local"
+        /></label>
+      </div>
+      <label
+        >追加一条发言<textarea
+          id="rsMessageText"
+          rows="3"
+          maxlength="4000"
+          placeholder="粘贴此人的原话，不会自动改写"
+        ></textarea>
+      </label>
+      <button id="rsAppend" type="button">追加到本会话记录</button>
+      <label
+        >对话背景 / 历史原文<textarea
+          id="rsContext"
+          rows="6"
+          maxlength="16000"
+          placeholder="可粘贴历史对话，建议用“我：”“对方：”区分。不同对象请使用不同会话。"
+        ></textarea>
+      </label>
+      <div class="studio-toolbar">
+        <label class="studio-file"
+          >导入 TXT<input
+            id="rsImport"
+            type="file"
+            accept=".txt,.md,text/plain" /></label
+        ><button id="rsSummarize" type="button">总结上下文</button>
+      </div>
+      <label
+        >摘要（可修改，生成后不会覆盖原文）<textarea
+          id="rsSummary"
+          rows="4"
+          maxlength="4000"
+          placeholder="事实、诉求、约定和待确认事项"
+        ></textarea>
+      </label>
+    </details>
+    <div class="studio-grid">
+      <label
+        >表达模式<select id="rsMode">
+          <option value="">正在读取模式…</option>
+        </select></label
+      ><label
+        >预备数量<select id="rsCount">
+          <option value="3">3 条 · 少而精</option>
+          <option value="5">5 条 · 多些选择</option>
+        </select></label
+      >
+    </div>
+    <p id="rsModeDescription" class="studio-note"></p>
+    <label
+      >对方刚发来的消息 / 待改写原文<textarea
+        id="rsIncoming"
+        rows="5"
+        maxlength="4000"
+        placeholder="例如：这周末有空吗？想不想一起吃饭？"
+      ></textarea>
+    </label>
+    <label
+      >我的想法与要求<input
+        id="rsIntent"
+        maxlength="1300"
+        placeholder="例如：我想去，但想换成周日下午；轻松一点，不要太热情"
+    /></label>
+    <div class="studio-checks">
+      <label
+        ><input
+          id="rsUseContext"
+          type="checkbox"
+          checked
+        />使用本会话上下文与摘要</label
+      ><label
+        ><input
+          id="rsAuto"
+          type="checkbox"
+        />新消息粘贴/输入后自动预备回复</label
+      >
+    </div>
+    <p id="rsSendPreview" class="studio-note" aria-live="polite"></p>
+    <div class="studio-toolbar">
+      <button id="rsGenerate" class="studio-primary" type="button">
+        生成预备回复</button
+      ><button id="rsCancel" type="button">取消生成</button>
+    </div>
+    <p class="studio-note">
+      生成和总结会将上述文本发送给“语音输入 →
+      润色”中配置的模型服务；自动预备只响应此框中的内容变更，不扫描聊天软件。不会自动发送消息。
+    </p>
+    <div id="rsStatus" role="status" aria-live="polite"></div>
+    <div id="rsReplies" class="studio-replies"></div>
+    <label
+      >选中的回复草稿（可继续修改）<textarea
+        id="rsDraft"
+        rows="4"
+        maxlength="4000"
+        placeholder="点击一条备选的“选为草稿”，再调整成自己的说法"
+      ></textarea>
+    </label>
+    <div class="studio-toolbar">
+      <button id="rsCopyDraft" type="button">复制草稿</button
+      ><button id="rsRemember" type="button">把本轮草稿加入上下文并保存</button>
+    </div>
+    <p class="studio-note">
+      草稿会标记为“尚未发送”，不会被当成已作出的承诺。关闭窗口不会保存未主动保存的内容。
+    </p>
+  </section>
+</div>
