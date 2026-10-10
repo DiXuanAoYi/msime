@@ -173,7 +173,11 @@ export function setupReplyStudio(): void {
   }
   function confirmDiscard(): boolean {
     return (
-      !dirty || window.confirm("当前修改还没有保存，确定切换并丢弃这些修改吗？")
+      (!dirty &&
+        !value("rsIncoming").trim() &&
+        !value("rsDraft").trim() &&
+        !value("rsMessageText").trim()) ||
+      window.confirm("当前修改还没有保存，确定切换并丢弃这些修改吗？")
     );
   }
   function copy(text: string) {

@@ -261,3 +261,23 @@ it("does not attach an old draft to a newly received message", () => {
   expect(get("rsStatus").textContent).toContain("上一条消息");
   expect(get("rsDraft").value).toBe("old answer");
 });
+
+it("still confirms unsaved reply loss after successfully saving only context", () => {
+  input("rsIncoming", "unsaved message");
+  input("rsDraft", "unsaved reply");
+  get("rsSave").emit("click");
+  reply({
+    session: {
+      sessionId: last().sessionId,
+      title: "A",
+      context: "",
+      summary: "",
+      retentionDays: 90,
+    },
+  });
+  const confirm = vi.fn(() => false);
+  window.confirm = confirm;
+  get("rsNew").emit("click");
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(get("rsDraft").value).toBe("unsaved reply");
+});
