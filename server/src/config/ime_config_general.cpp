@@ -92,6 +92,41 @@ bool SetConfiguredCandidateTranslationsEnabled(bool enabled)
     return true;
 }
 
+bool GetConfiguredCandidateTranslationCloudEnabled()
+{
+    return g_candidate_translation_cloud_enabled.load();
+}
+
+bool SetConfiguredCandidateTranslationCloudEnabled(bool enabled)
+{
+    if (!WriteConfiguredValue("general", "candidate_translation_cloud", enabled ? "true" : "false"))
+        return false;
+    g_candidate_translation_cloud_enabled.store(enabled);
+    return true;
+}
+
+std::shared_ptr<const EnglishIme::PersonalGlossary> GetConfiguredPersonalTranslationGlossary()
+{
+    return std::atomic_load(&g_personal_translation_glossary);
+}
+
+uint64_t GetConfiguredPersonalTranslationGlossaryRevision()
+{
+    return g_personal_translation_glossary_revision.load();
+}
+
+bool SetConfiguredPersonalTranslationGlossary(const std::string &text)
+{
+    auto parsed = std::make_shared<EnglishIme::PersonalGlossary>();
+    if (!parsed->Parse(text) ||
+        !WriteConfiguredValue("general", "personal_translation_glossary", EscapeTomlBasicString(text)))
+        return false;
+    std::shared_ptr<const EnglishIme::PersonalGlossary> snapshot = std::move(parsed);
+    std::atomic_store(&g_personal_translation_glossary, std::move(snapshot));
+    g_personal_translation_glossary_revision.fetch_add(1);
+    return true;
+}
+
 int GetConfiguredEnglishMixedInputMinChars()
 {
     return g_english_mixed_input_min_chars;

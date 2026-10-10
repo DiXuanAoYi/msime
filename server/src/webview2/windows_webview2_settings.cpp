@@ -634,6 +634,16 @@ static void ApplyGeneralSubkey(const std::string &path, const json::object &data
             PostSettingsConfig();
         }
     }
+    if (path == "general.candidate_translation_cloud" || path == "general.personal_translation_glossary")
+    {
+        const bool updated =
+            path == "general.candidate_translation_cloud"
+                ? SetConfiguredCandidateTranslationCloudEnabled(json::value_to<bool>(data.at("value")))
+                : SetConfiguredPersonalTranslationGlossary(json::value_to<std::string>(data.at("value")));
+        if (updated)
+            FanyNamedPipe::EnqueueRefreshCandidatePageTask();
+        PostSettingsConfig();
+    }
     if (path == "general.candidate_translations")
     {
         const bool value = json::value_to<bool>(data.at("value"));
@@ -1651,6 +1661,8 @@ void PostSettingsConfig()
             {"floating_toolbar_auto_hide_delay", GetConfiguredFloatingToolbarAutoHideDelay()},
             {"cn_en_mixed_input", GetConfiguredEnglishCandidatesEnabled()},
             {"candidate_translations", GetConfiguredCandidateTranslationsEnabled()},
+            {"candidate_translation_cloud", GetConfiguredCandidateTranslationCloudEnabled()},
+            {"personal_translation_glossary", GetConfiguredPersonalTranslationGlossary()->Source()},
             {"cn_en_mixed_input_min_chars", GetConfiguredEnglishMixedInputMinChars()},
             {"emoji_mixed_input", GetConfiguredEmojiMixedInputEnabled()},
             {"kaomoji_mixed_input", GetConfiguredKaomojiMixedInputEnabled()},

@@ -3,6 +3,8 @@
 #include "engine/core/word_item.h"
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include "personal_glossary.h"
 #include <string>
 #include <vector>
 
@@ -39,9 +41,10 @@ bool IsRunning();
 void OnInputChanged(const std::string &input, bool dedicated_mode = false, size_t mixed_min_prefix = 2);
 void Clear();
 bool IsCurrent(const std::string &input, uint64_t generation, bool dedicated_mode = false);
-// Non-English target languages have no local dictionary and must go directly
-// to cloud translation.
-void RequestTranslations(std::vector<TranslationQuery> queries, bool use_local_dictionary = true);
+// A request owns an immutable glossary and language snapshot, so changing
+// settings cannot relabel a result produced by an older lookup.
+void RequestTranslations(std::vector<TranslationQuery> queries, const std::string &target_language = "en",
+                         std::shared_ptr<const PersonalGlossary> personal_glossary = {});
 void ClearTranslations();
 bool IsTranslationCurrent(uint64_t generation);
 } // namespace EnglishIme

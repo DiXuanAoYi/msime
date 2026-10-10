@@ -28,7 +28,9 @@ vi.mock('./input', () => ({
   applyFrequencyConfig: vi.fn(),
   applyInputConfig: vi.fn(),
   applyNiuTransConfig: vi.fn(),
-  applyTencentTmtConfig: vi.fn()
+  applyTencentTmtConfig: vi.fn(),
+  applyPersonalGlossaryConfig: vi.fn(),
+  applyTranslationCloudEnabled: vi.fn()
 }));
 vi.mock('./tools-settings', () => ({ applyZhEnMixedInputConfig: vi.fn() }));
 vi.mock('./voice', () => ({ applyVoiceConfig: vi.fn() }));

@@ -1,3 +1,5 @@
+import { applyPersonalGlossaryConfig, setupPersonalGlossaryEditor } from './personal-glossary-editor';
+export { applyPersonalGlossaryConfig };
 import { serializeHostMessage } from '../../../../shared/messages';
 import { applyDropdownValue, applyToggleState, setFuzzyRuleOptionsDisabled, setSmartPunctuationOptionsDisabled, setupDropdownMenu, setupToggleButton } from './shared';
 import { updateConfig } from './config-sync';
@@ -161,6 +163,14 @@ export function applyFrequencyConfig(config: any): void {
   applyDropdownValue('frequencyLinearStepBtn', 'frequencyLinearStepMenu', String(config?.linear_step ?? 1));
 }
 
+export function applyTranslationCloudEnabled(enabled: boolean): void {
+  applyToggleState('candidateTranslationCloudToggleBtn', enabled);
+  for (const id of ['translationOnlineProvider', 'translationOnlineCredentials']) {
+    const element = document.getElementById(id);
+    if (element) element.hidden = !enabled;
+  }
+}
+
 function syncCandidateTranslationOptions(enabled: boolean): void {
   document.getElementById('candidateTranslationApiOptions')?.classList.toggle('is-disabled', !enabled);
 }
@@ -272,6 +282,11 @@ function setupSecretVisibility(inputId: string, buttonId: string, name: string):
 }
 
 export function setupInput(): void {
+  setupPersonalGlossaryEditor(text => updateConfig('general.personal_translation_glossary', text));
+  setupToggleButton('candidateTranslationCloudToggleBtn', (active) => {
+    applyTranslationCloudEnabled(active);
+    updateConfig('general.candidate_translation_cloud', active);
+  });
   document.querySelectorAll<HTMLInputElement>('input[name="input-mode"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       if (applyingInputConfig) return;

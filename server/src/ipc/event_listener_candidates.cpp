@@ -379,12 +379,17 @@ void PrepareCandidateTranslationRequest()
         }
         return;
     }
-    const std::string scope = fmt::format("{}|{}|{}", GetConfiguredTencentTmt().enabled,
-                                          GetConfiguredCustomTranslation().enabled, GetConfiguredNiuTrans().enabled);
+    const std::string scope = fmt::format(
+        "{}|{}|{}|{}|{}|{}", GetConfiguredTencentTmt().enabled, GetConfiguredCustomTranslation().enabled,
+        GetConfiguredNiuTrans().enabled, GetConfiguredTencentTmt().target_language,
+        GetConfiguredCandidateTranslationCloudEnabled(), GetConfiguredPersonalTranslationGlossaryRevision());
     if (scope != g_candidate_translation_scope)
     {
         g_candidate_translation_scope = scope;
         g_candidate_translation_glosses.clear();
+        g_candidate_translation_signature.clear();
+        EnglishIme::ClearTranslations();
+        CloudTranslation::Clear();
     }
 
     std::vector<EnglishIme::TranslationQuery> queries;
@@ -408,7 +413,8 @@ void PrepareCandidateTranslationRequest()
         return;
     g_candidate_translation_signature = std::move(signature);
     CloudTranslation::Clear();
-    EnglishIme::RequestTranslations(std::move(queries), GetConfiguredTencentTmt().target_language == "en");
+    EnglishIme::RequestTranslations(std::move(queries), GetConfiguredTencentTmt().target_language,
+                                    GetConfiguredPersonalTranslationGlossary());
 }
 
 // Copy the page the worker just finished into an immutable snapshot for the UI thread. This is the single publish

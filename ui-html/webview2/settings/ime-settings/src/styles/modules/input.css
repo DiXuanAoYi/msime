@@ -404,3 +404,24 @@
 .toggle-section-disabled-hint.is-hidden {
   display: none;
 }
+
+
+.personal-glossary-editor textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 130px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border-color, #888);
+  border-radius: 8px;
+  background: var(--control-bg);
+  color: inherit;
+  font: 13px/1.7 Consolas, "Microsoft YaHei", monospace;
+  tab-size: 12;
+  resize: vertical;
+}
+.personal-glossary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+#personalGlossaryStatus { overflow-wrap: anywhere; min-height: 1.5em; }
+
+#translationOnlineProvider[hidden], #translationOnlineCredentials[hidden] { display: none; }

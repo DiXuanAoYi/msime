@@ -491,6 +491,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"floating_toolbar_auto_hide_delay", GetConfiguredFloatingToolbarAutoHideDelay()},
             {"cn_en_mixed_input", GetConfiguredEnglishCandidatesEnabled()},
             {"candidate_translations", GetConfiguredCandidateTranslationsEnabled()},
+            {"candidate_translation_cloud", GetConfiguredCandidateTranslationCloudEnabled()},
+            {"personal_translation_glossary", GetConfiguredPersonalTranslationGlossary()->Source()},
             {"cn_en_mixed_input_min_chars", GetConfiguredEnglishMixedInputMinChars()},
             {"emoji_mixed_input", GetConfiguredEmojiMixedInputEnabled()},
             {"kaomoji_mixed_input", GetConfiguredKaomojiMixedInputEnabled()},
@@ -894,6 +896,10 @@ bool ApplyConfigUpdate(const json::object &data)
                                                        json::value_to<bool>(data.at("value")));
     if (path == "general.cn_en_mixed_input")
         return SetConfiguredEnglishCandidatesEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.candidate_translation_cloud")
+        return SetConfiguredCandidateTranslationCloudEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.personal_translation_glossary")
+        return SetConfiguredPersonalTranslationGlossary(json::value_to<std::string>(data.at("value")));
     if (path == "general.candidate_translations")
         return SetConfiguredCandidateTranslationsEnabled(json::value_to<bool>(data.at("value")));
     if (path == "general.cn_en_mixed_input_min_chars")

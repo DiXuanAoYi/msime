@@ -1,0 +1,85 @@
+水杉 Windows × 青简：首版源码集成说明
+
+交付状态
+本次交付是可审查的源码修改、补丁、词表示例和设置页截图，不是已完成安装验证的输入法安装包。
+已接通原有 Server 查询链、两个设置宿主、配置读写和安装模板。完整 Server 尚未编译通过：本机 CMake 在查找 Boost 时停止，后续 vcpkg 依赖和完整产品测试尚未验证。没有替换或注册本机输入法。
+
+一、固定的源码基线
+水杉：v0.9.5 / 5d6eaa5bd1a6003e4bf25c4bef8c581443616da3
+https://github.com/metasequoiaime/msime-windows/releases/tag/v0.9.5
+青简：main 的源码快照 / 4a3e963dfe299126574bfe3c370ff70a3f85ee77
+https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3f85ee77
+按用户要求以已发布的水杉版本为底座，本地分支 feature/qingjian-learning。没有推送上游或发布 Release。
+
+二、阅读源码后的取舍
+1. 个人译词优先与按语言隔离：已移植设计。
+   青简依据：crates/qingjian-translate/src/layered_translator.rs、personal_glossary.rs、glossary/mod.rs。
+   水杉已有 english.db 和 custom_translations.txt 覆盖层，但后者是中英用途，非英语目标原来跳过本地查询。
+   新实现增加七种目标语种的个人表，并接入现有异步翻译线程；个人表优先，未命中时英语继续查原词库，最后才考虑在线服务。
+
+2. 输入优先、释义不阻塞：保留并补强水杉既有机制。
+   青简依据：crates/qingjian-core/src/engine/commit/mod.rs 的 annotate 与 query 分离，engine/translator.rs。
+   水杉依据：server/src/english/english_ime.cpp、ipc/event_listener_candidates.cpp、ipc/event_listener_async_candidates.cpp。
+   新词表在设置加载/保存时解析成不可变快照。输入线程只交出快照引用，工作线程查询，不在逐键路径读文件或重建词表。
+   语言、词表版本和联网开关纳入刷新范围；修改词表可触发重新查询，旧代次结果不再更新当前候选。
+
+3. 云功能明确可选：已加入独立的译文在线补全开关。
+   青简依据：README.md 数据说明、crates/qingjian-core/src/engine/privacy.rs、engine/gloss/mod.rs。
+   默认关闭在线译文补全，本地查词仍可用。入队、发出请求、接收结果以及缓存读取均检查此开关。
+   关闭后不能撤回已经发出的网络包；已存入原英语词库的历史译文仍属于本地数据。
+   这是“译文补全”开关，不是整个输入法的断网模式，不控制原有云候选、AI 联想或语音服务。
+
+4. 两条简短释义、可直接输入译词：适配导入，复用水杉原功能。
+   青简依据：crates/qingjian-core/src/candidate/translation.rs、part_of_speech.rs、engine/commit/mod.rs。
+   青简个人 TSV 可导入；取前两条释义，移除词性和竖线后的读音。水杉已有 Ctrl+Enter 译词选择，上屏仍沿用它。
+   不导入青简 .qj 二进制库、词汇等级表、输入日志、学习统计或云释义缓存；没有搬入其品牌素材或附带大型词库。
+
+5. 生词熟悉度、按上屏时的候选页计数：已阅读，尚未移植。
+   青简依据：crates/qingjian-core/src/engine/vocabulary/mod.rs、crates/qingjian-learning/src/vocabulary_book.rs。
+   它按选词时真正展示的一页计数，并将见过/选过/直接用过分别统计；并不是每次刷新候选都累加。
+   接入水杉需要独立词汇数据表、真实上屏确认与撤销边界、清理/保留期限和统计页。当前原型没有这些能力，不能把已有字符统计称为生词学习闭环。
+
+6. 整句模型、拼写纠错、跨平台 Rust 核心：本次没有替换。
+   水杉 v0.9.5 本来就有本地神经重排、octagram、全拼纠错和双拼辅码。未做统一语料和逐键延迟基准前，不能认定青简模型更优。
+   保留水杉 DLL/Server 隔离与现有引擎接口，避免把两套输入状态机混在一起。
+
+三、已实现的使用流程
+进入设置 → 输入 → 候选词翻译。
+个人译词表支持英语 en、日语 ja、西班牙语 es、法语 fr、德语 de、俄语 ru、韩语 ko。
+每行以 Tab 分隔：语言代码、中文词、译词，可附第二条译词。例如随包 personal-translations.example.tsv。
+可以直接编辑，或导入 TSV / 青简个人 TSV，再点击“保存词表”。导入只进入草稿，不自动覆盖已保存配置；同语言同词最后一行生效。
+导入青简单语 TSV 前先选择目标语种；其词性和读音不保留。混合语言水杉 TSV 本身带语言列。
+导出导出的是当前编辑草稿；清空文本并保存可删除个人表。
+总表上限 64 KiB，每个字段上限 1024 UTF-8 字节。格式错误会报告行号并阻止保存；服务器再独立校验一次。
+个人表存入 general.personal_translation_glossary，沿用现有 config.toml 原子替换与升级模板合并。适用于个人小词表，不承诺大词库性能。
+在线补全由 general.candidate_translation_cloud 控制，默认 false。旧配置没有此项时也按 false；希望继续使用在线翻译的用户需要在设置中明确开启。
+英语之外的语言没有自带完整离线译库：只会显示个人表中已有的译词；开启在线补全且服务配置有效时才尝试补全未命中词。
+
+四、实际验证
+1. 修改前基线：便携 C++ 测试通过，设置页原有 104 项测试通过。
+2. 修改后：便携 C++ 测试 45 项通过；专门的真实 SQLite + 英语工作线程集成测试 6 项通过（其中 4 项解析测试与便携套件重叠，不应相加为 51 个独立用例）。
+   覆盖 BOM/CRLF、UTF-8、多语言隔离、双释义、重复项、坏行、过大文件、原子替换语义、优先覆盖、清空回退、英文反向释义以及失效代次。
+3. 启动竞态对照：从 v0.9.5 提取原 english_ime.cpp/.h，使用同一原生探针在 Start 后立即查询。原版返回 LOST（exit 1），修改版返回 received（exit 0）。
+   修复：在发布 running 状态之前捕获初始请求代次，传给后台线程，避免第一条请求在工作线程启动时被误判为已经处理。
+4. 前端：17 个测试文件、110 项测试通过；TypeScript 编译和 Vite 生产构建通过。
+   验证解析、青简导入、未保存草稿不被快照覆盖、只有收到相同内容确认才提示成功、保存超时保留草稿。
+5. WebView 契约同步检查、GUI 边界检查、clang-format 18.1.8 与 git diff --check 通过。
+6. 在实际浏览器渲染设置页，检查错误行提示、在线开关显示/隐藏、输入框和按钮布局。截图为浏览器预览，不能证明原生设置宿主已成功落盘。
+7. pnpm build 的前置命令硬编码 python3，本机只有 python，因此直接运行了等价的 python sync-contracts.py --check、pnpm exec tsc、pnpm exec vite build；没有改上游工具链配置来掩盖这个环境差异。
+
+未验证：完整 Server/Settings 链接、Windows TSF 实际上屏、x86/x64 宿主兼容、在线提供商真实请求、原生安装升级与签名发布。不能把以上单元/集成测试等同于完整输入法验收。
+
+五、文件与复用
+msime-qingjian-source.zip：完整水杉源码快照加本次修改（不含 .git、依赖缓存、词库 Release、生成的 dist；vendor 的原始 submodule 仍需按 .gitmodules 获取）。
+msime-qingjian.patch：从 v0.9.5 生成的完整修改补丁，含新增文件。
+推荐复现方式：
+  git clone --branch v0.9.5 https://github.com/metasequoiaime/msime-windows.git
+  cd msime-windows
+  git apply --check <补丁绝对路径>
+  git apply <补丁绝对路径>
+  git submodule update --init --recursive
+随后按仓库 CONTRIBUTING.md 准备 Boost、vcpkg、真实词库并构建。新增原生集成测试已登记到 server/tests/CMakeLists.txt。
+本地工作树在当前工作区 work/msime-windows；青简只读参考在 work/qingjian。
+
+许可与来源
+两仓均包含 GPL v3 许可证文本；青简 README 声明 GPL-3.0-or-later。本次保留水杉 LICENSE 与已有第三方许可，以青简行为设计及 TSV 格式为参考重新实现 C++/TypeScript 适配，没有复制其 Rust 引擎或打包其数据集。用户自行导入的数据仍应保留相应来源与许可。

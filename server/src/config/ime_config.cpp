@@ -120,6 +120,10 @@ bool g_floating_toolbar_auto_hide = false;
 int g_floating_toolbar_auto_hide_delay = kFloatingToolbarAutoHideDelayDefault;
 bool g_english_candidates_enabled = false;
 bool g_candidate_translations_enabled = true;
+std::atomic<bool> g_candidate_translation_cloud_enabled{false};
+std::shared_ptr<const EnglishIme::PersonalGlossary> g_personal_translation_glossary =
+    std::make_shared<const EnglishIme::PersonalGlossary>();
+std::atomic<uint64_t> g_personal_translation_glossary_revision{0};
 int g_english_mixed_input_min_chars = kEnglishMixedInputMinCharsDefault;
 bool g_cloud_candidates_enabled = true;
 // 整句候选来源与去重补位开关：词格、Google 和神经速度档默认开，神经效果档与去重补位默认关。
@@ -516,6 +520,14 @@ bool LoadImeConfig()
         }
         g_english_candidates_enabled = tbl["general"]["cn_en_mixed_input"].value_or(false);
         g_candidate_translations_enabled = tbl["general"]["candidate_translations"].value_or(true);
+        g_candidate_translation_cloud_enabled.store(tbl["general"]["candidate_translation_cloud"].value_or(false));
+        auto personal_glossary = std::make_shared<EnglishIme::PersonalGlossary>();
+        if (personal_glossary->Parse(tbl["general"]["personal_translation_glossary"].value_or(std::string{})))
+        {
+            std::shared_ptr<const EnglishIme::PersonalGlossary> snapshot = std::move(personal_glossary);
+            std::atomic_store(&g_personal_translation_glossary, std::move(snapshot));
+            g_personal_translation_glossary_revision.fetch_add(1);
+        }
         {
             const int min_chars =
                 tbl["general"]["cn_en_mixed_input_min_chars"].value_or(kEnglishMixedInputMinCharsDefault);

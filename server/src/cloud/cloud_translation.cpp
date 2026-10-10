@@ -206,7 +206,12 @@ void TranslateGroup(Provider provider, const TencentTmt::Credentials &credential
     texts.reserve(group.size());
     for (const auto &query : group)
         texts.push_back(query.key);
+    if (!GetConfiguredCandidateTranslationCloudEnabled())
+        return;
     const auto translated = TranslateWithProvider(provider, credentials, custom, niutrans, texts, source, target);
+    // Turning the switch off also prevents an in-flight result from being saved.
+    if (!GetConfiguredCandidateTranslationCloudEnabled())
+        return;
     ApplyTranslatedGroup(group, translated, target_language, provider_scope, out);
 }
 
@@ -238,7 +243,8 @@ void WorkerLoop()
             break;
         }
         lock.unlock();
-        if (!g_running || queries.empty() || !EnglishIme::IsTranslationCurrent(generation))
+        if (!g_running || queries.empty() || !GetConfiguredCandidateTranslationCloudEnabled() ||
+            !EnglishIme::IsTranslationCurrent(generation))
             continue;
 
         const Provider provider = ActiveProvider();
@@ -323,6 +329,8 @@ void Stop()
 
 void RequestMisses(std::vector<EnglishIme::TranslationQuery> queries, uint64_t generation)
 {
+    if (!GetConfiguredCandidateTranslationCloudEnabled())
+        queries.clear();
     {
         std::lock_guard lock(g_mutex);
         g_latest_queries = std::move(queries);
@@ -340,6 +348,8 @@ void Clear()
 
 std::string LookupCache(const std::string &key, EnglishIme::TranslationDirection direction)
 {
+    if (!GetConfiguredCandidateTranslationCloudEnabled())
+        return {};
     std::lock_guard lock(g_mutex);
     const auto found = g_cache.find(Identity({key, direction}, TargetLanguage(), ProviderScope()));
     return found == g_cache.end() ? std::string{} : found->second;

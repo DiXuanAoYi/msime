@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include "english/personal_glossary.h"
+
 #include "engine/core/fuzzy_pinyin_options.h"
 #include "engine/core/scheme_type.h"
 #include "engine/shuangpin/shuangpin_profile.h"
@@ -388,6 +392,11 @@ bool GetConfiguredEnglishCandidatesEnabled();
 bool SetConfiguredEnglishCandidatesEnabled(bool enabled);
 bool GetConfiguredCandidateTranslationsEnabled();
 bool SetConfiguredCandidateTranslationsEnabled(bool enabled);
+bool GetConfiguredCandidateTranslationCloudEnabled();
+bool SetConfiguredCandidateTranslationCloudEnabled(bool enabled);
+std::shared_ptr<const EnglishIme::PersonalGlossary> GetConfiguredPersonalTranslationGlossary();
+uint64_t GetConfiguredPersonalTranslationGlossaryRevision();
+bool SetConfiguredPersonalTranslationGlossary(const std::string &text);
 int GetConfiguredEnglishMixedInputMinChars();
 bool SetConfiguredEnglishMixedInputMinChars(int min_chars);
 bool GetConfiguredEmojiMixedInputEnabled();

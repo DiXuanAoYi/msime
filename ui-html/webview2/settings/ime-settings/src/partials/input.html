@@ -255,7 +255,7 @@
     <div class="section-header">
       <div>
         <div class="section-title">候选词翻译</div>
-        <div class="input-setting-description">在候选窗口中显示中文与所选语种的互译，每项最多两个简短释义</div>
+        <div class="input-setting-description">中文候选显示所选语言的译词；英文候选显示中文释义</div>
       </div>
       <div class="ftb-toggle-btn active" id="candidateTranslationsToggleBtn" role="switch" aria-checked="true" tabindex="0">
         <div class="ftb-toggle-knob"></div>
@@ -263,7 +263,29 @@
     </div>
     <div class="translation-api-options" id="candidateTranslationApiOptions">
       <div class="input-option-divider"></div>
-      <div class="section-header translation-language-row">
+      <div class="section-header">
+        <div>
+          <div class="section-title">允许在线补全译文</div>
+          <div class="input-setting-description">默认关闭，仅查本地词表。开启后，缺少释义的候选词会发给所选翻译服务；此开关不控制云候选或 AI 联想。</div>
+        </div>
+        <div class="ftb-toggle-btn" id="candidateTranslationCloudToggleBtn" role="switch" aria-label="允许在线补全译文" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div>
+      </div>
+      <div class="input-option-divider"></div>
+      <div class="personal-glossary-editor">
+        <label class="section-title" for="personalGlossaryText">个人译词表</label>
+        <div class="input-setting-description" id="personalGlossaryHelp">每行：语言代码、中文词、译词，可加第二释义，用 Tab 分隔。支持 en / ja / es / fr / de / ru / ko。相同语言和中文词以最后一行为准；清空并保存可删除全部个人译词。</div>
+        <textarea id="personalGlossaryText" rows="6" spellcheck="false" aria-describedby="personalGlossaryHelp" placeholder="en&#9;开发&#9;development&#10;ja&#9;开发&#9;開発&#10;es&#9;开发&#9;desarrollo"></textarea>
+        <div class="personal-glossary-actions">
+          <button id="personalGlossarySave" class="credential-test-button" type="button">保存词表</button>
+          <button id="personalGlossaryImport" class="credential-test-button" type="button">导入 TSV / 青简词表</button>
+          <button id="personalGlossaryExport" class="credential-test-button" type="button">导出 TSV</button>
+          <input id="personalGlossaryFile" type="file" accept=".tsv,.txt" hidden>
+        </div>
+        <div class="input-setting-description">仅保存在本机。青简单语词表按下方目标语种导入，去除词性与读音，保留前两条译词。导入后需点击保存。</div>
+        <div id="personalGlossaryStatus" class="input-setting-description" role="status" aria-live="polite"></div>
+      </div>
+      <div class="input-option-divider"></div>
+      <div class="section-header translation-language-row" id="translationOnlineProvider" hidden>
         <div>
           <div class="section-title">在线翻译服务</div>
           <div class="input-setting-description">可使用腾讯云、小牛翻译，或填写自己部署的 DeepLX 兼容接口</div>
@@ -283,7 +305,7 @@
       <div class="section-header translation-language-row">
         <div>
           <div class="section-title">目标语种</div>
-          <div class="input-setting-description">英语优先使用本地词库；本地未命中时使用所选在线服务</div>
+          <div class="input-setting-description">优先查询个人译词表；英语还可查询内置词库。开启在线补全后，未命中的词才会发送给所选服务</div>
         </div>
         <div class="dropdown">
           <button class="dropdown-toggle translation-language-toggle" id="translationTargetLanguageBtn">
@@ -301,6 +323,7 @@
         </div>
       </div>
       <div class="input-option-divider"></div>
+      <div id="translationOnlineCredentials" hidden>
       <div id="tencentTranslationFields">
         <div class="translation-api-heading">
           <div class="section-title">腾讯云 API 凭据</div>
@@ -396,6 +419,7 @@
       <div class="credential-test-row">
         <button id="candidateTranslationTestButton" class="credential-test-button" type="button">测试配置</button>
         <span id="candidateTranslationTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
+      </div>
       </div>
     </div>
   </div>

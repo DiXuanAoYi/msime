@@ -55,6 +55,10 @@ cn_en_mixed_input = true
 cn_en_mixed_input_min_chars = 2
 # 在竖排候选窗口中显示中英文互译（每项最多两个简短释义）
 candidate_translations = true
+# 本地词表优先；在线补全需明确开启，关闭不影响其他云功能。
+candidate_translation_cloud = false
+# UTF-8 TSV: 语言<Tab>中文词<Tab>译词[<Tab>第二释义]，由设置页编辑。
+personal_translation_glossary = ""
 # 中文输入状态下显示 emoji 前缀候选（第三个候选项，随云候选/AI 联想顺移）
 emoji_mixed_input = false
 # 中文输入状态下显示颜文字前缀候选（排在 emoji 之后）
