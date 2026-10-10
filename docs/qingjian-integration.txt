@@ -79,7 +79,7 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
 前端等价构建命令：python ui-html/scripts/sync-contracts.py --check，然后在设置前端目录 pnpm exec tsc、pnpm exec vite build；本机无 python3 命令别名。
 无签名证书时在 Server 完成链接后执行：
   ./scripts/ci/embed-server-manifest.ps1 -BuildDir server/build-release/bin/Release -Unsigned
-随后 Prepare-PackageFiles.ps1 -TargetVersion 0.9.6 -IncludeSymbols、product_lock.py manifest 写入确切提交、Compile-Installer.ps1。
+随后 Prepare-PackageFiles.ps1 -TargetVersion 0.9.6 -IncludeSymbols、product_lock.py manifest --windows-repository DiXuanAoYi/msime 写入确切提交、Compile-Installer.ps1。
 不要对无签名程序启用 uiAccess=true，否则 Windows 可能拒绝启动；不要将本地自签名证书作为公开信任签名分发。
 安装包附 SHA256SUMS 与验证报告；源码从相同标签获取。克隆后执行 git submodule update --init --recursive，再按锁文件准备第三方产物。
 

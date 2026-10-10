@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -232,12 +233,20 @@ class ProductLockTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "manifest.json"
             commit = "1" * 40
-            subprocess.run(["python3", str(ROOT / "scripts/product_lock.py"), "manifest",
+            subprocess.run([sys.executable, str(ROOT / "scripts/product_lock.py"), "manifest",
                             "--windows-commit", commit, "--output", str(output)], check=True)
             manifest = json.loads(output.read_text())
             self.assertEqual(manifest["repositories"]["windows"]["commit"], commit)
             self.assertEqual(manifest["dictionary"], self.data["dictionary"])
             self.assertEqual(manifest["lock_sha256"], lock.sha256(ROOT / "product-lock.json"))
+            self.assertEqual(manifest["repositories"]["windows"]["repository"], "metasequoiaime/MSIME-Windows")
+            subprocess.run([sys.executable, str(ROOT / "scripts/product_lock.py"), "manifest",
+                            "--windows-commit", commit, "--windows-repository", "DiXuanAoYi/msime",
+                            "--output", str(output)], check=True)
+            fork = json.loads(output.read_text())
+            self.assertEqual(fork["repositories"]["windows"]["repository"], "DiXuanAoYi/msime")
+            self.assertEqual(fork["repositories"]["windows"]["commit"], commit)
+            self.assertEqual(fork["dictionary"], manifest["dictionary"])
 
 
 if __name__ == "__main__":
