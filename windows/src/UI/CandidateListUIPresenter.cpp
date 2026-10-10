@@ -63,6 +63,7 @@ HRESULT CMetasequoiaIME::_HandleCandidateFinalize(TfEditCookie ec, _In_ ITfConte
             }
 
             _HandleCompleteCommitFirst(ec, pContext);
+            ConfirmVocabularyCommit(requestId);
             return hr;
         }
 
@@ -117,6 +118,8 @@ HRESULT CMetasequoiaIME::_HandleCandidateFinalize(TfEditCookie ec, _In_ ITfConte
     }
 
     _HandleCompleteCommitFirst(ec, pContext);
+    if (SUCCEEDED(hr))
+        ConfirmVocabularyCommit(requestId);
 
     return hr;
 }

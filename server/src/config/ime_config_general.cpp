@@ -34,6 +34,30 @@ bool SetConfiguredTsfDiagnosticLogEnabled(bool enabled)
     return true;
 }
 
+bool GetConfiguredVocabularyEnabled()
+{
+    return g_vocabulary_enabled.load();
+}
+int GetConfiguredVocabularyRetentionDays()
+{
+    return g_vocabulary_retention_days.load();
+}
+bool SetConfiguredVocabularyEnabled(bool enabled)
+{
+    if (!WriteConfiguredValue("vocabulary", "enabled", enabled ? "true" : "false"))
+        return false;
+    g_vocabulary_enabled.store(enabled);
+    return true;
+}
+bool SetConfiguredVocabularyRetentionDays(int days)
+{
+    if (days != 30 && days != 90 && days != 365)
+        return false;
+    if (!WriteConfiguredValue("vocabulary", "retention_days", std::to_string(days)))
+        return false;
+    g_vocabulary_retention_days.store(days);
+    return true;
+}
 bool GetConfiguredStatisticsEnabled()
 {
     return g_statistics_enabled.load(std::memory_order_relaxed);

@@ -607,7 +607,32 @@
           "punct": 10,
           "other": 0
         },
-        "todayHourly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 5, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "todayHourly": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          5,
+          12,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
         "daily": [
           {
             "dayKey": 20260919,
@@ -720,7 +745,32 @@
           "punct": 0,
           "other": 0
         },
-        "todayHourly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "todayHourly": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
         "daily": []
       }
     },
@@ -786,5 +836,68 @@
     "direction": "client",
     "surface": "settings",
     "valid": false
+  },
+  {
+    "name": "vocabulary overview request",
+    "message": {
+      "type": "vocabularyRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "v1",
+        "action": "overview"
+      }
+    },
+    "direction": "client",
+    "surface": "settings",
+    "valid": true
+  },
+  {
+    "name": "vocabulary rejects unrecognized action",
+    "message": {
+      "type": "vocabularyRequest",
+      "data": {
+        "requestId": "v1",
+        "action": "deleteFile"
+      }
+    },
+    "direction": "client",
+    "surface": "settings",
+    "valid": false
+  },
+  {
+    "name": "vocabulary request restricted to settings",
+    "message": {
+      "type": "vocabularyRequest",
+      "data": {
+        "requestId": "v1",
+        "action": "clear"
+      }
+    },
+    "direction": "client",
+    "surface": "candidate",
+    "valid": false
+  },
+  {
+    "name": "vocabulary response",
+    "message": {
+      "type": "vocabularyResponse",
+      "protocolVersion": 1,
+      "requestId": "v1",
+      "action": "overview",
+      "ok": true,
+      "message": "ok",
+      "rows": [
+        {
+          "language": "en",
+          "word": "develop",
+          "seen": 3,
+          "selected": 2,
+          "used": 1,
+          "last": 1
+        }
+      ]
+    },
+    "direction": "server",
+    "valid": true
   }
 ]

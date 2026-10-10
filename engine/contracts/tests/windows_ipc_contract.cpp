@@ -1,3 +1,4 @@
+#include "../vocabulary_commit.h"
 #include "../date_time_input.h"
 #include "../direct_helpcode.h"
 #include "../ipc_negotiation.h"
@@ -142,7 +143,23 @@ int main()
     CHECK(FanyImeWorkerReplyType::DirectHelpcodeChanged == 30);
     CHECK(FanyImeWorkerReplyType::MidSentenceHelpcodeUppercaseChanged == 31);
     CHECK(FanyImeWorkerReplyType::VModeChanged == 32);
-    CHECK(FanyImeWorkerReplyType::MaxKnown == FanyImeWorkerReplyType::VModeChanged);
+    const auto token = (uint64_t{1} << 63) + 1;
+    const auto payload = FanyImeVocabulary::Encode(token, L"hello");
+    CHECK(payload.has_value());
+    CHECK(FanyImeVocabulary::Decode(*payload)->request == token);
+    CHECK(FanyImeVocabulary::Decode(*payload)->text == L"hello");
+    CHECK(FanyImeVocabulary::Encode(token, std::wstring(179, L'x')).has_value());
+    CHECK(!FanyImeVocabulary::Encode(token, std::wstring(180, L'x')));
+    CHECK(!FanyImeVocabulary::Decode(L"18446744073709551616\thello"));
+    CHECK(!FanyImeVocabulary::Decode(L"-9223372036854775809\thello"));
+    CHECK(!FanyImeVocabulary::Decode(L"9223372036854775809\t"));
+    CHECK(FanyImeWorkerReplyType::VocabularyCommitCandidate == 33);
+    CHECK(FanyImeWorkerReplyType::MaxKnown == FanyImeWorkerReplyType::VocabularyCommitCandidate);
+    CHECK(FanyImePipeEventType::VocabularyCommitConfirmed == 17);
+    const auto learning = FanyImeProtocol::Capabilities | FanyImeProtocol::VocabularyCommit;
+    const auto learningHello = FanyImeProtocol::Hello(1, 2, learning);
+    CHECK((FanyImeProtocol::Negotiate(learningHello, learning).capabilities & FanyImeProtocol::VocabularyCommit) != 0);
+    CHECK((FanyImeProtocol::Negotiate(learningHello).capabilities & FanyImeProtocol::VocabularyCommit) == 0);
     // V 模式的形状规则，TSF（WCHAR）与 Server（char）共用。
     {
         using FanyImeVModeInput::Trigger;

@@ -1576,6 +1576,8 @@ HRESULT CMetasequoiaIME::_HandleCompositionPunctuation(TfEditCookie ec, _In_ ITf
         }
     }
 
+    if (SUCCEEDED(hr))
+        ConfirmVocabularyCommit(requestId);
     if (hasActiveComposition)
     {
         _HandleCompleteCommitFirst(ec, pContext);

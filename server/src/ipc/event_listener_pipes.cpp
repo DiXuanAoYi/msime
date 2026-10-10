@@ -213,6 +213,7 @@ bool IsKnownMainPipeEvent(UINT event_type)
     case FanyImePipeEventType::ClientSuspended:
     case FanyImePipeEventType::FocusRestored:
     case FanyImePipeEventType::HideCaretState:
+    case FanyImePipeEventType::VocabularyCommitConfirmed:
         return true;
     default:
         return false;
@@ -567,6 +568,11 @@ void MainPipeClientThread(HANDLE clientPipe, uint64_t handlerId)
             break;
         }
 
+        case FanyImePipeEventType::VocabularyCommitConfirmed: {
+            if (ClientNegotiatedVocabularyCommit(clientId) && pipeData.request_id != 0 && pipeData.pinyin_length == 0)
+                EnqueueTask(TaskType::VocabularyCommitConfirmed, pipeData, activation.epoch);
+            break;
+        }
         case FanyImePipeEventType::HideCandidateWnd: {
             EnqueueTask(TaskType::HideCandidate, pipeData, activation.epoch);
             break;

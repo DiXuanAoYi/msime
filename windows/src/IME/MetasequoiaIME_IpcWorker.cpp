@@ -1,3 +1,4 @@
+#include "../../../engine/contracts/vocabulary_commit.h"
 // Worker pipe side: IpcWorkerThread, which validates and dispatches Server frames, and the
 // token tables that hand its commits, voice snapshots and compartment switches to the TSF thread.
 
@@ -125,7 +126,8 @@ void CMetasequoiaIME::_DispatchUnsolicitedVoiceText(WPARAM wParam, KEYSTROKE_FUN
     }
 }
 
-bool CMetasequoiaIME::_PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text)
+bool CMetasequoiaIME::_PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text,
+                                              uint64_t vocabularyRequestId)
 {
     constexpr size_t maxPendingServerCommits = 64;
     if (!_workerCommitReady.load(std::memory_order_acquire) ||
@@ -157,8 +159,8 @@ bool CMetasequoiaIME::_PostServerTextDelivery(UINT windowMessage, _In_z_ const W
         {
             token = NextWindowMessageToken();
         } while (token == 0 || _pendingServerCommitMessages.count(token) != 0);
-        _pendingServerCommitMessages.emplace(token,
-                                             WorkerCandidateCommit{text ? text : L"", focusToken, compositionEpoch});
+        _pendingServerCommitMessages.emplace(
+            token, WorkerCandidateCommit{text ? text : L"", focusToken, compositionEpoch, vocabularyRequestId});
     }
 
     if (!PostMessage(ownerWindow, windowMessage, static_cast<WPARAM>(token), 0))
@@ -350,7 +352,8 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
         }
 
         bool validFrame = true;
-        if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCurCandidate ||
+        if (buf.msg_type == FanyImeWorkerReplyType::VocabularyCommitCandidate ||
+            buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCurCandidate ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCandidateAndContinue ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::InsertText ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CancelVoiceComposition)
@@ -541,6 +544,12 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
                     SetEvent(pIME->_workerAckEvent);
                 }
             }
+        }
+        else if (buf.msg_type == FanyImeWorkerReplyType::VocabularyCommitCandidate)
+        {
+            const auto commit = FanyImeVocabulary::Decode(buf.data);
+            if (pIME->_workerCommitReady.load(std::memory_order_acquire) && commit)
+                pIME->_PostServerTextDelivery(WM_CommitCandidate, commit->text.data(), commit->request);
         }
         else if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCurCandidate)
         {

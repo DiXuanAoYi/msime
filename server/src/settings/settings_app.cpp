@@ -1,3 +1,4 @@
+#include "english/vocabulary_service.h"
 #include "engine/contracts/webview/validator.h"
 #include "config/ime_config.h"
 #include "engine/core/data_path.h"
@@ -679,6 +680,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
            {{"autocorrect_transposition", GetConfiguredQuanpinAutocorrectTransposition()},
             {"autocorrect_neighbor", GetConfiguredQuanpinAutocorrectNeighbor()},
             {"autocorrect_marker", GetConfiguredQuanpinAutocorrectMarker()}}},
+          {"vocabulary", {{"enabled", GetConfiguredVocabularyEnabled()}, {"retention_days", GetConfiguredVocabularyRetentionDays()}}},
           {"statistics",
            {{"enabled", GetConfiguredStatisticsEnabled()}, {"retention", GetConfiguredStatisticsRetention()}}}}}};
     payload["data"]["voice_input"]["polish_presets"] = std::move(polish_presets);
@@ -873,6 +875,10 @@ bool ApplyConfigUpdate(const json::object &data)
         return SetConfiguredDiagnosticLogEnabled(json::value_to<bool>(data.at("value")));
     if (path == "general.tsf_diagnostic_log")
         return SetConfiguredTsfDiagnosticLogEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "vocabulary.enabled")
+        return SetConfiguredVocabularyEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "vocabulary.retention_days")
+        return SetConfiguredVocabularyRetentionDays(json::value_to<int>(data.at("value")));
     if (path == "statistics.enabled")
         return SetConfiguredStatisticsEnabled(json::value_to<bool>(data.at("value")));
     if (path == "statistics.retention")
@@ -1520,6 +1526,18 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 object["protocolVersion"] = metasequoia::webview::Version;
                 if (!metasequoia::webview::Validate(response, "server"))
                     throw std::runtime_error("Invalid dictionary response");
+                auto message = string_to_wstring(json::serialize(response));
+                return [message = std::move(message)] {
+                    if (g_webview)
+                        g_webview->PostWebMessageAsJson(message.c_str());
+                };
+            });
+        }
+        else if (type == "vocabularyRequest")
+        {
+            const auto data = value.at("data").as_object();
+            g_worker->Submit([data]() -> SerialTaskQueue::Completion {
+                const auto response = Vocabulary::HandleRequest(data);
                 auto message = string_to_wstring(json::serialize(response));
                 return [message = std::move(message)] {
                     if (g_webview)

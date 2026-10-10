@@ -425,3 +425,8 @@
 #personalGlossaryStatus { overflow-wrap: anywhere; min-height: 1.5em; }
 
 #translationOnlineProvider[hidden], #translationOnlineCredentials[hidden] { display: none; }
+
+.vocabulary-table { max-height: 320px; overflow: auto; }
+.vocabulary-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.vocabulary-table th, .vocabulary-table td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color, #ddd); overflow-wrap: anywhere; }
+#vocabularyPanel summary { cursor: pointer; padding: 8px 0; }

@@ -637,6 +637,7 @@ void HandleTranslationCommitKey(uint64_t client_id, uint64_t activation_epoch, u
 
     if (senses.size() == 1)
     {
+        CaptureVocabularySelection(static_cast<int>(index), true);
         Global::MsgTypeToTsf = Global::DataFromServerMsgType::CommitExactText;
         ui.selected_text = string_to_wstring(CandidateTextForOutput(senses.front()));
         // Normal/CommitExactText 的回复由 SendCurrentDataToClient 负责收尾（ClearState）。
@@ -647,6 +648,7 @@ void HandleTranslationCommitKey(uint64_t client_id, uint64_t activation_epoch, u
     g_translation_saved_items = ui.items;
     g_translation_saved_page_index = ui.page_index;
     g_translation_saved_selected_index = ui.selected_index_in_page;
+    BeginVocabularyTranslationPage(static_cast<int>(index));
     std::vector<WordItem> translation_items;
     translation_items.reserve(senses.size());
     for (const auto &sense : senses)

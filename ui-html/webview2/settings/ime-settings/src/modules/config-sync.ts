@@ -425,6 +425,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
       module.applyFrequencyConfig(data?.frequency_adjustment);
       module.applyTencentTmtConfig(data?.tencent_tmt);
       module.applyTranslationCloudEnabled(data?.general?.candidate_translation_cloud === true);
+      module.applyVocabularyConfig(data?.vocabulary);
       module.applyPersonalGlossaryConfig(data?.general?.personal_translation_glossary, data?.tencent_tmt?.target_language);
       module.applyNiuTransConfig(data?.niutrans);
       module.applyCustomTranslationConfig(data?.custom_translation);

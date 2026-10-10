@@ -185,6 +185,10 @@ bool SetConfiguredDiagnosticLogEnabled(bool enabled);
 bool GetConfiguredTsfDiagnosticLogEnabled();
 bool SetConfiguredTsfDiagnosticLogEnabled(bool enabled);
 // 本机输入统计总开关，默认关闭：关闭时 Server 不创建也不写 stats.db。
+bool GetConfiguredVocabularyEnabled();
+bool SetConfiguredVocabularyEnabled(bool enabled);
+int GetConfiguredVocabularyRetentionDays();
+bool SetConfiguredVocabularyRetentionDays(int days);
 bool GetConfiguredStatisticsEnabled();
 bool SetConfiguredStatisticsEnabled(bool enabled);
 // 统计保留策略：forever|30d|90d|180d|365d，默认 forever。缺键或非法值一律回落

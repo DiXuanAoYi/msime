@@ -655,6 +655,8 @@ bool SendCurrentDataToClient(uint64_t client_id, uint64_t activation_epoch, uint
     const UINT msg_type = Global::MsgTypeToTsf;
     FANY_IPC_LOGF(L"[msime]: [ipc] send-current-data: msg_type={}, text={}", msg_type,
                   ::Global::candidate_ui.selected_text);
+    if (msg_type == Global::DataFromServerMsgType::Normal || msg_type == Global::DataFromServerMsgType::CommitExactText)
+        ArmVocabularySelection(client_id, activation_epoch, request_id);
     const ULONGLONG send_started_at_ms = GetTickCount64();
     const bool sent = SendToTsfClientViaNamedpipe(client_id, activation_epoch, msg_type, request_id,
                                                   ::Global::candidate_ui.selected_text);

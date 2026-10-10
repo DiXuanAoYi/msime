@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.25)
+project(MsimeTsfHost LANGUAGES CXX)
+add_executable(msime-tsf-host WIN32 main.cpp)
+target_compile_features(msime-tsf-host PRIVATE cxx_std_17)
+target_compile_definitions(msime-tsf-host PRIVATE UNICODE _UNICODE)
+target_compile_options(msime-tsf-host PRIVATE /utf-8)
+target_link_libraries(msime-tsf-host PRIVATE ole32 uuid user32 gdi32)

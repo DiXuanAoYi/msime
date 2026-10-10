@@ -1,3 +1,5 @@
+import { setupVocabulary } from './vocabulary';
+export { applyVocabularyConfig } from './vocabulary';
 import { applyPersonalGlossaryConfig, setupPersonalGlossaryEditor } from './personal-glossary-editor';
 export { applyPersonalGlossaryConfig };
 import { serializeHostMessage } from '../../../../shared/messages';
@@ -282,6 +284,7 @@ function setupSecretVisibility(inputId: string, buttonId: string, name: string):
 }
 
 export function setupInput(): void {
+  setupVocabulary(updateConfig);
   setupPersonalGlossaryEditor(text => updateConfig('general.personal_translation_glossary', text));
   setupToggleButton('candidateTranslationCloudToggleBtn', (active) => {
     applyTranslationCloudEnabled(active);

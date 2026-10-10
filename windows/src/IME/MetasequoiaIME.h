@@ -473,11 +473,12 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
         std::wstring text;
         uint64_t focusToken = 0;
         uint64_t compositionEpoch = 0;
+        uint64_t vocabularyRequestId = 0;
     };
     bool _PostServerCandidateCommit(_In_z_ const WCHAR *candidateText);
     bool _PostServerCandidateCommitAndContinue(_In_z_ const WCHAR *payload);
     bool _PostServerInsertText(_In_z_ const WCHAR *text);
-    bool _PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text);
+    bool _PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text, uint64_t vocabularyRequestId = 0);
     bool _TakeServerCandidateCommit(UINT token, _Out_ WorkerCandidateCommit &request);
     void _ResetVoiceCompositionAssemble();
     void _AssembleVoiceCompositionFrame(const FanyImeNamedpipeDataToTsfWorkerThread &buf);

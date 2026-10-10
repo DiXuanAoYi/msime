@@ -4,7 +4,9 @@
 param(
     [string]$BuildDir = 'server/build-release/bin/Release',
     [string]$ManifestPath = 'server/MetasequoiaImeServer.manifest',
-    [string]$ManifestTool
+    [string]$ManifestTool,
+    # Unsigned preview packages must not request uiAccess: Windows refuses to launch them.
+    [switch]$Unsigned
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +38,14 @@ if ([string]::IsNullOrWhiteSpace($ManifestTool) -or
 }
 
 Write-Host "Embedding $manifest into $binary"
+if ($Unsigned) {
+    $unsignedManifest = Join-Path $buildRoot 'unsigned-server.manifest'
+    (Get-Content -LiteralPath $manifest -Raw).Replace('uiAccess="true"', 'uiAccess="false"') |
+        Set-Content -LiteralPath $unsignedManifest -Encoding utf8NoBOM
+    $manifest = $unsignedManifest
+}
 & $ManifestTool -manifest $manifest "-outputresource:$binary;1"
+if ($Unsigned) { Remove-Item -LiteralPath $unsignedManifest -Force }
 if ($LASTEXITCODE -ne 0) {
     throw "Server manifest embedding failed ($LASTEXITCODE)"
 }
@@ -51,10 +60,11 @@ try {
         throw "Server manifest verification failed ($LASTEXITCODE)"
     }
     $embedded = Get-Content -LiteralPath $probe -Raw
-    if ($embedded -notmatch 'uiAccess\s*=\s*["'']true["'']') {
-        throw 'Embedded Server manifest does not enable uiAccess.'
+    $expected = if ($Unsigned) { 'false' } else { 'true' }
+    if ($embedded -notmatch "uiAccess\s*=\s*[`"']$expected[`"']") {
+        throw "Embedded Server manifest does not set uiAccess=$expected."
     }
-    Write-Host 'Verified embedded Server manifest: uiAccess=true.'
+    Write-Host "Verified embedded Server manifest: uiAccess=$expected."
 }
 finally {
     Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue

@@ -17,6 +17,7 @@ $iss = [IO.File]::ReadAllText((Resolve-Path $issPath))
 $required = @(
     'msime_user.db', 'msime_user.db-wal', 'msime_user.db-shm', 'msime_user.db-journal',
     'stats.db', 'stats.db-wal', 'stats.db-shm', 'stats.db-journal',
+    'vocabulary.db', 'vocabulary.db-wal', 'vocabulary.db-shm', 'vocabulary.db-journal',
     'config.toml', 'config.base.toml'
 )
 

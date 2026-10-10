@@ -547,3 +547,8 @@ enabled = false
 # 统计保留策略：forever | 30d | 90d | 180d | 365d；Server 每天首次写入时删除
 # 超出保留窗口的记录，forever 表示永久保留、不自动删除。非法值按 forever 处理。
 retention = "forever"
+
+# 生词熟悉度：仅保存译词，默认关闭；超过保留天数未出现的记录自动清理。
+[vocabulary]
+enabled = false
+retention_days = 90

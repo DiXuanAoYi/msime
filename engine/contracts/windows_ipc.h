@@ -110,7 +110,8 @@ constexpr std::uint32_t ClientSuspended = 14;   // temporary focus route reset; 
 // the Server may have re-routed to another client meanwhile; without the
 // ownership claim the Server would discard it as an inactive-client event.
 constexpr std::uint32_t FocusRestored = 15;
-constexpr std::uint32_t HideCaretState = 16; // focus-context boundary; never clears candidate state
+constexpr std::uint32_t VocabularyCommitConfirmed = 17; // request_id only; no text
+constexpr std::uint32_t HideCaretState = 16;            // focus-context boundary; never clears candidate state
 // Caret-badge notifications (FanyImeProtocol::CaretStateIndicator). keycode is
 // the resulting mode (1 = Chinese / Chinese punctuation / fullwidth); point[]
 // is the physical caret anchor or {0, INVALID_Y} when none was resolved.
@@ -430,7 +431,9 @@ constexpr std::uint32_t MidSentenceHelpcodeUppercaseChanged = 31;
 // "2" V or v (quanpin); see FanyImeVModeInput::Trigger. TSF then eats digits and . + - * / ( ) after the prefix
 // (FanyImeVModeInput::AcceptsAt). Single-character payload, same rule as opcode 28.
 constexpr std::uint32_t VModeChanged = 32;
-constexpr std::uint32_t MaxKnown = VModeChanged;
+// Optional VocabularyCommit capability: decimal request id, tab, committed text.
+constexpr std::uint32_t VocabularyCommitCandidate = 33;
+constexpr std::uint32_t MaxKnown = VocabularyCommitCandidate;
 // Source compatibility for the Server's historical spellings.
 constexpr std::uint32_t SwitchToEn = SwitchToEnglish;
 constexpr std::uint32_t SwitchToCn = SwitchToChinese;

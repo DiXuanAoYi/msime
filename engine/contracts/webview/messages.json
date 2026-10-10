@@ -758,6 +758,32 @@
           "puncCn"
         ]
       }
+    },
+    "vocabularyRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "overview",
+              "clear",
+              "export"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "server": {
@@ -1067,6 +1093,80 @@
         "message"
       ],
       "additionalProperties": true
+    },
+    "vocabularyResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "language": {
+                "type": "string"
+              },
+              "word": {
+                "type": "string"
+              },
+              "seen": {
+                "type": "integer"
+              },
+              "selected": {
+                "type": "integer"
+              },
+              "used": {
+                "type": "integer"
+              },
+              "last": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "language",
+              "word",
+              "seen",
+              "selected",
+              "used",
+              "last"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "integer"
+        },
+        "familiar": {
+          "type": "integer"
+        },
+        "selected": {
+          "type": "integer"
+        },
+        "used": {
+          "type": "integer"
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "action",
+        "ok",
+        "message",
+        "rows"
+      ],
+      "additionalProperties": false
     }
   }
 }

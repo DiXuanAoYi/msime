@@ -31,6 +31,13 @@ Existing DLLs with unversioned hello remain accepted by the new Server using the
 
 Append opcodes; never change released values or reuse them. An incompatible layout needs a new major protocol and an explicit migration, not another copy of a header. Minor additions must be optional capabilities.
 
+`VocabularyCommit` is optional. A compatible TSF client sends Main event 17 only after a successful
+candidate text insertion; `request_id` identifies the original selection and the frame carries no text.
+The Server requires the same client, activation epoch and request, expires unconfirmed selections,
+and consumes each acknowledgement once. For mouse selections the Server sends Worker opcode 33
+with a high-bit request token followed by a tab and the candidate text. Older clients continue to
+receive the existing untracked mouse commit. Cancelled and partial compositions do not count.
+
 `CharacterSetShortcut` is optional and is not included in the default capability set.
 Windows implementations that support it pass `Capabilities | CharacterSetShortcut`
 to `Hello` / `Negotiate`. Only after negotiating this bit may a Chinese-mode client

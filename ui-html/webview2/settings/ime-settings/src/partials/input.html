@@ -285,6 +285,25 @@
         <div id="personalGlossaryStatus" class="input-setting-description" role="status" aria-live="polite"></div>
       </div>
       <div class="input-option-divider"></div>
+        <details id="vocabularyPanel" class="personal-glossary-editor">
+          <summary class="section-title">生词熟悉度</summary>
+          <p class="input-setting-description">按成功上屏时实际展示的一页记录译词；逐键刷新、取消输入不计数。看到 3 轮记为熟悉。仅本机保存，默认关闭。</p>
+          <div class="personal-glossary-actions">
+            <label><input id="vocabularyEnabled" type="checkbox"> 开启生词统计</label>
+            <label>保留期限 <select id="vocabularyRetention"><option value="30">30 天</option><option value="90" selected>90 天</option><option value="365">365 天</option></select></label>
+          </div>
+          <p class="input-setting-description">到期未再出现的记录自动清理；关闭统计保留已有记录。统计键为“语言 + 译词”，不保存原始按键或完整句子。</p>
+          <div class="personal-glossary-actions">
+            <button id="vocabularyRefresh" class="credential-test-button" type="button">刷新记录</button>
+            <button id="vocabularyExport" class="credential-test-button" type="button">导出全部 TSV</button>
+            <button id="vocabularyClear" class="credential-test-button" type="button">清空记录</button>
+          </div>
+          <div id="vocabularyConfirm" hidden><p>确定删除本机全部生词记录？此操作无法撤销。</p><button id="vocabularyConfirmClear" type="button">确认清空</button> <button id="vocabularyCancelClear" type="button">取消</button></div>
+          <p id="vocabularySummary" class="input-setting-description">点击“刷新记录”查看。</p>
+          <div class="vocabulary-table"><table><thead><tr><th>语言</th><th>译词</th><th>熟悉度</th><th>选过</th><th>直接用过</th></tr></thead><tbody id="vocabularyRows"></tbody></table></div>
+          <p id="vocabularyStatus" class="input-setting-description" role="status" aria-live="polite"></p>
+        </details>
+        <div class="input-option-divider"></div>
       <div class="section-header translation-language-row" id="translationOnlineProvider" hidden>
         <div>
           <div class="section-title">在线翻译服务</div>

@@ -195,6 +195,7 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
         // 同理，上屏必须回 Normal：_HandleCandidateFinalize 只在 Normal 时写入文本，
         // 而且它写的就是 candidate_string 本身，不会再补标点。
         Global::MsgTypeToTsf = Global::DataFromServerMsgType::Normal;
+        CaptureVocabularySelection(index, true);
         ui.selected_text = ui.page_words[index];
         return;
     }
@@ -235,6 +236,7 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
 
     if (is_valid_selection)
     {
+        CaptureVocabularySelection(index);
         // Capture ranking keys before reset_state()/composition advance clears the
         // input sequence. CandidateDatabaseKey() consults get_pinyin_sequence(),
         // and for single-code lists (e.g. "n") it must keep item.pinyin ("na"/"nv")

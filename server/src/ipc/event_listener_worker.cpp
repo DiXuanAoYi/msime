@@ -1,3 +1,4 @@
+#include "engine/contracts/vocabulary_commit.h"
 // 任务队列与任务线程：Task 定义、WorkerThread 的分发循环，以及各个 Enqueue* 入口。
 #include "ipc/event_listener_internal.h"
 #include <Windows.h>
@@ -337,6 +338,9 @@ void WorkerThread()
             break;
         }
 
+        case TaskType::VocabularyCommitConfirmed:
+            ConfirmVocabularySelection(task.client_id, task.activation_epoch, task.pipe_data.request_id);
+            break;
         case TaskType::ImeKeyEvent: {
             const ULONGLONG queue_elapsed_ms = task.enqueued_at_ms == 0 ? 0 : GetTickCount64() - task.enqueued_at_ms;
             if (queue_elapsed_ms >= 8)
@@ -349,6 +353,7 @@ void WorkerThread()
             CAND_DIAG_LOGF(L"task ImeKeyEvent dispatch request={} keycode=0x{:X} wch=U+{:04X} epoch={}",
                            task.pipe_data.request_id, task.pipe_data.keycode, static_cast<unsigned>(task.pipe_data.wch),
                            task.activation_epoch);
+            BeginVocabularySelection();
             HandleImeKey(task.client_id, task.activation_epoch, task.pipe_data.request_id);
             break;
         }
@@ -591,16 +596,27 @@ void WorkerThread()
         }
 
         case TaskType::UiCommitCandidate: {
+            BeginVocabularySelection();
             ProcessSelectionKey(0, task.client_id, task.activation_epoch, task.candidate_one_based_index - 1);
             if (Global::MsgTypeToTsf == Global::DataFromServerMsgType::Normal)
             {
                 // The worker packet is the complete edit-session-owned commit
                 // for a normal UI click. Do not also leave an unsolicited
                 // request-id-0 reply on the normal reverse pipe.
+                static uint64_t vocabulary_token = uint64_t{1} << 63;
+                const uint64_t token = ++vocabulary_token;
+                const auto payload =
+                    GetConfiguredVocabularyEnabled() && ClientNegotiatedVocabularyCommit(task.client_id)
+                        ? FanyImeVocabulary::Encode(token, Global::candidate_ui.selected_text)
+                        : std::nullopt;
+                const bool tracked = payload.has_value();
+                if (tracked)
+                    ArmVocabularySelection(task.client_id, task.activation_epoch, token);
                 if (SendToTsfWorkerThreadClientViaNamedpipe(
                         task.client_id, task.activation_epoch,
-                        Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidate,
-                        Global::candidate_ui.selected_text))
+                        tracked ? FanyImeWorkerReplyType::VocabularyCommitCandidate
+                                : Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidate,
+                        tracked ? *payload : Global::candidate_ui.selected_text))
                 {
                     ClearState();
                 }

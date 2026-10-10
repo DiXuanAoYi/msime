@@ -26,6 +26,7 @@ constexpr std::uint32_t CompositionRestore = 1u << 4;
 // still travels in StatusSnapshot. A client must not send them unless the
 // Server acknowledged this bit.
 constexpr std::uint32_t CaretStateIndicator = 1u << 5;
+constexpr std::uint32_t VocabularyCommit = 1u << 6;
 constexpr std::uint32_t Capabilities = RequestIds | FocusEpochs | FramedVoice;
 constexpr std::uint32_t RequiredCapabilities = RequestIds | FocusEpochs;
 

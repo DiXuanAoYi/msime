@@ -1,15 +1,15 @@
-水杉 Windows × 青简：首版源码集成说明
+水杉 Windows × 青简：Windows 预发布集成说明（0.9.6-qingjian.1）
 
 交付状态
-本次交付是可审查的源码修改、补丁、词表示例和设置页截图，不是已完成安装验证的输入法安装包。
-已接通原有 Server 查询链、两个设置宿主、配置读写和安装模板。完整 Server 尚未编译通过：本机 CMake 在查找 Boost 时停止，后续 vcpkg 依赖和完整产品测试尚未验证。没有替换或注册本机输入法。
+已完成 Windows x64 Server/Settings、x64 与 x86 TSF 构建和本机真实输入验证，可生成包含词库、模型、辅助程序及调试符号的完整安装包。
+Boost、vcpkg、Windows SDK、Inno Setup 依赖已补齐。本预发布为 unsigned 构建，Server 明确使用 uiAccess=false，普通桌面输入已验证，不承诺管理员窗口或安全桌面的跨权限输入。
 
 一、固定的源码基线
 水杉：v0.9.5 / 5d6eaa5bd1a6003e4bf25c4bef8c581443616da3
 https://github.com/metasequoiaime/msime-windows/releases/tag/v0.9.5
 青简：main 的源码快照 / 4a3e963dfe299126574bfe3c370ff70a3f85ee77
 https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3f85ee77
-按用户要求以已发布的水杉版本为底座，本地分支 feature/qingjian-learning。没有推送上游或发布 Release。
+按用户要求以已发布的水杉版本为底座，本地分支 feature/qingjian-learning。发布到用户分支与预发布标签，不改动用户仓库的 develop/main；不推送上游仓库。
 
 二、阅读源码后的取舍
 1. 个人译词优先与按语言隔离：已移植设计。
@@ -34,10 +34,13 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
    青简个人 TSV 可导入；取前两条释义，移除词性和竖线后的读音。水杉已有 Ctrl+Enter 译词选择，上屏仍沿用它。
    不导入青简 .qj 二进制库、词汇等级表、输入日志、学习统计或云释义缓存；没有搬入其品牌素材或附带大型词库。
 
-5. 生词熟悉度、按上屏时的候选页计数：已阅读，尚未移植。
+5. 生词熟悉度、按上屏时的候选页计数：已移植设计。
    青简依据：crates/qingjian-core/src/engine/vocabulary/mod.rs、crates/qingjian-learning/src/vocabulary_book.rs。
-   它按选词时真正展示的一页计数，并将见过/选过/直接用过分别统计；并不是每次刷新候选都累加。
-   接入水杉需要独立词汇数据表、真实上屏确认与撤销边界、清理/保留期限和统计页。当前原型没有这些能力，不能把已有字符统计称为生词学习闭环。
+   增加 vocabulary.db，以“目标语言 + 译词”为键，分别累计看到、选过、直接用过；同一页去重，曝光达到 3 次标为熟悉。
+   Server 保存实际渲染页的快照，TSF 成功插入文本后通过协商的可选能力确认；请求、客户及焦点代次必须匹配，确认只消费一次，10 秒过期。
+   逐键刷新、取消、失败提交、过期或重复确认不计数。旧 DLL 未协商此能力时仍可输入，但不生成新学习统计。
+   写库在后台有限队列执行；默认关闭，可选保留 30/90/365 天，最多保留 10 万条。设置页查看最近 500 条、导出全部 TSV、二次确认清空。
+   清空时间屏障阻止此前排队的记录重新出现；升级保留主库与 SQLite sidecar。没有导入青简旧学习历史，也没有复制 Rust 引擎。
 
 6. 整句模型、拼写纠错、跨平台 Rust 核心：本次没有替换。
    水杉 v0.9.5 本来就有本地神经重排、octagram、全拼纠错和双拼辅码。未做统一语料和逐键延迟基准前，不能认定青简模型更优。
@@ -55,31 +58,30 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
 在线补全由 general.candidate_translation_cloud 控制，默认 false。旧配置没有此项时也按 false；希望继续使用在线翻译的用户需要在设置中明确开启。
 英语之外的语言没有自带完整离线译库：只会显示个人表中已有的译词；开启在线补全且服务配置有效时才尝试补全未命中词。
 
-四、实际验证
-1. 修改前基线：便携 C++ 测试通过，设置页原有 104 项测试通过。
-2. 修改后：便携 C++ 测试 45 项通过；专门的真实 SQLite + 英语工作线程集成测试 6 项通过（其中 4 项解析测试与便携套件重叠，不应相加为 51 个独立用例）。
-   覆盖 BOM/CRLF、UTF-8、多语言隔离、双释义、重复项、坏行、过大文件、原子替换语义、优先覆盖、清空回退、英文反向释义以及失效代次。
-3. 启动竞态对照：从 v0.9.5 提取原 english_ime.cpp/.h，使用同一原生探针在 Start 后立即查询。原版返回 LOST（exit 1），修改版返回 received（exit 0）。
-   修复：在发布 running 状态之前捕获初始请求代次，传给后台线程，避免第一条请求在工作线程启动时被误判为已经处理。
-4. 前端：17 个测试文件、110 项测试通过；TypeScript 编译和 Vite 生产构建通过。
-   验证解析、青简导入、未保存草稿不被快照覆盖、只有收到相同内容确认才提示成功、保存超时保留草稿。
-5. WebView 契约同步检查、GUI 边界检查、clang-format 18.1.8 与 git diff --check 通过。
-6. 在实际浏览器渲染设置页，检查错误行提示、在线开关显示/隐藏、输入框和按钮布局。截图为浏览器预览，不能证明原生设置宿主已成功落盘。
-7. pnpm build 的前置命令硬编码 python3，本机只有 python，因此直接运行了等价的 python sync-contracts.py --check、pnpm exec tsc、pnpm exec vite build；没有改上游工具链配置来掩盖这个环境差异。
+四、实际验证（2026-10-10）
+1. 完整 Server Release 构建通过；CTest 3/3 通过，其中主套件 601 项、WebView 60 个共享契约夹具全部通过。
+2. x64、x86 TSF Release 构建通过，各 9/9 CTest 通过；真实命名管道探针两个架构均通过新旧客户端、版本拒绝、重连、可选能力协商。
+3. 设置页 18 个测试文件、114 项测试通过，TypeScript 与 Vite 生产构建通过；SQLite/工作线程专用集成套件 10 项通过。套件存在重叠，不将总数相加。
+4. 本机新建真实 Win32 EDIT 测试窗口（tests/tsf-host），分别确认载入本次构建的 32/64 位 DLL：
+   x64：nihao 显示“你好 / hello”，空格上屏；ni + Ctrl+Enter 上屏 you；PageDown 翻页、Backspace 取消、输入框切换成功。
+   x86：ni 显示“你 / you”，Ctrl+Enter 上屏 you。
+   数据库验证：hello=(看到1,选过1,用过0)，you=(看到4,选过3,用过2)，取消未增加计数。
+   正常启动原生 Settings，实际刷新后显示 2 词、熟悉 1 词，you 已熟悉、hello 生词 1/3。
+   实机使用独立合成词表与数据目录；结束后恢复原 0.9.5 的 32/64 位 COM 注册与 Server/Watchdog。
+5. 安装器数据保留清单、打包文件夹具、构建失败中止检查通过；版本资源、生成契约同步、GUI 边界、格式及 diff 检查通过。
+6. 范围边界：未覆盖所有宿主应用（如 Office/UWP）、在线提供商请求、完整清洁虚拟机的安装/卸载与重启循环，也无公开信任代码签名。实机验证不等于所有应用兼容承诺。
 
-未验证：完整 Server/Settings 链接、Windows TSF 实际上屏、x86/x64 宿主兼容、在线提供商真实请求、原生安装升级与签名发布。不能把以上单元/集成测试等同于完整输入法验收。
-
-五、文件与复用
-msime-qingjian-source.zip：完整水杉源码快照加本次修改（不含 .git、依赖缓存、词库 Release、生成的 dist；vendor 的原始 submodule 仍需按 .gitmodules 获取）。
-msime-qingjian.patch：从 v0.9.5 生成的完整修改补丁，含新增文件。
-推荐复现方式：
-  git clone --branch v0.9.5 https://github.com/metasequoiaime/msime-windows.git
-  cd msime-windows
-  git apply --check <补丁绝对路径>
-  git apply <补丁绝对路径>
-  git submodule update --init --recursive
-随后按仓库 CONTRIBUTING.md 准备 Boost、vcpkg、真实词库并构建。新增原生集成测试已登记到 server/tests/CMakeLists.txt。
-本地工作树在当前工作区 work/msime-windows；青简只读参考在 work/qingjian。
+五、构建与交付
+版本真源 version.txt=0.9.6，预发布标签 v0.9.6-qingjian.1。
+构建依赖：Visual Studio 2026 C++、Windows SDK、CMake、vcpkg 基线 04a9d8e5212d01ee1dd9478eadd9caade4f8b0d4、Boost locale/json x64-windows-static-md、Node/pnpm、Inno Setup 6.7.3。
+按仓库流程准备依赖与锁定词库/模型，Server 使用 x64-windows manifest 和独立的 static-md Boost_ROOT；TSF 使用自己的 x86/x64 static triplet，勿共用构建目录。
+在 Windows 使用短路径工作目录（本次通过 subst W: 缩短路径），避免 vcpkg 的 libiconv RC2136 长路径错误。
+前端等价构建命令：python ui-html/scripts/sync-contracts.py --check，然后在设置前端目录 pnpm exec tsc、pnpm exec vite build；本机无 python3 命令别名。
+无签名证书时在 Server 完成链接后执行：
+  ./scripts/ci/embed-server-manifest.ps1 -BuildDir server/build-release/bin/Release -Unsigned
+随后 Prepare-PackageFiles.ps1 -TargetVersion 0.9.6 -IncludeSymbols、product_lock.py manifest 写入确切提交、Compile-Installer.ps1。
+不要对无签名程序启用 uiAccess=true，否则 Windows 可能拒绝启动；不要将本地自签名证书作为公开信任签名分发。
+安装包附 SHA256SUMS 与验证报告；源码从相同标签获取。克隆后执行 git submodule update --init --recursive，再按锁文件准备第三方产物。
 
 许可与来源
 两仓均包含 GPL v3 许可证文本；青简 README 声明 GPL-3.0-or-later。本次保留水杉 LICENSE 与已有第三方许可，以青简行为设计及 TSV 格式为参考重新实现 C++/TypeScript 适配，没有复制其 Rust 引擎或打包其数据集。用户自行导入的数据仍应保留相应来源与许可。

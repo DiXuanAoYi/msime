@@ -100,6 +100,7 @@ int WriteDataToNamedPipe(              //
     UINT write_flag                    //
 );
 KeyEventSendResult SendKeyEventToUIProcessViaNamedPipe(_Out_opt_ uint64_t *requestId = nullptr);
+void ConfirmVocabularyCommit(uint64_t requestId);
 int SendHideCandidateWndEventToUIProcessViaNamedPipe();
 int SendHideCaretStateEventToUIProcessViaNamedPipe();
 int SendShowCandidateWndEventToUIProcessViaNamedPipe();

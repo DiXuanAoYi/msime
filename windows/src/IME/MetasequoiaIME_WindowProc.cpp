@@ -541,7 +541,7 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
                 _KEYSTROKE_STATE KeystrokeState;
                 KeystrokeState.Category = CATEGORY_CANDIDATE;
                 KeystrokeState.Function = FUNCTION_FINALIZE_CANDIDATELIST;
-                pIME->_InvokeKeyHandler(pContext, 0, 0, 0, KeystrokeState, FANY_IME_UNSOLICITED_REQUEST_ID,
+                pIME->_InvokeKeyHandler(pContext, 0, 0, 0, KeystrokeState, request.vocabularyRequestId,
                                         std::move(request.text), 0, request.compositionEpoch, request.focusToken);
                 pContext->Release();
             }

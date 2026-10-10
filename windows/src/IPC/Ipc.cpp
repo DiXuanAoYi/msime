@@ -488,7 +488,8 @@ bool WritePipeHello(HANDLE hPipeHandle, UINT pipeRole)
         const auto hello =
             FanyImeProtocol::Hello(GetPipeClientId(), NextProtocolId(nextRequestId),
                                    FanyImeProtocol::Capabilities | FanyImeProtocol::CharacterSetShortcut |
-                                       FanyImeProtocol::CompositionRestore | FanyImeProtocol::CaretStateIndicator);
+                                       FanyImeProtocol::CompositionRestore | FanyImeProtocol::CaretStateIndicator |
+                                       FanyImeProtocol::VocabularyCommit);
         BOOL ret = WriteFile(hPipeHandle, &hello, sizeof(hello), &bytesWritten, NULL);
         // Never authorize keys from merely writing a hello. An old Server
         // without negotiation times out into the existing raw-input fallback.
@@ -1552,6 +1553,15 @@ KeyEventSendResult SendKeyEventToUIProcessViaNamedPipe(uint64_t *requestId)
     return KeyEventSendResult::Sent;
 }
 
+void ConfirmVocabularyCommit(uint64_t requestId)
+{
+    if (!requestId || requestId == UINT64_MAX || !(negotiatedServerCapabilities & FanyImeProtocol::VocabularyCommit))
+        return;
+    namedpipeData = {};
+    namedpipeData.event_type = FanyImePipeEventType::VocabularyCommitConfirmed;
+    namedpipeData.request_id = requestId;
+    SendToNamedpipe();
+}
 int SendHideCandidateWndEventToUIProcessViaNamedPipe()
 {
     namedpipeData = {};

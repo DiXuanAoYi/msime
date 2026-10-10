@@ -104,6 +104,12 @@ AsyncRequestOrigin FindMixedRequestOrigin(const std::string &input, uint64_t gen
 AsyncRequestOrigin FindAiRequestOrigin(const std::string &input, uint64_t generation);
 std::string CandidateTextForOutput(const std::string &text);
 void AppendAiContext(const std::string &committed_word);
+void BeginVocabularySelection();
+void CaptureVocabularySelection(int index, bool use_translation = false);
+void BeginVocabularyTranslationPage(int index);
+void ArmVocabularySelection(uint64_t client, uint64_t epoch, uint64_t request);
+void ConfirmVocabularySelection(uint64_t client, uint64_t epoch, uint64_t request);
+void ResetVocabularySelections();
 std::wstring BuildCreateWordPipePayload(const std::string &remaining_raw_input_with_cases,
                                         const std::string &current_word);
 // segmented_pinyin 定下来之后调用：双拼组合时把原串切分和全拼切分记进 GlobalIme::composition，
@@ -128,6 +134,7 @@ enum class TaskType
     HideCaretState,
     MoveCandidate,
     ImeKeyEvent,
+    VocabularyCommitConfirmed,
     LangbarRightClick,
     IMESwitch,
     PuncSwitch,

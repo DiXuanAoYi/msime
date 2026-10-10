@@ -43,6 +43,8 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_cache.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_ui_action_policy.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_translation_policy.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vocabulary.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/english/vocabulary_store.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_personal_glossary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_english_ime_translations.cpp"
     "${CMAKE_SOURCE_DIR}/src/english/english_ime.cpp"

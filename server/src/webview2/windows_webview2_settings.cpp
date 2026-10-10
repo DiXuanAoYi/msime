@@ -1,3 +1,4 @@
+#include "english/vocabulary_service.h"
 // 设置窗口 WebView：DirectComposition 视觉树、composition controller 的创建、设置页消息与
 // configUpdate 分发，以及 PostSettingsWindowState / PostSettingsConfig / InitWebviewSettingsWnd。
 #include "webview2/windows_webview2_internal.h"
@@ -1486,6 +1487,12 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                             ShellExecuteW(hwnd, L"open", string_to_wstring(url).c_str(), nullptr, nullptr,
                                           SW_SHOWNORMAL);
                     }
+                    else if (type == "vocabularyRequest")
+                    {
+                        const auto response = Vocabulary::HandleRequest(val.at("data").as_object());
+                        const auto message = string_to_wstring(json::serialize(response));
+                        ::webviewSettingsWnd->PostWebMessageAsJson(message.c_str());
+                    }
                     else if (type == "configUpdate")
                     {
                         try
@@ -1496,6 +1503,10 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                             ApplyAppearanceSubkey(path, data);
                             ApplyGeneralSubkey(path, data);
                             ApplyStatisticsSubkey(path, data);
+                            if (path == "vocabulary.enabled")
+                                SetConfiguredVocabularyEnabled(json::value_to<bool>(data.at("value")));
+                            if (path == "vocabulary.retention_days")
+                                SetConfiguredVocabularyRetentionDays(json::value_to<int>(data.at("value")));
                             ApplyTencentTmtSubkey(path, data);
                             ApplyCustomTranslationSubkey(path, data);
                             ApplyNetworkSubkey(path, data);
@@ -1787,6 +1798,8 @@ void PostSettingsConfig()
             {"show_sp_helpcode_in_candidate_window", GetConfiguredShowShuangpinHelpcodeInCandidateWindow()},
             {"show_qp_helpcode_in_candidate_window", GetConfiguredShowQuanpinHelpcodeInCandidateWindow()}}},
           {"quanpin", {{"autocorrect_marker", GetConfiguredQuanpinAutocorrectMarker()}}},
+          {"vocabulary",
+           {{"enabled", GetConfiguredVocabularyEnabled()}, {"retention_days", GetConfiguredVocabularyRetentionDays()}}},
           {"statistics",
            {{"enabled", GetConfiguredStatisticsEnabled()}, {"retention", GetConfiguredStatisticsRetention()}}}}}};
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
