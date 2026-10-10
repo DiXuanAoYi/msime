@@ -289,9 +289,14 @@ def run_qwen(root, model_id):
         atomic_json(root / "service.json", dict(state="loading", model=model_id,
             message="首次启动正在准备 Python / PyTorch 运行依赖（额外下载，不计入模型大小）", pid=os.getpid()))
         env = dict(os.environ, UV_CACHE_DIR=str(root / "runtime-cache"))
+        worker = BASE / "worker" if getattr(sys, "frozen", False) else BASE
         command = [str(BASE / "uv.exe"), "run", "--python", "3.12", "--no-project", "--script",
-                   str(BASE / "qwen_worker.py"), str(root), model_id]
+                   str(worker / "qwen_worker.py"), str(root), model_id]
         try:
+            if getattr(sys, "frozen", False) and sys.platform == "win32":
+                # PyInstaller's DLL search directory must not leak into another Python ABI.
+                import ctypes
+                ctypes.windll.kernel32.SetDllDirectoryW(None)
             with (root / "runtime-install.log").open("w", encoding="utf-8") as output:
                 child = subprocess.Popen(command, env=env, stdout=output, stderr=output,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

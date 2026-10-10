@@ -56,7 +56,7 @@ function Reset-Directory {
     New-Item -ItemType Directory -Path $LiteralPath -Force | Out-Null
 }
 
-$serverRelease = Join-Path $RepoRoot (Join-Path $ServerDirectory 'build-release\bin\Release')
+$serverRelease = [IO.Path]::GetFullPath((Join-Path $RepoRoot (Join-Path $ServerDirectory 'build-release\bin\Release')))
 $dictionaryReplayRelease = Join-Path $serverRelease 'MetasequoiaImeDictionaryReplay.exe'
 $tsf32Release = Join-Path $RepoRoot (Join-Path $TsfDirectory 'build32-release\Release\MetasequoiaImeTsf.dll')
 $tsf64Release = Join-Path $RepoRoot (Join-Path $TsfDirectory 'build64-release\Release\MetasequoiaImeTsf.dll')

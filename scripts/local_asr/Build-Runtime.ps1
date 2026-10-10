@@ -22,8 +22,9 @@ if ($LASTEXITCODE) { throw 'Local ASR tests failed' }
     --distpath "$WorkDirectory/dist" --workpath "$WorkDirectory/build" --specpath $WorkDirectory `
     --collect-all sherpa_onnx --copy-metadata sherpa-onnx --copy-metadata sherpa-onnx-core `
     --copy-metadata numpy --copy-metadata uv `
-    --add-data "$PSScriptRoot/catalog.json;." --add-data "$PSScriptRoot/manager.py;." `
-    --add-data "$PSScriptRoot/qwen_worker.py;." --add-data "$PSScriptRoot/THIRD-PARTY-NOTICES.txt;." `
+    --add-data "$PSScriptRoot/catalog.json;." --add-data "$PSScriptRoot/catalog.json;worker" `
+    --add-data "$PSScriptRoot/manager.py;worker" --add-data "$PSScriptRoot/qwen_worker.py;worker" `
+    --add-data "$PSScriptRoot/THIRD-PARTY-NOTICES.txt;." `
     --add-data "$PSScriptRoot/licenses;licenses" `
     --add-binary "$venv/Scripts/uv.exe;." "$PSScriptRoot/manager.py"
 if ($LASTEXITCODE) { throw 'Local ASR packaging failed' }
