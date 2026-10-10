@@ -5,6 +5,8 @@
 #include "cloud/tencent_tmt.h"
 #include "cloud/translation_gloss.h"
 #include "voice-input/doubao_asr_client.h"
+#include "voice-input/voice_batch_protocol.h"
+#include <ctime>
 
 #include "utils/network_proxy.h"
 #include <curl/curl.h>
@@ -176,7 +178,7 @@ ApiCredentialTest::Result TestBatchAsr(const ApiCredentialTest::Request &request
     const std::string token = Value(request, "token");
     const std::string endpoint = Value(request, "endpoint");
     const std::string model = Value(request, "model");
-    if (!CloudTranslation::IsUsableSecret(token))
+    if (Value(request, "provider") != "local" && !CloudTranslation::IsUsableSecret(token))
         return {false, "请先填写有效的 API Key。"};
     if (!IsHttpEndpoint(endpoint) || model.empty())
         return {false, "请填写有效的 HTTPS 接口地址和模型名。"};
@@ -187,24 +189,34 @@ ApiCredentialTest::Result TestBatchAsr(const ApiCredentialTest::Request &request
     if (!curl)
         return {false, "无法初始化网络请求。"};
     char error[CURL_ERROR_SIZE] = {};
-    const auto wav = SilentWav();
-    curl_mime *mime = curl_mime_init(curl);
-    curl_mimepart *file = curl_mime_addpart(mime);
-    curl_mime_name(file, "file");
-    curl_mime_filename(file, "credential-test.wav");
-    curl_mime_type(file, "audio/wav");
-    curl_mime_data(file, reinterpret_cast<const char *>(wav.data()), wav.size());
-    curl_mimepart *model_part = curl_mime_addpart(mime);
-    curl_mime_name(model_part, "model");
-    curl_mime_data(model_part, model.c_str(), CURL_ZERO_TERMINATED);
+    VoiceInputConfig config;
+    config.asr_provider = Value(request, "provider");
+    config.asr_tokens[config.asr_provider] = token;
+    config.asr_endpoint = endpoint;
+    config.asr_model = model;
+    config.tencent_secret_id = Value(request, "secretId");
+    VoiceInput::AsrHttpRequest payload;
+    try
+    {
+        payload = VoiceInput::BuildAsrHttpRequest(std::vector<float>(16000, 0), config, std::time(nullptr));
+    }
+    catch (const std::exception &e)
+    {
+        curl_easy_cleanup(curl);
+        return {false, e.what()};
+    }
     curl_slist *headers = nullptr;
-    const std::string authorization = "Authorization: Bearer " + token;
-    headers = curl_slist_append(headers, authorization.c_str());
+    for (const auto &h : payload.headers)
+        headers = curl_slist_append(headers, h.c_str());
+    headers = curl_slist_append(headers, ("Content-Type: " + payload.content_type).c_str());
     headers = curl_slist_append(headers, "Expect:");
     curl_easy_setopt(curl, CURLOPT_URL, endpoint.c_str());
     NetworkProxy::ApplyToCurl(curl);
+    if (config.asr_provider == "local")
+        curl_easy_setopt(curl, CURLOPT_PROXY, "");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.body.data());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(payload.body.size()));
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteResponse);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response.body);
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error);
@@ -215,10 +227,19 @@ ApiCredentialTest::Result TestBatchAsr(const ApiCredentialTest::Request &request
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status);
     response.error = error;
     curl_slist_free_all(headers);
-    curl_mime_free(mime);
     curl_easy_cleanup(curl);
     if (response.code == CURLE_OK && response.status >= 200 && response.status < 300)
-        return {true, "连接成功，API Key 和模型配置有效。"};
+    {
+        try
+        {
+            VoiceInput::ParseAsrHttpResponse(response.body, config.asr_provider);
+        }
+        catch (const std::exception &e)
+        {
+            return {false, e.what()};
+        }
+        return {true, "服务已接受测试音频，配置有效。"};
+    }
     return {false, "测试失败：" + ErrorDetail(response)};
 }
 

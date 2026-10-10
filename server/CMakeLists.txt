@@ -218,6 +218,7 @@ set(SRC_FILES
     "./src/settings/api_credential_test.cpp"
     "./src/settings/api_credential_test.h"
     "./src/settings/collocation_model.cpp"
+    "./src/settings/local_asr_models.cpp"
     "./src/settings/collocation_model.h"
     "./src/skin/candidate_skin_catalog.cpp"
     "./src/skin/candidate_skin_catalog.h"
@@ -450,8 +451,10 @@ set(SETTINGS_EXECUTABLE_NAME "MetasequoiaImeSettings")
 add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/settings/settings_app.cpp"
     "./src/settings/api_credential_test.cpp"
+    "./src/voice-input/voice_batch_protocol.cpp"
     "./src/settings/api_credential_test.h"
     "./src/settings/collocation_model.cpp"
+    "./src/settings/local_asr_models.cpp"
     "./src/settings/collocation_model.h"
     "./src/settings/settings_splash.cpp"
     "./src/settings/settings_splash.h"
@@ -594,3 +597,5 @@ add_dependencies(${SETTINGS_EXECUTABLE_NAME} MetasequoiaImeChatCapture)
 if(TARGET MetasequoiaImeServerTests)
     add_dependencies(MetasequoiaImeServerTests MetasequoiaImeChatCapture)
 endif()
+
+target_link_libraries(${SETTINGS_EXECUTABLE_NAME} PRIVATE MetasequoiaIme::Voice)

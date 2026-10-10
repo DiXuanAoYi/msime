@@ -39,7 +39,7 @@
 
   <div class="section voice-section">
     <div class="section-title voice-heading">ASR API</div>
-    <div class="voice-description">豆包为流式识别；OpenAI、SiliconFlow、Groq 走 OpenAI 兼容的语音转写接口。每个提供商的 Token 分开保存，切换时只换当前使用的那一份。</div>
+    <div class="voice-description">豆包为流式识别；OpenAI、SiliconFlow、Groq 走 OpenAI 兼容的语音转写接口。阿里云走百炼语音，腾讯云走签名认证。本地模型离线识别。各提供商凭据分开保存。</div>
     <div class="voice-grid">
       <div class="voice-field">
         <span>服务提供商</span>
@@ -49,13 +49,17 @@
             <img src="./assets/arrow.svg" alt="">
           </button>
           <div class="dropdown-menu" id="voiceAsrProviderMenu">
+            <div class="dropdown-item" data-value="local">本地离线模型</div>
             <div class="dropdown-item" data-value="doubao">豆包</div>
             <div class="dropdown-item" data-value="openai">OpenAI</div>
             <div class="dropdown-item" data-value="siliconflow">SiliconFlow</div>
             <div class="dropdown-item" data-value="groq">Groq</div>
+            <div class="dropdown-item" data-value="aliyun">阿里云 · 百炼</div>
+            <div class="dropdown-item" data-value="tencent">腾讯云</div>
           </div>
         </div>
       </div>
+      <label id="voiceTencentSecretIdField" hidden><span>SecretId（腾讯云 ASR）</span><input id="voiceTencentSecretId" autocomplete="off" spellcheck="false"></label>
       <div class="voice-field" id="voiceDoubaoAuthModeField">
         <span>豆包鉴权方式</span>
         <div class="dropdown">
@@ -71,7 +75,7 @@
       </div>
       <label id="voiceAsrAppKeyField"><span>App ID / App Key</span><input id="voiceAsrAppKey" type="text" autocomplete="off"></label>
       <label id="voiceAsrModelField"><span>模型</span><input id="voiceAsrModel" type="text" autocomplete="off" spellcheck="false" placeholder="whisper-1"></label>
-      <div class="voice-field voice-wide">
+      <div class="voice-field voice-wide" id="voiceAsrTokenField">
         <label for="voiceAsrToken">Access Token / API Key</label>
         <span class="voice-secret-input">
           <input id="voiceAsrToken" type="password" autocomplete="off" spellcheck="false">
@@ -90,6 +94,7 @@
       </div>
       <label class="voice-wide"><span>接口地址</span><input id="voiceAsrEndpoint" type="url" autocomplete="off"></label>
     </div>
+    <div id="voiceAsrLinks" class="voice-provider-links"></div>
     <div class="credential-test-row">
       <button id="voiceAsrTestButton" class="credential-test-button" type="button">测试配置</button>
       <span id="voiceAsrTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
@@ -118,9 +123,17 @@
     </div>
   </div>
 
+  <details class="section voice-section" id="localAsrPanel">
+    <summary class="section-title">本地语音模型 · 下载与使用</summary>
+    <p class="voice-description">下载完成后可离线识别，音频留在本机。如开启云端文本润色，转写后的文字仍会发给润色服务；完全离线请关闭文本润色。大小来自锁定版本的文件清单；1 GB = 10 亿字节。内存建议为预留参考，并非显存占用实测。下载支持暂停续传，完成后校验 SHA-256。</p>
+    <div class="local-asr-actions"><button type="button" id="localAsrRefresh" class="credential-test-button">刷新状态</button><button type="button" id="localAsrStop" class="credential-test-button">停止本地识别</button></div>
+    <p id="localAsrStatus" role="status" aria-live="polite">展开后载入模型清单。</p>
+    <div id="localAsrModels"></div>
+  </details>
+
   <div class="section voice-section">
     <div class="section-header voice-heading"><div class="section-title">文本润色 API</div><div class="ftb-toggle-btn" id="voicePolishText" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
-    <div class="voice-description">SiliconFlow、OpenAI、DeepSeek、Groq 均走 OpenAI 兼容的 Chat Completions 接口。</div>
+    <div class="voice-description">SiliconFlow、OpenAI、DeepSeek、Groq、阿里云和腾讯混元均走 OpenAI 兼容的 Chat Completions 接口。</div>
     <div class="voice-grid">
       <div class="voice-field">
         <span>服务提供商</span>
@@ -134,6 +147,8 @@
             <div class="dropdown-item" data-value="openai">OpenAI</div>
             <div class="dropdown-item" data-value="deepseek">DeepSeek</div>
             <div class="dropdown-item" data-value="groq">Groq</div>
+            <div class="dropdown-item" data-value="aliyun">阿里云 · 百炼</div>
+            <div class="dropdown-item" data-value="tencent">腾讯云</div>
           </div>
         </div>
       </div>
@@ -157,6 +172,7 @@
       </div>
       <label class="voice-wide"><span>接口地址</span><input id="voicePolishEndpoint" type="url" autocomplete="off"></label>
     </div>
+    <div id="voicePolishLinks" class="voice-provider-links"></div>
     <div class="credential-test-row">
       <button id="voicePolishTestButton" class="credential-test-button" type="button">测试配置</button>
       <span id="voicePolishTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>

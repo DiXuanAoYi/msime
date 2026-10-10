@@ -76,6 +76,8 @@ bool SetConfiguredVoiceInputString(const std::string &key, const std::string &va
     std::string VoiceInputConfig::*target = nullptr;
     if (key == "asr_provider")
         target = &VoiceInputConfig::asr_provider;
+    else if (key == "tencent_secret_id")
+        target = &VoiceInputConfig::tencent_secret_id;
     else if (key == "asr_app_key")
         target = &VoiceInputConfig::asr_app_key;
     else if (key == "doubao_auth_mode")

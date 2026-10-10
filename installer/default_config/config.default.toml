@@ -404,6 +404,12 @@ asr_token = "FAKESECRET_k4l5m6n7o8p9q0r1s2t3"
 asr_token_doubao = "<YOUR_ASR_TOKEN_DOUBAO>"
 asr_token_openai = "<YOUR_ASR_TOKEN_OPENAI>"
 asr_token_siliconflow = "<YOUR_ASR_TOKEN_SILICONFLOW>"
+tencent_secret_id = ""
+asr_token_aliyun = ""
+asr_token_tencent = ""
+asr_token_local = ""
+polish_token_aliyun = ""
+polish_token_tencent = ""
 asr_token_groq = "<YOUR_ASR_TOKEN_GROQ>"
 # 豆包流式接口二选一：
 #   .../sauc/bigmodel_nostream 边录边传、返回整句结果，准确率更高，官方推荐用于输入法

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$TargetVersion = '0.0.1',
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
@@ -88,13 +88,16 @@ $neuralModelNotice = Join-Path $RepoRoot (Join-Path $NeuralModelDirectory 'NOTIC
 Assert-PathExists -LiteralPath $RepoRoot -Description '源码仓库根目录'
 Assert-PathExists -LiteralPath $serverRelease -Description 'Server Release 输出目录'
 Assert-PathExists -LiteralPath $dictionaryReplayRelease -Description '用户词库回放程序 Release EXE'
+# Frozen Python / sherpa runtime has upstream binaries, not MSVC PDB companions.
+Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\MetasequoiaLocalASR.exe') -Description '本地语音运行组件'
+Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\_internal\catalog.json') -Description '本地模型锁定目录'
 Assert-PathExists -LiteralPath $tsf32Release -Description '32 位 TSF Release DLL'
 Assert-PathExists -LiteralPath $tsf64Release -Description '64 位 TSF Release DLL'
 Assert-PathExists -LiteralPath $tsf32Pdb -Description '32 位 TSF Release PDB'
 Assert-PathExists -LiteralPath $tsf64Pdb -Description '64 位 TSF Release PDB'
 $serverExecutables = @(
     Get-ChildItem -LiteralPath $serverRelease -Recurse -File -Filter '*.exe' |
-        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' }
+        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.FullName -notlike (Join-Path $serverRelease 'local-asr\*') }
 )
 $missingServerPdb = @(
     $serverExecutables |

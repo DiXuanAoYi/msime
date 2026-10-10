@@ -14,6 +14,8 @@
         <include path="MetasequoiaImeKeyboardPanel.exe" />
         <include path="MetasequoiaImeHandwritingPanel.exe" />
         <include path="MetasequoiaImeSettings.exe" />
+        <include path="MetasequoiaImeChatCapture.exe" />
+        <include path="local-asr/MetasequoiaLocalASR.exe" />
         <for-each>
           <authenticode-sign description="Metasequoia IME" description-url="https://github.com/metasequoiaime/MSIME-Windows" />
         </for-each>

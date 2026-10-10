@@ -386,3 +386,53 @@ TEST_CASE(chat_unrelated_same_title_snapshot_stops_before_mixing_context)
     });
     REQUIRE(s.Load()["messages"].size() == 1);
 }
+
+TEST_CASE(chat_wechat_exact_latest_summary_corrects_ocr_without_guessing_older_senders)
+{
+    json nodes = json::array(
+        {Node(-1, 50020, "测试群", "current_chat_name_label"), Node(-1, 50020, "(3)", "current_chat_count_label"),
+         Node(-1, 50008, "消息", "chat_message_list"), Node(2, 50007, "10:30", "", "mmui::ChatItemView"),
+         Node(2, 50007, "周末下午一起吃饭吗", "chat_bubble_item_view", "mmui::ChatTextItemView"),
+         Node(-1, 50007, "测试群\n已置顶\n小林: 周末下午一起吃饭吗\n10:30\n消息免打扰\n", "session_item_测试群")});
+    json raw = {{"window", "wx"}, {"platform", "wechat"}, {"complete", true}, {"nodes", nodes}};
+    auto result = ReplyStudio::ParseChatWindow(raw);
+    REQUIRE_EQ(result["messages"].size(), size_t(1));
+    REQUIRE_EQ(result["messages"][0]["speaker"].get<std::string>(), "小林");
+    REQUIRE_EQ(result["messages"][0]["source"].get<std::string>(), "uia+verified-session-sender");
+    raw["nodes"][5]["name"] = "测试群\n已置顶\n小林: 周末下午一起吃饭吗\n10:31\n";
+    result = ReplyStudio::ParseChatWindow(raw);
+    REQUIRE(result["messages"][0]["speaker"] == "");
+    raw["nodes"][5]["name"] = "测试群\n已置顶\n小林: 周末下午一起…\n10:30\n";
+    result = ReplyStudio::ParseChatWindow(raw);
+    REQUIRE(result["messages"][0]["speaker"] == "");
+}
+TEST_CASE(chat_qq_ocr_uses_visible_bubbles_and_merges_single_line_title_fragments)
+{
+    auto line = [](const char *text, double x, double y, double width, double height) {
+        return json{{"text", text}, {"x", x}, {"y", y}, {"width", width}, {"height", height}};
+    };
+    json raw = {
+        {"window", "qq"},
+        {"platform", "qq"},
+        {"complete", true},
+        {"nodes", json::array()},
+        {"ocr",
+         {{"verifiedLayout", true},
+          {"left", 250},
+          {"right", 800},
+          {"width", 1000},
+          {"lines",
+           json::array({line("测试", 270, 30, 30, 18), line("群（3）", 301, 31, 50, 18), line("小林", 300, 100, 30, 16),
+                        line("最新来信", 302, 131, 70, 17), line("群公告", 850, 80, 70, 20),
+                        line("不应作为消息", 850, 130, 100, 20), line("未发送草稿", 300, 650, 100, 20)})},
+          {"bubbles", json::array({{{"x", 300}, {"y", 125}, {"width", 120}, {"height", 40}, {"self", false}}})}}}};
+    auto result = ReplyStudio::ParseChatWindow(raw);
+    REQUIRE(result["readable"] == true);
+    REQUIRE(result["title"] == "测试群（3）");
+    REQUIRE(result["kind"] == "group");
+    REQUIRE_EQ(result["messages"].size(), size_t(1));
+    REQUIRE(result["messages"][0]["speaker"] == "小林");
+    REQUIRE(result["messages"][0]["text"] == "最新来信");
+    raw["ocr"]["lines"][1]["y"] = 49;
+    REQUIRE(ReplyStudio::ParseChatWindow(raw)["readable"] == false);
+}

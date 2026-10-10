@@ -22,8 +22,9 @@ namespace
 // 文件是否损坏，只要用户填过真值就一条都不能丢。
 bool IsCredentialKey(const std::string &key)
 {
-    static const std::set<std::string> exact = {"token",  "api_key",     "apikey",    "secret_id",   "secret_key",
-                                                "app_id", "asr_app_key", "asr_token", "polish_token"};
+    static const std::set<std::string> exact = {"token",      "api_key",           "apikey", "secret_id",
+                                                "secret_key", "tencent_secret_id", "app_id", "asr_app_key",
+                                                "asr_token",  "polish_token"};
     if (exact.count(key) != 0)
     {
         return true;

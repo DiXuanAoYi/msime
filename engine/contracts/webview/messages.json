@@ -939,6 +939,37 @@
         ],
         "additionalProperties": false
       }
+    },
+    "localAsrRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "download",
+              "cancel",
+              "start",
+              "stop"
+            ]
+          },
+          "modelId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "server": {
@@ -1730,6 +1761,42 @@
         "action",
         "ok",
         "message"
+      ],
+      "additionalProperties": false
+    },
+    "localAsrResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": true
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "models",
+        "service"
       ],
       "additionalProperties": false
     }

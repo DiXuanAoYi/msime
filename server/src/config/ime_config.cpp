@@ -708,6 +708,7 @@ bool LoadImeConfig()
         voice.hotkey_rctrl_ralt = tbl["voice_input"]["hotkey_rctrl_ralt"].value_or(false);
         voice.hotkey_hold_space_lock = tbl["voice_input"]["hotkey_hold_space_lock"].value_or(true);
         voice.asr_provider = tbl["voice_input"]["asr_provider"].value_or(std::string("doubao"));
+        voice.tencent_secret_id = tbl["voice_input"]["tencent_secret_id"].value_or(std::string());
         voice.asr_app_key = tbl["voice_input"]["asr_app_key"].value_or(std::string());
         voice.doubao_auth_mode = VoiceInput::NormalizeDoubaoAuthMode(
             tbl["voice_input"]["doubao_auth_mode"].value_or(std::string()), voice.asr_app_key);

@@ -1,3 +1,5 @@
+#include "settings/local_asr_models.h"
+#include "voice-input/voice_providers.h"
 #include "assistant/service.h"
 #include "english/vocabulary_service.h"
 // 设置窗口 WebView：DirectComposition 视觉树、composition controller 的创建、设置页消息与
@@ -1523,6 +1525,12 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                             ShellExecuteW(hwnd, L"open", string_to_wstring(url).c_str(), nullptr, nullptr,
                                           SW_SHOWNORMAL);
                     }
+                    else if (type == "localAsrRequest")
+                    {
+                        auto response = LocalAsr::Handle(nlohmann::json::parse(json::serialize(val.at("data"))));
+                        if (::webviewSettingsWnd)
+                            ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
                     else if (type == "chatRequest")
                     {
                         const auto action = json::value_to<std::string>(val.at("data").at("action"));
@@ -1566,6 +1574,17 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         {
                             const auto &data = val.at("data").as_object();
                             const std::string path = json::value_to<std::string>(data.at("path"));
+                            if (path.rfind("voice_input.", 0) == 0)
+                            {
+                                const auto &value = data.at("value");
+                                bool changed =
+                                    value.is_bool()
+                                        ? SetConfiguredVoiceInputBool(path.substr(12), json::value_to<bool>(value))
+                                        : value.is_string() && SetConfiguredVoiceInputString(
+                                                                   path.substr(12), json::value_to<std::string>(value));
+                                if (changed)
+                                    PostSettingsConfig();
+                            }
                             ApplyInputSubkey(path, data);
                             ApplyAppearanceSubkey(path, data);
                             ApplyGeneralSubkey(path, data);
@@ -1691,6 +1710,7 @@ void PostSettingsConfig()
     }
 
     const FloatingToolbarItemsConfig &toolbar = GetConfiguredFloatingToolbarItems();
+    const VoiceInputConfig &voice = GetConfiguredVoiceInput();
     const TencentTmtConfig &tencent_tmt = GetConfiguredTencentTmt();
     const CustomTranslationConfig &custom_translation = GetConfiguredCustomTranslation();
     const NetworkProxyConfig network_proxy = GetConfiguredNetworkProxy();
@@ -1867,8 +1887,52 @@ void PostSettingsConfig()
           {"quanpin", {{"autocorrect_marker", GetConfiguredQuanpinAutocorrectMarker()}}},
           {"vocabulary",
            {{"enabled", GetConfiguredVocabularyEnabled()}, {"retention_days", GetConfiguredVocabularyRetentionDays()}}},
+          {"voice_input",
+           {{"enabled", voice.enabled},
+            {"hotkey_ralt", voice.hotkey_ralt},
+            {"hotkey_ctrl_f9", voice.hotkey_ctrl_f9},
+            {"hotkey_ctrl_win", voice.hotkey_ctrl_win},
+            {"hotkey_rctrl_ralt", voice.hotkey_rctrl_ralt},
+            {"hotkey_hold_space_lock", voice.hotkey_hold_space_lock},
+            {"asr_provider", voice.asr_provider},
+            {"doubao_auth_mode", voice.doubao_auth_mode},
+            {"asr_app_key", voice.asr_app_key},
+            {"tencent_secret_id", voice.tencent_secret_id},
+            {"asr_token", voice.asr_token},
+            {"asr_tokens", voice.asr_tokens},
+            {"asr_endpoint", voice.asr_endpoint},
+            {"asr_resource_id", voice.asr_resource_id},
+            {"doubao_enable_itn", voice.doubao_enable_itn},
+            {"doubao_enable_punc", voice.doubao_enable_punc},
+            {"doubao_enable_ddc", voice.doubao_enable_ddc},
+            {"doubao_boosting_table_id", voice.doubao_boosting_table_id},
+            {"asr_model", voice.asr_model},
+            {"polish_provider", voice.polish_provider},
+            {"polish_token", voice.polish_token},
+            {"polish_tokens", voice.polish_tokens},
+            {"polish_endpoint", voice.polish_endpoint},
+            {"polish_model", voice.polish_model},
+            {"polish_prompt_id", voice.polish_prompt_id},
+            {"polish_prompt", voice.polish_prompt},
+            {"polish_prompt_custom_1", voice.polish_prompt_custom_1},
+            {"polish_prompt_custom_2", voice.polish_prompt_custom_2},
+            {"polish_prompt_custom_3", voice.polish_prompt_custom_3},
+            {"language", voice.language},
+            {"start_sound", voice.start_sound},
+            {"end_sound", voice.end_sound},
+            {"mute_system_audio", voice.mute_system_audio},
+            {"notification_sound", voice.start_sound && voice.end_sound},
+            {"polish_text", voice.polish_text},
+            {"stream_inline_preedit", voice.stream_inline_preedit},
+            {"commit_mode", voice.commit_mode}}},
           {"statistics",
            {{"enabled", GetConfiguredStatisticsEnabled()}, {"retention", GetConfiguredStatisticsRetention()}}}}}};
+    nlohmann::json voice_presets = nlohmann::json::array();
+    for (const auto &preset : VoiceInput::BuiltinPolishPromptPresets())
+        voice_presets.push_back({{"id", std::string(preset.id)},
+                                 {"name", std::string(preset.name)},
+                                 {"prompt", std::string(preset.prompt)}});
+    payload["data"]["voice_input"]["polish_presets"] = std::move(voice_presets);
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();
     payload["data"]["input"]["custom_shuangpin_schemas"] = CustomShuangpinSchemasJson();

@@ -322,3 +322,13 @@
   background: var(--control-bg);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color) 20%, transparent);
 }
+
+.voice-provider-links, .local-asr-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:12px 0; }
+.voice-provider-links a, .local-asr-actions a { color:var(--accent-color, #58a6ff); text-decoration:underline; cursor:pointer; }
+.voice-provider-links p { flex-basis:100%; margin:0; font-size:12px; opacity:.8; }
+.local-asr-card { border:1px solid var(--border-color, #8885); border-radius:10px; padding:16px; margin:12px 0; }
+.local-asr-card h4 { margin:0 0 8px; font-size:15px; }
+.local-asr-card p { line-height:1.6; margin:6px 0; overflow-wrap:anywhere; }
+.local-asr-size { font-variant-numeric:tabular-nums; font-weight:600; }
+.local-asr-card progress { width:100%; height:10px; }
+#localAsrPanel summary { cursor:pointer; }

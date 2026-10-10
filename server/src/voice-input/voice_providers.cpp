@@ -2,6 +2,8 @@
 #include "assistant/modes.h"
 
 #include <map>
+#include <fstream>
+#include "engine/core/data_path.h"
 
 namespace VoiceInput
 {
@@ -117,13 +119,15 @@ std::string LookupToken(const std::map<std::string, std::string> &tokens, std::s
 
 const std::vector<std::string_view> &AsrProviders()
 {
-    static const std::vector<std::string_view> kProviders{"doubao", "openai", "siliconflow", "groq"};
+    static const std::vector<std::string_view> kProviders{"doubao", "openai",  "siliconflow", "groq",
+                                                          "aliyun", "tencent", "local"};
     return kProviders;
 }
 
 const std::vector<std::string_view> &PolishProviders()
 {
-    static const std::vector<std::string_view> kProviders{"siliconflow", "openai", "deepseek", "groq"};
+    static const std::vector<std::string_view> kProviders{"siliconflow", "openai", "deepseek",
+                                                          "groq",        "aliyun", "tencent"};
     return kProviders;
 }
 
@@ -151,6 +155,14 @@ std::string PolishTokenSlotKey(std::string_view provider)
 
 std::string ResolveAsrToken(const VoiceInputConfig &config)
 {
+    if (config.asr_provider == "local")
+    {
+        std::ifstream input(metasequoia::data_directory() / "models" / "asr" / "service-token.txt");
+        std::string token;
+        input >> token;
+        return token.size() == 64 && token.find_first_not_of("0123456789abcdef") == std::string::npos ? token
+                                                                                                      : std::string{};
+    }
     return LookupToken(config.asr_tokens, config.asr_provider);
 }
 
@@ -162,6 +174,12 @@ std::string ResolvePolishToken(const VoiceInputConfig &config)
 std::string DefaultAsrEndpoint(std::string_view provider)
 {
     const std::string id = Lower(provider);
+    if (id == "local")
+        return "http://127.0.0.1:18766/v1/audio/transcriptions";
+    if (id == "aliyun")
+        return "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+    if (id == "tencent")
+        return "https://asr.tencentcloudapi.com";
     if (id == "openai")
         return "https://api.openai.com/v1/audio/transcriptions";
     if (id == "groq")
@@ -174,6 +192,12 @@ std::string DefaultAsrEndpoint(std::string_view provider)
 std::string DefaultAsrModel(std::string_view provider)
 {
     const std::string id = Lower(provider);
+    if (id == "local")
+        return "sensevoice-small";
+    if (id == "aliyun")
+        return "qwen3-asr-flash";
+    if (id == "tencent")
+        return "16k_zh";
     if (id == "openai")
         return "whisper-1";
     if (id == "groq")
@@ -186,6 +210,10 @@ std::string DefaultAsrModel(std::string_view provider)
 std::string DefaultPolishEndpoint(std::string_view provider)
 {
     const std::string id = Lower(provider);
+    if (id == "aliyun")
+        return "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+    if (id == "tencent")
+        return "https://api.hunyuan.cloud.tencent.com/v1/chat/completions";
     if (id == "openai")
         return "https://api.openai.com/v1/chat/completions";
     if (id == "deepseek")
@@ -198,6 +226,10 @@ std::string DefaultPolishEndpoint(std::string_view provider)
 std::string DefaultPolishModel(std::string_view provider)
 {
     const std::string id = Lower(provider);
+    if (id == "aliyun")
+        return "qwen-plus";
+    if (id == "tencent")
+        return "hunyuan-turbos-latest";
     if (id == "openai")
         return "gpt-4o-mini";
     if (id == "deepseek")

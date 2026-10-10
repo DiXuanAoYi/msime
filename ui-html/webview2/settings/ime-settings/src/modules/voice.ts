@@ -1,3 +1,5 @@
+import { setupLocalAsr } from './local-asr';
+import { serializeHostMessage } from '../../../../shared/messages';
 import { applyDropdownValue, applyToggleState, setupDropdownMenu, setupToggleButton } from './shared';
 import { updateConfig } from './config-sync';
 import { setupCredentialTest } from './credential-test';
@@ -7,6 +9,7 @@ type PolishPreset = { id: string; name: string; prompt: string };
 
 const fields: Record<string, string> = {
   voiceAsrAppKey: 'voice_input.asr_app_key',
+  voiceTencentSecretId: 'voice_input.tencent_secret_id',
   voiceAsrToken: 'voice_input.asr_token',
   voiceAsrEndpoint: 'voice_input.asr_endpoint',
   voiceAsrModel: 'voice_input.asr_model',
@@ -17,6 +20,9 @@ const fields: Record<string, string> = {
 };
 
 const ASR_DEFAULTS: Record<string, ProviderDefaults> = {
+  aliyun: { endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', model: 'qwen3-asr-flash' },
+  tencent: { endpoint: 'https://asr.tencentcloudapi.com', model: '16k_zh' },
+  local: { endpoint: 'http://127.0.0.1:18766/v1/audio/transcriptions', model: 'sensevoice-small' },
   doubao: {
     endpoint: 'wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async',
     model: ''
@@ -36,6 +42,8 @@ const ASR_DEFAULTS: Record<string, ProviderDefaults> = {
 };
 
 const POLISH_DEFAULTS: Record<string, ProviderDefaults> = {
+  aliyun: { endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', model: 'qwen-plus' },
+  tencent: { endpoint: 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', model: 'hunyuan-turbos-latest' },
   siliconflow: {
     endpoint: 'https://api.siliconflow.cn/v1/chat/completions',
     model: 'Qwen/Qwen3-8B'
@@ -107,8 +115,8 @@ const FALLBACK_PRESETS: PolishPreset[] = [
   }
 ];
 
-const ASR_PROVIDERS = ['doubao', 'openai', 'siliconflow', 'groq'] as const;
-const POLISH_PROVIDERS = ['siliconflow', 'openai', 'deepseek', 'groq'] as const;
+const ASR_PROVIDERS = ['doubao', 'openai', 'siliconflow', 'groq', 'aliyun', 'tencent', 'local'] as const;
+const POLISH_PROVIDERS = ['siliconflow', 'openai', 'deepseek', 'groq', 'aliyun', 'tencent'] as const;
 
 let asrTokens: Record<string, string> = {};
 let polishTokens: Record<string, string> = {};
@@ -156,6 +164,7 @@ function asrTestConfig(): Record<string, string> {
     provider: currentAsrProvider,
     authMode: currentDoubaoAuthMode,
     appId: fieldValue('voiceAsrAppKey'),
+    secretId: fieldValue('voiceTencentSecretId'),
     token: fieldValue('voiceAsrToken'),
     endpoint: fieldValue('voiceAsrEndpoint') || defaults?.endpoint || '',
     model: fieldValue('voiceAsrModel') || defaults?.model || '',
@@ -216,6 +225,9 @@ function switchPolishProvider(provider: string): void {
 
 function syncAsrProviderUi(provider: string): void {
   const doubao = provider === 'doubao';
+  setHidden('voiceTencentSecretIdField', provider !== 'tencent');
+  setHidden('voiceAsrTokenField', provider === 'local');
+  renderProviderLinks('voiceAsrLinks', provider, false);
   setHidden('voiceDoubaoAuthModeField', !doubao);
   // The new console issues a single API Key, so App ID only applies to the legacy console.
   setHidden('voiceAsrAppKeyField', !doubao || currentDoubaoAuthMode !== 'legacy');
@@ -226,7 +238,7 @@ function syncAsrProviderUi(provider: string): void {
   if (model && defaults?.model) model.placeholder = defaults.model;
   const tokenLabel = document.querySelector<HTMLElement>('label[for="voiceAsrToken"]');
   if (tokenLabel) {
-    tokenLabel.textContent = doubao && currentDoubaoAuthMode !== 'legacy' ? 'API Key' : 'Access Token / API Key';
+    tokenLabel.textContent = provider === 'tencent' ? 'SecretKey（腾讯云 ASR）' : doubao && currentDoubaoAuthMode !== 'legacy' ? 'API Key' : 'Access Token / API Key';
   }
 }
 
@@ -266,6 +278,7 @@ function applyAsrProviderDefaults(provider: string): void {
 }
 
 function applyPolishProviderDefaults(provider: string): void {
+  renderProviderLinks('voicePolishLinks', provider, true);
   const defaults = POLISH_DEFAULTS[provider];
   if (!defaults) return;
   const model = document.getElementById('voicePolishModel') as HTMLInputElement | null;
@@ -346,6 +359,7 @@ function listenMenuSelection(menuId: string, onSelect: (value: string) => void):
 }
 
 export function setupVoiceInput(): void {
+  setupLocalAsr();
   setupToggleButton('voiceEnabled', value => updateConfig('voice_input.voice_input', value));
   setupToggleButton('voicePolishText', value => updateConfig('voice_input.polish_text', value));
   setupToggleButton('voiceStreamInlinePreedit', value => updateConfig('voice_input.stream_inline_preedit', value));
@@ -511,6 +525,7 @@ export function applyVoiceConfig(config: Record<string, unknown>): void {
   );
   const polishProvider = typeof config.polish_provider === 'string' ? config.polish_provider : 'siliconflow';
   currentPolishProvider = polishProvider;
+  renderProviderLinks('voicePolishLinks', polishProvider, true);
   polishTokens = readTokenMap(
     config.polish_tokens,
     polishProvider,
@@ -561,4 +576,25 @@ export function applyVoiceConfig(config: Record<string, unknown>): void {
   }
   syncSoundMaster();
   applyingConfig = false;
+}
+
+const PROVIDER_LINKS: Record<string, [string,string,string]> = {
+  doubao:['https://www.volcengine.com/product/speech','https://console.volcengine.com/speech/app','https://www.volcengine.com/docs/6561/1354869'],
+  openai:['https://platform.openai.com','https://platform.openai.com/api-keys','https://platform.openai.com/docs/guides/speech-to-text'],
+  siliconflow:['https://siliconflow.cn','https://cloud.siliconflow.cn/account/ak','https://docs.siliconflow.cn'],
+  groq:['https://groq.com','https://console.groq.com/keys','https://console.groq.com/docs/speech-to-text'],
+  deepseek:['https://www.deepseek.com','https://platform.deepseek.com/api_keys','https://api-docs.deepseek.com/zh-cn/'],
+  aliyun:['https://www.aliyun.com/product/bailian','https://bailian.console.aliyun.com','https://help.aliyun.com/zh/model-studio/non-realtime-speech-recognition-user-guide'],
+  tencent:['https://cloud.tencent.com/product/asr','https://console.cloud.tencent.com/asr','https://cloud.tencent.com/document/product/1093/35646'],
+  local:['https://github.com/k2-fsa/sherpa-onnx','https://huggingface.co/Qwen/Qwen3-ASR-1.7B','https://k2-fsa.github.io/sherpa/onnx/index.html']
+};
+function renderProviderLinks(id: string, provider: string, polish: boolean): void {
+  const root = document.getElementById(id); if (!root) return;
+  root.replaceChildren();
+  let links = PROVIDER_LINKS[provider]; if (!links) return;
+  if (polish && provider === 'tencent') links = ['https://cloud.tencent.com/product/hunyuan','https://console.cloud.tencent.com/hunyuan','https://cloud.tencent.com/document/product/1729/111007'];
+  const labels = provider === 'local' ? ['运行框架说明','Qwen 原版模型','离线部署说明'] : ['服务官网','开通服务 / 获取密钥','配置文档'];
+  links.forEach((url, i) => { const a = document.createElement('a'); a.href = url; a.textContent = labels[i]; a.addEventListener('click', e => { e.preventDefault(); window.chrome?.webview?.postMessage(serializeHostMessage({type:'openExternalUrl',data:url})); }); root.appendChild(a); });
+  if (provider === 'tencent') { const note = document.createElement('p'); note.textContent = polish ? '混元 API Key 与 ASR SecretId / SecretKey 不通用。' : '先开通语音识别服务，再填 SecretId、SecretKey；一句话识别每段最多 60 秒。'; root.appendChild(note); }
+  if (provider === 'aliyun') { const note = document.createElement('p'); note.textContent = '百炼 API Key 和接口地域必须一致；自有工作空间请按文档修改接口地址。'; root.appendChild(note); }
 }

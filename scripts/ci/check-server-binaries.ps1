@@ -18,7 +18,7 @@ if ($missing) {
 
 $productionExecutables = @(
     Get-ChildItem -LiteralPath $BuildDir -Recurse -File -Filter '*.exe' |
-        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' }
+        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.FullName -notlike (Join-Path ([IO.Path]::GetFullPath($BuildDir)) 'local-asr\*') }
 )
 $missingPdb = @(
     $productionExecutables |

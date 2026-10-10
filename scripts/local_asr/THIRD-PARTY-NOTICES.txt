@@ -1,0 +1,19 @@
+Metasequoia IME local ASR runtime
+
+The installer contains the CPU runtime only. Model weights are downloaded separately
+from the links and immutable file digests in catalog.json. Original and converted
+models retain their respective upstream licenses; consult each official model card.
+
+Python: PSF License, https://docs.python.org/3/license.html
+sherpa-onnx and sherpa-onnx-core: Apache-2.0, https://github.com/k2-fsa/sherpa-onnx
+ONNX Runtime: MIT, https://github.com/microsoft/onnxruntime
+NumPy: BSD-3-Clause, https://numpy.org/doc/stable/license.html
+uv: MIT OR Apache-2.0, https://github.com/astral-sh/uv
+PyInstaller bootloader: GPL-2.0-or-later with linking exception,
+https://pyinstaller.org/en/stable/license.html
+
+Distribution metadata and bundled license files are preserved in _internal.
+Full Python, sherpa-onnx, ONNX Runtime and PyInstaller license texts are in
+_internal/licenses; ONNX Runtime dependency notices are also included there.
+The optional Qwen 1.7B worker installs qwen-asr and PyTorch into an isolated uv
+environment on first launch. Their licenses and dependency metadata remain there.

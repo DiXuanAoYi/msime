@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <ctime>
 #include <vector>
 
 namespace TencentTmt
@@ -12,6 +13,8 @@ struct Credentials
     std::string region = "ap-guangzhou";
 };
 
+// ASR uses the same TC3 primitive, with its own service and signed action.
+std::string AsrAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp);
 // Returns one translation per source string. Empty entries mean that item failed.
 std::vector<std::string> TextTranslateBatch(const Credentials &credentials, const std::vector<std::string> &texts,
                                             const std::string &source, const std::string &target);

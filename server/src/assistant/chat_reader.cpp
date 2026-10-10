@@ -162,26 +162,44 @@ json ParseChatWindow(const json &w)
         return out;
     }
     const auto &nodes = w.at("nodes");
-    if (w.at("platform") == "wecom" && w.contains("ocr"))
+    if ((w.at("platform") == "wecom" || w.at("platform") == "qq") && w.contains("ocr"))
     {
         const auto &ocr = w.at("ocr");
-        out["status"] = "企业微信本地 OCR：需标准浅色消息布局，隐藏 / 最小化 / 不可识别时暂停";
+        out["status"] = "当前画面本地 OCR：核对标题与发言人；布局无法确认时暂停";
         if (!ocr.value("verifiedLayout", false))
             return out;
-        std::vector<std::string> titles;
+        std::vector<json> titleLines;
         for (const auto &line : ocr.at("lines"))
         {
             double x = line.at("x"), y = line.at("y");
             auto text = line.value("text", "");
-            if (x >= 320 && x < 650 && y >= 20 && y < 55 && !text.empty())
-                titles.push_back(text);
-            if (text.find("群成员") != std::string::npos && x > ocr.value("width", 0.0) - 180)
+            if (x >= ocr.value("left", 308.0) + 10 && x < ocr.value("right", 900.0) - 50 && y >= 20 && y < 55 &&
+                !text.empty())
+                titleLines.push_back(line);
+            if ((text.find("群成员") != std::string::npos ||
+                 (text.find("群") != std::string::npos && text.find("成员") != std::string::npos) ||
+                 text == "群公告") &&
+                x > ocr.value("width", 0.0) * 0.64)
                 out["kind"] = "group";
         }
-        if (titles.size() != 1)
+        if (titleLines.empty())
             return out;
-        out["title"] = titles[0];
-        if (titles[0] == "我的客服" || titles[0] == "企业微信团队" || titles[0] == "文件传输助手")
+        std::sort(titleLines.begin(), titleLines.end(),
+                  [](const json &a, const json &b) { return a.at("x").get<double>() < b.at("x").get<double>(); });
+        std::string titleText;
+        double end = titleLines.front().at("x");
+        double baseline = titleLines.front().at("y");
+        for (const auto &line : titleLines)
+        {
+            if (std::abs(line.at("y").get<double>() - baseline) > 8 || line.at("x").get<double>() > end + 35)
+                return out;
+            titleText += line.value("text", "");
+            end = line.at("x").get<double>() + line.at("width").get<double>();
+        }
+        out["title"] = titleText;
+        if (w.at("platform") == "qq" && std::regex_search(titleText, std::regex(R"((\(|（)[0-9]+(\)|）))")))
+            out["kind"] = "group";
+        if (titleText == "我的客服" || titleText == "企业微信团队" || titleText == "文件传输助手")
         {
             out["status"] = "服务 / 文件传输会话不参与自动预回复";
             return out;
@@ -208,13 +226,14 @@ json ParseChatWindow(const json &w)
                         body += '\n';
                     body += text;
                 }
-                else if (!self && lx >= x - 2 && lx < x + 80 && bt <= y && bt >= y - 28 && ly >= 70)
+                else if (!self && lx >= x - 2 && lx < x + 80 && bt <= y && bt >= y - 28 && ly >= 70 &&
+                         text != "管理员" && text != "群主")
                 {
                     speaker = text;
                     ++names;
                 }
             }
-            if (body.empty() || body.size() > 12000)
+            if (body.empty() || body.size() > 12000 || body.find("条新消息") != std::string::npos)
                 continue;
             if (self)
                 speaker = "本人";
@@ -564,6 +583,56 @@ json ParseChatWindow(const json &w)
             {
                 speaker = labels[0];
                 source = "uia+local-ocr-speaker";
+            }
+        }
+        // The selected session's accessibility summary includes the latest sender in
+        // native text. Use it only when the full latest body (not an ellipsis) agrees,
+        // and its timestamp agrees with the loaded final row. Never use sidebar text
+        // as a message or apply this identity to older bubbles.
+        if (w.at("platform") == "wechat" && group && r == rows.back() && text.size() >= 3 &&
+            text.find("…") == std::string::npos && text.find("...") == std::string::npos)
+        {
+            const auto chatTitle = out["title"].get<std::string>();
+            std::vector<std::string> summaries;
+            for (const auto &session : nodes)
+            {
+                if (session.value("id", "") != "session_item_" + chatTitle)
+                    continue;
+                auto summary = session.value("name", "");
+                summary = std::regex_replace(summary, std::regex(R"(\s+)"), " ");
+                while (!summary.empty() && summary.back() == ' ')
+                    summary.pop_back();
+                if (summary.rfind(chatTitle + " ", 0) != 0)
+                    continue;
+                summary.erase(0, chatTitle.size() + 1);
+                if (summary.rfind("已置顶 ", 0) == 0)
+                    summary.erase(0, std::string("已置顶 ").size());
+                if (summary.rfind("[", 0) == 0)
+                {
+                    auto end = summary.find("条] ");
+                    if (end == std::string::npos || end > 12)
+                        continue;
+                    summary.erase(0, end + std::string("条] ").size());
+                }
+                auto delimiter = summary.find(": ");
+                if (delimiter == std::string::npos || delimiter == 0 || delimiter > 160)
+                    continue;
+                auto author = summary.substr(0, delimiter);
+                auto remainder = summary.substr(delimiter + 2);
+                if (remainder.rfind(text + " ", 0) != 0)
+                    continue;
+                auto suffix = remainder.substr(text.size() + 1);
+                if (timestamp.empty() || suffix.rfind(timestamp, 0) != 0)
+                    continue;
+                suffix.erase(0, timestamp.size());
+                if (!suffix.empty() && suffix != " 消息免打扰")
+                    continue;
+                summaries.push_back(author);
+            }
+            if (summaries.size() == 1)
+            {
+                speaker = summaries[0];
+                source = "uia+verified-session-sender";
             }
         }
         if (w.at("platform") == "qq" && !qqDuplicates.insert(speaker + "\n" + timestamp + "\n" + text).second)

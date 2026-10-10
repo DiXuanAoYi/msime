@@ -29,4 +29,4 @@
 server/src/assistant：模式目录、请求协议、DPAPI 会话存储、串行可取消请求。
 前端懒加载工作台，两个原生设置宿主均接入版本化 WebView 契约。现有语音设置共享同一模式目录，避免风格名单漂移。
 
-验证记录见发行包的 windows-voice-validation.txt。真实麦克风/云端 ASR 识别尚未在本次开发中使用；没有消费用户的云端 API 配额。模型端到端测试使用本机回环模拟服务和模拟对话。
+旧版验证记录见 windows-voice-validation.txt。v0.9.9 新增原生设置页的真实 DeepSeek 自动预回复测试，仅发送合成对话；本地 ASR 使用官方样例音频验证。阿里云和腾讯云未提供相应凭据，只有协议/签名与界面回归，不能视为云端识别实测。新版范围见发行包 windows-v099-validation.txt。

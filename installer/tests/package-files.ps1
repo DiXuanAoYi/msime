@@ -17,6 +17,8 @@ try {
         'server/build-release/bin/Release/MetasequoiaImeServer.pdb',
         'server/build-release/bin/Release/MetasequoiaImeDictionaryReplay.exe',
         'server/build-release/bin/Release/MetasequoiaImeDictionaryReplay.pdb',
+        'server/build-release/bin/Release/local-asr/MetasequoiaLocalASR.exe',
+        'server/build-release/bin/Release/local-asr/_internal/catalog.json',
         'server/build-release/bin/Release/MetasequoiaImeServerTests.exe',
         'server/build-release/bin/Release/MetasequoiaImeServerTests.pdb',
         'server/build-release/bin/Release/test_webview_contract.exe',

@@ -27,6 +27,7 @@ struct VoiceInputConfig
     // Empty means "infer from asr_app_key", which keeps configs written before this setting working.
     std::string doubao_auth_mode = "api_key";
     std::string asr_app_key;
+    std::string tencent_secret_id;
     std::string asr_token;
     // Per-provider tokens so switching ASR/polish providers restores the matching key.
     std::map<std::string, std::string> asr_tokens;

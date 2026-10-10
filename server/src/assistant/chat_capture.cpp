@@ -145,14 +145,14 @@ json ReadLabels(HWND hwnd, const json &nodes)
 // WeCom 5 uses a custom drawn window with no message UIA provider.
 // This local-only fallback accepts the observed light theme and isolates colored
 // bubble components from the composer, navigation and group member sidebar.
-json ReadWeCom(HWND hwnd)
+json ReadWeCom(HWND hwnd, bool qq = false)
 {
     json result = {{"lines", json::array()}, {"bubbles", json::array()}};
     RECT rect{};
     GetWindowRect(hwnd, &rect);
     int width = rect.right - rect.left, height = rect.bottom - rect.top;
     double scale = GetDpiForWindow(hwnd) / 96.0;
-    if (width < 700 * scale || width > 1750 || height < 400 * scale || height > 1700)
+    if (width < 600 * scale || width > 2300 || height < 350 * scale || height > 1900)
         return result;
     HDC dc = GetDC(hwnd), mem = CreateCompatibleDC(dc);
     BITMAPINFO info{};
@@ -214,27 +214,73 @@ json ReadWeCom(HWND hwnd)
                                                {"width", (right - left) / 2 / scale},
                                                {"height", (bottom - top) / 2 / scale}});
                 }
-                // Restrict the fallback to its observed theme/layout. Unexpected skins fail closed.
-                size_t bg = (size_t(int(75 * scale)) * width + int(315 * scale)) * 4;
-                if (src[bg] < 235 || src[bg + 1] < 235 || src[bg + 2] < 235)
-                    throw std::runtime_error("unsupported theme");
-                int right = width - int(16 * scale);
+                // Locate the actual sidebar boundary from a persistent vertical edge,
+                // measured in physical pixels. The OCR geometry is converted once.
+                auto luminance = [&](int x, int y) {
+                    size_t a = (size_t(y) * width + x) * 4;
+                    return (int(src[a]) + src[a + 1] + src[a + 2]) / 3;
+                };
+                int divider = 0;
+                double best = 0;
+                for (int x = int(180 * scale); x < std::min(width / 2, int(440 * scale)); ++x)
+                {
+                    double score = 0;
+                    for (int y = int(75 * scale); y < height - int(35 * scale); y += 3)
+                        score += std::abs(luminance(x - 2, y) - luminance(x + 2, y));
+                    if (score > best)
+                    {
+                        best = score;
+                        divider = x;
+                    }
+                }
+                if (!divider || best < height * 0.5)
+                    throw std::runtime_error("sidebar not found");
+                int left = divider + int(12 * scale), top = int(70 * scale);
+                int right = width - int(16 * scale), bottom = height - int(145 * scale);
                 for (const auto &line : result["lines"])
                 {
                     auto text = line.value("text", "");
-                    if (text.find("群成员") != std::string::npos && line["x"].get<double>() > width / scale - 180)
-                        right = int((line["x"].get<double>() - 12) * scale);
+                    double x = line["x"], y = line["y"];
+                    if ((text.find("群成员") != std::string::npos ||
+                         (text.find("群") != std::string::npos && text.find("成员") != std::string::npos) ||
+                         text == "群公告") &&
+                        x * scale > width * 0.64)
+                        right = std::min(right, int((x - 12) * scale));
                 }
+                // Composer border spans the message column; do not OCR drafts as messages.
+                double horizontalBest = 0;
+                for (int y = height / 2; y < height - int(70 * scale); ++y)
+                {
+                    int edges = 0;
+                    for (int x = left + int(15 * scale); x < right - int(15 * scale); x += 3)
+                        if (std::abs(luminance(x, y - 2) - luminance(x, y + 2)) >= 4)
+                            ++edges;
+                    if (edges > horizontalBest && edges * 3 > (right - left) * 0.65)
+                    {
+                        horizontalBest = edges;
+                        bottom = y - int(5 * scale);
+                    }
+                }
+                const bool dark = luminance(left + int(8 * scale), top + int(4 * scale)) < 128;
+                if (!qq && dark)
+                    throw std::runtime_error("unsupported WeCom theme");
                 auto color = [&](int x, int y) {
                     size_t a = (size_t(y) * width + x) * 4;
                     int b = src[a], g = src[a + 1], r = src[a + 2];
                     if (r >= 175 && r <= 220 && g >= 210 && b >= 235 && b - r >= 22)
                         return 2;
-                    if (r >= 217 && r <= 238 && g >= r - 3 && g <= r + 8 && b >= g && b <= g + 12)
+                    if (qq && b > 130 && b - r > 65 && g > 70)
+                        return 2;
+                    if (dark && r >= 29 && r <= 64 && std::abs(r - g) < 5 && std::abs(g - b) < 5)
+                        return 1;
+                    if (!dark && r >= 217 && r <= 241 && g >= r - 3 && g <= r + 8 && b >= g && b <= g + 12)
                         return 1;
                     return 0;
                 };
-                int left = int(323 * scale), top = int(76 * scale), bottom = height - int(150 * scale);
+                result["left"] = divider / scale;
+                result["right"] = right / scale;
+                result["bottom"] = bottom / scale;
+                result["dark"] = dark;
                 std::vector<uint8_t> seen(size_t(width) * height, 0);
                 for (int y = top; y < bottom; ++y)
                     for (int x = left; x < right; ++x)
@@ -442,9 +488,9 @@ struct Probe
                 row["complete"] = !truncated;
                 if (platform == "wechat" && !truncated && GetTickCount64() < deadline)
                     row["labels"] = ReadLabels(hwnd, row["nodes"]);
-                if (platform == "wecom" && !truncated && row["nodes"].size() < 20 && row["title"] == "企业微信" &&
-                    GetTickCount64() < deadline)
-                    row["ocr"] = ReadWeCom(hwnd);
+                if ((platform == "wecom" || platform == "qq") && !truncated &&
+                    (row["title"] == "企业微信" || platform == "qq") && GetTickCount64() < deadline)
+                    row["ocr"] = ReadWeCom(hwnd, platform == "qq");
                 // Re-read the active chat title to reject a mid-capture conversation switch.
                 for (auto &node : row["nodes"])
                 {

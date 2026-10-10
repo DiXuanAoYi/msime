@@ -1,3 +1,4 @@
+#include "settings/local_asr_models.h"
 #include "assistant/service.h"
 #include "english/vocabulary_service.h"
 #include "engine/contracts/webview/validator.h"
@@ -613,6 +614,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"asr_provider", voice.asr_provider},
             {"doubao_auth_mode", voice.doubao_auth_mode},
             {"asr_app_key", voice.asr_app_key},
+            {"tencent_secret_id", voice.tencent_secret_id},
             {"asr_token", voice.asr_token},
             {"asr_tokens", voice.asr_tokens},
             {"asr_endpoint", voice.asr_endpoint},
@@ -1536,6 +1538,12 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                         g_webview->PostWebMessageAsJson(message.c_str());
                 };
             });
+        }
+        else if (type == "localAsrRequest")
+        {
+            auto response = LocalAsr::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
         }
         else if (type == "chatRequest")
         {
