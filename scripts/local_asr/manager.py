@@ -288,7 +288,8 @@ def run_qwen(root, model_id, worker_name="qwen_worker.py"):
         stop.unlink(missing_ok=True)
         atomic_json(root / "service.json", dict(state="loading", model=model_id,
             message="首次启动正在准备 Python / PyTorch 运行依赖（额外下载，不计入模型大小）", pid=os.getpid()))
-        env = dict(os.environ, UV_CACHE_DIR=str(root / "runtime-cache"))
+        env = dict(os.environ, UV_CACHE_DIR=str(root / "runtime-cache"),
+                   HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
         worker = BASE / "worker" if getattr(sys, "frozen", False) else BASE
         command = [str(BASE / "uv.exe"), "run", "--python", "3.12", "--no-project", "--script",
                    str(worker / worker_name), str(root), model_id]
