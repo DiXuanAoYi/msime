@@ -15,6 +15,7 @@ export function setupLocalTts(): void {
   let busy = false;
   let timer = 0;
   let activeModel = "";
+  let renderedModels = '';
   const send = (action: 'status' | 'download' | 'cancel' | 'start' | 'stop', modelId?: string) => {
     const requestId = `local-tts-${++counter}`;
     window.chrome?.webview?.postMessage(serializeHostMessage({type:'localTtsRequest', data:{requestId, action, ...(modelId ? {modelId} : {})}}));
@@ -26,7 +27,7 @@ export function setupLocalTts(): void {
   const actionButton = (parent: HTMLElement, label: string, action: 'download' | 'cancel' | 'start' | 'stop', id: string, disabled = false) => {
     const button = add(parent, 'button', label, 'credential-test-button') as HTMLButtonElement;
     button.type = 'button'; button.disabled = disabled;
-    button.addEventListener('click', () => { button.disabled = true; send(action, id); });
+    button.addEventListener('click', () => { button.disabled = true; renderedModels = ''; send(action, id); });
   };
   onHostMessage('localTtsResponse', message => {
     if (message.type !== 'localTtsResponse') return;
@@ -36,6 +37,12 @@ export function setupLocalTts(): void {
     activeModel = readyModel;
     if (!message.ok || message.message) status.textContent = message.message;
     else status.textContent = typeof service.message === 'string' ? service.message : '选择模型，下载完成后点击“启动并使用”。';
+    // Status polling must not replace focused buttons or interrupt a click.
+    // Actions invalidate this snapshot so an unchanged error response can
+    // restore the temporarily disabled button too.
+    const modelSnapshot = JSON.stringify([message.models, service.model, service.state]);
+    if (modelSnapshot === renderedModels) return;
+    renderedModels = modelSnapshot;
     container.replaceChildren(); busy = false;
     for (const row of message.models) {
       const id = String(row.id ?? '');

@@ -57,3 +57,14 @@ it('polls an initially open panel and refreshes configuration only after the mod
   response('running'); response('running'); expect(sent.filter(m=>m.type==='configRequest')).toHaveLength(1);
   vi.advanceTimersByTime(1500); expect(sent.at(-1).data.action).toBe('status');
 });
+it('preserves buttons on unchanged polls and restores an action after an unchanged response',()=>{
+  setupLocalTts(); response('running');
+  const stop=actions(0).find(b=>b.textContent.includes('正在使用'))!;
+  response('running');
+  expect(actions(0).find(b=>b.textContent.includes('正在使用'))).toBe(stop);
+  stop.events.get('click')(); expect(stop.disabled).toBe(true);
+  response('running');
+  expect(actions(0).find(b=>b.textContent.includes('正在使用'))!.disabled).toBe(false);
+  response('stopped');
+  expect(actions(0).find(b=>b.textContent==='启动并使用')!.disabled).toBe(false);
+});
