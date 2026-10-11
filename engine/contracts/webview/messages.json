@@ -1046,6 +1046,80 @@
         ],
         "additionalProperties": false
       }
+    },
+    "speechRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "action": {
+            "enum": [
+              "status",
+              "preview",
+              "stop"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "language": {
+            "enum": [
+              "zh",
+              "en",
+              "ja",
+              "es",
+              "vi",
+              "fr",
+              "de",
+              "ru",
+              "ko"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "localTtsRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "download",
+              "cancel",
+              "start",
+              "stop"
+            ]
+          },
+          "modelId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "server": {
@@ -1957,6 +2031,69 @@
         "message",
         "books"
       ]
+    },
+    "speechResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "voices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "voices"
+      ],
+      "additionalProperties": true
+    },
+    "localTtsResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": true
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "models",
+        "service"
+      ],
+      "additionalProperties": false
     }
   }
 }

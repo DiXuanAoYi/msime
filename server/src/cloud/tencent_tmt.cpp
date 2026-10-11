@@ -129,6 +129,11 @@ std::string Tc3Authorization(const TencentTmt::Credentials &credentials, const s
 
 namespace TencentTmt
 {
+std::string TtsAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp)
+{
+    return Tc3Authorization(credentials, payload, timestamp, "tts.tencentcloudapi.com", "tts", "texttovoice");
+}
+
 std::string AsrAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp)
 {
     return Tc3Authorization(credentials, payload, timestamp, "asr.tencentcloudapi.com", "asr", "sentencerecognition");

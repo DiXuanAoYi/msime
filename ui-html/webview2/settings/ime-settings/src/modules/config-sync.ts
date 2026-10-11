@@ -440,6 +440,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
       );
     });
   }
+  if (applies('voice') && data?.speech) void import('./speech').then(m => { if (data === lastSnapshot) m.applySpeechConfig(data.speech); });
   if (applies('voice') && data?.voice_input && typeof data.voice_input === 'object') {
     void import('./voice').then((module) => { if (data === lastSnapshot) module.applyVoiceConfig(data.voice_input); });
   }

@@ -1,5 +1,20 @@
 <div class="content" id="voice-settings">
-  <div class="content-header"><span>语音输入</span></div>
+  <div class="content-header"><span>语音与发音</span></div>
+
+  <details class="section voice-section" id="speechPanel" open>
+    <summary class="section-title">候选发音 · 文字转语音</summary>
+    <p class="voice-description">按住 Ctrl 点击原词或译文朗读，不会上屏。默认离线；切换云服务后仅发送你点击的文字。</p>
+    <label><input type="checkbox" id="speech-enabled" checked> 启用 Ctrl 点击发音</label>
+    <div class="speech-fields"><label class="speech-field">发音引擎<select id="speech-provider"></select></label>
+    <label class="speech-field">语速（0.5–2 倍）<input id="speech-rate" type="number" min="0.5" max="2" step="0.1" value="1"></label>
+    <label class="speech-field">音量（0–100）<input id="speech-volume" type="number" min="0" max="100" value="100"></label></div>
+    <p id="speechProviderNote" class="voice-description"></p><div id="speechLinks" class="local-asr-actions"></div>
+    <div id="speechFields" class="speech-fields"></div>
+    <label class="speech-field">试听文本<textarea id="speechText" rows="2" maxlength="600">你好，欢迎使用水杉输入法。</textarea></label>
+    <div class="local-asr-actions"><select id="speechLanguage" aria-label="试听语言"><option value="zh">中文</option><option value="en">English</option></select><button type="button" id="speechPreview" class="credential-test-button">试听 / 测试连接</button><button type="button" id="speechStop" class="credential-test-button">停止朗读</button></div>
+    <p id="speechStatus" role="status" class="voice-description"></p>
+    <details id="localTtsPanel"><summary>开源发音模型 · 下载与运行</summary><p class="voice-description">模型按需下载；大小是所列文件总和，运行环境另外安装。各模型特点、许可证和硬件要求见卡片。</p><div id="localTtsModels"></div><p id="localTtsStatus" role="status"></p><button id="localTtsRefresh" type="button">刷新模型状态</button><button id="localTtsStop" type="button">停止本地服务</button></details>
+  </details>
 
   <div class="section voice-section">
     <div class="section-header"><div><div class="section-title">启用语音输入</div><div class="voice-description">在右键菜单中点击“语音输入”开始或停止录音</div></div><div class="ftb-toggle-btn active" id="voiceEnabled" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>

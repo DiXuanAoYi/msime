@@ -463,3 +463,47 @@ TEST_CASE(chat_right_unnamed_avatar_identifies_self_for_person_and_group)
         REQUIRE(ReplyStudio::ParseChatWindow(Raw("wechat", nodes))["messages"][0]["self"] == true);
     }
 }
+
+TEST_CASE(chat_qq_nt_prefers_native_messages_and_excludes_draft_sidebar_and_history)
+{
+    json nodes = json::array(
+        {Node(-1, 50000, "测试群", "", "chat-header__contact-name"),
+         Node(-1, 50026, "", "id-func-bar-group_application"), Node(-1, 50026, "", "ml-root"),
+         Node(2, 50026, "", "10001", "ml-item"), Node(3, 50026, "", "", "message-container"),
+         Node(4, 50026, "小林", "", "avatar-span"), Node(4, 50026, "", "", "message-content mix-message__inner"),
+         Node(6, 50020, "最新来信"), Node(-1, 50004, "未发送草稿", "input"), Node(-1, 50020, "旁栏人员"),
+         Node(2, 50026, "", "10002", "ml-item"), Node(10, 50026, "", "", "message-container message-container--self"),
+         Node(11, 50026, "", "", "message-content mix-message__inner"), Node(12, 50020, "我的回复")});
+    nodes[2]["y"] = 100;
+    nodes[2]["height"] = 400;
+    nodes[3]["y"] = 200;
+    nodes[3]["offscreen"] = false;
+    nodes[3]["height"] = 70;
+    nodes[10]["y"] = 400;
+    nodes[10]["offscreen"] = false;
+    nodes[10]["height"] = 70;
+    auto raw = Raw("qq", nodes);
+    raw["ocr"] = {{"verifiedLayout", false}};
+    auto result = ReplyStudio::ParseChatWindow(raw);
+    REQUIRE(result["readable"] == true);
+    REQUIRE(result["kind"] == "group");
+    REQUIRE(result["messages"].size() == 2);
+    REQUIRE(result["messages"][0]["speaker"] == "小林");
+    REQUIRE(result["messages"][0]["text"] == "最新来信");
+    REQUIRE(result["messages"][1]["self"] == true);
+    REQUIRE(result["messages"][1]["id"] == "10002");
+    raw["nodes"][10]["offscreen"] = true;
+    REQUIRE(ReplyStudio::ParseChatWindow(raw)["readable"] == false);
+}
+TEST_CASE(chat_wechat_private_contact_requires_positive_incoming_bubble_evidence)
+{
+    auto nodes =
+        json::array({Node(-1, 50020, "联系人", "current_chat_name_label"), Node(-1, 50008, "消息", "chat_message_list"),
+                     Node(1, 50007, "你好", "chat_bubble_item_view", "mmui::ChatTextItemView")});
+    auto raw = Raw("wechat", nodes);
+    REQUIRE(ReplyStudio::ParseChatWindow(raw)["messages"][0]["speaker"] == "");
+    raw["nodes"][2]["directionEvidence"] = "wechat-neutral-left-text-bubble";
+    REQUIRE(ReplyStudio::ParseChatWindow(raw)["messages"][0]["speaker"] == "联系人");
+    raw["nodes"].push_back(Node(-1, 50020, "(3)", "current_chat_count_label"));
+    REQUIRE(ReplyStudio::ParseChatWindow(raw)["messages"][0]["speaker"] == "");
+}

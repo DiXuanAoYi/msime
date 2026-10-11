@@ -292,6 +292,32 @@ BOOL CMetasequoiaIME::_IsKeyEaten(         //
         }
     }
 
+    if (!isOpen && !_serverUnavailableFallbackActive)
+    {
+        const UINT modifiers = CaptureIpcModifiers();
+        const bool active = !freshCompositionState && _IsCompositionActiveForKeyGuard();
+        if (active && IsTranslationCommitShortcut(*pCodeOut, modifiers))
+        {
+            if (pKeyState)
+            {
+                pKeyState->Category = CATEGORY_CANDIDATE;
+                pKeyState->Function = FUNCTION_SERVER_CANDIDATE_KEY;
+            }
+            return TRUE;
+        }
+        if ((modifiers & 0b00000110u) != 0 || (GetAsyncKeyState(VK_LWIN) & 0x8000) ||
+            (GetAsyncKeyState(VK_RWIN) & 0x8000))
+            return isTouchKeyboardSpecialKeys;
+        if (ClassifyEnglishCandidateKey(*pCodeOut, wch, active,
+                                        !freshCompositionState && _candidateMode != CANDIDATE_NONE,
+                                        (GetKeyState(VK_CAPITAL) & 1) != 0, pKeyState))
+        {
+            if (pwch)
+                *pwch = wch;
+            return TRUE;
+        }
+    }
+
     // if the keyboard is closed, we don't eat keys, with the exception of the touch keyboard specials keys
     if (!isOpen && !isDoubleSingleByte && !isPunctuation)
     {

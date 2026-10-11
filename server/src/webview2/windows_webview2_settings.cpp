@@ -1,5 +1,7 @@
+#include "english/speech_service.h"
 #include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
+#include "settings/local_tts_models.h"
 #include "voice-input/voice_providers.h"
 #include "assistant/service.h"
 #include "english/vocabulary_service.h"
@@ -1532,6 +1534,18 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                             ShellExecuteW(hwnd, L"open", string_to_wstring(url).c_str(), nullptr, nullptr,
                                           SW_SHOWNORMAL);
                     }
+                    else if (type == "speechRequest")
+                    {
+                        auto response = Speech::Handle(nlohmann::json::parse(json::serialize(val.at("data"))));
+                        if (::webviewSettingsWnd)
+                            ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
+                    else if (type == "localTtsRequest")
+                    {
+                        auto response = LocalTts::Handle(nlohmann::json::parse(json::serialize(val.at("data"))));
+                        if (::webviewSettingsWnd)
+                            ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
                     else if (type == "localAsrRequest")
                     {
                         auto response = LocalAsr::Handle(nlohmann::json::parse(json::serialize(val.at("data"))));
@@ -1587,6 +1601,9 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         {
                             const auto &data = val.at("data").as_object();
                             const std::string path = json::value_to<std::string>(data.at("path"));
+                            if (path.rfind("speech.", 0) == 0)
+                                return data.at("value").is_string() &&
+                                       Speech::SetConfig(path.substr(7), json::value_to<std::string>(data.at("value")));
                             if (path.rfind("voice_input.", 0) == 0)
                             {
                                 const auto &value = data.at("value");
@@ -1948,6 +1965,7 @@ void PostSettingsConfig()
         voice_presets.push_back({{"id", std::string(preset.id)},
                                  {"name", std::string(preset.name)},
                                  {"prompt", std::string(preset.prompt)}});
+    payload["data"]["speech"] = Speech::GetConfig();
     payload["data"]["voice_input"]["polish_presets"] = std::move(voice_presets);
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();

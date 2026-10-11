@@ -36,10 +36,14 @@ TEST_CASE(shift_variants_are_backend_independent_composition_reset_keys)
     REQUIRE(!FanyImeIpc::IsBackendIndependentCompositionResetKey(0x11));
 }
 
-TEST_CASE(english_ime_status_requires_backend_independent_composition_reset)
+TEST_CASE(mode_transitions_reset_but_repeated_english_status_preserves_composition)
 {
-    REQUIRE(FanyImeIpc::ShouldResetCompositionForImeMode(false));
-    REQUIRE(!FanyImeIpc::ShouldResetCompositionForImeMode(true));
+    REQUIRE(FanyImeIpc::ShouldResetCompositionForImeMode(4, false));
+    REQUIRE(FanyImeIpc::ShouldResetCompositionForImeMode(0, true));
+    REQUIRE(FanyImeIpc::ShouldResetCompositionForImeMode(-1, false));
+    REQUIRE(!FanyImeIpc::ShouldResetCompositionForImeMode(0, false));
+    REQUIRE(!FanyImeIpc::ShouldResetCompositionForImeMode(4, true));
+    REQUIRE(!FanyImeIpc::ShouldResetCompositionForImeMode(8, false));
 }
 
 TEST_CASE(enter_english_learning_does_not_conflict_with_shift_letter_special_modes)

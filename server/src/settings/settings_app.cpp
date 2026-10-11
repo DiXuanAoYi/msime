@@ -1,5 +1,7 @@
+#include "english/speech_service.h"
 #include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
+#include "settings/local_tts_models.h"
 #include "assistant/service.h"
 #include "english/vocabulary_service.h"
 #include "engine/contracts/webview/validator.h"
@@ -719,6 +721,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
           {"vocabulary", {{"enabled", GetConfiguredVocabularyEnabled()}, {"retention_days", GetConfiguredVocabularyRetentionDays()}}},
           {"statistics",
            {{"enabled", GetConfiguredStatisticsEnabled()}, {"retention", GetConfiguredStatisticsRetention()}}}}}};
+    payload["data"]["speech"] = Speech::GetConfig();
     payload["data"]["voice_input"]["polish_presets"] = std::move(polish_presets);
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();
@@ -1032,6 +1035,9 @@ bool ApplyConfigUpdate(const json::object &data)
             return SetConfiguredFrequencyAdjustmentInt(key, static_cast<int>(value.as_int64()));
         return false;
     }
+    if (path.rfind("speech.", 0) == 0)
+        return data.at("value").is_string() &&
+               Speech::SetConfig(path.substr(7), json::value_to<std::string>(data.at("value")));
     if (path.rfind("voice_input.", 0) == 0)
     {
         const std::string key = path.substr(12);
@@ -1570,6 +1576,18 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                         g_webview->PostWebMessageAsJson(message.c_str());
                 };
             });
+        }
+        else if (type == "speechRequest")
+        {
+            auto response = Speech::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "localTtsRequest")
+        {
+            auto response = LocalTts::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
         }
         else if (type == "localAsrRequest")
         {

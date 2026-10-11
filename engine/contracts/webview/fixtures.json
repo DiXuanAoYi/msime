@@ -1236,5 +1236,73 @@
     "valid": true,
     "surface": "settings",
     "direction": "server"
+  },
+  {
+    "name": "speech preview",
+    "message": {
+      "type": "speechRequest",
+      "data": {
+        "requestId": "test",
+        "action": "preview",
+        "text": "你好",
+        "language": "zh"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "speech no send",
+    "message": {
+      "type": "speechRequest",
+      "data": {
+        "requestId": "test",
+        "action": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "tts status",
+    "message": {
+      "type": "localTtsRequest",
+      "data": {
+        "requestId": "test",
+        "action": "status"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "tts download explicit",
+    "message": {
+      "type": "localTtsRequest",
+      "data": {
+        "requestId": "test",
+        "action": "download",
+        "modelId": "kokoro"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "tts unknown action",
+    "message": {
+      "type": "localTtsRequest",
+      "data": {
+        "requestId": "test",
+        "action": "autoDownloadAll"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
   }
 ]

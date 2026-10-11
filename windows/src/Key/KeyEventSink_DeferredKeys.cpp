@@ -418,7 +418,10 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
     // 同上：译文上屏也要在这条 Ctrl/Alt 拦截之前分类，否则这颗键会被交还给应用。
     const bool projectedCandidateActive =
         _deferredKeyProjectionValid ? _deferredProjectedCandidateActive : (_candidateMode == CANDIDATE_ORIGINAL);
-    if (projectedImeOpen && !_IsKeyboardDisabled() && projectedCandidateActive &&
+    const bool projectedEnglishComposition =
+        !projectedImeOpen && !_serverUnavailableFallbackActive &&
+        (_deferredKeyProjectionValid ? _deferredProjectedInputLength > 0 : _IsCompositionActiveForKeyGuard());
+    if (!_IsKeyboardDisabled() && (projectedCandidateActive || projectedEnglishComposition) &&
         IsTranslationCommitShortcut(*classifiedCode, capturedModifiers))
     {
         keyState->Category = CATEGORY_CANDIDATE;
@@ -507,6 +510,11 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
     {
         return setKeyState(CATEGORY_COMPOSING, FUNCTION_BACKSPACE);
     }
+
+    if (!shadow.imeOpen && !_serverUnavailableFallbackActive &&
+        ClassifyEnglishCandidateKey(*classifiedCode, *classifiedWch, shadow.inputLength > 0 || shadow.candidateActive,
+                                    shadow.candidateActive, (GetKeyState(VK_CAPITAL) & 1) != 0, keyState))
+        return true;
 
     _KEYSTROKE_STATE inputState = {};
     WCHAR inputWch = *classifiedWch;

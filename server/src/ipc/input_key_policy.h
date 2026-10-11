@@ -59,9 +59,9 @@ constexpr bool IsBackendIndependentCompositionResetKey(uint32_t keycode)
            keycode == kVirtualKeyRightShift;
 }
 
-constexpr bool ShouldResetCompositionForImeMode(bool chinese_mode)
+constexpr bool ShouldResetCompositionForImeMode(int previous_snapshot, bool chinese_mode)
 {
-    return !chinese_mode;
+    return previous_snapshot < 0 || ((previous_snapshot & 4) != 0) != chinese_mode;
 }
 
 // A complete four-letter wubi code the table answered with exactly one candidate is committed as

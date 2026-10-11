@@ -332,3 +332,8 @@
 .local-asr-size { font-variant-numeric:tabular-nums; font-weight:600; }
 .local-asr-card progress { width:100%; height:10px; }
 #localAsrPanel summary { cursor:pointer; }
+
+.speech-fields { display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0; }
+.speech-field { display:flex;flex-direction:column;gap:7px;font-size:13px;min-width:0; }
+.speech-field input,.speech-field select,.speech-field textarea,#speechLanguage { padding:8px;border:1px solid var(--border-color,#666);border-radius:7px;background:var(--bg-secondary,#252525);color:inherit;min-width:0;box-sizing:border-box; }
+#speechPanel summary { cursor:pointer;margin:8px 0; }

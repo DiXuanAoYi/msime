@@ -24,6 +24,8 @@ if ($LASTEXITCODE) { throw 'Local ASR tests failed' }
     --copy-metadata numpy --copy-metadata uv `
     --add-data "$PSScriptRoot/catalog.json;." --add-data "$PSScriptRoot/catalog.json;worker" `
     --add-data "$PSScriptRoot/manager.py;worker" --add-data "$PSScriptRoot/qwen_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_catalog.json;." --add-data "$PSScriptRoot/tts_catalog.json;worker" `
+    --add-data "$PSScriptRoot/tts_manager.py;worker" --add-data "$PSScriptRoot/tts_qwen_worker.py;worker" `
     --add-data "$PSScriptRoot/THIRD-PARTY-NOTICES.txt;." `
     --add-data "$PSScriptRoot/licenses;licenses" `
     --add-binary "$venv/Scripts/uv.exe;." "$PSScriptRoot/manager.py"

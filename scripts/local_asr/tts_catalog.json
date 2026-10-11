@@ -1,0 +1,269 @@
+[
+  {
+    "id": "kokoro",
+    "name": "Kokoro · 82M（CPU 推荐）",
+    "official": "https://huggingface.co/hexgrad/Kokoro-82M",
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
+    "engine": "kokoro",
+    "directory": "kokoro-int8-multi-lang-v1_1",
+    "format": "sherpa-onnx INT8 中英运行包",
+    "features": "轻量多语言模型；此运行包内置中文和英文发音。量化包体积小，CPU 即可运行。",
+    "hardware": "不需要独显；运行包约 147 MB，首次下载后可完全离线使用。",
+    "downloadBytes": 147031220,
+    "diskBytes": 600000000,
+    "files": [
+      {
+        "name": "kokoro-int8-multi-lang-v1_1.tar.bz2",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
+        "bytes": 147031220,
+        "sha256": "a1e94694776049035c4f2c6529f003aaece993c76aae9a78995831c3c4dcafc6"
+      }
+    ]
+  },
+  {
+    "id": "qwen-0.6b",
+    "name": "Qwen3-TTS 0.6B",
+    "official": "https://github.com/QwenLM/Qwen3-TTS",
+    "downloadUrl": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5",
+    "revision": "85e237c12c027371202489a0ec509ded67b5e4b5",
+    "engine": "qwen",
+    "format": "原版",
+    "features": "10 种语言及多方言；内置运行 CustomVoice 音色。Base 版的 3 秒克隆、VoiceDesign 版的音色设计需使用对应官方模型。",
+    "hardware": "建议独显；CPU 可运行但生成较慢。首次启动另行下载 Python / PyTorch 依赖。",
+    "downloadBytes": 2498383610,
+    "diskBytes": 7495150830,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/config.json",
+        "bytes": 4908,
+        "sha256": "81aca2b6fac304944d8acf345272d8a9a727d5fc2e2e66b222ab4729340c7455"
+      },
+      {
+        "name": "generation_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/generation_config.json",
+        "bytes": 245,
+        "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa"
+      },
+      {
+        "name": "merges.txt",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/merges.txt",
+        "bytes": 1671839,
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/model.safetensors",
+        "bytes": 1811626576,
+        "sha256": "bc3c7e785eb961179c25450d1acff03f839e0002f2f3a5aeb67b5735c0fa2adb"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/preprocessor_config.json",
+        "bytes": 127,
+        "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119"
+      },
+      {
+        "name": "speech_tokenizer/config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/config.json",
+        "bytes": 2336,
+        "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167"
+      },
+      {
+        "name": "speech_tokenizer/configuration.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/configuration.json",
+        "bytes": 76,
+        "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd"
+      },
+      {
+        "name": "speech_tokenizer/model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/model.safetensors",
+        "bytes": 682293092,
+        "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258"
+      },
+      {
+        "name": "speech_tokenizer/preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/preprocessor_config.json",
+        "bytes": 234,
+        "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/tokenizer_config.json",
+        "bytes": 7344,
+        "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/vocab.json",
+        "bytes": 2776833,
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ]
+  },
+  {
+    "id": "qwen-1.7b",
+    "name": "Qwen3-TTS 1.7B",
+    "official": "https://github.com/QwenLM/Qwen3-TTS",
+    "downloadUrl": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/tree/0c0e3051f131929182e2c023b9537f8b1c68adfe",
+    "revision": "0c0e3051f131929182e2c023b9537f8b1c68adfe",
+    "engine": "qwen",
+    "format": "原版",
+    "features": "10 种语言；CustomVoice 支持表达指令。最低延迟为官方特定环境指标，本机速度视硬件而定。",
+    "hardware": "建议 CUDA 独显与充足显存；首次启动需额外运行依赖。",
+    "downloadBytes": 4520159586,
+    "diskBytes": 13560478758,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/config.json",
+        "bytes": 4908,
+        "sha256": "17a07f527a1c25ea30b4e023a184482a23d3e279d697b1dc81b1bde498d29cf9"
+      },
+      {
+        "name": "generation_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/generation_config.json",
+        "bytes": 245,
+        "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa"
+      },
+      {
+        "name": "merges.txt",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/merges.txt",
+        "bytes": 1671839,
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/model.safetensors",
+        "bytes": 3833402552,
+        "sha256": "38b1d5971bdbd982b561cccec982669a53b0537c3cf5e9bd4778ed07bb2f5137"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/preprocessor_config.json",
+        "bytes": 127,
+        "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119"
+      },
+      {
+        "name": "speech_tokenizer/config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/config.json",
+        "bytes": 2336,
+        "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167"
+      },
+      {
+        "name": "speech_tokenizer/configuration.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/configuration.json",
+        "bytes": 76,
+        "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd"
+      },
+      {
+        "name": "speech_tokenizer/model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/model.safetensors",
+        "bytes": 682293092,
+        "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258"
+      },
+      {
+        "name": "speech_tokenizer/preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/preprocessor_config.json",
+        "bytes": 234,
+        "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/tokenizer_config.json",
+        "bytes": 7344,
+        "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/vocab.json",
+        "bytes": 2776833,
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ]
+  },
+  {
+    "id": "cosyvoice2",
+    "name": "CosyVoice 2 · 0.5B",
+    "official": "https://github.com/FunAudioLLM/CosyVoice",
+    "downloadUrl": "https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B/tree/eec1ae6c79877dbd9379285cf8789c9e0879293d",
+    "revision": "eec1ae6c79877dbd9379285cf8789c9e0879293d",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "流式零样本、多语言和跨语言合成，适合中文自然韵律。",
+    "hardware": "官方环境依赖较多；下载后按官方指南部署，接入本机 WAV 服务。",
+    "downloadBytes": 4856505002,
+    "diskBytes": 14569515006,
+    "files": []
+  },
+  {
+    "id": "csm",
+    "name": "Sesame CSM · 1B",
+    "official": "https://github.com/SesameAILabs/csm",
+    "downloadUrl": "https://huggingface.co/sesame/csm-1b/tree/c92a71e1c419772e25be7dc14d952c2521a740ab",
+    "revision": "c92a71e1c419772e25be7dc14d952c2521a740ab",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "上下文对话语音，保留停顿、强调和情绪。",
+    "hardware": "模型需要 Hugging Face 授权登录；建议 CUDA。仓库总量含多个权重变体。",
+    "downloadBytes": 19589168489,
+    "diskBytes": 58767505467,
+    "files": []
+  },
+  {
+    "id": "dia",
+    "name": "Dia · 1.6B",
+    "official": "https://github.com/nari-labs/dia",
+    "downloadUrl": "https://huggingface.co/nari-labs/Dia-1.6B-0626/tree/ef2795fcc29c5abe6ffc91fd33808588b49bbc66",
+    "revision": "ef2795fcc29c5abe6ffc91fd33808588b49bbc66",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "多说话人对话，支持笑声与停顿等非语言表达。",
+    "hardware": "建议独显；完整对话生成并非低延迟候选朗读。仓库总量含多个权重变体。",
+    "downloadBytes": 19334302562,
+    "diskBytes": 58002907686,
+    "files": []
+  },
+  {
+    "id": "vibevoice",
+    "name": "VibeVoice · 1.5B",
+    "official": "https://github.com/microsoft/VibeVoice",
+    "downloadUrl": "https://huggingface.co/microsoft/VibeVoice-1.5B/tree/c00898d257e6b46004e3e2866a47534085fb685a",
+    "revision": "c00898d257e6b46004e3e2866a47534085fb685a",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "长文本、多说话人内容。官方已撤下此版 TTS 推理代码；仅列出权重，不提供一键启动。",
+    "hardware": "可另选官方 Realtime 0.5B；请查阅官方当前发布说明。",
+    "downloadBytes": 5408491036,
+    "diskBytes": 16225473108,
+    "files": []
+  },
+  {
+    "id": "vibevoice-realtime",
+    "name": "VibeVoice Realtime · 0.5B",
+    "official": "https://github.com/microsoft/VibeVoice",
+    "downloadUrl": "https://huggingface.co/microsoft/VibeVoice-Realtime-0.5B/tree/6bce5f06044837fe6d2c5d7a71a84f0416bd57e4",
+    "revision": "6bce5f06044837fe6d2c5d7a71a84f0416bd57e4",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "实时流式语音版本，适合较低延迟输出；与长文本多说话人版能力不同。",
+    "hardware": "按官方指南单独部署，再填写本机兼容接口。",
+    "downloadBytes": 2035470640,
+    "diskBytes": 6106411920,
+    "files": []
+  },
+  {
+    "id": "moss-nano",
+    "name": "MOSS-TTS-Nano · 100M",
+    "official": "https://github.com/OpenMOSS/MOSS-TTS-Nano",
+    "downloadUrl": "https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano-100M/tree/44502f80dbf9743528fa921cc544d662c685ebec",
+    "revision": "44502f80dbf9743528fa921cc544d662c685ebec",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "CPU 友好，20 种语言、48 kHz 双声道；官方提供 4 核 CPU 流式部署方案。",
+    "hardware": "额外音频 tokenizer 和运行依赖不包含在主权重仓库大小内。",
+    "downloadBytes": 237808621,
+    "diskBytes": 713425863,
+    "files": []
+  }
+]

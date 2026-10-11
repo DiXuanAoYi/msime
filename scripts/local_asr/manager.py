@@ -281,7 +281,7 @@ def serve(root, model_id, loader=sherpa_recognizer, externally_locked=False):
             (root / "service-token.txt").unlink(missing_ok=True)
 
 
-def run_qwen(root, model_id):
+def run_qwen(root, model_id, worker_name="qwen_worker.py"):
     """Keep a single service slot through dependency preparation and model loading."""
     with job_lock(root / "service.lock"):
         stop = root / "stop"
@@ -291,7 +291,7 @@ def run_qwen(root, model_id):
         env = dict(os.environ, UV_CACHE_DIR=str(root / "runtime-cache"))
         worker = BASE / "worker" if getattr(sys, "frozen", False) else BASE
         command = [str(BASE / "uv.exe"), "run", "--python", "3.12", "--no-project", "--script",
-                   str(worker / "qwen_worker.py"), str(root), model_id]
+                   str(worker / worker_name), str(root), model_id]
         try:
             if getattr(sys, "frozen", False) and sys.platform == "win32":
                 # PyInstaller's DLL search directory must not leak into another Python ABI.
@@ -336,4 +336,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if '--tts' in sys.argv:
+        import tts_manager
+        tts_manager.main()
+    else:
+        main()

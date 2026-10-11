@@ -51,3 +51,11 @@ add_executable(test_focus_announcement_policy focus_announcement_policy.cpp)
 target_include_directories(test_focus_announcement_policy PRIVATE ../src)
 target_compile_features(test_focus_announcement_policy PRIVATE cxx_std_17)
 add_test(NAME focus_announcement_policy COMMAND test_focus_announcement_policy)
+
+# Exercises the exact shared classifier used by both immediate and deferred TSF paths.
+if(WIN32 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    add_executable(test_english_candidate_keys english_candidate_keys.cpp)
+    target_include_directories(test_english_candidate_keys PRIVATE ../src ../src/Header ../src/IME)
+    target_compile_features(test_english_candidate_keys PRIVATE cxx_std_17)
+    add_test(NAME english_candidate_keys COMMAND test_english_candidate_keys)
+endif()

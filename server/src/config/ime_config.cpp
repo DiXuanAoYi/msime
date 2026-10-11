@@ -1,3 +1,4 @@
+#include "english/speech_service.h"
 #include "window/ui_backend_policy.h"
 #include "window/caret_state_indicator_policy.h"
 #include "ime_config.h"
@@ -706,6 +707,7 @@ bool LoadImeConfig()
             RefreshEffectiveTsfPreeditStyle();
         }
         // Parse into a local and publish it in one step, so readers never observe half-rewritten strings or maps.
+        Speech::LoadConfig(tbl);
         VoiceInputConfig voice;
         voice.enabled = tbl["voice_input"]["voice_input"].value_or(true);
         voice.hotkey_ralt = tbl["voice_input"]["hotkey_ralt"].value_or(true);

@@ -13,6 +13,8 @@ struct Credentials
     std::string region = "ap-guangzhou";
 };
 
+std::string TtsAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp);
+
 // ASR uses the same TC3 primitive, with its own service and signed action.
 std::string AsrAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp);
 // Returns one translation per source string. Empty entries mean that item failed.

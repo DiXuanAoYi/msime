@@ -1,3 +1,4 @@
+import { setupSpeech } from './speech';
 import { setupLocalAsr } from './local-asr';
 import { serializeHostMessage } from '../../../../shared/messages';
 import { applyDropdownValue, applyToggleState, setupDropdownMenu, setupToggleButton } from './shared';
@@ -359,6 +360,7 @@ function listenMenuSelection(menuId: string, onSelect: (value: string) => void):
 }
 
 export function setupVoiceInput(): void {
+  setupSpeech();
   setupLocalAsr();
   setupToggleButton('voiceEnabled', value => updateConfig('voice_input.voice_input', value));
   setupToggleButton('voicePolishText', value => updateConfig('voice_input.polish_text', value));

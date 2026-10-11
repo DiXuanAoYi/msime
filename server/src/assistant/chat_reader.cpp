@@ -162,6 +162,88 @@ json ParseChatWindow(const json &w)
         return out;
     }
     const auto &nodes = w.at("nodes");
+    // QQ NT exposes a virtualized DOM through UIA. Prefer stable message IDs
+    // over OCR; the composer, member sidebar and hidden history are not messages.
+    if (w.at("platform") == "qq")
+    {
+        int root = -1, header = -1;
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            const auto &n = nodes[i];
+            if (n.value("id", "") == "ml-root")
+                root = static_cast<int>(i);
+            if (Has(n.value("class", ""), {"chat-header__contact-name"}))
+                header = static_cast<int>(i);
+        }
+        if (root >= 0 && header >= 0)
+        {
+            out["title"] = nodes[header].value("name", "");
+            for (const auto &n : nodes)
+                if (n.value("id", "") == "id-func-bar-group_application" ||
+                    Has(n.value("class", ""), {"group-member-list", "group-member-count"}))
+                    out["kind"] = "group";
+            if (out["kind"] != "group")
+                out["kind"] = "person";
+            const int viewportTop = nodes[root].value("y", 0);
+            const int viewportBottom = viewportTop + nodes[root].value("height", 0);
+            bool newestVisible = false;
+            for (size_t i = root + 1; i < nodes.size(); ++i)
+            {
+                const auto &row = nodes[i];
+                if (!Descendant(nodes, static_cast<int>(i), root) || row.value("class", "") != "ml-item")
+                    continue;
+                const auto id = row.value("id", "");
+                if (id.empty() || id.find_first_not_of("0123456789") != std::string::npos)
+                    continue;
+                newestVisible = !row.value("offscreen", true) && row.value("y", 0) < viewportBottom &&
+                                row.value("y", 0) + row.value("height", 0) > viewportTop;
+                if (!newestVisible)
+                    continue;
+                std::string author, body;
+                bool self = false;
+                int bodyRoot = -1;
+                for (size_t j = i + 1; j < nodes.size() && Descendant(nodes, static_cast<int>(j), static_cast<int>(i));
+                     ++j)
+                {
+                    const auto cls = nodes[j].value("class", "");
+                    if (Has(cls, {"message-container--self"}))
+                        self = true;
+                    if (cls == "avatar-span" && !nodes[j].value("name", "").empty())
+                        author = nodes[j].value("name", "");
+                    if (cls.rfind("message-content ", 0) == 0 || cls == "message-content")
+                        bodyRoot = static_cast<int>(j);
+                    if (bodyRoot >= 0 && Descendant(nodes, static_cast<int>(j), bodyRoot) &&
+                        nodes[j].value("type", 0) == 50020)
+                        body += nodes[j].value("name", "");
+                }
+                if (self)
+                    author = "本人";
+                if (!self && author.empty() && out["kind"] == "person")
+                    author = out["title"].get<std::string>();
+                if (!body.empty() && body.size() <= 12000 && author.size() <= 160)
+                    out["messages"].push_back({{"id", id},
+                                               {"speaker", author},
+                                               {"text", body},
+                                               {"time", ""},
+                                               {"self", self},
+                                               {"source", "qq-nt-uia"}});
+            }
+            // Native scrollbar semantics distinguish latest messages from scrolled history.
+            for (size_t i = 0; i < nodes.size(); ++i)
+                if (nodes[i].value("class", "") == "v-scrollbar-thumb" && !nodes[i].value("offscreen", true))
+                {
+                    int parent = nodes[i].value("parent", -1);
+                    if (parent >= 0 && nodes[parent].value("class", "") == "v-scrollbar-track" &&
+                        std::abs(nodes[parent].value("y", 0) - viewportTop) < 5 &&
+                        nodes[i].value("y", 0) + nodes[i].value("height", 0) + 5 < viewportBottom)
+                        newestVisible = false;
+                }
+            out["readable"] = newestVisible && !out["title"].get<std::string>().empty();
+            out["status"] = newestVisible ? "QQ NT：读取当前可见消息，按消息 ID 去重；草稿和侧栏不参与"
+                                          : "QQ 当前停留在历史位置，请回到最新消息；自动预回复已暂停";
+            return out;
+        }
+    }
     if ((w.at("platform") == "wecom" || w.at("platform") == "qq") && w.contains("ocr"))
     {
         const auto &ocr = w.at("ocr");
@@ -582,6 +664,12 @@ json ParseChatWindow(const json &w)
         if (self)
             speaker = "本人";
         std::string source = self ? "uia+outgoing-direction" : "uia";
+        if (!self && speaker.empty() && w.at("platform") == "wechat" && !group &&
+            n.value("directionEvidence", "") == "wechat-neutral-left-text-bubble")
+        {
+            speaker = out["title"].get<std::string>();
+            source = "uia+incoming-direction";
+        }
         if (!self && speaker.empty() && w.at("platform") == "wechat" && group && w.contains("labels"))
         {
             // Group sender sits above the bubble, inside this row. A bare/private bubble

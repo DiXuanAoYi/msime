@@ -93,3 +93,51 @@ TEST_CASE(personal_glossary_replacement_removes_previous_translation)
     fixture.Request("ja", std::make_shared<const EnglishIme::PersonalGlossary>());
     REQUIRE(fixture.results[0].gloss.empty());
 }
+
+TEST_CASE(english_dedicated_candidates_include_offline_sentences_with_chinese_glosses)
+{
+    auto directory = std::filesystem::temp_directory_path() / "msime-english-phrases-test";
+    std::filesystem::create_directories(directory);
+    auto path = (directory / "english.db").u8string();
+    REQUIRE(EnglishDictionary::ensure_schema(path));
+    std::mutex mutex;
+    std::condition_variable ready;
+    bool received = false;
+    std::vector<WordItem> items;
+    std::vector<EnglishIme::TranslationResult> translations;
+    EnglishIme::Start(
+        path,
+        [&](auto result, const auto &, uint64_t) {
+            std::lock_guard lock(mutex);
+            items = std::move(result);
+            received = true;
+            ready.notify_one();
+        },
+        [&](auto result, uint64_t) {
+            std::lock_guard lock(mutex);
+            translations = std::move(result);
+            ready.notify_one();
+        });
+    EnglishIme::OnInputChanged("hell", true);
+    bool arrived = false;
+    {
+        std::unique_lock lock(mutex);
+        arrived = ready.wait_for(lock, std::chrono::seconds(5), [&] { return received; });
+    }
+    REQUIRE(arrived);
+    REQUIRE(std::any_of(items.begin(), items.end(), [](const WordItem &w) { return w.word == "Hello, how are you?"; }));
+    const auto sentence =
+        std::find_if(items.begin(), items.end(), [](const WordItem &w) { return w.word == "Hello, how are you?"; });
+    // The candidate pipeline uses pinyin as the English dictionary lookup key.
+    REQUIRE_EQ(sentence->pinyin, sentence->word);
+    EnglishIme::RequestTranslations({{sentence->pinyin, EnglishIme::TranslationDirection::EnglishToChinese}});
+    {
+        std::unique_lock lock(mutex);
+        arrived = ready.wait_for(lock, std::chrono::seconds(5), [&] { return !translations.empty(); });
+    }
+    EnglishIme::Stop();
+    REQUIRE(arrived);
+    REQUIRE_EQ(translations.front().gloss, std::string("你好，最近怎么样？"));
+    std::error_code error;
+    std::filesystem::remove_all(directory, error);
+}

@@ -1,4 +1,5 @@
 #include "english_ime.h"
+#include "english_phrases.h"
 #include "config/ime_config.h"
 
 #include "engine/english/english_dictionary.h"
@@ -97,6 +98,8 @@ void WorkerLoop(uint64_t observed_generation, uint64_t observed_translation_gene
                 if (!g_running || g_translation_generation.load() != observed_translation_generation)
                     break;
                 std::string gloss;
+                if (query.direction == EnglishIme::TranslationDirection::EnglishToChinese)
+                    gloss = EnglishIme::PhraseGloss(query.key);
                 if (personal_glossary && query.direction == EnglishIme::TranslationDirection::ChineseToEnglish)
                     gloss = personal_glossary->Lookup(translation_language, query.key);
                 if (gloss.empty() && translation_language != "en" &&
@@ -136,6 +139,25 @@ void WorkerLoop(uint64_t observed_generation, uint64_t observed_translation_gene
 
         auto candidates =
             dictionary.query_prefix(prefix, dedicated_mode ? kDedicatedCandidateLimit : kMixedCandidateLimit);
+        if (dedicated_mode && prefix.size() >= 2)
+        {
+            std::vector<WordItem> phrases;
+            for (const auto &[phrase, gloss] : EnglishIme::kPhrases)
+            {
+                std::string key;
+                for (unsigned char c : std::string(phrase))
+                    if (c >= 'a' && c <= 'z')
+                        key += char(c);
+                    else if (c >= 'A' && c <= 'Z')
+                        key += char(c + 32);
+                if (key.rfind(prefix, 0) == 0)
+                    phrases.emplace_back(phrase, phrase, 0, CandidateSource::EnglishDictionary);
+                if (phrases.size() == 3)
+                    break;
+            }
+            candidates.insert(candidates.begin() + (std::min)(size_t{3}, candidates.size()), phrases.begin(),
+                              phrases.end());
+        }
         if (!g_running || g_generation.load() != observed_generation)
         {
             continue;

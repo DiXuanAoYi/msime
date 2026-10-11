@@ -59,12 +59,12 @@ json ReadLabels(HWND hwnd, json &nodes)
                 continue;
             const int rowRight = n.value("x", 0) + n.value("width", 0) - bounds.left;
             const int rowTop = n.value("y", 0) - bounds.top;
-            const int x1 = rowRight - int(82 * scale), x2 = rowRight - int(55 * scale);
+            const int x1 = rowRight - int(110 * scale), x2 = rowRight - int(85 * scale);
             const int y1 = std::max(0, rowTop + int(12 * scale));
             const int y2 = std::min(height, rowTop + std::min(n.value("height", 0), int(100 * scale)));
             if (x1 < 0 || x2 >= width || x2 <= x1 || y2 <= y1)
                 continue;
-            int consecutive = 0, longest = 0;
+            int filledRows = 0;
             for (int y = y1; y < y2; ++y)
             {
                 int green = 0;
@@ -74,11 +74,38 @@ json ReadLabels(HWND hwnd, json &nodes)
                     const int b = rgba[at], g = rgba[at + 1], r = rgba[at + 2];
                     green += g > 75 && g - r > 25 && g - b > 18;
                 }
-                consecutive = green * 4 >= (x2 - x1) * 3 ? consecutive + 1 : 0;
-                longest = std::max(longest, consecutive);
+                filledRows += green * 5 >= (x2 - x1) * 3;
             }
-            if (longest >= 14 * scale)
+            if (filledRows >= 16 * scale)
                 n["directionEvidence"] = "wechat-green-right-text-bubble";
+            else
+            {
+                // The private-chat contact has no name above a left-hand bubble.
+                // Require the neutral bubble surface and a distinct empty gutter;
+                // an unrecognized theme remains unknown instead of assuming incoming.
+                const int rowLeft = n.value("x", 0) - bounds.left;
+                const int a = rowLeft + int(90 * scale), b = rowLeft + int(108 * scale);
+                const int gutter = rowLeft + int(54 * scale);
+                int neutralRows = 0;
+                if (a >= 0 && b < width && gutter >= 0)
+                    for (int y = y1; y < y2; ++y)
+                    {
+                        const size_t bg = (size_t(y) * width + gutter) * 4;
+                        const int background = (rgba[bg] + rgba[bg + 1] + rgba[bg + 2]) / 3;
+                        int filled = 0;
+                        for (int x = a; x < b; ++x)
+                        {
+                            const size_t at = (size_t(y) * width + x) * 4;
+                            const int blue = rgba[at], green = rgba[at + 1], red = rgba[at + 2];
+                            const int shade = (red + green + blue) / 3;
+                            filled += std::abs(red - green) < 8 && std::abs(green - blue) < 8 &&
+                                      shade - background >= 10 && shade - background <= 100;
+                        }
+                        neutralRows += filled * 5 >= (b - a) * 3;
+                    }
+                if (neutralRows >= 16 * scale)
+                    n["directionEvidence"] = "wechat-neutral-left-text-bubble";
+            }
         }
         try
         {
@@ -520,22 +547,28 @@ struct Probe
                 row["complete"] = !truncated;
                 if (platform == "wechat" && !truncated && GetTickCount64() < deadline)
                     row["labels"] = ReadLabels(hwnd, row["nodes"]);
-                if ((platform == "wecom" || platform == "qq") && !truncated &&
+                const bool qqNative =
+                    platform == "qq" && std::any_of(row["nodes"].begin(), row["nodes"].end(),
+                                                    [](const json &n) { return n.value("id", "") == "ml-root"; });
+                if ((platform == "wecom" || (platform == "qq" && !qqNative)) && !truncated &&
                     (row["title"] == "企业微信" || platform == "qq") && GetTickCount64() < deadline)
                     row["ocr"] = ReadWeCom(hwnd, platform == "qq");
                 // Re-read the active chat title to reject a mid-capture conversation switch.
                 for (auto &node : row["nodes"])
                 {
                     auto id = node.value("id", "");
-                    if (id.find("current_chat_name_label") == std::string::npos &&
+                    const bool qqTitle = platform == "qq" && node.value("class", "") == "chat-header__contact-name";
+                    if (!qqTitle && id.find("current_chat_name_label") == std::string::npos &&
                         !(platform == "dingtalk" && id == "title_label"))
                         continue;
                     VARIANT v{};
                     v.vt = VT_BSTR;
-                    std::wstring wide(id.begin(), id.end());
+                    const auto selector = qqTitle ? std::string("chat-header__contact-name") : id;
+                    std::wstring wide(selector.begin(), selector.end());
                     v.bstrVal = SysAllocString(wide.c_str());
                     ComPtr<IUIAutomationCondition> condition;
-                    automation->CreatePropertyCondition(UIA_AutomationIdPropertyId, v, &condition);
+                    automation->CreatePropertyCondition(qqTitle ? UIA_ClassNamePropertyId : UIA_AutomationIdPropertyId,
+                                                        v, &condition);
                     VariantClear(&v);
                     ComPtr<IUIAutomationElement> current;
                     if (!condition || FAILED(root->FindFirst(TreeScope_Descendants, condition.Get(), &current)) ||

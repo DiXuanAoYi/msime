@@ -477,6 +477,7 @@ void WorkerThread()
                 {
                     remembered = (EnsureAuthoritativeCnMode() << 2) | (remembered & 0x3);
                 }
+                SetEnglishInputMode((remembered & 4) == 0);
                 PublishStatusSnapshotValue(remembered);
             }
             break;
@@ -573,19 +574,24 @@ void WorkerThread()
             const int caps_state = GetServerCapsLockState();
             const int packed_state =
                 (caps_state << 3) | (effective_cn << 2) | (fullwidth_state << 1) | punctuation_state;
-            if (FanyImeIpc::ShouldResetCompositionForImeMode(effective_cn != 0))
+            const int previous_mode = RecallClientStatusSnapshot(task.client_id);
+            const bool mode_changed = FanyImeIpc::ShouldResetCompositionForImeMode(previous_mode, effective_cn != 0);
+            if (mode_changed)
             {
-                if (effective_cn == 0)
-                    SetEnglishInputMode(false);
+                SetEnglishInputMode(effective_cn == 0);
                 PostMessage(::global_hwnd, WM_HIDE_MAIN_WINDOW, 0, 0);
                 ClearState();
             }
+            else if (effective_cn == 0 && !g_english_input_mode)
+                SetEnglishInputMode(true);
             RememberClientStatusSnapshot(task.client_id, packed_state);
             PublishStatusSnapshotValue(packed_state);
             break;
         }
 
         case TaskType::ExitEnglishInputMode: {
+            if (g_authoritative_cn_mode == 0)
+                SendToTsfWorkerThreadViaNamedpipe(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToCn, L"");
             if (g_english_input_mode)
             {
                 SetEnglishInputMode(false);
