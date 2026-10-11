@@ -76,6 +76,17 @@ void Launch(const std::filesystem::path &runtime, const std::filesystem::path &r
     CloseHandle(process.hProcess);
 }
 } // namespace
+nlohmann::json ModelInfo(const std::string &id)
+{
+    wchar_t path[32768]{};
+    GetModuleFileNameW(nullptr, path, 32768);
+    auto catalog = Read(std::filesystem::path(path).parent_path() / L"local-asr" / L"_internal" / L"tts_catalog.json");
+    if (catalog.is_array())
+        for (const auto &row : catalog)
+            if (row.value("id", "") == id)
+                return row;
+    return nlohmann::json::object();
+}
 nlohmann::json Handle(const nlohmann::json &request)
 {
     std::lock_guard lock(operationMutex);

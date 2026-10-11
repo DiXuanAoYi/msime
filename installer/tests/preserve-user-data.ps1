@@ -22,7 +22,7 @@ $required = @(
 )
 
 # 目录类用户数据由 MigrateUserDataDir 单独 robocopy，迁移清单按文件解析取不到它们。
-$preservedDirectories = @('skins', 'helpcodes\custom', 'shuangpin', 'models')
+$preservedDirectories = @('skins', 'helpcodes\custom', 'shuangpin', 'models', 'voice-outbox')
 
 function Get-PascalBody([string]$Text, [string]$Signature) {
     $start = [regex]::Match($Text, [regex]::Escape($Signature) + '\s*\(')

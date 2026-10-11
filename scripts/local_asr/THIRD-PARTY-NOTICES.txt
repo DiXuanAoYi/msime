@@ -33,3 +33,12 @@ PyAV: BSD-3-Clause, https://github.com/PyAV-Org/PyAV
 SentencePiece: Apache-2.0, https://github.com/google/sentencepiece
 No Qwen, Kokoro or MOSS model weights, CUDA libraries or Edge service credentials
 are bundled in the installer. Online synthesis is explicit opt-in.
+
+Voxtral Windows runtime: audio.cpp, Apache-2.0, ShugoAI LLC.
+Pinned source: https://github.com/0xShug0/audio.cpp
+Commit 96269554d00621fb0fca6b52b58919749eba1c8d.
+Build and modification details are in worker/vendor/voxtral/UPSTREAM.md.
+Voxtral model and reference embeddings: Mistral AI, CC BY-NC 4.0.
+Official model files are downloaded only by an explicit user action. No Voxtral
+model weights are bundled in the installer. Extra CPU conversion dependencies
+are installed in an isolated environment on first explicit startup.

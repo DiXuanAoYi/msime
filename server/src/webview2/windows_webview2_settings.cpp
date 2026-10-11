@@ -1,4 +1,5 @@
 #include "english/speech_service.h"
+#include "english/voice_studio.h"
 #include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
 #include "settings/local_tts_models.h"
@@ -1434,6 +1435,7 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         }
                         else if (value == "close")
                         {
+                            VoiceStudio::Stop();
                             if (g_legacy_chat_reader)
                                 g_legacy_chat_reader->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
                             if (g_legacy_chat_model)
@@ -1537,6 +1539,13 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                     else if (type == "speechRequest")
                     {
                         auto response = Speech::Handle(nlohmann::json::parse(json::serialize(val.at("data"))));
+                        if (::webviewSettingsWnd)
+                            ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
+                    else if (type == "voiceStudioRequest")
+                    {
+                        auto response =
+                            VoiceStudio::Handle(nlohmann::json::parse(json::serialize(val.at("data"))), hwnd);
                         if (::webviewSettingsWnd)
                             ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
                     }

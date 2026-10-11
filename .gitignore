@@ -34,3 +34,5 @@ __pycache__/
 
 # 本地测试数据暂存（照 scripts/ci/test-server.ps1 的布局手工准备的）
 /stage/
+# Generated, reproducible audio.cpp runtime; see scripts/local_asr/Build-Voxtral.ps1.
+scripts/local_asr/native-voxtral/

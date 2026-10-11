@@ -31,11 +31,12 @@ def load(root, model_id):
     # Prime codec kernels before publishing running; no sound or spoken-text cache.
     for _ in model.generate_custom_voice_streaming(text='你好', speaker='Vivian', language='Chinese', max_new_tokens=6, chunk_size=6):
         pass
-    def generate(text, voice, language, speed, emit, cancelled):
+    def generate(text, voice, language, speed, options, emit, cancelled):
         if language not in LANGUAGES:
             raise ValueError('此模型不支持所选语言')
         with torch.inference_mode():
-            for audio, rate, timing in model.generate_custom_voice_streaming(text=text, speaker=voice or 'Vivian', language=LANGUAGES[language], chunk_size=6, max_new_tokens=1024):
+            kwargs = {'chunk_size': 6, 'max_new_tokens': 1024, **options}
+            for audio, rate, timing in model.generate_custom_voice_streaming(text=text, speaker=voice or 'Vivian', language=LANGUAGES[language], **kwargs):
                 if cancelled():
                     raise InterruptedError('已停止朗读')
                 samples = np.asarray(audio).reshape(-1)
@@ -43,7 +44,7 @@ def load(root, model_id):
                     samples = np.interp(np.arange(0, len(samples), speed), np.arange(len(samples)), samples)
                 if len(samples):
                     emit(samples, rate)
-    return StreamingSynthesizer(generate, torch.cuda.get_device_name(0) + ' · CUDA 流式')
+    return StreamingSynthesizer(generate, torch.cuda.get_device_name(0) + ' · CUDA 流式', accepts_options=True)
 
 if __name__ == '__main__':
     serve(Path(sys.argv[1]), sys.argv[2], load, externally_locked=True)

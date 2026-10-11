@@ -24,6 +24,7 @@ class PcmPlayer
     std::atomic<uint64_t> &generation_;
     uint64_t request_;
     int volume_;
+    unsigned outputDevice_;
     std::mutex deviceMutex_;
     std::atomic<bool> quit_{false};
     std::thread monitor_;
@@ -52,8 +53,8 @@ class PcmPlayer
     }
 
   public:
-    PcmPlayer(std::atomic<uint64_t> &generation, uint64_t request, int volume)
-        : generation_(generation), request_(request), volume_(volume), monitor_([this] {
+    PcmPlayer(std::atomic<uint64_t> &generation, uint64_t request, int volume, unsigned outputDevice = WAVE_MAPPER)
+        : generation_(generation), request_(request), volume_(volume), outputDevice_(outputDevice), monitor_([this] {
               while (!quit_)
               {
                   if (generation_.load() != request_)
@@ -95,7 +96,7 @@ class PcmPlayer
                                 static_cast<WORD>(channels * 2),
                                 16,
                                 0};
-            if (waveOutOpen(&device_, WAVE_MAPPER, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR)
+            if (waveOutOpen(&device_, outputDevice_, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR)
                 throw std::runtime_error("无法打开流式播放设备");
         }
         auto buffer = std::make_unique<Buffer>();

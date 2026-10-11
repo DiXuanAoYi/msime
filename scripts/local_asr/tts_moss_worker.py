@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent / 'vendor/moss'))
 from ort_cpu_runtime import OrtCpuRuntime
 from tts_stream import StreamingSynthesizer
 from tts_manager import serve
+from tts_options import moss_generation_options
 
 class Runtime(OrtCpuRuntime):
     def _create_sessions(self):
@@ -27,7 +28,12 @@ def load(root, model_id):
     runtime = Runtime(root / model_id / 'original', thread_count=4, max_new_frames=1125)
     tokenizer = spm.SentencePieceProcessor(model_file=str(runtime.resolve_manifest_relative_path(runtime.manifest['model_files']['tokenizer_model'])))
     voices = {v['voice']: v for v in runtime.list_builtin_voices()}
-    def generate(text, voice, language, speed, emit, cancelled):
+    defaults = dict(runtime.manifest['generation_defaults'])
+    def generate(text, voice, language, speed, options, emit, cancelled):
+        # The optimized fixed-sampling ONNX graph bakes in its sampling values.
+        # Use the cached-step path when controls differ, rather than silently
+        # accepting UI parameters that the fixed graph would ignore.
+        runtime.manifest['generation_defaults'] = moss_generation_options(defaults, options)
         selected = voice
         if selected in ('', 'default'):
             selected = 'Xiaoyu' if language == 'zh' else 'Bella'
@@ -57,7 +63,7 @@ def load(root, model_id):
             if cancelled():
                 raise InterruptedError('已停止朗读')
             pending.append(frame)
-            if len(pending) >= 2:
+            if len(pending) >= options.get('chunk_frames', 2):
                 flush()
         runtime.codec_streaming_session.reset()
         try:
@@ -65,7 +71,7 @@ def load(root, model_id):
             flush()
         finally:
             runtime.codec_streaming_session.reset()
-    return StreamingSynthesizer(generate, 'ONNX CPU · 流式')
+    return StreamingSynthesizer(generate, 'ONNX CPU · 流式', accepts_options=True)
 
 if __name__ == '__main__':
     serve(Path(sys.argv[1]), sys.argv[2], load, externally_locked=True)

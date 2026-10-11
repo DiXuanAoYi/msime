@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.14"
+#define MyAppVersion   "0.9.15"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -856,6 +856,7 @@ begin
     IsUserSkinDirectory(FileName) or
     IsUserShuangpinDirectory(FileName) or
     IsCollocationModelDirectory(FileName) or
+    (CompareText(FileName, 'voice-outbox') = 0) or
     (CompareText(FileName, DataDirMarkerName) = 0);
 end;
 
@@ -1457,6 +1458,16 @@ begin
         SW_HIDE,
         ewWaitUntilTerminated,
         ResultCode
+      ) and (ResultCode < 8) and Moved;
+
+  { Generated voice drafts are user data, including files still on the clipboard. }
+  if DirExists(AddBackslash(OldDir) + 'voice-outbox') then
+    Moved :=
+      Exec(
+        ExpandConstant('{sys}\robocopy.exe'),
+        '"' + AddBackslash(OldDir) + 'voice-outbox" "' + AddBackslash(NewDir) + 'voice-outbox" ' +
+        '/E /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
+        '', SW_HIDE, ewWaitUntilTerminated, ResultCode
       ) and (ResultCode < 8) and Moved;
 
   if not Moved then

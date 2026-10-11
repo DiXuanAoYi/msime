@@ -19,7 +19,7 @@ def load(root, model_id):
         dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         device_map='cuda:0' if torch.cuda.is_available() else 'cpu', attn_implementation='sdpa', local_files_only=True)
     languages={'zh':'Chinese','en':'English','ja':'Japanese','ko':'Korean','de':'German','fr':'French','ru':'Russian','es':'Spanish','it':'Italian','pt':'Portuguese'}
-    def synthesize(text, voice, language, speed, emit, cancelled):
+    def synthesize(text, voice, language, speed, options, emit, cancelled):
         if language not in languages:
             raise ValueError('此模型不支持所选语言')
         codes = []
@@ -44,15 +44,16 @@ def load(root, model_id):
             codec = output.hidden_states[-1]
             if codec is not None and int(codec[0, 0]) < module.config.vocab_size - 1024:
                 codes.append(codec.detach())
-                if len(codes) - emitted >= 6:
+                if len(codes) - emitted >= options.get('chunk_size', 6):
                     flush()
         handle = model.model.talker.register_forward_hook(on_forward)
         try:
-            model.generate_custom_voice(text=text, language=languages[language], speaker=voice or 'Vivian', max_new_tokens=1024)
+            kwargs = {'max_new_tokens': 1024, **{k:v for k,v in options.items() if k != 'chunk_size'}}
+            model.generate_custom_voice(text=text, language=languages[language], speaker=voice or 'Vivian', **kwargs)
             flush()
         finally:
             handle.remove()
-    return StreamingSynthesizer(synthesize, 'CPU · Qwen 流式')
+    return StreamingSynthesizer(synthesize, 'CPU · Qwen 流式', accepts_options=True)
 
 if __name__ == '__main__':
     serve(Path(sys.argv[1]),sys.argv[2],load,externally_locked=True)

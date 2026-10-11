@@ -121,6 +121,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/config/ime_config.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_speech.cpp"
     "${CMAKE_SOURCE_DIR}/src/english/speech_service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/english/voice_studio.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/local_tts_models.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_appearance.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_fonts.cpp"
@@ -176,6 +177,7 @@ target_link_libraries(${TEST_EXECUTABLE_NAME}
     PRIVATE
     MetasequoiaIme::Engine
     MetasequoiaIme::Voice
+    MetasequoiaIme::VoiceCapture
     nlohmann_json::nlohmann_json
     fmt::fmt
     spdlog::spdlog

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <toml++/toml.h>
+#include "speech_audio.h"
 
 namespace Speech
 {
@@ -25,4 +26,8 @@ struct Request
 };
 Request BuildRequest(const Config &config, const std::string &text, const std::string &language, int64_t timestamp);
 std::string DecodeAudio(const std::string &provider, const std::string &body);
+// Explicit voice-studio generation. No configuration writes or message sending.
+PcmAudio RenderAudio(const Config &config, const std::string &text, const std::string &language,
+                     const std::function<bool()> &cancelled,
+                     const std::function<void(unsigned, unsigned, const std::string &)> &onChunk = {});
 } // namespace Speech

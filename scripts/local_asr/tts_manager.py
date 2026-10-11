@@ -17,6 +17,7 @@ import time
 import wave
 import manager as support
 from tts_stream import StreamingSynthesizer, CONTRACT
+from tts_options import validate_options
 
 CATALOG = json.loads((support.BASE / "tts_catalog.json").read_text(encoding="utf-8"))
 
@@ -41,10 +42,21 @@ def validate_request(body, model_id):
         raise ValueError("朗读文字必须为 1–2000 UTF-8 字节")
     if request.get("model") != model_id or request.get("response_format", "wav") != "wav":
         raise ValueError("请选择正在运行的模型和 WAV 输出")
+    if isinstance(request.get('speed'), bool):
+        raise ValueError('语速必须是数值')
     speed = float(request.get("speed", 1))
     if not math.isfinite(speed) or not 0.5 <= speed <= 2:
         raise ValueError("语速必须在 0.5–2 之间")
-    return text, str(request.get("voice", "")), str(request.get("language", "zh")), speed
+    voice, language = request.get('voice', ''), request.get('language', 'zh')
+    if not isinstance(voice, str) or len(voice) > 300 or not isinstance(language, str) or len(language) > 16:
+        raise ValueError('音色或语言格式无效')
+    model = entry(model_id)
+    if model.get('languages') and language not in model['languages']:
+        raise ValueError('此模型不支持所选语言：' + language)
+    args = text, voice, language, speed
+    if 'options' in request:
+        return (*args, validate_options(request['options'], entry(model_id)))
+    return args
 
 def pcm_wav(samples, sample_rate):
     import numpy as np
@@ -101,7 +113,7 @@ def load_kokoro(root, model_id, num_threads=2):
     model = sherpa_onnx.OfflineTts(config)
     # v1.1's first 53 IDs retain v1.0's named voices.
     voices = {"af_heart":3, "zf_xiaobei":45, "zf_xiaoni":46, "zm_yunjian":49}
-    def synthesize(text, voice, language, speed, emit, cancelled):
+    def synthesize(text, voice, language, speed, options, emit, cancelled):
         if language not in ('zh', 'en'):
             raise ValueError("此 Kokoro 运行包支持中文和英文")
         sid = int(voice) if voice.isdecimal() else voices.get(voice, -1)
@@ -113,7 +125,7 @@ def load_kokoro(root, model_id, num_threads=2):
             emit(samples, model.sample_rate)
             return 1
         model.generate(text, sid=sid, speed=speed, callback=callback)
-    return StreamingSynthesizer(synthesize)
+    return StreamingSynthesizer(synthesize, accepts_options=True)
 
 def serve(root, model_id, loader=load_kokoro, externally_locked=False, guard=lambda: True):
     state = root / "service.json"
@@ -245,8 +257,8 @@ def main():
         support.download(args.root, args.id)
     else:
         def run(guard=lambda: True):
-            if model['engine'] in ('qwen', 'moss', 'edge'):
-                worker = {'moss': 'tts_moss_worker.py', 'qwen': 'tts_qwen_worker.py', 'edge': 'tts_edge_worker.py'}[model['engine']]
+            if model['engine'] in ('qwen', 'moss', 'edge', 'voxtral'):
+                worker = {'moss': 'tts_moss_worker.py', 'qwen': 'tts_qwen_worker.py', 'edge': 'tts_edge_worker.py', 'voxtral': 'tts_voxtral_worker.py'}[model['engine']]
                 if model['engine'] == 'qwen' and nvidia_available():
                     worker = 'tts_qwen_cuda_worker.py'
                 support.run_qwen(args.root, args.id, worker_name=worker, guard=guard)

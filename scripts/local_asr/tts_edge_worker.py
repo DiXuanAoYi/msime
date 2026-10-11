@@ -12,11 +12,11 @@ from tts_manager import serve
 from tts_stream import StreamingSynthesizer
 
 def load(root, model_id):
-    def generate(text, voice, language, speed, emit, cancelled):
+    def generate(text, voice, language, speed, options, emit, cancelled):
         async def synthesize():
             codec = av.CodecContext.create('mp3float', 'r')
             voice_id = voice or ('zh-CN-XiaoxiaoNeural' if language == 'zh' else 'en-US-JennyNeural')
-            stream = edge_tts.Communicate(text, voice_id, rate=f'{int((speed - 1) * 100):+d}%')
+            stream = edge_tts.Communicate(text, voice_id, rate=f'{int((speed - 1) * 100):+d}%', pitch=f"{options.get('pitch', 0):+d}Hz")
             async for item in stream.stream():
                 if cancelled():
                     raise InterruptedError('已停止朗读')
@@ -31,7 +31,7 @@ def load(root, model_id):
             for frame in codec.decode(None):
                 emit(frame.to_ndarray().T, frame.sample_rate)
         asyncio.run(synthesize())
-    return StreamingSynthesizer(generate, 'Edge-TTS 在线服务 · 文本将发送到微软')
+    return StreamingSynthesizer(generate, 'Edge-TTS 在线服务 · 文本将发送到微软', accepts_options=True)
 
 if __name__ == '__main__':
     serve(Path(sys.argv[1]), sys.argv[2], load, externally_locked=True)

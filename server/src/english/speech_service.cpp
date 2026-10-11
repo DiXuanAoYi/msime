@@ -479,6 +479,19 @@ Request BuildRequest(const Config &c, const std::string &text, const std::string
         r.body = json{{"input", text}, {"model", c.at("local_model")}, {"voice", voice}, {"language", lang},
                       {"speed", rate}, {"response_format", "wav"}}
                      .dump();
+        if (r.url == "http://127.0.0.1:18767/v1/audio/speech" && c.count("local_options"))
+        {
+            auto options = json::parse(c.at("local_options"));
+            const auto selected = options.value(c.at("local_model"), json::object());
+            if (!selected.is_object())
+                throw std::runtime_error("本地模型参数无效");
+            if (!selected.empty())
+            {
+                auto body = json::parse(r.body);
+                body["options"] = selected;
+                r.body = body.dump();
+            }
+        }
     }
     else
         throw std::runtime_error("未知发音服务");
@@ -559,6 +572,188 @@ std::string DecodeAudio(const std::string &provider, const std::string &body)
         throw std::runtime_error("WAV 缺少音频数据");
     return audio;
 }
+PcmAudio RenderAudio(const Config &config, const std::string &text, const std::string &language,
+                     const std::function<bool()> &cancelled,
+                     const std::function<void(unsigned, unsigned, const std::string &)> &onChunk)
+{
+    if (text.empty() || text.size() > 2000)
+        throw std::runtime_error("每段语音限 2000 UTF-8 字节");
+    PcmAudio result;
+    const int volume = std::clamp(std::stoi(config.at("volume")), 0, 100);
+    auto accept = [&](unsigned rate, unsigned channels, std::string pcm) {
+        if (cancelled())
+            throw std::runtime_error("已取消语音生成");
+        if (!result.rate)
+        {
+            result.rate = rate;
+            result.channels = channels;
+        }
+        if (result.rate != rate || result.channels != channels ||
+            result.pcm.size() + pcm.size() > size_t(rate) * channels * 2 * 90)
+            throw std::runtime_error("音频格式变化或超过 90 秒");
+        for (size_t i = 0; i + 1 < pcm.size(); i += 2)
+        {
+            int16_t sample;
+            memcpy(&sample, pcm.data() + i, 2);
+            sample = static_cast<int16_t>(int(sample) * volume / 100);
+            memcpy(pcm.data() + i, &sample, 2);
+        }
+        result.pcm += pcm;
+        if (onChunk)
+            onChunk(rate, channels, pcm);
+    };
+    const auto provider = config.at("provider");
+    if (provider == "sapi")
+    {
+        Microsoft::WRL::ComPtr<ISpVoice> voice;
+        Microsoft::WRL::ComPtr<ISpStream> speechStream;
+        Microsoft::WRL::ComPtr<IStream> memory;
+        if (FAILED(CoCreateInstance(CLSID_SpVoice, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&voice))) ||
+            FAILED(CoCreateInstance(CLSID_SpStream, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&speechStream))) ||
+            FAILED(CreateStreamOnHGlobal(nullptr, TRUE, &memory)))
+            throw std::runtime_error("无法初始化 Windows 音频生成");
+        WAVEFORMATEX format{WAVE_FORMAT_PCM, 1, 24000, 48000, 2, 16, 0};
+        if (FAILED(speechStream->SetBaseStream(memory.Get(), SPDFID_WaveFormatEx, &format)) ||
+            FAILED(voice->SetOutput(speechStream.Get(), TRUE)))
+            throw std::runtime_error("Windows 语音不支持 PCM 输出");
+        Microsoft::WRL::ComPtr<ISpObjectTokenCategory> category;
+        Microsoft::WRL::ComPtr<IEnumSpObjectTokens> tokens;
+        const auto wanted = config.at(language == "zh" ? "sapi_voice_zh" : "sapi_voice_en");
+        const std::map<std::string, std::wstring> lcids = {{"zh", L"804"}, {"en", L"409"}, {"ja", L"411"},
+                                                           {"ko", L"412"}, {"fr", L"40C"}, {"de", L"407"},
+                                                           {"es", L"40A"}};
+        const auto filter = L"Language=" + (lcids.count(language) ? lcids.at(language) : L"409");
+        if (FAILED(CoCreateInstance(CLSID_SpObjectTokenCategory, nullptr, CLSCTX_INPROC_SERVER,
+                                    IID_PPV_ARGS(&category))) ||
+            FAILED(category->SetId(SPCAT_VOICES, FALSE)) ||
+            FAILED(category->EnumTokens(wanted.empty() ? filter.c_str() : nullptr, nullptr, &tokens)))
+            throw std::runtime_error("无法获取 Windows 音色");
+        Microsoft::WRL::ComPtr<ISpObjectToken> token;
+        bool selected = false;
+        while (tokens->Next(1, &token, nullptr) == S_OK)
+        {
+            LPWSTR id = nullptr;
+            token->GetId(&id);
+            const bool match = wanted.empty() || (id && string_to_wstring(wanted) == id);
+            CoTaskMemFree(id);
+            if (match)
+            {
+                voice->SetVoice(token.Get());
+                selected = true;
+                break;
+            }
+            token.Reset();
+        }
+        if (!selected)
+            throw std::runtime_error("请安装或选择可用的 Windows 音色");
+        voice->SetRate(static_cast<long>(std::clamp(std::log2(std::stod(config.at("rate"))) * 5.0, -10.0, 10.0)));
+        voice->SetVolume(100);
+        if (FAILED(voice->Speak(string_to_wstring(text).c_str(), SPF_ASYNC | SPF_IS_NOT_XML, nullptr)))
+            throw std::runtime_error("Windows 语音合成失败");
+        while (voice->WaitUntilDone(50) == S_FALSE)
+            if (cancelled())
+            {
+                voice->Speak(nullptr, SPF_PURGEBEFORESPEAK, nullptr);
+                throw std::runtime_error("已取消语音生成");
+            }
+        STATSTG stat{};
+        if (FAILED(memory->Stat(&stat, STATFLAG_NONAME)) || stat.cbSize.QuadPart > 24000 * 2 * 90)
+            throw std::runtime_error("生成音频超过 90 秒");
+        memory->Seek({}, STREAM_SEEK_SET, nullptr);
+        std::string pcm(static_cast<size_t>(stat.cbSize.QuadPart), '\0');
+        ULONG read = 0;
+        if (FAILED(memory->Read(pcm.data(), static_cast<ULONG>(pcm.size()), &read)) || read != pcm.size())
+            throw std::runtime_error("无法读取生成音频");
+        accept(24000, 1, std::move(pcm));
+    }
+    else
+    {
+        auto payload = BuildRequest(config, text, language, std::time(nullptr));
+        const bool streaming = provider == "local" && payload.url == "http://127.0.0.1:18767/v1/audio/speech";
+        if (streaming)
+        {
+            std::ifstream file(metasequoia::data_directory() / "models" / "tts" / "service-token.txt");
+            std::string token;
+            file >> token;
+            if (token.size() != 64 || token.find_first_not_of("0123456789abcdef") != std::string::npos)
+                throw std::runtime_error("请先启动本地发音模型");
+            payload.headers.push_back("Authorization: Bearer " + token);
+            auto body = json::parse(payload.body);
+            body["stream"] = true;
+            payload.body = body.dump();
+        }
+        PcmStream parser(accept);
+        struct Receive
+        {
+            PcmStream *parser;
+            std::string body, error;
+        } receive{streaming ? &parser : nullptr, {}, {}};
+        std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), curl_easy_cleanup);
+        if (!curl)
+            throw std::runtime_error("无法初始化语音请求");
+        curl_slist *list = nullptr;
+        for (const auto &header : payload.headers)
+            list = curl_slist_append(list, header.c_str());
+        std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> headers(list, curl_slist_free_all);
+        curl_easy_setopt(curl.get(), CURLOPT_URL, payload.url.c_str());
+        curl_easy_setopt(curl.get(), CURLOPT_HTTPHEADER, headers.get());
+        curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, payload.body.c_str());
+        curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(payload.body.size()));
+        curl_easy_setopt(
+            curl.get(), CURLOPT_WRITEFUNCTION, +[](char *data, size_t size, size_t count, void *opaque) -> size_t {
+                auto &r = *static_cast<Receive *>(opaque);
+                const auto length = size * count;
+                try
+                {
+                    if (r.parser)
+                        r.parser->Feed(std::string_view(data, length));
+                    else
+                    {
+                        if (r.body.size() + length > 16 * 1024 * 1024)
+                            throw std::runtime_error("音频响应过大");
+                        r.body.append(data, length);
+                    }
+                    return length;
+                }
+                catch (const std::exception &e)
+                {
+                    r.error = e.what();
+                    return 0;
+                }
+            });
+        curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &receive);
+        curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(
+            curl.get(), CURLOPT_XFERINFOFUNCTION, +[](void *p, curl_off_t, curl_off_t, curl_off_t, curl_off_t) -> int {
+                return (*static_cast<const std::function<bool()> *>(p))() ? 1 : 0;
+            });
+        curl_easy_setopt(curl.get(), CURLOPT_XFERINFODATA, &cancelled);
+        curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, 10L);
+        curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, 240L);
+        if (provider == "local")
+            curl_easy_setopt(curl.get(), CURLOPT_PROXY, "");
+        else
+            NetworkProxy::ApplyToCurl(curl.get());
+        const auto code = curl_easy_perform(curl.get());
+        long statusCode = 0;
+        curl_easy_getinfo(curl.get(), CURLINFO_RESPONSE_CODE, &statusCode);
+        if (cancelled())
+            throw std::runtime_error("已取消语音生成");
+        if (!receive.error.empty())
+            throw std::runtime_error(receive.error);
+        if (code != CURLE_OK || statusCode != 200)
+            throw std::runtime_error("语音生成失败，请检查模型状态或服务配置");
+        if (streaming)
+            parser.Finish();
+        else
+        {
+            auto audio = ParseWav(DecodeAudio(provider, receive.body));
+            accept(audio.rate, audio.channels, std::move(audio.pcm));
+        }
+    }
+    EncodeWav(result);
+    return result;
+}
 void Speak(std::string text, std::string language)
 {
     if (text.empty() || text.size() > 2000)
@@ -600,8 +795,12 @@ nlohmann::json Handle(const nlohmann::json &request)
         }
     }
     std::lock_guard lock(statusMutex);
-    return {
-        {"type", "speechResponse"}, {"protocolVersion", 1}, {"requestId", request.value("requestId", "")}, {"ok", true},
-        {"message", status},        {"voices", voices}};
+    return {{"type", "speechResponse"},
+            {"protocolVersion", 1},
+            {"requestId", request.value("requestId", "")},
+            {"ok", true},
+            {"message", status},
+            {"voices", voices},
+            {"modelInfo", LocalTts::ModelInfo(GetConfig().at("local_model"))}};
 }
 } // namespace Speech

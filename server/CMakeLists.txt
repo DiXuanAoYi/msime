@@ -177,6 +177,7 @@ set(SRC_FILES
     "./src/config/ime_config_services.cpp"
     "./src/config/ime_config_speech.cpp"
     "./src/english/speech_service.cpp"
+    "./src/english/voice_studio.cpp"
     "./src/config/ime_config_shuangpin.cpp"
     "./src/config/ime_config_template.cpp"
     "./src/config/ime_config_theme.cpp"
@@ -494,6 +495,7 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/config/ime_config_services.cpp"
     "./src/config/ime_config_speech.cpp"
     "./src/english/speech_service.cpp"
+    "./src/english/voice_studio.cpp"
     "./src/config/ime_config_shuangpin.cpp"
     "./src/config/ime_config_template.cpp"
     "./src/config/ime_config_theme.cpp"
@@ -604,4 +606,4 @@ if(TARGET MetasequoiaImeServerTests)
     add_dependencies(MetasequoiaImeServerTests MetasequoiaImeChatCapture)
 endif()
 
-target_link_libraries(${SETTINGS_EXECUTABLE_NAME} PRIVATE MetasequoiaIme::Voice)
+target_link_libraries(${SETTINGS_EXECUTABLE_NAME} PRIVATE MetasequoiaIme::Voice MetasequoiaIme::VoiceCapture)

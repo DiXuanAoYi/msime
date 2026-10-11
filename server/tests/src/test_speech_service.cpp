@@ -1,6 +1,9 @@
 #include "english/speech_service.h"
 #include "english/pcm_stream.h"
+#include "english/voice_studio.h"
 #include "tests/includes/test_framework.h"
+#include <fstream>
+#include <cmath>
 
 namespace
 {
@@ -18,6 +21,81 @@ template <class F> void RejectSpeech(F f)
     REQUIRE(failed);
 }
 } // namespace
+TEST_CASE(speech_wav_roundtrip_validates_stereo_alignment_and_duration)
+{
+    Speech::PcmAudio audio{48000, 2, std::string(400, '\0')};
+    const auto decoded = Speech::ParseWav(Speech::EncodeWav(audio));
+    REQUIRE(decoded.rate == 48000);
+    REQUIRE(decoded.channels == 2);
+    REQUIRE(decoded.pcm == audio.pcm);
+    auto damaged = Speech::EncodeWav(audio);
+    damaged.pop_back();
+    RejectSpeech([&] { Speech::ParseWav(damaged); });
+    audio.pcm.push_back('x');
+    RejectSpeech([&] { Speech::EncodeWav(audio); });
+    audio = {24000, 1, std::string(24000 * 2 * 91, '\0')};
+    RejectSpeech([&] { Speech::EncodeWav(audio); });
+}
+TEST_CASE(speech_model_parameters_are_scoped_to_the_requested_model)
+{
+    auto config = Speech::Defaults();
+    config["provider"] = "local";
+    config["local_model"] = "qwen-0.6b";
+    config["local_options"] = R"({"qwen-0.6b":{"temperature":0.65,"do_sample":false},"moss-nano":{"audio_top_k":10}})";
+    const auto request = nlohmann::json::parse(Speech::BuildRequest(config, "你好", "zh", 0).body);
+    REQUIRE(request["options"]["temperature"] == 0.65);
+    REQUIRE(request["options"]["do_sample"] == false);
+    REQUIRE(!request["options"].contains("audio_top_k"));
+}
+TEST_CASE(voice_studio_decodes_stereo_wav_to_local_asr_format)
+{
+    const auto hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const auto path = std::filesystem::temp_directory_path() /
+                      (L"msime-voice-decode-" + std::to_wstring(GetCurrentProcessId()) + L".wav");
+    Speech::PcmAudio audio{48000, 2, std::string(48000 * 2 * 2 / 5, '\0')};
+    for (size_t pos = 0; pos < audio.pcm.size(); pos += 2)
+    {
+        const int16_t sample = 8192;
+        memcpy(audio.pcm.data() + pos, &sample, 2);
+    }
+    const auto wav = Speech::EncodeWav(audio);
+    {
+        std::ofstream output(path, std::ios::binary);
+        output.write(wav.data(), wav.size());
+    }
+    try
+    {
+        const auto samples = VoiceStudio::ReadAudioFile(path, [] { return false; });
+        REQUIRE(samples.size() > 2800);
+        REQUIRE(samples.size() < 3600);
+        REQUIRE(std::all_of(samples.begin(), samples.end(), [](float value) { return std::isfinite(value); }));
+        REQUIRE(
+            std::any_of(samples.begin(), samples.end(), [](float value) { return value > 0.20f && value < 0.30f; }));
+        RejectSpeech([&] { VoiceStudio::ReadAudioFile(path, [] { return true; }); });
+    }
+    catch (...)
+    {
+        std::filesystem::remove(path);
+        if (SUCCEEDED(hr))
+            CoUninitialize();
+        throw;
+    }
+    std::filesystem::remove(path);
+    if (SUCCEEDED(hr))
+        CoUninitialize();
+}
+TEST_CASE(voice_studio_rejects_stale_audio_and_empty_generation_without_side_effects)
+{
+    for (const auto *action : {"copy", "save", "play", "route"})
+    {
+        const auto result =
+            VoiceStudio::Handle({{"action", action}, {"artifactId", "stale"}, {"deviceId", 0}}, nullptr);
+        REQUIRE(result["ok"] == false);
+    }
+    const auto empty = VoiceStudio::Handle({{"action", "generate"}, {"text", ""}}, nullptr);
+    REQUIRE(empty["ok"] == false);
+    VoiceStudio::Stop();
+}
 TEST_CASE(speech_stream_plays_before_terminal_frame_and_accepts_fragmented_transport)
 {
     std::string bytes = TtsStreamContract::magic;

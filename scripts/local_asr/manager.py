@@ -114,7 +114,7 @@ def download(root, model_id):
             for file in entry["files"]:
                 if cancel.exists():
                     raise InterruptedError("已暂停；再次下载将续传")
-                target = dest / ("original" if entry["engine"] in ('qwen', 'moss') else "archives") / file["name"]
+                target = dest / ("original" if entry["engine"] in ('qwen', 'moss', 'voxtral') else "archives") / file["name"]
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists() and target.stat().st_size == file["bytes"] and digest(target) == file["sha256"]:
                     done += file["bytes"]
@@ -156,7 +156,7 @@ def download(root, model_id):
                     part.unlink(missing_ok=True)
                     raise ValueError("模型校验失败，损坏文件已移除，请重新下载")
                 os.replace(part, target)
-            if entry["engine"] not in ('qwen', 'moss'):
+            if entry["engine"] not in ('qwen', 'moss', 'voxtral'):
                 report("extracting", "校验通过，正在展开运行包")
                 staging = dest / "unpacking"
                 safe_extract(dest / "archives" / entry["files"][0]["name"], staging, entry["diskBytes"] * 2, cancel.exists)

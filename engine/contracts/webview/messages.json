@@ -1070,17 +1070,8 @@
             "maxLength": 2000
           },
           "language": {
-            "enum": [
-              "zh",
-              "en",
-              "ja",
-              "es",
-              "vi",
-              "fr",
-              "de",
-              "ru",
-              "ko"
-            ]
+            "type": "string",
+            "maxLength": 16
           }
         },
         "required": [
@@ -1112,6 +1103,70 @@
           },
           "modelId": {
             "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "voiceStudioRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "action": {
+            "enum": [
+              "status",
+              "generate",
+              "stop",
+              "recordStart",
+              "recordStop",
+              "import",
+              "transcribe",
+              "play",
+              "route",
+              "copy",
+              "save"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "voice": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "optionsJson": {
+            "type": "string",
+            "maxLength": 32768
+          },
+          "rate": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2
+          },
+          "deviceId": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "artifactId": {
+            "type": "string",
+            "maxLength": 100
           }
         },
         "required": [
@@ -2094,6 +2149,30 @@
         "service"
       ],
       "additionalProperties": false
+    },
+    "voiceStudioResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "state": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "state"
+      ],
+      "additionalProperties": true
     }
   }
 }

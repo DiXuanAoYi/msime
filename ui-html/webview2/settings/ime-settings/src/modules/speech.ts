@@ -2,6 +2,8 @@ import { setupLocalTts } from './local-tts';
 import { serializeHostMessage } from '../../../../shared/messages';
 import { onHostMessage } from '../utils/host-messages';
 import { updateConfig } from './config-sync';
+import { fillVoices, LANGUAGE_NAMES, parseModelOptions, renderModelControls, type SpeechModel } from './speech-model-options';
+import { applyVoiceStudioConfig, setupVoiceStudio } from './voice-studio';
 
 type Provider = { name: string; note: string; links: [string, string][]; fields: [string, string, string?][] };
 export const SPEECH_PROVIDERS: Record<string, Provider> = {
@@ -14,6 +16,7 @@ export const SPEECH_PROVIDERS: Record<string, Provider> = {
 };
 let config: Record<string,string> = {};
 let voices: {id:string;name:string}[] = [];
+let modelInfo:SpeechModel = {};
 const post = (action:'status'|'preview'|'stop', text?:string, language?:'zh'|'en') => window.chrome?.webview?.postMessage(serializeHostMessage({type:'speechRequest',data:{requestId:`speech-${Date.now()}`,action,...(text?{text,language}: {})}}));
 function link(parent: HTMLElement, label:string, url:string): void {
   const a=document.createElement('a');a.textContent=label;a.href=url;
@@ -28,7 +31,9 @@ function renderFields(): void {
   for(const [key,label,type] of provider.fields){
     const row=document.createElement('label');row.className='speech-field';row.append(document.createTextNode(label));
     let input:HTMLInputElement|HTMLSelectElement;
-    if(key.startsWith('sapi_voice')||key==='elevenlabs_model'){
+    if(key.startsWith('local_voice') && config.provider==='local' && modelInfo.voices?.length){
+      const select=document.createElement('select');input=select;fillVoices(select,modelInfo.voices,config[key]??'');
+    }else if(key.startsWith('sapi_voice')||key==='elevenlabs_model'){
       const select=document.createElement('select');input=select;
       const options=key==='elevenlabs_model'?[{id:'eleven_flash_v2_5',name:'Flash v2.5 · 快速'},{id:'eleven_v3',name:'Eleven v3 · 情感'}]:[{id:'',name:'按语言自动选择'},...voices];
       for(const o of options)select.add(new Option(o.name,o.id));
@@ -37,6 +42,20 @@ function renderFields(): void {
     input.value=config[key]??'';input.id=`speech-${key}`;
     input.addEventListener('change',()=>{config[key]=input.value.trim();updateConfig(`speech.${key}`,config[key]);});row.append(input);root.append(row);
   }
+  const controls=document.getElementById('speechModelControls');
+  if(controls){
+    controls.hidden=config.provider!=='local';
+    if(config.provider==='local'){
+      const options=parseModelOptions(config.local_options);
+      renderModelControls(controls,modelInfo,options[config.local_model]??{},value=>{
+        const current=parseModelOptions(config.local_options);current[config.local_model]=value;
+        config.local_options=JSON.stringify(current);updateConfig('speech.local_options',config.local_options);
+      });
+    }
+  }
+  const language=document.getElementById('speechLanguage') as HTMLSelectElement|null;
+  if(language){const current=language.value;const choices=config.provider==='local'&&modelInfo.languages?.length?modelInfo.languages:['zh','en','ja','ko','fr','de','es','it','pt','ru'];language.replaceChildren();for(const id of choices)language.add(new Option(LANGUAGE_NAMES[id]??id,id));language.value=choices.includes(current)?current:choices[0];}
+  applyVoiceStudioConfig(config,modelInfo,voices);
 }
 export function applySpeechConfig(value:Record<string,string>):void{
   config={...value};
@@ -53,10 +72,11 @@ export function setupSpeech():void{
   document.getElementById('speechPreview')?.addEventListener('click',()=>{const text=(document.getElementById('speechText') as HTMLTextAreaElement).value.trim();const lang=(document.getElementById('speechLanguage') as HTMLSelectElement).value as 'zh'|'en';if(text)post('preview',text,lang);});
   document.getElementById('speechStop')?.addEventListener('click',()=>post('stop'));
   onHostMessage('speechResponse',message=>{if(message.type!=='speechResponse')return;const el=document.getElementById('speechStatus');if(el)el.textContent=message.message;
-    const next=message.voices as {id:string;name:string}[];if(JSON.stringify(next)!==JSON.stringify(voices)){voices=next;renderFields();}});
+    const next=message.voices as {id:string;name:string}[];const nextModel=(message.modelInfo??{}) as SpeechModel;
+    if(JSON.stringify(next)!==JSON.stringify(voices)||JSON.stringify(nextModel)!==JSON.stringify(modelInfo)){voices=next;modelInfo=nextModel;renderFields();}});
   const panel=document.getElementById('speechPanel') as HTMLDetailsElement;let timer=0;
   const updatePolling=()=>{clearInterval(timer);if(panel.open){post('status');timer=window.setInterval(()=>{if(!document.hidden)post('status');},2000);}};
   panel.addEventListener('toggle',updatePolling);
   window.addEventListener('beforeunload',()=>clearInterval(timer));
-  applySpeechConfig(config);updatePolling();setupLocalTts();
+  setupVoiceStudio();applySpeechConfig(config);updatePolling();setupLocalTts();
 }

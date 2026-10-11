@@ -1,4 +1,5 @@
 #include "english/speech_service.h"
+#include "english/voice_studio.h"
 #include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
 #include "settings/local_tts_models.h"
@@ -1583,6 +1584,12 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
             if (g_webview)
                 g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
         }
+        else if (type == "voiceStudioRequest")
+        {
+            auto response = VoiceStudio::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
         else if (type == "localTtsRequest")
         {
             auto response = LocalTts::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
@@ -2027,6 +2034,7 @@ std::optional<UINT> SettingsLingerTimeoutMs(const std::string &linger)
 // 首帧还没出来就被关掉，说明用户不想等这次冷启动，直接退出，别留一个半初始化的进程。
 void HideSettings(HWND hwnd)
 {
+    VoiceStudio::Stop();
     if (g_closing)
         return;
     if (g_chat_reader)
@@ -2068,6 +2076,7 @@ void HideSettings(HWND hwnd)
 
 void CloseSettings(HWND hwnd)
 {
+    VoiceStudio::Stop();
     if (g_closing)
         return;
     g_closing = true;

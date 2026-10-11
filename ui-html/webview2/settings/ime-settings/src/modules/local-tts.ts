@@ -53,7 +53,8 @@ export function setupLocalTts(): void {
       const card = add(container, 'article', '', 'local-asr-card');
       add(card, 'h4', String(row.name));
       const online = row.engine === 'edge';
-      add(card, 'p', `${row.format} · ${online ? '无需下载模型权重' : `下载 ${formatModelBytes(Number(row.downloadBytes))}`} · 建议磁盘预留 ${formatModelBytes(Number(row.diskBytes))}`, 'local-asr-size');
+      const awaiting = row.availability === 'awaiting_weights';
+      add(card, 'p', awaiting ? `${row.format} · 等待官方权重，下载大小尚不可核实` : `${row.format} · ${online ? '无需下载模型权重' : `下载 ${formatModelBytes(Number(row.downloadBytes))}`} · 建议磁盘预留 ${formatModelBytes(Number(row.diskBytes))}`, 'local-asr-size');
       add(card, 'p', String(row.features));
       add(card, 'p', String(row.hardware), 'voice-description');
       const links = add(card, 'div', '', 'local-asr-actions');
@@ -61,6 +62,7 @@ export function setupLocalTts(): void {
       link.href = String(row.official); link.addEventListener('click', event => {
         event.preventDefault(); window.chrome?.webview?.postMessage(serializeHostMessage({type:'openExternalUrl',data:link.href}));
       });
+      if (awaiting) { add(card, 'p', '官方完整权重尚不可获取，本版暂不能下载或运行此模型。', 'voice-description'); continue; }
       const external = row.engine === 'external';
       const downloadLink = add(links, 'a', '官方下载网址') as HTMLAnchorElement;
       downloadLink.href = String(row.downloadUrl); downloadLink.addEventListener('click', event => {event.preventDefault();window.chrome?.webview?.postMessage(serializeHostMessage({type:'openExternalUrl',data:downloadLink.href}));});

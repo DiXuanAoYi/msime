@@ -1304,5 +1304,94 @@
     "valid": false,
     "surface": "settings",
     "direction": "client"
+  },
+  {
+    "name": "studio generation parameters",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "generate",
+        "text": "今天见",
+        "language": "zh",
+        "voice": "Eric",
+        "rate": 1,
+        "optionsJson": "{\"chunk_size\":6}"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio explicit file copy",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "copy",
+        "artifactId": "draft-id"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio explicit device route",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "route",
+        "artifactId": "draft-id",
+        "deviceId": 2
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio has no chat send operation",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio rejects invalid speed",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "generate",
+        "text": "hello",
+        "rate": 3
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio rejects invalid output device",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "route",
+        "deviceId": -1
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
   }
 ]

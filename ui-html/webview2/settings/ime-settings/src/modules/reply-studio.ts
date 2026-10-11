@@ -313,6 +313,10 @@ export function setupReplyStudio(): void {
     status("已追加到当前记录，点击“保存上下文”后加密保存。");
   };
   el("rsCopyDraft").onclick = () => copy(value("rsDraft"));
+  document.getElementById("rsVoiceDraft")?.addEventListener("click", async () => {
+    const {openVoiceStudio} = await import('./voice-studio');
+    await openVoiceStudio(value("rsDraft"));
+  });
   el("rsRemember").onclick = () => {
     if (!value("rsDraft").trim()) {
       status("先选取或填写一条草稿。");
@@ -521,7 +525,10 @@ export function setupReplyStudio(): void {
         const copyButton = document.createElement("button");
         copyButton.textContent = "复制";
         copyButton.onclick = () => copy(row.text);
-        buttons.append(choose, copyButton);
+        const voiceButton = document.createElement("button");
+        voiceButton.textContent = "转成语音";
+        voiceButton.onclick = async () => { const {openVoiceStudio} = await import('./voice-studio'); await openVoiceStudio(row.text); };
+        buttons.append(choose, copyButton, voiceButton);
         card.append(title, p, buttons);
         list.append(card);
       });

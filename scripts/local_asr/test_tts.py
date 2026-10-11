@@ -5,14 +5,44 @@ import wave
 from pathlib import Path
 import tomllib
 import struct
+from tts_options import validate_options
 from tts_stream import StreamingSynthesizer, CONTRACT
 import tts_manager as tts
 from worker_dependencies import validate_torch_audio
 
 class LocalTtsTests(unittest.TestCase):
+    def test_controls_reject_unsupported_values_and_only_qwen_17_accepts_instructions(self):
+        qwen = tts.entry('qwen-0.6b')
+        self.assertEqual(json.loads(validate_options({'temperature':0.7,'do_sample':False},qwen)), {'temperature':0.7,'do_sample':False})
+        for value in [{'temperature':True},{'temperature':float('nan')},{'temperature':99},{'chunk_size':1.5},{'instruct':'unused'},{'endpoint':'https://example.com'}]:
+            with self.assertRaises(ValueError):validate_options(value,qwen)
+        self.assertEqual(json.loads(validate_options({'instruct':'温柔地说'},tts.entry('qwen-1.7b')))['instruct'],'温柔地说')
+        with self.assertRaises(ValueError):
+            tts.validate_request(json.dumps({'input':'text','model':'voxtral-tts','language':'zh'}),'voxtral-tts')
+
+    def test_model_options_reach_generation_and_separate_cache_keys(self):
+        received=[]
+        def generate(text,voice,language,speed,options,emit,cancelled):
+            received.append(options);emit([options['temperature']/10],24000)
+        synth=StreamingSynthesizer(generate,accepts_options=True)
+        args=('hello','v','en',1)
+        first=synth(*args,'{"temperature":0.5}')
+        self.assertEqual(synth(*args,'{"temperature":0.5}'),first)
+        self.assertNotEqual(synth(*args,'{"temperature":0.8}'),first)
+        self.assertEqual(received,[{'temperature':0.5},{'temperature':0.8}])
+
+    def test_explicit_random_seed_does_not_reuse_cached_audio(self):
+        calls=[]
+        def generate(text,voice,language,speed,options,emit,cancelled):
+            calls.append(1);emit([len(calls)/10],24000)
+        synth=StreamingSynthesizer(generate,accepts_options=True)
+        a=synth('a','v','en',1,'{"seed":-1}')
+        self.assertNotEqual(synth('a','v','en',1,'{"seed":-1}'),a)
+        self.assertEqual(len(calls),2)
+
     def test_catalog_has_sizes_and_pinned_managed_downloads(self):
         managed=[m for m in tts.CATALOG if m['engine'] not in ('external', 'edge')]
-        self.assertEqual({m['id'] for m in managed}, {'kokoro','qwen-0.6b','qwen-1.7b','moss-nano'})
+        self.assertEqual({m['id'] for m in managed}, {'kokoro','qwen-0.6b','qwen-1.7b','moss-nano','voxtral-tts'})
         for m in tts.CATALOG:
             if m in managed:
                 self.assertGreater(m['downloadBytes'], 0)

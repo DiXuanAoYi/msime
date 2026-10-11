@@ -310,6 +310,10 @@ jobs:
         shell: pwsh
         run: ./scripts/ci/check-server-binaries.ps1 -BuildDir server/build-release/bin/Release
 
+      - name: Build the Voxtral native CPU adapter (no model weights)
+        shell: pwsh
+        run: ./scripts/local_asr/Build-Voxtral.ps1 -SourceDirectory "$env:RUNNER_TEMP/audio-cpp" -BuildDirectory "$env:RUNNER_TEMP/audio-cpp-build"
+
       - name: Build the local speech CPU runtime (models download separately)
         shell: pwsh
         run: ./scripts/local_asr/Build-Runtime.ps1 -WorkDirectory "$env:RUNNER_TEMP/local-asr-build"
