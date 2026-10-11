@@ -1,5 +1,11 @@
 set(TEST_EXECUTABLE_NAME "MetasequoiaImeServerTests")
 
+# Explicit manual probe exercises the shipped PCM parser/player and real device.
+add_executable(MetasequoiaTtsStreamProbe tts_stream_probe.cpp)
+target_include_directories(MetasequoiaTtsStreamProbe PRIVATE ../src "${MSIME_ENGINE_DIR}/..")
+target_compile_features(MetasequoiaTtsStreamProbe PRIVATE cxx_std_20)
+target_link_libraries(MetasequoiaTtsStreamProbe PRIVATE CURL::libcurl winmm)
+
 add_executable(test_voice_control_dispatch src/test_voice_control_dispatch.cpp
     ../src/ipc/voice_control_dispatch.cpp)
 target_include_directories(test_voice_control_dispatch PRIVATE ../src "${MSIME_ENGINE_DIR}")
@@ -115,6 +121,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/config/ime_config.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_speech.cpp"
     "${CMAKE_SOURCE_DIR}/src/english/speech_service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/local_tts_models.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_appearance.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_fonts.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_general.cpp"

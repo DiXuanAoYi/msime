@@ -46,6 +46,34 @@ Config GetConfig()
     std::lock_guard lock(mutex);
     return current.empty() ? Defaults() : current;
 }
+bool ActivateLocalModel(const std::string &model, bool resetVoices)
+{
+    Config changes{
+        {"provider", "local"}, {"local_endpoint", "http://127.0.0.1:18767/v1/audio/speech"}, {"local_model", model}};
+    if (resetVoices)
+    {
+        changes["local_voice_zh"] = model == "edge-tts"    ? "zh-CN-XiaoxiaoNeural"
+                                    : model == "kokoro"    ? "zf_xiaobei"
+                                    : model == "moss-nano" ? "default"
+                                                           : "Vivian";
+        changes["local_voice_en"] = model == "edge-tts"    ? "en-US-JennyNeural"
+                                    : model == "kokoro"    ? "af_heart"
+                                    : model == "moss-nano" ? "default"
+                                                           : "Ryan";
+    }
+    std::vector<ime_config_detail::ConfigValueUpdate> updates;
+    for (const auto &[key, value] : changes)
+        updates.push_back({"speech", key, ime_config_detail::EscapeTomlBasicString(value)});
+    // The existing cross-process writer atomically replaces the entire file.
+    if (!ime_config_detail::WriteConfiguredValues(updates))
+        return false;
+    std::lock_guard lock(mutex);
+    if (current.empty())
+        current = Defaults();
+    for (const auto &[key, value] : changes)
+        current[key] = value;
+    return true;
+}
 void LoadConfig(const toml::table &table)
 {
     auto next = Defaults();

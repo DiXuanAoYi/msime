@@ -10,14 +10,29 @@ import math
 import os
 from pathlib import Path
 import secrets
+import select
+import socket
 import sys
+import time
 import wave
 import manager as support
+from tts_stream import StreamingSynthesizer, CONTRACT
 
 CATALOG = json.loads((support.BASE / "tts_catalog.json").read_text(encoding="utf-8"))
 
 def entry(model_id):
     return next(x for x in CATALOG if x["id"] == model_id)
+
+def nvidia_available():
+    if sys.platform != 'win32':
+        return False
+    try:
+        import ctypes
+        driver = ctypes.WinDLL('nvcuda.dll')
+        count = ctypes.c_int()
+        return driver.cuInit(0) == 0 and driver.cuDeviceGetCount(ctypes.byref(count)) == 0 and count.value > 0
+    except (OSError, AttributeError):
+        return False
 
 def validate_request(body, model_id):
     request = json.loads(body)
@@ -68,7 +83,7 @@ def cache_synthesis(synthesize, max_bytes=16 * 1024 * 1024, max_entries=128):
         return audio
     return cached
 
-def load_kokoro(root, model_id):
+def load_kokoro(root, model_id, num_threads=2):
     import sherpa_onnx
     directory = root / model_id / "active"
     config = sherpa_onnx.OfflineTtsConfig(
@@ -78,7 +93,7 @@ def load_kokoro(root, model_id):
                 tokens=str(directory / "tokens.txt"), data_dir=str(directory / "espeak-ng-data"),
                 dict_dir=str(directory / "dict"),
                 lexicon=','.join(str(directory / n) for n in ['lexicon-zh.txt','lexicon-us-en.txt'])),
-            num_threads=min(4, os.cpu_count() or 1), provider="cpu"),
+            num_threads=min(num_threads, os.cpu_count() or 1), provider="cpu"),
         rule_fsts=','.join(str(directory / n) for n in ['phone-zh.fst','date-zh.fst','number-zh.fst']),
         max_num_sentences=1)
     if not config.validate():
@@ -86,27 +101,34 @@ def load_kokoro(root, model_id):
     model = sherpa_onnx.OfflineTts(config)
     # v1.1's first 53 IDs retain v1.0's named voices.
     voices = {"af_heart":3, "zf_xiaobei":45, "zf_xiaoni":46, "zm_yunjian":49}
-    def synthesize(text, voice, language, speed):
+    def synthesize(text, voice, language, speed, emit, cancelled):
         if language not in ('zh', 'en'):
             raise ValueError("此 Kokoro 运行包支持中文和英文")
         sid = int(voice) if voice.isdecimal() else voices.get(voice, -1)
         if sid < 0 or sid >= model.num_speakers:
             raise ValueError("音色无效，请使用 af_heart / zf_xiaobei 或有效数字音色 ID")
-        audio = model.generate(text, sid=sid, speed=speed)
-        return pcm_wav(audio.samples, audio.sample_rate)
-    return synthesize
+        def callback(samples, progress):
+            if cancelled():
+                return 0
+            emit(samples, model.sample_rate)
+            return 1
+        model.generate(text, sid=sid, speed=speed, callback=callback)
+    return StreamingSynthesizer(synthesize)
 
-def serve(root, model_id, loader=load_kokoro, externally_locked=False):
+def serve(root, model_id, loader=load_kokoro, externally_locked=False, guard=lambda: True):
     state = root / "service.json"
     stop = root / "stop"
     with contextlib.nullcontext() if externally_locked else support.job_lock(root / "service.lock"):
+        if not guard():
+            return
         if not externally_locked:
             stop.unlink(missing_ok=True)
         token = secrets.token_hex(32)
         (root / "service-token.txt").write_text(token, encoding="ascii")
         support.atomic_json(state, dict(state="loading", model=model_id, message="正在加载发音模型", pid=os.getpid()))
         try:
-            synthesize = cache_synthesis(loader(root, model_id))
+            loaded = loader(root, model_id)
+            synthesize = loaded if isinstance(loaded, StreamingSynthesizer) else cache_synthesis(loaded)
             class Handler(http.server.BaseHTTPRequestHandler):
                 timeout = 15
                 def log_message(self, *args):
@@ -121,6 +143,7 @@ def serve(root, model_id, loader=load_kokoro, externally_locked=False):
                     if self.path != "/v1/audio/speech" or self.headers.get("Origin") or not secrets.compare_digest(self.headers.get("Authorization", ""), "Bearer " + token):
                         self.reply(403, b'{"error":"unauthorized"}')
                         return
+                    streaming_started = False
                     try:
                         size = int(self.headers.get("Content-Length", "0"))
                         if not 0 < size <= 16384:
@@ -129,15 +152,39 @@ def serve(root, model_id, loader=load_kokoro, externally_locked=False):
                         body = self.rfile.read(size)
                         if len(body) != size:
                             raise ValueError("请求不完整")
-                        audio = synthesize(*validate_request(body, model_id))
-                        self.reply(200, audio, "audio/wav")
+                        args = validate_request(body, model_id)
+                        if json.loads(body).get('stream') is True:
+                            if not isinstance(synthesize, StreamingSynthesizer):
+                                raise ValueError('此适配器尚不支持流式生成')
+                            self.send_response(200)
+                            self.send_header('Content-Type', CONTRACT['content_type'])
+                            self.send_header('Connection', 'close')
+                            self.end_headers()
+                            streaming_started = True
+                            self.close_connection = True
+                            def write(data):
+                                self.wfile.write(data)
+                                self.wfile.flush()
+                            def cancelled():
+                                if stop.exists():
+                                    return True
+                                readable, _, _ = select.select([self.connection], [], [], 0)
+                                return bool(readable) and not self.connection.recv(1, socket.MSG_PEEK)
+                            metrics = synthesize.stream(args, write, cancelled)
+                            support.atomic_json(root / 'last-latency.json', dict(model=model_id, device=synthesize.device, **metrics))
+                        else:
+                            audio = synthesize(*args)
+                            self.reply(200, audio, "audio/wav")
                     except (BrokenPipeError, ConnectionResetError):
                         pass
                     except Exception as error:
-                        self.reply(400, json.dumps({"error":str(error)[:200]}, ensure_ascii=False).encode("utf-8"))
+                        if not streaming_started:
+                            self.reply(400, json.dumps({"error":str(error)[:200]}, ensure_ascii=False).encode("utf-8"))
+                        # After headers, EOF without a terminal frame means failure.
+                        self.close_connection = True
             server = http.server.HTTPServer(("127.0.0.1", 18767), Handler)
             server.timeout = 0.5
-            support.atomic_json(state, dict(state="running", model=model_id, message="离线发音已就绪", pid=os.getpid()))
+            support.atomic_json(state, dict(state="running", model=model_id, operation=os.environ.get('MSIME_TTS_OPERATION', ''), message="发音已就绪 · " + getattr(synthesize, 'device', 'CPU'), pid=os.getpid()))
             try:
                 while not stop.exists():
                     server.handle_request()
@@ -149,12 +196,45 @@ def serve(root, model_id, loader=load_kokoro, externally_locked=False):
         finally:
             (root / "service-token.txt").unlink(missing_ok=True)
 
+def switch_service(root, model_id, operation, run):
+    """Latest user intent wins, including during dependency setup or model load."""
+    def current():
+        try:
+            desired = json.loads((root / 'desired.json').read_text(encoding='utf-8'))
+            return desired.get('operation') == operation and desired.get('model') == model_id
+        except (OSError, ValueError):
+            return False
+    deadline = time.monotonic() + 120
+    while current():
+        try:
+            with support.job_lock(root / 'switch.lock'):
+                if not current():
+                    return
+                (root / 'stop').write_text('switch', encoding='ascii')
+                while current():
+                    try:
+                        with support.job_lock(root / 'service.lock'):
+                            break
+                    except OSError:
+                        if time.monotonic() > deadline:
+                            raise TimeoutError('旧模型未能及时停止，请稍后重试')
+                        time.sleep(0.1)
+            if current():
+                os.environ['MSIME_TTS_OPERATION'] = operation
+                run(current)
+            return
+        except PermissionError:
+            if time.monotonic() > deadline:
+                raise TimeoutError('模型切换等待超时')
+            time.sleep(0.1)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tts', action='store_true')
     parser.add_argument('--root', type=Path, required=True)
-    parser.add_argument('--action', choices=['download','serve'], required=True)
+    parser.add_argument('--action', choices=['download','serve','switch'], required=True)
     parser.add_argument('--id', required=True)
+    parser.add_argument('--operation', default='')
     args = parser.parse_args()
     model = entry(args.id)
     if model['engine'] == 'external':
@@ -163,10 +243,22 @@ def main():
     support.CATALOG = CATALOG
     if args.action == 'download':
         support.download(args.root, args.id)
-    elif model['engine'] == 'qwen':
-        support.run_qwen(args.root, args.id, worker_name='tts_qwen_worker.py')
     else:
-        serve(args.root, args.id)
+        def run(guard=lambda: True):
+            if model['engine'] in ('qwen', 'moss', 'edge'):
+                worker = {'moss': 'tts_moss_worker.py', 'qwen': 'tts_qwen_worker.py', 'edge': 'tts_edge_worker.py'}[model['engine']]
+                if model['engine'] == 'qwen' and nvidia_available():
+                    worker = 'tts_qwen_cuda_worker.py'
+                support.run_qwen(args.root, args.id, worker_name=worker, guard=guard)
+            else:
+                serve(args.root, args.id, guard=guard)
+        if args.action == 'switch':
+            try:
+                switch_service(args.root, args.id, args.operation, run)
+            except Exception as error:
+                support.atomic_json(args.root / 'switch-error.json', dict(operation=args.operation, message=str(error)[:240]))
+        else:
+            run()
 
 if __name__ == '__main__':
     main()

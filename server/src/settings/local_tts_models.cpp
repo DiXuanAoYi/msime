@@ -5,12 +5,29 @@
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
+#include <mutex>
+#include <atomic>
 
 namespace LocalTts
 {
 namespace
 {
 using nlohmann::json;
+std::mutex operationMutex;
+std::atomic<unsigned> serial{0};
+void Write(const std::filesystem::path &path, const json &value)
+{
+    auto temp = path;
+    temp += L".tmp";
+    {
+        std::ofstream file(temp);
+        file << value.dump();
+        if (!file)
+            throw std::runtime_error("无法保存模型选择");
+    }
+    if (!MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        throw std::runtime_error("无法更新模型选择，请重试");
+}
 json Read(const std::filesystem::path &path)
 {
     std::error_code ec;
@@ -38,14 +55,17 @@ std::wstring Quote(std::wstring text)
         throw std::runtime_error("路径无效");
     return L"\"" + text + L"\"";
 }
-void Launch(const std::filesystem::path &runtime, const std::filesystem::path &root, const std::string &id, bool serve)
+void Launch(const std::filesystem::path &runtime, const std::filesystem::path &root, const std::string &id, bool serve,
+            const std::string &operation = {})
 {
     auto exe = runtime / L"MetasequoiaLocalASR.exe";
     if (!std::filesystem::is_regular_file(exe))
         throw std::runtime_error("本地运行组件缺失，请重新安装完整安装包。");
     std::wstring command = Quote(exe.wstring()) + L" --tts --root " + Quote(root.wstring()) +
-                           (serve ? L" --action serve --id " : L" --action download --id ") +
+                           (serve ? L" --action switch --id " : L" --action download --id ") +
                            std::wstring(id.begin(), id.end());
+    if (serve)
+        command += L" --operation " + std::wstring(operation.begin(), operation.end());
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
     PROCESS_INFORMATION process{};
@@ -58,6 +78,7 @@ void Launch(const std::filesystem::path &runtime, const std::filesystem::path &r
 } // namespace
 nlohmann::json Handle(const nlohmann::json &request)
 {
+    std::lock_guard lock(operationMutex);
     using nlohmann::json;
     json response = {{"type", "localTtsResponse"},
                      {"protocolVersion", 1},
@@ -79,6 +100,8 @@ nlohmann::json Handle(const nlohmann::json &request)
         auto action = request.value("action", "status"), id = request.value("modelId", "");
         if (action == "stop")
         {
+            Write(root / "desired.json", {{"model", ""}, {"operation", "stopped"}});
+            Speech::Stop();
             std::ofstream(root / "stop") << "stop";
             response["message"] = "已请求停止本地发音";
         }
@@ -109,18 +132,27 @@ nlohmann::json Handle(const nlohmann::json &request)
             else if (action == "start")
             {
                 auto ready = Read(root / id / "ready.json");
-                if (!ready.is_object() || ready.value("files", json::array()) != found->at("files"))
+                if (found->value("engine", "") != "edge" &&
+                    (!ready.is_object() || ready.value("files", json::array()) != found->at("files")))
                     throw std::runtime_error("请先下载并完成校验。");
-                if (Alive(Read(root / "service.json")))
-                    throw std::runtime_error("已有本地模型正在启动或运行，请先停止它。");
-                std::filesystem::remove(root / "stop");
-                Launch(runtime, root, id, true);
-                Speech::SetConfig("provider", "local");
-                Speech::SetConfig("local_endpoint", "http://127.0.0.1:18767/v1/audio/speech");
-                Speech::SetConfig("local_model", id);
-                Speech::SetConfig("local_voice_zh", id == "kokoro" ? "zf_xiaobei" : "Vivian");
-                Speech::SetConfig("local_voice_en", id == "kokoro" ? "af_heart" : "Ryan");
-                response["message"] = "正在启动；就绪后候选发音将使用这个本地模型";
+                auto operation = std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64()) + "-" +
+                                 std::to_string(++serial);
+                Write(root / "desired.json", {{"model", id},
+                                              {"operation", operation},
+                                              {"activated", false},
+                                              {"previousModel", Speech::GetConfig().at("local_model")}});
+                Speech::Stop();
+                std::ofstream(root / "stop") << "switch";
+                try
+                {
+                    Launch(runtime, root, id, true, operation);
+                }
+                catch (const std::exception &e)
+                {
+                    Write(root / "switch-error.json", {{"operation", operation}, {"message", e.what()}});
+                    throw;
+                }
+                response["message"] = "正在切换；旧模型将自动停止，新模型就绪后再应用发音配置";
             }
             else
                 throw std::runtime_error("未知模型操作。");
@@ -143,6 +175,24 @@ nlohmann::json Handle(const nlohmann::json &request)
             response["models"].push_back(std::move(row));
         }
         auto service = Read(root / "service.json");
+        auto desired = Read(root / "desired.json");
+        if (desired.is_object() && !desired.value("model", "").empty())
+        {
+            const auto selected = desired.value("model", ""), operation = desired.value("operation", "");
+            const auto failure = Read(root / "switch-error.json");
+            if (failure.is_object() && failure.value("operation", "") == operation)
+                service = {{"state", "error"}, {"model", selected}, {"message", failure.value("message", "切换失败")}};
+            else if (!service.is_object() || service.value("operation", "") != operation)
+                service = {{"state", "switching"}, {"model", selected}, {"message", "正在停止旧模型并切换…"}};
+            else if (service.value("state", "") == "running" && Alive(service) && !desired.value("activated", false))
+            {
+                // Keep customized voices when restarting the same model.
+                if (!Speech::ActivateLocalModel(selected, desired.value("previousModel", "") != selected))
+                    throw std::runtime_error("模型已就绪，但发音配置保存失败；原配置已保留，请重试");
+                desired["activated"] = true;
+                Write(root / "desired.json", desired);
+            }
+        }
         if (service.is_object())
         {
             if ((service.value("state", "") == "loading" || service.value("state", "") == "running") && !Alive(service))

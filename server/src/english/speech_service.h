@@ -13,6 +13,7 @@ Config Defaults();
 Config GetConfig();
 void LoadConfig(const toml::table &table);
 bool SetConfig(const std::string &key, const std::string &value);
+bool ActivateLocalModel(const std::string &model, bool resetVoices);
 // Only an explicit click or preview queues speech. No input/commit/send APIs.
 void Speak(std::string text, std::string language);
 void Stop();

@@ -1,4 +1,7 @@
 #include "speech_service.h"
+#include "pcm_stream.h"
+#include "pcm_player.h"
+#include "settings/local_tts_models.h"
 #include "cloud/tencent_tmt.h"
 #include "utils/common_utils.h"
 #include "utils/network_proxy.h"
@@ -108,6 +111,25 @@ class Speaker
     bool quit_ = false, pending_ = false;
     std::string text_, language_, audio_;
     std::thread thread_;
+    struct StreamRequest
+    {
+        PcmStream &parser;
+        std::string error;
+    };
+    static size_t WriteStream(char *data, size_t size, size_t count, void *p)
+    {
+        auto &stream = *static_cast<StreamRequest *>(p);
+        try
+        {
+            stream.parser.Feed(std::string_view(data, size * count));
+            return size * count;
+        }
+        catch (const std::exception &e)
+        {
+            stream.error = e.what();
+            return 0;
+        }
+    }
     static size_t Write(char *data, size_t size, size_t count, void *p)
     {
         auto &out = *static_cast<std::string *>(p);
@@ -215,7 +237,9 @@ class Speaker
                     else
                     {
                         auto payload = BuildRequest(config, text, lang, std::time(nullptr));
-                        if (provider == "local" && payload.url == "http://127.0.0.1:18767/v1/audio/speech")
+                        const bool streaming =
+                            provider == "local" && payload.url == "http://127.0.0.1:18767/v1/audio/speech";
+                        if (streaming)
                         {
                             std::ifstream file(metasequoia::data_directory() / "models" / "tts" / "service-token.txt");
                             std::string token;
@@ -223,6 +247,9 @@ class Speaker
                             if (token.size() != 64 || token.find_first_not_of("0123456789abcdef") != std::string::npos)
                                 throw std::runtime_error("请先在设置中启动本地发音模型");
                             payload.headers.push_back("Authorization: Bearer " + token);
+                            auto body = json::parse(payload.body);
+                            body["stream"] = true;
+                            payload.body = body.dump();
                         }
                         std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), curl_easy_cleanup);
                         if (!curl)
@@ -232,12 +259,34 @@ class Speaker
                             list = curl_slist_append(list, header.c_str());
                         std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> headers(list, curl_slist_free_all);
                         std::string body;
+                        PcmPlayer player(generation, request, std::clamp(std::stoi(config.at("volume")), 0, 100));
+                        const auto started = std::chrono::steady_clock::now();
+                        bool firstAudio = true;
+                        long long firstAudioMs = 0;
+                        PcmStream parser([&](unsigned rate, unsigned channels, std::string pcm) {
+                            player.Write(rate, channels, std::move(pcm));
+                            if (firstAudio)
+                            {
+                                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                              std::chrono::steady_clock::now() - started)
+                                              .count();
+                                firstAudioMs = ms;
+                                Status("流式朗读中 · 首段送入播放器 " + std::to_string(ms) + " ms（不会上屏或发送）");
+                                firstAudio = false;
+                            }
+                        });
+                        StreamRequest streamRequest{parser, {}};
                         curl_easy_setopt(curl.get(), CURLOPT_URL, payload.url.c_str());
                         curl_easy_setopt(curl.get(), CURLOPT_HTTPHEADER, headers.get());
                         curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDS, payload.body.c_str());
                         curl_easy_setopt(curl.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(payload.body.size()));
                         curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, Write);
                         curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &body);
+                        if (streaming)
+                        {
+                            curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, WriteStream);
+                            curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &streamRequest);
+                        }
                         curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT_MS, 90000L);
                         curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT_MS, 10000L);
                         curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
@@ -252,6 +301,8 @@ class Speaker
                         auto result = curl_easy_perform(curl.get());
                         if (request != generation.load())
                             continue;
+                        if (!streamRequest.error.empty())
+                            throw std::runtime_error(streamRequest.error);
                         if (result != CURLE_OK)
                             throw std::runtime_error("发音请求未完成：请检查服务、网络或本地模型是否启动");
                         long code = 0;
@@ -259,6 +310,13 @@ class Speaker
                         if (code != 200)
                             throw std::runtime_error("发音服务 HTTP " + std::to_string(code) +
                                                      "：请检查凭据、音色和额度");
+                        if (streaming)
+                        {
+                            parser.Finish();
+                            player.Finish();
+                            Status("已完成流式朗读 · 首段送入播放器 " + std::to_string(firstAudioMs) + " ms");
+                            continue;
+                        }
                         audio_ = DecodeAudio(provider, body);
                         // Scale PCM locally so volume works consistently across providers.
                         int volume = std::clamp(std::stoi(config.at("volume")), 0, 100);
@@ -506,6 +564,8 @@ void Speak(std::string text, std::string language)
     if (text.empty() || text.size() > 2000)
         return;
     ReloadImeConfigIfChanged();
+    // Apply a completed explicit model switch even if settings was closed while loading.
+    LocalTts::Handle({{"action", "status"}});
     Instance().Queue(std::move(text), std::move(language));
 }
 void Stop()

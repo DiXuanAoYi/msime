@@ -17,3 +17,19 @@ Full Python, sherpa-onnx, ONNX Runtime and PyInstaller license texts are in
 _internal/licenses; ONNX Runtime dependency notices are also included there.
 The optional Qwen 1.7B worker installs qwen-asr and PyTorch into an isolated uv
 environment on first launch. Their licenses and dependency metadata remain there.
+
+MOSS-TTS-Nano ONNX runtime: Apache-2.0, OpenMOSS Team.
+Source commit 8b7bcc9341b3b4ef3a3a58ba1338a7d85ff133eb:
+https://github.com/OpenMOSS/MOSS-TTS-Nano
+The unmodified runtime source and full license are in worker/vendor/moss.
+MOSS model files (including its streaming codec) are separately downloaded from
+the official openmoss ModelScope account and checked against pinned SHA-256.
+
+Optional TTS environments install their own distribution license metadata:
+qwen-tts / qwen-tts-hf: Apache-2.0, https://github.com/QwenLM/Qwen3-TTS
+faster-qwen3-tts: MIT, https://github.com/andimarafioti/faster-qwen3-tts
+edge-tts: LGPL-3.0, https://github.com/rany2/edge-tts (online service client)
+PyAV: BSD-3-Clause, https://github.com/PyAV-Org/PyAV
+SentencePiece: Apache-2.0, https://github.com/google/sentencepiece
+No Qwen, Kokoro or MOSS model weights, CUDA libraries or Edge service credentials
+are bundled in the installer. Online synthesis is explicit opt-in.

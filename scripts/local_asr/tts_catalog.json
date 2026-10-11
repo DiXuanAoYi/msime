@@ -28,7 +28,7 @@
     "revision": "85e237c12c027371202489a0ec509ded67b5e4b5",
     "engine": "qwen",
     "format": "原版",
-    "features": "10 种语言及多方言；内置运行 CustomVoice 音色。Base 版的 3 秒克隆、VoiceDesign 版的音色设计需使用对应官方模型。",
+    "features": "10 种语言及多方言；内置运行 CustomVoice 音色。Base 版的 3 秒克隆、VoiceDesign 版的音色设计需使用对应官方模型。 Dual-Track 双轨架构；本运行组件对接分块生成与 PCM 流式播放。",
     "hardware": "建议独显；CPU 可运行但生成较慢。首次启动另行下载 Python / PyTorch 依赖。",
     "downloadBytes": 2498383610,
     "diskBytes": 7495150830,
@@ -109,7 +109,7 @@
     "revision": "0c0e3051f131929182e2c023b9537f8b1c68adfe",
     "engine": "qwen",
     "format": "原版",
-    "features": "10 种语言；CustomVoice 支持表达指令。最低延迟为官方特定环境指标，本机速度视硬件而定。",
+    "features": "10 种语言；CustomVoice 支持表达指令。最低延迟为官方特定环境指标，本机速度视硬件而定。 Dual-Track 双轨架构；本运行组件对接分块生成与 PCM 流式播放。",
     "hardware": "建议 CUDA 独显与充足显存；首次启动需额外运行依赖。",
     "downloadBytes": 4520159586,
     "diskBytes": 13560478758,
@@ -256,14 +256,132 @@
     "id": "moss-nano",
     "name": "MOSS-TTS-Nano · 100M",
     "official": "https://github.com/OpenMOSS/MOSS-TTS-Nano",
-    "downloadUrl": "https://huggingface.co/OpenMOSS-Team/MOSS-TTS-Nano-100M/tree/44502f80dbf9743528fa921cc544d662c685ebec",
+    "downloadUrl": "https://modelscope.cn/models/openmoss/MOSS-TTS-Nano-100M-ONNX",
     "revision": "44502f80dbf9743528fa921cc544d662c685ebec",
+    "engine": "moss",
+    "format": "官方 ONNX CPU 流式运行包（内置音色）",
+    "features": "100M，多语言、48 kHz 双声道；逐帧生成并流式播放。此运行包使用内置音色，不包含录音克隆编码器。",
+    "hardware": "CPU 即可运行；含 TTS、流式音频解码器和内置音色。首次启动需额外下载 ONNX Runtime / Python 依赖。",
+    "downloadBytes": 717153306,
+    "diskBytes": 1434306612,
+    "files": [
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/browser_poc_manifest.json",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=browser_poc_manifest.json",
+        "bytes": 470720,
+        "sha256": "803716e58b71fe2a770af1495ca74797d38c181b41cfeeaf9e524adc15910a20"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_decode_step.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_decode_step.onnx",
+        "bytes": 291483,
+        "sha256": "698cbc2fc1c2feca16e5895614ed52bbb32ded10f236c076f477b2e69abf32d8"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_global_shared.data",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_global_shared.data",
+        "bytes": 440813568,
+        "sha256": "bce8312c3df6a44545302cae229b61054fe0672e0b252ba59cba47adeed831dc"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_cached_step.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_cached_step.onnx",
+        "bytes": 53685,
+        "sha256": "aa9035fefc1c138a951a8bcfc0374fb03a25f1ece67f7f7f53bce349b84a1dd5"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_decoder.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_decoder.onnx",
+        "bytes": 49231,
+        "sha256": "51aa754301b38550a5f9adda0ad93bd3dc95819afb511e6dcabf4a90b345a454"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_fixed_sampled_frame.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_fixed_sampled_frame.onnx",
+        "bytes": 471262,
+        "sha256": "40cdb00efc171c450cf91468e01429caa41b0252222cd308e978f58fe354afa8"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_shared.data",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_shared.data",
+        "bytes": 229678080,
+        "sha256": "bae7782032c0fb12490ab42afe009f87ae6c75a0f0596fc7b5c08e4d5ee93916"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_prefill.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_prefill.onnx",
+        "bytes": 283305,
+        "sha256": "d56126dcd0574c2f15d98fc6b35eda68d0386b5bd9c5e38e28548d6f2ea8f3db"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/tokenizer.model",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=tokenizer.model",
+        "bytes": 470897,
+        "sha256": "c353ee1479b536bf414c1b247f5542b6607fb8ae91320e5af1781fee200fddff"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/tts_browser_onnx_meta.json",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=tts_browser_onnx_meta.json",
+        "bytes": 4302,
+        "sha256": "1dacbf4d59732ae1fb1253139b70a4ca07415246fb6473919c9947d489a59e04"
+      },
+      {
+        "name": "MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-Audio-Tokenizer-Nano-ONNX/repo?Revision=82a897035d9ff72803df10a06c1a5aa6691be0f8&FilePath=codec_browser_onnx_meta.json",
+        "bytes": 16461,
+        "sha256": "c40eb144a4f50453ac0437944cbdeee1467845b886e90197ff1eada1353303db"
+      },
+      {
+        "name": "MOSS-Audio-Tokenizer-Nano-ONNX/moss_audio_tokenizer_decode_shared.data",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-Audio-Tokenizer-Nano-ONNX/repo?Revision=82a897035d9ff72803df10a06c1a5aa6691be0f8&FilePath=moss_audio_tokenizer_decode_shared.data",
+        "bytes": 44198912,
+        "sha256": "e69d52e0f4e84ca27850557ee54face46632d3a5a16c89bd246c7c408466dcad"
+      },
+      {
+        "name": "MOSS-Audio-Tokenizer-Nano-ONNX/moss_audio_tokenizer_decode_step.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-Audio-Tokenizer-Nano-ONNX/repo?Revision=82a897035d9ff72803df10a06c1a5aa6691be0f8&FilePath=moss_audio_tokenizer_decode_step.onnx",
+        "bytes": 351400,
+        "sha256": "9527c86a29e1837edec1f74db57d5eeaadb3a715af3382703566460afed25855"
+      }
+    ]
+  },
+  {
+    "id": "edge-tts",
+    "name": "Edge-TTS（在线服务）",
+    "official": "https://github.com/rany2/edge-tts",
+    "downloadUrl": "https://github.com/rany2/edge-tts",
+    "engine": "edge",
+    "format": "开源客户端 · 在线语音",
+    "features": "使用微软在线语音服务，无需下载模型权重。逐包解码并流式播放；启用后朗读文本会发送到微软。",
+    "hardware": "需要联网；首次启用下载客户端和音频解码依赖。保持原离线默认，只有点击启用后才使用。",
+    "downloadBytes": 0,
+    "diskBytes": 300000000,
+    "files": []
+  },
+  {
+    "id": "voxtral-tts",
+    "name": "Voxtral TTS · 4B",
+    "official": "https://docs.mistral.ai/models/voxtral-tts-26-03",
+    "downloadUrl": "https://huggingface.co/mistralai/Voxtral-4B-TTS-2603",
     "engine": "external",
-    "format": "官方仓库（外部部署）",
-    "features": "CPU 友好，20 种语言、48 kHz 双声道；官方提供 4 核 CPU 流式部署方案。",
-    "hardware": "额外音频 tokenizer 和运行依赖不包含在主权重仓库大小内。",
-    "downloadBytes": 237808621,
-    "diskBytes": 713425863,
+    "format": "开放权重 · CC BY-NC 4.0",
+    "features": "9 种语言、流式语音与零样本音色克隆；权重许可仅限非商业使用。",
+    "hardware": "需按官方环境单独部署；本机 6 GB 显存未验证，不自动下载。下载体积以官方文件页为准。",
+    "downloadBytes": -1,
+    "diskBytes": -1,
+    "files": []
+  },
+  {
+    "id": "flashtts",
+    "name": "FlashTTS · 2026 论文版",
+    "official": "https://github.com/ASLP-lab/FlashTTS",
+    "downloadUrl": "https://github.com/ASLP-lab/FlashTTS#-quick-start",
+    "engine": "external",
+    "format": "ASLP-lab · MTP / X-pred Mean Flow",
+    "features": "原生多轨流式输入输出，MTP 加速与两步声学解码；论文首包 325 ms 为特定实验结果，不代表本机承诺。",
+    "hardware": "官方方案需要 LLM、MeanFlow、vocoder 和参考音频。按官方指南外部部署；模型文件总量尚未核实，不自动下载。",
+    "downloadBytes": -1,
+    "diskBytes": -1,
     "files": []
   }
 ]

@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Python = 'python',
+    [string]$VenvDirectory = '',
     [string]$WorkDirectory = "$PSScriptRoot/../../work/local-asr-build",
     [string]$OutputDirectory = "$PSScriptRoot/../../server/build-release/bin/Release/local-asr"
 )
@@ -8,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $WorkDirectory = [IO.Path]::GetFullPath($WorkDirectory)
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force $WorkDirectory | Out-Null
-$venv = Join-Path $WorkDirectory 'venv'
+$venv = if ($VenvDirectory) { [IO.Path]::GetFullPath($VenvDirectory) } else { Join-Path $WorkDirectory 'venv' }
 if (!(Test-Path "$venv/Scripts/python.exe")) {
     & $Python -m venv $venv
     if ($LASTEXITCODE) { throw 'Could not create local ASR build environment' }
@@ -26,6 +27,10 @@ if ($LASTEXITCODE) { throw 'Local ASR tests failed' }
     --add-data "$PSScriptRoot/manager.py;worker" --add-data "$PSScriptRoot/qwen_worker.py;worker" `
     --add-data "$PSScriptRoot/tts_catalog.json;." --add-data "$PSScriptRoot/tts_catalog.json;worker" `
     --add-data "$PSScriptRoot/tts_manager.py;worker" --add-data "$PSScriptRoot/tts_qwen_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_qwen_cuda_worker.py;worker" --add-data "$PSScriptRoot/tts_moss_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_edge_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_stream.py;worker" --add-data "$PSScriptRoot/vendor;worker/vendor" `
+    --add-data "$PSScriptRoot/../../engine/contracts/tts_stream.json;." --add-data "$PSScriptRoot/../../engine/contracts/tts_stream.json;worker" `
     --add-data "$PSScriptRoot/worker_dependencies.py;worker" `
     --add-data "$PSScriptRoot/THIRD-PARTY-NOTICES.txt;." `
     --add-data "$PSScriptRoot/licenses;licenses" `

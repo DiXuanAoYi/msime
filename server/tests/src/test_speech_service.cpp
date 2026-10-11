@@ -1,4 +1,5 @@
 #include "english/speech_service.h"
+#include "english/pcm_stream.h"
 #include "tests/includes/test_framework.h"
 
 namespace
@@ -17,6 +18,49 @@ template <class F> void RejectSpeech(F f)
     REQUIRE(failed);
 }
 } // namespace
+TEST_CASE(speech_stream_plays_before_terminal_frame_and_accepts_fragmented_transport)
+{
+    std::string bytes = TtsStreamContract::magic;
+    auto put = [&](uint32_t n) {
+        for (int i = 0; i < 4; ++i)
+            bytes.push_back(static_cast<char>(n >> (i * 8)));
+    };
+    put(24000);
+    put(1);
+    put(4);
+    bytes.append("\1\0\2\0", 4);
+    int calls = 0;
+    Speech::PcmStream parser([&](unsigned rate, unsigned channels, std::string pcm) {
+        REQUIRE(rate == 24000);
+        REQUIRE(channels == 1);
+        REQUIRE(pcm.size() == 4);
+        ++calls;
+    });
+    for (const char &c : bytes)
+        parser.Feed(std::string_view(&c, 1));
+    REQUIRE(calls == 1);
+    RejectSpeech([&] { parser.Finish(); });
+    parser.Feed(std::string(4, '\0'));
+    parser.Finish();
+    RejectSpeech([&] { parser.Feed("extra"); });
+}
+TEST_CASE(speech_stream_rejects_invalid_format_and_unaligned_chunks)
+{
+    for (uint32_t rate : {1u, 192000u, 24000u})
+    {
+        std::string bytes = TtsStreamContract::magic;
+        auto put = [&](uint32_t n) {
+            for (int i = 0; i < 4; ++i)
+                bytes.push_back(static_cast<char>(n >> (i * 8)));
+        };
+        put(rate);
+        put(1);
+        put(3);
+        bytes += "abc";
+        Speech::PcmStream parser([](unsigned, unsigned, std::string) { REQUIRE(false); });
+        RejectSpeech([&] { parser.Feed(bytes); });
+    }
+}
 TEST_CASE(speech_defaults_are_offline_and_cloud_payloads_are_provider_specific)
 {
     auto c = Speech::Defaults();

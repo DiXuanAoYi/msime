@@ -4,22 +4,71 @@ import unittest
 import wave
 from pathlib import Path
 import tomllib
+import struct
+from tts_stream import StreamingSynthesizer, CONTRACT
 import tts_manager as tts
 from worker_dependencies import validate_torch_audio
 
 class LocalTtsTests(unittest.TestCase):
-    def test_catalog_has_sizes_and_only_three_managed_downloads(self):
-        self.assertEqual(len(tts.CATALOG), 9)
-        managed=[m for m in tts.CATALOG if m['engine']!='external']
-        self.assertEqual(len(managed), 3)
+    def test_catalog_has_sizes_and_pinned_managed_downloads(self):
+        managed=[m for m in tts.CATALOG if m['engine'] not in ('external', 'edge')]
+        self.assertEqual({m['id'] for m in managed}, {'kokoro','qwen-0.6b','qwen-1.7b','moss-nano'})
         for m in tts.CATALOG:
-            self.assertGreater(m['downloadBytes'], 0)
+            if m in managed:
+                self.assertGreater(m['downloadBytes'], 0)
             self.assertTrue(m['official'].startswith('https://'))
         for m in managed:
             self.assertEqual(sum(f['bytes'] for f in m['files']), m['downloadBytes'])
             for f in m['files']:
                 self.assertRegex(f['sha256'], r'^[0-9a-f]{64}$')
                 self.assertNotIn('/resolve/main/', f['url'])
+
+    def test_stream_emits_before_generation_finishes_and_replays_complete_cache(self):
+        events, frames = [], []
+        def generate(text, voice, language, speed, emit, cancelled):
+            emit([0.1, -0.1], 24000)
+            self.assertEqual(events, ['write', 'write'])
+            events.append('generation-continues')
+            emit([0.2, 0.3], 24000)
+        model = StreamingSynthesizer(generate)
+        def write(frame):
+            events.append('write')
+            frames.append(frame)
+        args = ('test', 'voice', 'zh', 1)
+        model.stream(args, write)
+        self.assertEqual(frames[0], CONTRACT['magic'].encode() + struct.pack('<II', 24000, 1))
+        self.assertEqual(frames[-1], b'\0'*4)
+        replay = []
+        self.assertTrue(model.stream(args, replay.append)['cached'])
+        self.assertEqual(replay, frames)
+        with wave.open(io.BytesIO(model(*args))) as wav:
+            self.assertEqual(wav.getnframes(), 4)
+
+    def test_stream_failure_and_cancel_never_cache_or_emit_success_marker(self):
+        def failing(text, voice, language, speed, emit, cancelled):
+            emit([0.1], 24000)
+            raise ValueError('model failed mid-generation')
+        model = StreamingSynthesizer(failing)
+        frames = []
+        with self.assertRaises(ValueError):
+            model.stream(('test', 'v', 'zh', 1), frames.append)
+        self.assertNotEqual(frames[-1], b'\0'*4)
+        self.assertFalse(model.cache)
+        with self.assertRaises(InterruptedError):
+            model.stream(('test', 'v', 'zh', 1), frames.append, lambda: True)
+        self.assertFalse(model.cache)
+
+    def test_stream_rejects_format_changes_and_nonfinite_audio(self):
+        for samples, rate in [([float('nan')], 24000), ([0.1], 96000), ([[0.1,0.2,0.3]], 24000)]:
+            def generate(*args):
+                args[-2](samples, rate)
+            with self.assertRaises(ValueError):
+                StreamingSynthesizer(generate).stream(('t','v','zh',1), lambda _: None)
+        def changed(*args):
+            args[-2]([0.1], 24000)
+            args[-2]([0.1], 48000)
+        with self.assertRaises(ValueError):
+            StreamingSynthesizer(changed).stream(('t','v','zh',1), lambda _: None)
 
     def test_request_rejects_wrong_model_long_text_and_invalid_speed(self):
         request={'input':'你好','model':'kokoro','voice':'45','language':'zh','speed':1,'response_format':'wav'}

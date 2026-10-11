@@ -28,6 +28,8 @@ MAX_AUDIO = 20 * 1024 * 1024
 
 def atomic_json(path, value):
     path = Path(path)
+    if path.name == 'service.json' and os.environ.get('MSIME_TTS_OPERATION'):
+        value = dict(value, operation=os.environ['MSIME_TTS_OPERATION'])
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
@@ -112,7 +114,7 @@ def download(root, model_id):
             for file in entry["files"]:
                 if cancel.exists():
                     raise InterruptedError("已暂停；再次下载将续传")
-                target = dest / ("original" if entry["engine"] == "qwen" else "archives") / file["name"]
+                target = dest / ("original" if entry["engine"] in ('qwen', 'moss') else "archives") / file["name"]
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists() and target.stat().st_size == file["bytes"] and digest(target) == file["sha256"]:
                     done += file["bytes"]
@@ -154,7 +156,7 @@ def download(root, model_id):
                     part.unlink(missing_ok=True)
                     raise ValueError("模型校验失败，损坏文件已移除，请重新下载")
                 os.replace(part, target)
-            if entry["engine"] != "qwen":
+            if entry["engine"] not in ('qwen', 'moss'):
                 report("extracting", "校验通过，正在展开运行包")
                 staging = dest / "unpacking"
                 safe_extract(dest / "archives" / entry["files"][0]["name"], staging, entry["diskBytes"] * 2, cancel.exists)
@@ -281,13 +283,15 @@ def serve(root, model_id, loader=sherpa_recognizer, externally_locked=False):
             (root / "service-token.txt").unlink(missing_ok=True)
 
 
-def run_qwen(root, model_id, worker_name="qwen_worker.py"):
+def run_qwen(root, model_id, worker_name="qwen_worker.py", guard=lambda: True):
     """Keep a single service slot through dependency preparation and model loading."""
     with job_lock(root / "service.lock"):
+        if not guard():
+            return
         stop = root / "stop"
         stop.unlink(missing_ok=True)
         atomic_json(root / "service.json", dict(state="loading", model=model_id,
-            message="首次启动正在准备 Python / PyTorch 运行依赖（额外下载，不计入模型大小）", pid=os.getpid()))
+            message="首次启动正在准备模型运行依赖（额外下载，不计入模型大小）", pid=os.getpid()))
         env = dict(os.environ, UV_CACHE_DIR=str(root / "runtime-cache"),
                    HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
         worker = BASE / "worker" if getattr(sys, "frozen", False) else BASE
@@ -313,7 +317,7 @@ def run_qwen(root, model_id, worker_name="qwen_worker.py"):
                         return
                     time.sleep(0.5)
                 if child.returncode:
-                    raise RuntimeError("Qwen 运行依赖安装或启动失败，详情见 runtime-install.log")
+                    raise RuntimeError("模型运行依赖安装或启动失败，详情见 runtime-install.log")
         except Exception as error:
             atomic_json(root / "service.json", dict(state="error", model=model_id, message=str(error)[:300]))
         finally:
