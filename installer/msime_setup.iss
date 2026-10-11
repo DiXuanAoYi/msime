@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.12"
+#define MyAppVersion   "0.9.13"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -69,6 +69,10 @@ VersionInfoVersion={#MyAppVersion}
 [Languages]
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Messages]
+chinesesimplified.FinishedLabel=水杉输入法已安装完成。%n%n请保存正在编辑的内容，将安装或升级前已经打开的软件完整退出后重新打开（部分聊天软件需从托盘退出），以加载新版输入法及英文候选。仅关闭窗口或切换中英文可能不会生效。%n%n若仍未生效，可保存工作后注销 Windows 再登录。无需卸载或清空原有配置。
+english.FinishedLabel=Metasequoia IME has been installed.%n%nSave your work, then fully quit and reopen apps that were running before installation or upgrade. Some chat apps must be exited from the system tray. This loads the new IME and English candidates. Closing a window or switching input modes may not reload it.%n%nIf needed, save your work and sign out of Windows, then sign in again. Your existing settings can be kept.
 
 [Dirs]
 Name: "{commonpf32}\metasequoiaime\{code:GetVersionDir}"
