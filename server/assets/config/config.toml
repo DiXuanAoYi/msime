@@ -10,6 +10,7 @@ theme = "dark"
 # 通用
 #
 [general]
+disabled_translation_dictionaries = "" # 关闭的离线翻译词典 ID，逗号分隔
 # Server 端诊断日志（默认关闭；不记录输入内容或候选文本）
 diagnostic_log = false
 # TSF 端批量诊断日志（默认关闭；不记录输入内容或候选文本）

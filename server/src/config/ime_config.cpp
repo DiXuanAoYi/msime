@@ -123,6 +123,7 @@ int g_floating_toolbar_auto_hide_delay = kFloatingToolbarAutoHideDelayDefault;
 bool g_english_candidates_enabled = false;
 bool g_candidate_translations_enabled = true;
 std::atomic<bool> g_candidate_translation_cloud_enabled{false};
+std::shared_ptr<const std::string> g_disabled_translation_dictionaries = std::make_shared<const std::string>();
 std::shared_ptr<const EnglishIme::PersonalGlossary> g_personal_translation_glossary =
     std::make_shared<const EnglishIme::PersonalGlossary>();
 std::atomic<uint64_t> g_personal_translation_glossary_revision{0};
@@ -528,6 +529,9 @@ bool LoadImeConfig()
         g_english_candidates_enabled = tbl["general"]["cn_en_mixed_input"].value_or(false);
         g_candidate_translations_enabled = tbl["general"]["candidate_translations"].value_or(true);
         g_candidate_translation_cloud_enabled.store(tbl["general"]["candidate_translation_cloud"].value_or(false));
+        std::atomic_store(&g_disabled_translation_dictionaries,
+                          std::make_shared<const std::string>(
+                              tbl["general"]["disabled_translation_dictionaries"].value_or(std::string{})));
         auto personal_glossary = std::make_shared<EnglishIme::PersonalGlossary>();
         if (personal_glossary->Parse(tbl["general"]["personal_translation_glossary"].value_or(std::string{})))
         {

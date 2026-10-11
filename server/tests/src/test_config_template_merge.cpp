@@ -324,3 +324,13 @@ TEST_CASE(shipped_credentials_survive_template_upgrade)
         REQUIRE_EQ(merged["ai_assistant"]["token_openai"].value_or(std::string()), std::string("real-ai-openai"));
     }
 }
+
+TEST_CASE(dictionary_switches_survive_shipped_template_upgrade)
+{
+    std::ifstream input(MSIME_DEFAULT_CONFIG_PATH, std::ios::binary);
+    const std::string installed((std::istreambuf_iterator<char>(input)), {});
+    const std::string configured = "[general]\ndisabled_translation_dictionaries = \"qingjian-en,study-cet4\"\n";
+    const auto merged = toml::parse(MergeConfigIntoTemplate(installed, configured, std::string()));
+    REQUIRE_EQ(merged["general"]["disabled_translation_dictionaries"].value_or(std::string()),
+               std::string("qingjian-en,study-cet4"));
+}

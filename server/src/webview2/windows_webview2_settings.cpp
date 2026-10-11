@@ -1,3 +1,4 @@
+#include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
 #include "voice-input/voice_providers.h"
 #include "assistant/service.h"
@@ -665,6 +666,12 @@ static void ApplyGeneralSubkey(const std::string &path, const json::object &data
         {
             PostSettingsConfig();
         }
+    }
+    if (path == "general.disabled_translation_dictionaries")
+    {
+        if (SetConfiguredDisabledTranslationDictionaries(json::value_to<std::string>(data.at("value"))))
+            FanyNamedPipe::EnqueueRefreshCandidatePageTask();
+        PostSettingsConfig();
     }
     if (path == "general.candidate_translation_cloud" || path == "general.personal_translation_glossary")
     {
@@ -1562,6 +1569,12 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                                 ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
                         });
                     }
+                    else if (type == "dictionaryLibraryRequest")
+                    {
+                        const auto response =
+                            TranslationLibrary::Handle(nlohmann::json::parse(json::serialize(val.at("data"))), hwnd);
+                        ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
                     else if (type == "vocabularyRequest")
                     {
                         const auto response = Vocabulary::HandleRequest(val.at("data").as_object());
@@ -1763,6 +1776,7 @@ void PostSettingsConfig()
             {"candidate_translations", GetConfiguredCandidateTranslationsEnabled()},
             {"candidate_translation_cloud", GetConfiguredCandidateTranslationCloudEnabled()},
             {"personal_translation_glossary", GetConfiguredPersonalTranslationGlossary()->Source()},
+            {"disabled_translation_dictionaries", *GetConfiguredDisabledTranslationDictionaries()},
             {"cn_en_mixed_input_min_chars", GetConfiguredEnglishMixedInputMinChars()},
             {"emoji_mixed_input", GetConfiguredEmojiMixedInputEnabled()},
             {"kaomoji_mixed_input", GetConfiguredKaomojiMixedInputEnabled()},

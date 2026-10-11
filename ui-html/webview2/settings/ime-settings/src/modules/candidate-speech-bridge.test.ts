@@ -1,0 +1,22 @@
+import { expect,it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+const source=readFileSync(new URL('../../../../../../server/src/webview2/windows_webview2_candidate.cpp',import.meta.url),'utf8');
+const start=source.indexOf('if (!window.__msimeSpeechInstalled)');
+const script=source.slice(start,source.indexOf('window.ApplyCandidateFrame',start));
+it('speech clicks use the native string bridge, preserve Ctrl latch and never fall through to commit',()=>{
+  const handlers:Record<string,(event:any)=>void>={};const messages:string[]=[];const candidate={};
+  const window={chrome:{webview:{postMessage:(m:string)=>messages.push(m)}}};
+  const document={addEventListener:(name:string,fn:(e:any)=>void)=>handlers[name]=fn,querySelectorAll:()=>[candidate]};
+  runInNewContext(script,{window,document});
+  let stopped=0,prevented=0;
+  const event=(ctrlKey:boolean,translation:boolean)=>({ctrlKey,target:{closest:(q:string)=>q==='.cand'?candidate:translation?{}:null},preventDefault:()=>++prevented,stopImmediatePropagation:()=>++stopped});
+  handlers.mousedown(event(true,true));handlers.click(event(false,true));
+  expect(typeof messages[0]).toBe('string');
+  expect(JSON.parse(messages[0])).toEqual({protocolVersion:1,type:'candidateSpeak',data:{index:1,translation:true}});
+  expect([stopped,prevented]).toEqual([1,1]);
+  handlers.mousedown(event(false,false));handlers.click(event(false,false));
+  expect(messages).toHaveLength(1);expect([stopped,prevented]).toEqual([1,1]);
+  handlers.mousedown(event(false,false));handlers.click(event(true,false));
+  expect(JSON.parse(messages[1]).data).toEqual({index:1,translation:false});
+});

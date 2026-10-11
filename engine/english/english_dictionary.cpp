@@ -32,6 +32,9 @@ EnglishDictionary::EnglishDictionary(std::string db_path, bool initialize_schema
 
 EnglishDictionary::~EnglishDictionary()
 {
+    sqlite3_finalize(packs_statement_);
+    if (packs_db_)
+        sqlite3_close(packs_db_);
     sqlite3_finalize(bundled_statement_);
     if (bundled_db_)
         sqlite3_close(bundled_db_);
@@ -158,7 +161,9 @@ std::string EnglishDictionary::query_chinese_gloss(const std::string &english)
         return custom->second;
     if (auto gloss = query_translation_gloss(english, "zh"); !gloss.empty())
         return gloss;
-    return english.empty() || !ensure_gloss_statements() ? std::string{} : QueryGloss(en_zh_statement_, english);
+    return !dictionary_enabled("legacy-en") || english.empty() || !ensure_gloss_statements()
+               ? std::string{}
+               : QueryGloss(en_zh_statement_, english);
 }
 
 std::string EnglishDictionary::query_english_gloss(const std::string &chinese)
@@ -167,13 +172,16 @@ std::string EnglishDictionary::query_english_gloss(const std::string &chinese)
     if (custom != custom_zh_en_.end())
         return custom->second;
     const auto bundled = query_translation_gloss(chinese, "en");
-    const auto fallback =
-        chinese.empty() || !ensure_gloss_statements() ? std::string{} : QueryGloss(zh_en_statement_, chinese);
+    const auto fallback = !dictionary_enabled("legacy-en") || chinese.empty() || !ensure_gloss_statements()
+                              ? std::string{}
+                              : QueryGloss(zh_en_statement_, chinese);
     return MergeGlosses(bundled, fallback);
 }
 
-std::string EnglishDictionary::query_translation_gloss(const std::string &word, const std::string &language)
+std::string EnglishDictionary::query_qingjian_gloss(const std::string &word, const std::string &language)
 {
+    if (!dictionary_enabled("qingjian-" + language))
+        return {};
     if (word.empty() ||
         (language != "en" && language != "zh" && language != "ja" && language != "es" && language != "vi"))
         return {};
@@ -442,4 +450,48 @@ void EnglishDictionary::close_database()
         sqlite3_close(db_);
         db_ = nullptr;
     }
+}
+
+void EnglishDictionary::set_disabled_dictionaries(const std::string &ids)
+{
+    disabled_dictionaries_ = "," + ids + ",";
+}
+bool EnglishDictionary::dictionary_enabled(const std::string &id) const
+{
+    return disabled_dictionaries_.find("," + id + ",") == std::string::npos;
+}
+std::string EnglishDictionary::query_translation_gloss(const std::string &word, const std::string &language)
+{
+    auto result = query_qingjian_gloss(word, language);
+    if (word.empty())
+        return result;
+    if (!packs_open_attempted_)
+    {
+        packs_open_attempted_ = true;
+        const auto path = (std::filesystem::u8path(db_path_).parent_path() / "industry-learning.db").u8string();
+        if (sqlite3_open_v2(reinterpret_cast<const char *>(path.c_str()), &packs_db_, SQLITE_OPEN_READONLY, nullptr) !=
+                SQLITE_OK ||
+            sqlite3_prepare_v2(packs_db_, "SELECT pack,gloss FROM glosses WHERE language=?1 AND word=?2 ORDER BY pack",
+                               -1, &packs_statement_, nullptr) != SQLITE_OK)
+        {
+            sqlite3_finalize(packs_statement_);
+            packs_statement_ = nullptr;
+            sqlite3_close(packs_db_);
+            packs_db_ = nullptr;
+        }
+    }
+    if (!packs_statement_)
+        return result;
+    sqlite3_reset(packs_statement_);
+    sqlite3_bind_text(packs_statement_, 1, language.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(packs_statement_, 2, word.c_str(), -1, SQLITE_TRANSIENT);
+    while (sqlite3_step(packs_statement_) == SQLITE_ROW)
+    {
+        const auto *id = sqlite3_column_text(packs_statement_, 0);
+        const auto *gloss = sqlite3_column_text(packs_statement_, 1);
+        if (id && gloss && dictionary_enabled(reinterpret_cast<const char *>(id)))
+            result = MergeGlosses(result, reinterpret_cast<const char *>(gloss));
+    }
+    sqlite3_reset(packs_statement_);
+    return result;
 }

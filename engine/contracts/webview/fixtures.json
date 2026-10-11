@@ -1140,5 +1140,101 @@
     "valid": false,
     "surface": "settings",
     "direction": "client"
+  },
+  {
+    "name": "dictionary catalog list",
+    "message": {
+      "type": "dictionaryLibraryRequest",
+      "data": {
+        "requestId": "one",
+        "action": "list"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "dictionary export cannot supply a filesystem destination",
+    "message": {
+      "type": "dictionaryLibraryRequest",
+      "data": {
+        "requestId": "one",
+        "action": "export",
+        "id": "study-cet4",
+        "path": "C:/secret"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "candidate speak translation",
+    "message": {
+      "type": "candidateSpeak",
+      "data": {
+        "index": 2,
+        "translation": true
+      }
+    },
+    "valid": true,
+    "surface": "candidate",
+    "direction": "client"
+  },
+  {
+    "name": "candidate speak rejects bad index",
+    "message": {
+      "type": "candidateSpeak",
+      "data": {
+        "index": 0,
+        "translation": true
+      }
+    },
+    "valid": false,
+    "surface": "candidate",
+    "direction": "client"
+  },
+  {
+    "name": "candidate speak rejects settings surface",
+    "message": {
+      "type": "candidateSpeak",
+      "data": {
+        "index": 2,
+        "translation": true
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "dictionary catalog metadata",
+    "message": {
+      "type": "dictionaryLibraryResponse",
+      "requestId": "one",
+      "ok": true,
+      "message": "",
+      "books": [
+        {
+          "id": "study-zk",
+          "name": "中考 / 初中",
+          "category": "学习",
+          "language": "中英双向",
+          "source": "https://github.com/skywind3000/ECDICT",
+          "version": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+          "license": "MIT",
+          "note": "依据上游历史标签筛选，非最新官方考试大纲；词典间可能重叠。",
+          "entries": 8633,
+          "headwords": 1603,
+          "bytes": 270831,
+          "sha256": "ab725cfcb20b51b653aa3e27e0771b21a0018abefcd8138cc4ca380942994cc3",
+          "enabled": true
+        }
+      ]
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
   }
 ]

@@ -582,3 +582,18 @@ bool SetConfiguredClipboardHistoryEnabled(bool enabled)
     ClipboardMonitor::Sync(enabled);
     return true;
 }
+
+std::shared_ptr<const std::string> GetConfiguredDisabledTranslationDictionaries()
+{
+    return std::atomic_load(&g_disabled_translation_dictionaries);
+}
+bool SetConfiguredDisabledTranslationDictionaries(const std::string &ids)
+{
+    if (ids.size() > 8192 || ids.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-,") != std::string::npos)
+        return false;
+    if (!WriteConfiguredValue("general", "disabled_translation_dictionaries", EscapeTomlBasicString(ids)))
+        return false;
+    std::atomic_store(&g_disabled_translation_dictionaries, std::make_shared<const std::string>(ids));
+    g_personal_translation_glossary_revision.fetch_add(1);
+    return true;
+}

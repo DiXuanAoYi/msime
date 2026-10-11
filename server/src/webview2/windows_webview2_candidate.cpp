@@ -1,3 +1,4 @@
+#include "english/candidate_speech.h"
 // 候选窗 WebView：内容与测量区的脚本更新、悬停锁与粘性卡片脚本、候选槽位增量更新、
 // 测量用 bounds，以及候选窗 controller 的创建与页面消息处理。
 #include "webview2/windows_webview2_internal.h"
@@ -235,6 +236,18 @@ void ResetContainerHoverCandWnd(ComPtr<ICoreWebView2> webview)
 }
 
 constexpr wchar_t kEnsureApplyCandidateFrameScript[] = LR"(
+if (!window.__msimeSpeechInstalled) {
+  window.__msimeSpeechInstalled = true;
+  let pressed = null;
+  document.addEventListener('mousedown', e => { pressed = e.ctrlKey ? e.target.closest('.cand') : null; }, true);
+  document.addEventListener('click', e => {
+    const cand = e.target.closest('.cand'); const held = pressed; pressed = null;
+    if (!cand || (!e.ctrlKey && held !== cand)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const index = Array.from(document.querySelectorAll('#realContainer .cand')).indexOf(cand)+1;
+    if (index > 0 && index <= 10) window.chrome.webview.postMessage(JSON.stringify({protocolVersion:1,type:'candidateSpeak',data:{index,translation:!!e.target.closest('.cand-translation')}}));
+  }, true);
+}
 window.ApplyCandidateFrame = function (payload) {
     const container = document.getElementById('realContainer');
     const parent = document.getElementById('realContainerParent');
@@ -1075,6 +1088,12 @@ HRESULT OnControllerCreatedCandWnd(     //
                                                              : GetPreeditWithCaretMarker();
                             std::wstring measurement = preedit + L"," + Global::CandidateString;
                             InflateMeasureDivCandWnd(measurement, [hwnd]() { FineTuneWindow(hwnd); });
+                        }
+                        else if (type == "candidateSpeak")
+                        {
+                            const auto &data = val.at("data").as_object();
+                            CandidateSpeech::Speak(json::value_to<int>(data.at("index")) - 1,
+                                                   json::value_to<bool>(data.at("translation")));
                         }
                         else if (type == "candidate")
                         {

@@ -180,6 +180,8 @@ else {
     # Pinned source tables remain separate from the immutable base dictionary release.
     & python (Join-Path $RepoRoot 'scripts/build_bundled_glossary.py') --output (Join-Path $targetAppData 'qingjian-glossary.db')
     if ($LASTEXITCODE -ne 0) { throw 'Failed to build the pinned Qingjian glossary.' }
+    & python (Join-Path $RepoRoot 'scripts/build_translation_library.py') --output $targetAppData --english-db $englishDb
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to build the translation library.' }
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'assets/qingjian-glossary') -Destination (Join-Path $targetAppData 'qingjian-glossary-sources') -Recurse -Force
     Copy-Item -LiteralPath $othersDb -Destination (Join-Path $targetAppData 'others.db') -Force
     # sc.lm 落在资源目录根下，与 msime.db 同级：engine/contracts/assets 的清单就是这么

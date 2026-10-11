@@ -1,4 +1,5 @@
 #include "english_ime.h"
+#include "config/ime_config.h"
 
 #include "engine/english/english_dictionary.h"
 #include <algorithm>
@@ -88,6 +89,7 @@ void WorkerLoop(uint64_t observed_generation, uint64_t observed_translation_gene
 
         if (run_translations)
         {
+            dictionary.set_disabled_dictionaries(*GetConfiguredDisabledTranslationDictionaries());
             std::vector<EnglishIme::TranslationResult> results;
             results.reserve(translation_queries.size());
             for (const auto &query : translation_queries)

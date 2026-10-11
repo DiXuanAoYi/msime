@@ -1169,3 +1169,31 @@ Source: https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c3
 Copyright: Qingjian contributors. License: GPL-3.0-or-later.
 Unmodified source TSV, license and provenance: assets/qingjian-glossary (installed as qingjian-glossary-sources).
 SQLite adaptation by this project, 2026-10-11. Machine-generated translations may contain errors.
+
+
+Additional learning and industry translation dictionaries
+
+ECDICT: https://github.com/skywind3000/ECDICT
+Pinned commit: bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b
+MIT license, copyright notice preserved in sources/ECDICT-LICENSE.txt.
+The pinned CSV is included as deterministic gzip. Exam lists use upstream historical tags;
+they are not current official examination syllabi. Industry lists use upstream domain tags.
+Adaptations: select tagged entries, normalize English lookup keys, create reverse indexes
+only for short Chinese senses, convert to SQLite and UTF-8 TSV. Definitions are retained
+from the source. Source row counts and bidirectional lookup counts are distinct.
+
+CNCF Cloud Native Glossary: https://github.com/cncf/glossary
+Pinned commit: af21906fc24fa2afeb69e1eb186d97318c0f2687
+Documentation copyright CNCF glossary contributors, CC BY 4.0.
+https://creativecommons.org/licenses/by/4.0/
+Adaptations: paired Chinese and English front-matter titles from matching term pages;
+converted to bidirectional title mappings. No source definitions are included.
+The documentation license, rather than the Apache-2.0 code license, applies to these terms.
+Full license is in sources/CNCF-CC-BY-4.0.txt; upstream README is retained.
+
+Qingjian dictionaries keep their separate sources, license and provenance under
+assets/qingjian-glossary. The installed catalog exports two source senses per row
+and retains the original lookup database and source files.
+
+Every exported TSV starts with source, pinned version, license and adaptation lines.
+The installed translation-library directory also contains complete license documents.

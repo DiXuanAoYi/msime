@@ -194,6 +194,12 @@ TEST_CASE(BundledGlossaryLoadsLanguagesMergesDistinctSensesAndHonorsOverrides)
         REQUIRE_EQ(dictionary.query_translation_gloss("开发", "vi"), "v. phát triển");
         REQUIRE_EQ(dictionary.query_translation_gloss("开发", "ja"), "v. 開発する (かいはつする)");
         REQUIRE_EQ(dictionary.query_chinese_gloss("hello"), "int. 你好");
+        dictionary.set_disabled_dictionaries("qingjian-en,qingjian-zh");
+        REQUIRE_EQ(dictionary.query_english_gloss("开发"), "exploit; tap");
+        REQUIRE(dictionary.query_chinese_gloss("hello").empty());
+        REQUIRE_EQ(dictionary.query_translation_gloss("开发", "ja"), "v. 開発する (かいはつする)");
+        dictionary.set_disabled_dictionaries("");
+        REQUIRE_EQ(dictionary.query_chinese_gloss("hello"), "int. 你好");
         REQUIRE(dictionary.query_translation_gloss("开发", "unknown").empty());
         REQUIRE(dictionary.query_translation_gloss("not-in-table", "en").empty());
     }
@@ -211,4 +217,36 @@ TEST_CASE(MissingBundledGlossaryDoesNotCreateEmptyDatabase)
     EnglishDictionary dictionary(test::Utf8(database.path()));
     REQUIRE(dictionary.query_translation_gloss("词", "ja").empty());
     REQUIRE(!std::filesystem::exists(database.path().parent_path() / "qingjian-glossary.db"));
+}
+
+TEST_CASE(DictionarySwitchesIsolateOverlappingPacksAndRestoreWithoutReopening)
+{
+    TemporaryEnglishDatabase database;
+    sqlite3 *db = nullptr;
+    const auto bundle = database.path().parent_path() / "industry-learning.db";
+    REQUIRE_EQ(sqlite3_open(test::Utf8(bundle).c_str(), &db), SQLITE_OK);
+    REQUIRE_EQ(sqlite3_exec(db,
+                            "CREATE TABLE glosses(language TEXT,word TEXT,pack TEXT,gloss TEXT,PRIMARY "
+                            "KEY(language,word,pack)) WITHOUT ROWID;"
+                            "INSERT INTO glosses VALUES('en','学习','study-cet4','study');"
+                            "INSERT INTO glosses VALUES('en','学习','study-cet6','learn');"
+                            "INSERT INTO glosses VALUES('zh','study','study-cet4','学习');",
+                            nullptr, nullptr, nullptr),
+               SQLITE_OK);
+    sqlite3_close(db);
+    EnglishDictionary dictionary(test::Utf8(database.path()));
+    REQUIRE_EQ(dictionary.query_english_gloss("学习"), "study; learn");
+    dictionary.set_disabled_dictionaries("study-cet4");
+    REQUIRE_EQ(dictionary.query_english_gloss("学习"), "learn");
+    REQUIRE(dictionary.query_chinese_gloss("study").empty());
+    dictionary.set_disabled_dictionaries("study-cet4,study-cet6");
+    REQUIRE(dictionary.query_english_gloss("学习").empty());
+    dictionary.set_disabled_dictionaries("study-cet"); // Exact ids, not prefix matching.
+    REQUIRE_EQ(dictionary.query_english_gloss("学习"), "study; learn");
+    REQUIRE(EnglishDictionary::upsert_gloss(test::Utf8(database.path()), true, "回退", "fallback"));
+    REQUIRE_EQ(dictionary.query_english_gloss("回退"), "fallback");
+    dictionary.set_disabled_dictionaries("legacy-en");
+    REQUIRE(dictionary.query_english_gloss("回退").empty());
+    dictionary.set_disabled_dictionaries("");
+    REQUIRE_EQ(dictionary.query_english_gloss("回退"), "fallback");
 }

@@ -281,3 +281,8 @@ bool WriteConfiguredValues(const std::vector<ConfigValueUpdate> &updates);
 bool WriteConfiguredValue(const std::string &section, const std::string &key, const std::string &replacement);
 void NotifyImeServer(UINT windowMessage, const wchar_t *auxMessage, WPARAM wParam = 0);
 } // namespace ime_config_detail
+
+namespace ime_config_detail
+{
+extern std::shared_ptr<const std::string> g_disabled_translation_dictionaries;
+}

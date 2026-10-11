@@ -1,3 +1,4 @@
+#include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
 #include "assistant/service.h"
 #include "english/vocabulary_service.h"
@@ -527,6 +528,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"candidate_translations", GetConfiguredCandidateTranslationsEnabled()},
             {"candidate_translation_cloud", GetConfiguredCandidateTranslationCloudEnabled()},
             {"personal_translation_glossary", GetConfiguredPersonalTranslationGlossary()->Source()},
+            {"disabled_translation_dictionaries", *GetConfiguredDisabledTranslationDictionaries()},
             {"cn_en_mixed_input_min_chars", GetConfiguredEnglishMixedInputMinChars()},
             {"emoji_mixed_input", GetConfiguredEmojiMixedInputEnabled()},
             {"kaomoji_mixed_input", GetConfiguredKaomojiMixedInputEnabled()},
@@ -938,6 +940,8 @@ bool ApplyConfigUpdate(const json::object &data)
         return SetConfiguredEnglishCandidatesEnabled(json::value_to<bool>(data.at("value")));
     if (path == "general.candidate_translation_cloud")
         return SetConfiguredCandidateTranslationCloudEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.disabled_translation_dictionaries")
+        return SetConfiguredDisabledTranslationDictionaries(json::value_to<std::string>(data.at("value")));
     if (path == "general.personal_translation_glossary")
         return SetConfiguredPersonalTranslationGlossary(json::value_to<std::string>(data.at("value")));
     if (path == "general.candidate_translations")
@@ -1600,6 +1604,13 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 if (g_webview)
                     g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
             });
+        }
+        else if (type == "dictionaryLibraryRequest")
+        {
+            const auto response =
+                TranslationLibrary::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
         }
         else if (type == "vocabularyRequest")
         {

@@ -583,6 +583,7 @@ class CandidateList : public Visual
 
     using SelectionChangedHandler = std::function<void(size_t selectedIndex)>;
     using ItemActivatedHandler = std::function<void(size_t selectedIndex)>;
+    using ModifiedItemHandler = std::function<bool(size_t index, WPARAM modifiers, bool annotation)>;
     using ContextMenuHandler = std::function<void(size_t selectedIndex, const POINT &clientPoint)>;
 
     explicit CandidateList(float itemHeight = 40.0f);
@@ -597,6 +598,7 @@ class CandidateList : public Visual
     RectF GetItemBounds(size_t index) const;
     void SetOnSelectionChanged(SelectionChangedHandler handler);
     void SetOnItemActivated(ItemActivatedHandler handler);
+    void SetOnModifiedItemActivated(ModifiedItemHandler handler);
     void SetOnContextMenu(ContextMenuHandler handler);
     void SetAppearance(Appearance appearance);
     void SetOrientation(Orientation orientation);
@@ -664,6 +666,8 @@ class CandidateList : public Visual
     size_t selectedIndex_ = 0;
     SelectionChangedHandler onSelectionChanged_;
     ItemActivatedHandler onItemActivated_;
+    ModifiedItemHandler onModifiedItemActivated_;
+    WPARAM pressedModifiers_ = 0;
     ContextMenuHandler onContextMenu_;
 };
 

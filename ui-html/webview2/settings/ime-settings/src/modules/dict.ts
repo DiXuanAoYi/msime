@@ -1,3 +1,4 @@
+import { setupTranslationLibrary } from './translation-library';
 import { createDictionaryPager, DICTIONARY_PAGE_SIZE } from '../utils/dictionary-pagination';
 import { readDictionaryFile } from '../utils/dictionary-file';
 import { confirmDialog } from '../utils/confirm-dialog';
@@ -167,6 +168,7 @@ function downloadExport(content: string, filename: string): void {
 }
 
 export function setupDictionary(): void {
+  setupTranslationLibrary();
   hoistOverlay(document.getElementById('dictToast'));
   hoistOverlay(document.getElementById('dictModal'));
   const table = document.querySelector<HTMLElement>('.dict-table-wrap');

@@ -1,0 +1,14 @@
+{
+  "ecdict": {
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "commit": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "license": "MIT",
+    "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf"
+  },
+  "cncf": {
+    "repository": "https://github.com/cncf/glossary",
+    "commit": "af21906fc24fa2afeb69e1eb186d97318c0f2687",
+    "license": "CC-BY-4.0",
+    "sha256": "ade84a204891b0661dd4b7f79789c1f1e26ba6da7700439a24efcd7298b02d20"
+  }
+}

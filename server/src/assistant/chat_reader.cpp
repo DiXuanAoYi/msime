@@ -562,8 +562,27 @@ json ParseChatWindow(const json &w)
             timestamp = text;
             continue;
         }
-        std::string source = "uia";
-        if (speaker.empty() && w.at("platform") == "wechat" && group && w.contains("labels"))
+        bool self = Has(cls, {"message--self", "message-outgoing", "msg-item-self"});
+        if (w.at("platform") == "wechat" && n.value("directionEvidence", "") == "wechat-green-right-text-bubble")
+            self = true;
+        // Some clients expose an unnamed avatar. Its position must belong to this
+        // message row inside the verified chat list, not a sidebar/profile image.
+        if (w.at("platform") == "wechat" || w.at("platform") == "wecom")
+        {
+            const double left = nodes[list].value("x", 0), width = nodes[list].value("width", 0);
+            for (size_t i = r + 1; i < nodes.size(); ++i)
+            {
+                if (!Descendant(nodes, static_cast<int>(i), r) || nodes[i].value("offscreen", false))
+                    continue;
+                const auto marker = Lower(nodes[i].value("id", "") + " " + nodes[i].value("class", ""));
+                if (width > 100 && Has(marker, {"avatar", "head_pic"}) && nodes[i].value("x", 0) > left + width * 0.8)
+                    self = true;
+            }
+        }
+        if (self)
+            speaker = "本人";
+        std::string source = self ? "uia+outgoing-direction" : "uia";
+        if (!self && speaker.empty() && w.at("platform") == "wechat" && group && w.contains("labels"))
         {
             // Group sender sits above the bubble, inside this row. A bare/private bubble
             // is never assigned to the contact solely from its horizontal position.
@@ -589,7 +608,7 @@ json ParseChatWindow(const json &w)
         // native text. Use it only when the full latest body (not an ellipsis) agrees,
         // and its timestamp agrees with the loaded final row. Never use sidebar text
         // as a message or apply this identity to older bubbles.
-        if (w.at("platform") == "wechat" && group && r == rows.back() && text.size() >= 3 &&
+        if (!self && w.at("platform") == "wechat" && group && r == rows.back() && text.size() >= 3 &&
             text.find("…") == std::string::npos && text.find("...") == std::string::npos)
         {
             const auto chatTitle = out["title"].get<std::string>();
@@ -654,7 +673,7 @@ json ParseChatWindow(const json &w)
                                    {"speaker", speaker},
                                    {"text", text},
                                    {"time", timestamp},
-                                   {"self", Has(cls, {"message--self", "message-outgoing", "msg-item-self"})},
+                                   {"self", self},
                                    {"source", source}});
         if (out["messages"].size() >= 200)
             break;

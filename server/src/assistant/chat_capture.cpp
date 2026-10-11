@@ -20,7 +20,7 @@ using nlohmann::json;
 namespace
 {
 // Local OCR supplements only missing WeChat sender labels. Pixels never leave this process.
-json ReadLabels(HWND hwnd, const json &nodes)
+json ReadLabels(HWND hwnd, json &nodes)
 {
     json lines = json::array();
     RECT bounds{};
@@ -48,6 +48,38 @@ json ReadLabels(HWND hwnd, const json &nodes)
     bool captured = PrintWindow(hwnd, memory, 2) != FALSE;
     if (captured)
     {
+        // WeChat 4 exposes full-width rows with no accessible avatar children.
+        // Identify only text bubbles with a sustained outgoing green surface
+        // immediately left of the right-hand avatar; never infer self from text X alone.
+        const double scale = GetDpiForWindow(hwnd) / 96.0;
+        auto *rgba = static_cast<uint8_t *>(pixels);
+        for (auto &n : nodes)
+        {
+            if (n.value("class", "") != "mmui::ChatTextItemView" || n.value("offscreen", false))
+                continue;
+            const int rowRight = n.value("x", 0) + n.value("width", 0) - bounds.left;
+            const int rowTop = n.value("y", 0) - bounds.top;
+            const int x1 = rowRight - int(82 * scale), x2 = rowRight - int(55 * scale);
+            const int y1 = std::max(0, rowTop + int(12 * scale));
+            const int y2 = std::min(height, rowTop + std::min(n.value("height", 0), int(100 * scale)));
+            if (x1 < 0 || x2 >= width || x2 <= x1 || y2 <= y1)
+                continue;
+            int consecutive = 0, longest = 0;
+            for (int y = y1; y < y2; ++y)
+            {
+                int green = 0;
+                for (int x = x1; x < x2; ++x)
+                {
+                    const auto at = (size_t(y) * width + x) * 4;
+                    const int b = rgba[at], g = rgba[at + 1], r = rgba[at + 2];
+                    green += g > 75 && g - r > 25 && g - b > 18;
+                }
+                consecutive = green * 4 >= (x2 - x1) * 3 ? consecutive + 1 : 0;
+                longest = std::max(longest, consecutive);
+            }
+            if (longest >= 14 * scale)
+                n["directionEvidence"] = "wechat-green-right-text-bubble";
+        }
         try
         {
             using namespace winrt::Windows;

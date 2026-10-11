@@ -995,6 +995,57 @@
         ],
         "additionalProperties": false
       }
+    },
+    "dictionaryLibraryRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "list",
+              "export"
+            ]
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "candidateSpeak": {
+      "surfaces": [
+        "candidate"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "translation": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "index",
+          "translation"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "server": {
@@ -1824,6 +1875,88 @@
         "service"
       ],
       "additionalProperties": false
+    },
+    "dictionaryLibraryResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "books": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "license": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "integer"
+              },
+              "bytes": {
+                "type": "integer"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "headwords": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "category",
+              "language",
+              "source",
+              "version",
+              "license",
+              "note",
+              "sha256",
+              "entries",
+              "bytes",
+              "enabled",
+              "headwords"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "books"
+      ]
     }
   }
 }

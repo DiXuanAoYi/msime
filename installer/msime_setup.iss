@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.10"
+#define MyAppVersion   "0.9.11"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -867,6 +867,8 @@ begin
     (CompareText(FileName, 'MOZC_DICTIONARY_LICENSE.txt') = 0) or
     (CompareText(FileName, 'english.db') = 0) or
     (CompareText(FileName, 'qingjian-glossary.db') = 0) or
+    (CompareText(FileName, 'industry-learning.db') = 0) or
+    (CompareText(FileName, 'translation-library') = 0) or
     (CompareText(FileName, 'qingjian-glossary-sources') = 0) or
     (CompareText(FileName, 'others.db') = 0) or
     (CompareText(FileName, 'sc.lm') = 0) or

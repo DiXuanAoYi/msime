@@ -1,5 +1,12 @@
 <div class="content" id="dict-settings">
   <div class="content-header"><span>词库</span></div>
+  <section class="dict-card" id="translationLibrary">
+    <h3>离线翻译与学习词典</h3>
+    <p>按需开启通用、行业和学习词典。源词条与反向检索条目分开计数；词典之间可能重叠。导出的 TSV 可用文本编辑器或表格软件保存、整理。</p>
+    <div class="dict-toolbar"><input data-search class="dict-input" placeholder="搜索：青简、四级、医学…" aria-label="搜索离线词典"><select data-category aria-label="词典分类"><option value="all">全部词典</option><option>通用</option><option>学习</option><option>行业</option></select><button data-refresh type="button">刷新列表</button></div>
+    <p>按住 Ctrl 点击候选中文朗读原词，点击译文朗读释义；使用本机已安装的语音。</p>
+    <p data-status role="status">正在读取词典…</p><div data-books class="library-books"></div>
+  </section>
   <div class="dict-card">
     <div class="dict-tabs" role="tablist">
       <button class="dict-tab active" data-dictionary="quanpin">全拼词库</button>

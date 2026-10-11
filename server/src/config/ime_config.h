@@ -590,3 +590,6 @@ bool SetConfiguredFrequencyAdjustmentInt(const std::string &key, int value);
 bool SetConfiguredAiAssistantString(const std::string &key, const std::string &value);
 bool SetConfiguredAiAssistantBool(const std::string &key, bool value);
 bool SetConfiguredAiAssistantInt(const std::string &key, int value);
+
+std::shared_ptr<const std::string> GetConfiguredDisabledTranslationDictionaries();
+bool SetConfiguredDisabledTranslationDictionaries(const std::string &ids);

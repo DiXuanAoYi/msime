@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('msime-package-' + [Guid]::NewGuid())
 function Write-Fixture([string]$Relative, [string]$Text = 'fixture') {
@@ -57,14 +57,16 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $fixture 'scripts'), (Join-Path $fixture 'assets') | Out-Null
     Copy-Item (Join-Path $PSScriptRoot '../../scripts/build_bundled_glossary.py') (Join-Path $fixture 'scripts')
     Copy-Item (Join-Path $PSScriptRoot '../../assets/qingjian-glossary') (Join-Path $fixture 'assets') -Recurse
+    Copy-Item (Join-Path $PSScriptRoot '../../scripts/build_translation_library.py') (Join-Path $fixture 'scripts')
+    Copy-Item (Join-Path $PSScriptRoot '../../assets/translation-library') (Join-Path $fixture 'assets') -Recurse
     $english = Join-Path $fixture 'MetasequoiaImeDict/out/english.db'
-    python -c "import sqlite3,sys; sqlite3.connect(sys.argv[1]).execute('CREATE TABLE english_words(word TEXT,display TEXT,weight INTEGER,PRIMARY KEY(word,display))')" $english
+    python -c "import sqlite3,sys; sqlite3.connect(sys.argv[1]).executescript('CREATE TABLE english_words(word TEXT,display TEXT,weight INTEGER,PRIMARY KEY(word,display)); CREATE TABLE zh_en_glosses(word TEXT,gloss TEXT); CREATE TABLE en_zh_glosses(word TEXT,gloss TEXT);')" $english
     if ($LASTEXITCODE -ne 0) { throw 'Failed to create packaging fixture' }
     & (Join-Path $installer 'Prepare-PackageFiles.ps1') -RepoRoot $fixture -TargetVersion '2026.9.1' -IncludeSymbols
     foreach ($file in @('app_data/html/webview2/shared/runtime.js', 'app_data/dictionary-manifest.json',
                          'app_data/sc.lm', 'app_data/libime-lm-NOTICE.md', 'app_data/dict_pinyin.dat',
                          'app_data/sentence-model-desktop.safetensors', 'app_data/sentence-model.safetensors',
-                         'app_data/chinese-ime-lm-NOTICE.md', 'app_data/qingjian-glossary.db', 'app_data/qingjian-glossary-sources/LICENSE',
+                         'app_data/industry-learning.db', 'app_data/translation-library/catalog.json', 'app_data/translation-library/study-cet4.tsv', 'app_data/translation-library/ECDICT-LICENSE.txt', 'app_data/chinese-ime-lm-NOTICE.md', 'app_data/qingjian-glossary.db', 'app_data/qingjian-glossary-sources/LICENSE',
                          'tsf_dll/32/MetasequoiaImeTsf.dll', 'tsf_dll/32/MetasequoiaImeTsf.pdb',
                          'tsf_dll/64/MetasequoiaImeTsf.dll', 'tsf_dll/64/MetasequoiaImeTsf.pdb',
                          'server_exe/MetasequoiaImeServer.pdb',

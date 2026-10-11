@@ -150,6 +150,11 @@ void CandidateList::SetOnItemActivated(ItemActivatedHandler handler)
     onItemActivated_ = std::move(handler);
 }
 
+void CandidateList::SetOnModifiedItemActivated(ModifiedItemHandler handler)
+{
+    onModifiedItemActivated_ = std::move(handler);
+}
+
 void CandidateList::SetOnContextMenu(ContextMenuHandler handler)
 {
     onContextMenu_ = std::move(handler);
@@ -688,6 +693,7 @@ bool CandidateList::OnMouseDown(const POINT &point, WPARAM keyState)
     }
 
     pressed_ = true;
+    pressedModifiers_ = keyState;
     pressedIndex_ = hit;
     InvalidateVisual();
     return true;
@@ -709,6 +715,14 @@ bool CandidateList::OnMouseUp(const POINT &point, WPARAM keyState)
 
     if (hit != static_cast<size_t>(-1) && hit == pressedIndex)
     {
+        const auto &box = itemGeometry_[hit].translation;
+        const auto row = ItemRect(hit);
+        const bool annotation = PointInRect(RectF{row.x + box.x, row.y + box.y, box.width, box.height}, dipPoint);
+        if (onModifiedItemActivated_ && onModifiedItemActivated_(hit, keyState | pressedModifiers_, annotation))
+        {
+            InvalidateVisual();
+            return true;
+        }
         SetSelectedIndex(hit);
         if (onItemActivated_)
         {

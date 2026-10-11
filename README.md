@@ -380,3 +380,5 @@ GPL-3.0。
   <img src="https://api.star-history.com/svg?repos=metasequoiaime/MSIME-Windows&type=Date" alt="Star History Chart" width="600">
 </a>
 <!-- star-history:end -->
+
+离线学习与行业词典、独立开关、导出和 Ctrl 点击发音的用法见 [词典与候选发音](docs/translation-library.md)。

@@ -435,3 +435,18 @@ html[data-theme="dark"] .dict-toast.error .dict-toast-icon {
 .dict-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 12px 0; padding: 0 18px; }
 .dict-pagination-status { margin-right: auto; }
 .dict-pagination button:disabled { opacity: .45; cursor: default; }
+
+.library-books { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr)); gap:12px; max-height:560px; overflow:auto; }
+.library-book { border:1px solid rgba(128,128,128,.25); border-radius:10px; padding:14px; min-width:0; }
+.library-book label { display:flex; gap:8px; align-items:center; font-weight:600; }
+.library-book p,.library-book small { display:block; font-size:12px; line-height:1.7; opacity:.8; overflow-wrap:anywhere; }
+.library-book-actions { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-top:12px; }
+.library-book-actions a { font-size:12px; color:var(--accent-color,#a8a4ef); }
+.library-book-actions button { flex-shrink:0; }
+
+#translationLibrary { padding:20px; }
+#translationLibrary h3 { margin-top:0; }
+#translationLibrary > p { font-size:13px; line-height:1.7; }
+#translationLibrary .dict-toolbar { padding-left:0; padding-right:0; flex-wrap:wrap; }
+#translationLibrary [data-refresh] { padding:7px 12px; border-radius:6px; cursor:pointer; }
+.library-book-actions .dict-button { padding:5px 10px; font-size:12px; }

@@ -1,3 +1,4 @@
+#include "english/candidate_speech.h"
 #include "window/candidate_presenter.h"
 
 #include "config/ime_config.h"
@@ -363,6 +364,12 @@ void CandidatePresenter::RebuildScene()
     impl_->preedit->SetHorizontalAlignment(msimeui::HorizontalAlignment::Leading);
     impl_->list = std::make_shared<msimeui::CandidateList>(28.0f);
     impl_->list->SetOnItemActivated([this](size_t index) { CommitItem(index); });
+    impl_->list->SetOnModifiedItemActivated([](size_t index, WPARAM keys, bool translation) {
+        if (!(keys & MK_CONTROL))
+            return false;
+        CandidateSpeech::Speak(index, translation);
+        return true;
+    });
     impl_->list->SetOnContextMenu(
         [this](size_t index, const POINT &clientPoint) { ShowItemContextMenu(index, clientPoint); });
     impl_->body = std::make_shared<msimeui::StackPanel>(2.0f);
