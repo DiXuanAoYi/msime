@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.13"
+#define MyAppVersion   "0.9.14"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -80,7 +80,8 @@ Name: "{commonpf64}\metasequoiaime\{code:GetVersionDir}"
 Name: "{commonpf64}\metasequoiaime\server"
 ; 用户数据（词库、配置、皮肤、前端资源）。默认在 LocalAppData，安装时可以改到别的盘，
 ; 选择写进 HKLM 的 DataDir，Server / TSF DLL / 引擎三方都从那里读。
-Name: "{code:GetDataDir}"; Permissions: users-modify
+; Permissions are repaired after install, without traversing user model caches.
+Name: "{code:GetDataDir}"
 ; 用户自己的辅助码方案放这里，Server 扫描后列进设置页，升级时保留。
 Name: "{code:GetDataDir}\helpcodes\custom"
 ; 用户自己的双拼方案（.toml）放这里，同样由 Server 扫描、升级时保留。
@@ -995,36 +996,66 @@ begin
   );
 end;
 
-procedure EnsureImeUserDataDir;
+procedure EnsureWritableImePath(Path: String; Recursive: Boolean);
 var
-  AppDataPath: String;
+  RecurseArg, InheritArg: String;
   ResultCode: Integer;
 begin
-  // Elevated setup writes {localappdata} as high integrity. Medium-IL Server
-  // and Settings cannot replace those files. Users who never rewrote config.toml
-  // at the real path (the non-ASCII path bug) keep that leftover and cannot save.
-  // Note: brace comments do not nest in Inno Setup, so a constant like the one
-  // above would close a { } comment early -- keep these as line comments.
-  // Also required when the data directory sits on another volume: files the elevated setup
-  // copied there inherit the parent's ACL, which may not let a Medium-IL Server write them.
+  RecurseArg := '';
+  InheritArg := '';
+  if DirExists(Path) then InheritArg := '(OI)(CI)';
+  if Recursive then RecurseArg := ' /T';
+  Exec(
+    ExpandConstant('{sys}\icacls.exe'),
+    '"' + Path + '" /grant *S-1-5-32-545:' + InheritArg + 'M' + RecurseArg + ' /C /Q',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  Exec(
+    ExpandConstant('{sys}\icacls.exe'),
+    '"' + Path + '" /setintegritylevel ' + InheritArg + 'M' + RecurseArg + ' /C /Q',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+end;
+
+procedure EnsureImeUserDataDir;
+var
+  AppDataPath, ItemPath: String;
+  FindRec: TFindRec;
+begin
+  // Setup-created resources must remain writable by the medium-integrity IME.
+  // Model runtimes are downloaded by the user's worker, never installed here.
+  // Rewalking tens of thousands of Python/CUDA cache files twice made upgrades
+  // take over twenty minutes. Keep inherited root permissions, but repair only
+  // the actual user data/resources, excluding separately managed model caches.
   AppDataPath := GetDataDir('');
   ForceDirectories(AppDataPath);
-  Exec(
-    ExpandConstant('{sys}\icacls.exe'),
-    '"' + AppDataPath + '" /grant *S-1-5-32-545:(OI)(CI)M /T /C /Q',
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode
-  );
-  Exec(
-    ExpandConstant('{sys}\icacls.exe'),
-    '"' + AppDataPath + '" /setintegritylevel (OI)(CI)M /T /C /Q',
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode
-  );
+  // A model directory is created by the unelevated runtime: its existing root
+  // already supports user writes. Even non-recursive ACL updates on that root
+  // propagate inheritable entries through Windows to every model cache file.
+  // New installations still need the initial writable root ACL.
+  if not DirExists(AddBackslash(AppDataPath) + 'models') then
+    EnsureWritableImePath(AppDataPath, False);
+  if FindFirst(AddBackslash(AppDataPath) + '*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') and
+           (CompareText(FindRec.Name, 'models') <> 0) then
+        begin
+          ItemPath := AddBackslash(AppDataPath) + FindRec.Name;
+          EnsureWritableImePath(ItemPath, (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0);
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
 end;
 
 procedure EnsureSharedWebView2DataDir;

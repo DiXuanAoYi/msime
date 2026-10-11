@@ -98,7 +98,7 @@ Assert-PathExists -LiteralPath $tsf32Pdb -Description '32 位 TSF Release PDB'
 Assert-PathExists -LiteralPath $tsf64Pdb -Description '64 位 TSF Release PDB'
 $serverExecutables = @(
     Get-ChildItem -LiteralPath $serverRelease -Recurse -File -Filter '*.exe' |
-        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.FullName -notlike (Join-Path $serverRelease 'local-asr\*') }
+        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.BaseName -ne 'MetasequoiaTtsStreamProbe' -and $_.FullName -notlike (Join-Path $serverRelease 'local-asr\*') }
 )
 $missingServerPdb = @(
     $serverExecutables |
@@ -306,6 +306,10 @@ Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter '*Tests.exe' |
     Remove-Item -Force
 Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter 'test_*.exe' |
     Remove-Item -Force
+foreach ($probeName in @('MetasequoiaTtsStreamProbe.exe', 'MetasequoiaTtsStreamProbe.pdb')) {
+    $probePath = Join-Path $targetServer $probeName
+    if (Test-Path -LiteralPath $probePath) { Remove-Item -LiteralPath $probePath -Force }
+}
 if ($IncludeSymbols) {
     Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter '*Tests.pdb' |
         Remove-Item -Force
