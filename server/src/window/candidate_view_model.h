@@ -1,6 +1,16 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include <functional>
+#include "ipc/candidate_translation_policy.h"
+
+struct TranslationDisplayRun
+{
+    std::string text;
+    bool muted = false;
+    bool fresh = false;
+};
 
 // Built once on the candidate worker. Renderers only adapt this presentation data;
 // they do not query dictionaries, derive helpcodes or decide which source gets a badge.
@@ -13,7 +23,47 @@ struct CandidateViewItem
     std::string badge;
     std::string translation;
     bool fixed_position = false;
+    std::vector<TranslationDisplayRun> translation_runs;
 };
+
+// Show two senses like Qingjian. The complete gloss remains available through
+// Ctrl+Enter, and only the displayed senses count as vocabulary exposure.
+inline void DecorateCandidateTranslation(CandidateViewItem &item,
+                                         const std::function<bool(const std::string &)> &is_familiar)
+{
+    item.translation_runs.clear();
+    const auto output = FanyImeIpc::SplitTranslationGloss(item.translation);
+    size_t start = 0, count = 0;
+    while (start < item.translation.size() && count < 2)
+    {
+        const auto ascii = item.translation.find(';', start);
+        const auto full = item.translation.find("；", start);
+        const auto end = (std::min)(ascii, full);
+        auto sense = item.translation.substr(start, end == std::string::npos ? end : end - start);
+        const auto first = sense.find_first_not_of(" \t\r\n");
+        if (first != std::string::npos)
+        {
+            sense = sense.substr(first, sense.find_last_not_of(" \t\r\n") - first + 1);
+            if (count)
+                item.translation_runs.push_back({" · ", true});
+            for (const auto pos : {"n. ", "v. ", "adj. ", "adv. ", "prep. ", "pron. ", "conj. ", "int. ", "num. ",
+                                   "aux. ", "det. ", "part. ", "phr. ", "m. "})
+                if (sense.rfind(pos, 0) == 0)
+                {
+                    item.translation_runs.push_back({pos, true});
+                    sense.erase(0, std::char_traits<char>::length(pos));
+                    break;
+                }
+            item.translation_runs.push_back({sense, false, count < output.size() && !is_familiar(output[count])});
+            ++count;
+        }
+        if (end == std::string::npos)
+            break;
+        start = end + (end == full ? std::string("；").size() : 1);
+    }
+    if (output.size() > count)
+        item.translation_runs.push_back({" · +" + std::to_string(output.size() - count), true});
+}
 
 inline std::string EscapeCandidateViewHtml(const std::string &text)
 {
@@ -69,7 +119,17 @@ inline std::string CandidateViewHtml(const CandidateViewItem &item)
     std::string html = EscapeCandidateViewHtml(item.text + item.annotation + item.badge);
     if (item.fixed_position)
         html = "<span style=\"color:#379AD3\">" + html + "</span>";
-    if (!item.translation.empty())
+    if (!item.translation_runs.empty())
+    {
+        html += "<span class=\"cand-translation\" style=\"opacity:1\">";
+        for (const auto &run : item.translation_runs)
+        {
+            const auto style = run.fresh ? "color:#ed9409" : run.muted ? "opacity:.58" : "opacity:.75";
+            html += "<span style=\"" + std::string(style) + "\">" + EscapeCandidateViewHtml(run.text) + "</span>";
+        }
+        html += "</span>";
+    }
+    else if (!item.translation.empty())
         html += "<span class=\"cand-translation\">" + EscapeCandidateViewHtml(item.translation) + "</span>";
     return html;
 }

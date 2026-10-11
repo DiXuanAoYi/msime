@@ -377,6 +377,8 @@ struct FloatingToolbarItemsConfig
     bool character_set = true;
     bool emoji = true;
     bool screen_keyboard = false;
+    bool voice = true;
+    bool reply = true;
     bool settings = true;
 };
 const FloatingToolbarItemsConfig &GetConfiguredFloatingToolbarItems();

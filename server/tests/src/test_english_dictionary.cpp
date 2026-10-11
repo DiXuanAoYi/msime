@@ -170,3 +170,45 @@ TEST_CASE(EnglishDictionaryUpsertsGlossForCloudFallback)
     REQUIRE(EnglishDictionary::upsert_gloss(test::Utf8(database.path()), false, "metasequoia", "水杉"));
     REQUIRE_EQ(dictionary.query_chinese_gloss("metasequoia"), std::string("水杉"));
 }
+
+TEST_CASE(BundledGlossaryLoadsLanguagesMergesDistinctSensesAndHonorsOverrides)
+{
+    TemporaryEnglishDatabase database;
+    const auto bundle = database.path().parent_path() / "qingjian-glossary.db";
+    sqlite3 *db = nullptr;
+    REQUIRE_EQ(sqlite3_open(test::Utf8(bundle).c_str(), &db), SQLITE_OK);
+    REQUIRE_EQ(sqlite3_exec(
+                   db,
+                   "CREATE TABLE glosses(language TEXT,word TEXT,gloss TEXT,PRIMARY KEY(language,word)) WITHOUT ROWID;"
+                   "INSERT INTO glosses VALUES('en','开发','v. develop; v. exploit');"
+                   "INSERT INTO glosses VALUES('ja','开发','v. 開発する (かいはつする)');"
+                   "INSERT INTO glosses VALUES('vi','开发','v. phát triển');"
+                   "INSERT INTO glosses VALUES('zh','hello','int. 你好');",
+                   nullptr, nullptr, nullptr),
+               SQLITE_OK);
+    sqlite3_close(db);
+    REQUIRE(EnglishDictionary::upsert_gloss(test::Utf8(database.path()), true, "开发", "exploit; tap"));
+    {
+        EnglishDictionary dictionary(test::Utf8(database.path()));
+        REQUIRE_EQ(dictionary.query_english_gloss("开发"), "v. develop; v. exploit; tap");
+        REQUIRE_EQ(dictionary.query_translation_gloss("开发", "vi"), "v. phát triển");
+        REQUIRE_EQ(dictionary.query_translation_gloss("开发", "ja"), "v. 開発する (かいはつする)");
+        REQUIRE_EQ(dictionary.query_chinese_gloss("hello"), "int. 你好");
+        REQUIRE(dictionary.query_translation_gloss("开发", "unknown").empty());
+        REQUIRE(dictionary.query_translation_gloss("not-in-table", "en").empty());
+    }
+    const auto custom = database.path().parent_path() / "custom_translations.txt";
+    {
+        std::ofstream out(custom);
+        out << "开发\tmy corrected translation\n";
+    }
+    EnglishDictionary dictionary(test::Utf8(database.path()));
+    REQUIRE_EQ(dictionary.query_english_gloss("开发"), "my corrected translation");
+}
+TEST_CASE(MissingBundledGlossaryDoesNotCreateEmptyDatabase)
+{
+    TemporaryEnglishDatabase database;
+    EnglishDictionary dictionary(test::Utf8(database.path()));
+    REQUIRE(dictionary.query_translation_gloss("词", "ja").empty());
+    REQUIRE(!std::filesystem::exists(database.path().parent_path() / "qingjian-glossary.db"));
+}

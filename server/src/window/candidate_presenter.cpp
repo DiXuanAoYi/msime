@@ -961,7 +961,25 @@ std::uint64_t CandidatePresenter::FillItemsFromUi()
         item.text = string_to_wstring(view.text + view.badge);
         item.annotation = string_to_wstring(view.annotation);
         if (translationsEnabled)
+        {
             item.translation = string_to_wstring(view.translation);
+            if (!view.translation_runs.empty())
+            {
+                item.translation.clear();
+                for (const auto &run : view.translation_runs)
+                {
+                    auto text = string_to_wstring(run.text);
+                    msimeui::CandidateList::TextSpan span;
+                    span.start = static_cast<uint32_t>(item.translation.size());
+                    span.length = static_cast<uint32_t>(text.size());
+                    span.opacity = run.muted ? 0.65f : 1.0f;
+                    if (run.fresh)
+                        span.color = D2D1::ColorF(0xed9409);
+                    item.translationSpans.push_back(span);
+                    item.translation += text;
+                }
+            }
+        }
         items.push_back(std::move(item));
     }
     ignoreSelectionCallback_ = true;

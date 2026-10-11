@@ -282,3 +282,24 @@ it("still confirms unsaved reply loss after successfully saving only context", (
   expect(confirm).toHaveBeenCalledOnce();
   expect(get("rsDraft").value).toBe("unsaved reply");
 });
+
+it("keeps alternative replies when editing the selected draft", () => {
+  input("rsIncoming", "明天聊聊？");
+  get("rsGenerate").emit("click");
+  reply({replies: [{label: "轻松", text: "好呀"}, {label: "明确", text: "可以，下午如何"}]});
+  const card = get("rsReplies").children[0];
+  card.children[2].children[0].emit("click");
+  input("rsDraft", "好呀，明天下午见");
+  expect(get("rsReplies").children).toHaveLength(2);
+  expect(get("rsDraft").value).toBe("好呀，明天下午见");
+});
+it("sends writing task, length and relationship without turning on auto generation", () => {
+  input("rsIncoming", "这句话需要润色");
+  get("rsTask").value = "rewrite";
+  get("rsTask").emit("change");
+  get("rsLength").value = "short";
+  input("rsRelationship", "同事");
+  get("rsGenerate").emit("click");
+  expect(last()).toMatchObject({task: "rewrite", length: "short", relationship: "同事"});
+  expect(get("rsAuto").checked).toBe(false);
+});

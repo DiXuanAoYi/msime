@@ -1081,5 +1081,64 @@
     "valid": true,
     "surface": "settings",
     "direction": "server"
+  },
+  {
+    "name": "toolbar voice",
+    "message": {
+      "type": "voiceInput"
+    },
+    "valid": true,
+    "surface": "toolbar",
+    "direction": "client"
+  },
+  {
+    "name": "toolbar reply",
+    "message": {
+      "type": "openReplyStudio"
+    },
+    "valid": true,
+    "surface": "toolbar",
+    "direction": "client"
+  },
+  {
+    "name": "reply cannot open on candidate",
+    "message": {
+      "type": "openReplyStudio"
+    },
+    "valid": false,
+    "surface": "candidate",
+    "direction": "client"
+  },
+  {
+    "name": "explicit rewrite task",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "test",
+        "action": "generate",
+        "task": "rewrite",
+        "length": "short",
+        "relationship": "同事",
+        "incoming": "原文",
+        "mode": "polish"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reject automatic send task",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "test",
+        "action": "generate",
+        "task": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
   }
 ]

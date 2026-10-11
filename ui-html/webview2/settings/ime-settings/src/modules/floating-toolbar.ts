@@ -5,7 +5,7 @@ import { syncAppearancePreviews } from './skin';
 import { applyToolbarIconGlyphFallbacks } from './toolbar-icon-glyphs';
 import ftbHTML from '../../../../ftb/default.html?raw';
 
-type FloatingToolbarItem = 'fullwidth' | 'punctuation' | 'character_set' | 'emoji' | 'screen_keyboard' | 'settings';
+type FloatingToolbarItem = 'fullwidth' | 'punctuation' | 'character_set' | 'emoji' | 'screen_keyboard' | 'voice' | 'reply' | 'settings';
 type FloatingToolbarItemsConfig = Partial<Record<FloatingToolbarItem, boolean>>;
 
 const toolbarItems: FloatingToolbarItem[] = [
@@ -14,6 +14,8 @@ const toolbarItems: FloatingToolbarItem[] = [
   'character_set',
   'emoji',
   'screen_keyboard',
+  'voice',
+  'reply',
   'settings'
 ];
 
@@ -23,6 +25,8 @@ const toolbarItemState: Record<FloatingToolbarItem, boolean> = {
   character_set: true,
   emoji: true,
   screen_keyboard: false,
+  voice: true,
+  reply: true,
   settings: true
 };
 

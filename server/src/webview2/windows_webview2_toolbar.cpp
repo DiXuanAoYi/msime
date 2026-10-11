@@ -7,6 +7,7 @@
 #include "ipc/ipc.h"
 #include "ipc/event_listener.h"
 #include "settings/settings_launcher.h"
+#include "voice-input/voice_input_service.h"
 #include "utils/common_utils.h"
 #include "utils/window_utils.h"
 #include "window/floating_toolbar_presenter.h"
@@ -172,6 +173,10 @@ void RenderFloatingToolbarState(ICoreWebView2 *webview)
                               : L"window.setToolbarItem('emoji-panel',false);");
     script.append(items.screen_keyboard ? L"window.setToolbarItem('screen-keyboard',true);"
                                         : L"window.setToolbarItem('screen-keyboard',false);");
+    script.append(items.voice ? L"window.setToolbarItem('voice-input',true);"
+                              : L"window.setToolbarItem('voice-input',false);");
+    script.append(items.reply ? L"window.setToolbarItem('reply-studio',true);"
+                              : L"window.setToolbarItem('reply-studio',false);");
     script.append(items.settings ? L"window.setToolbarItem('settings',true);"
                                  : L"window.setToolbarItem('settings',false);");
     script.append(L"if(window.CheckContentTruncation)window.CheckContentTruncation();");
@@ -470,6 +475,14 @@ HRESULT OnControllerCreatedFtbWnd(      //
                         (void)0;
 #endif
                         OpenEmojiPanelApplication();
+                    }
+                    else if (type == "voiceInput")
+                    {
+                        VoiceInput::ToggleRecording();
+                    }
+                    else if (type == "openReplyStudio")
+                    {
+                        OpenReplyStudioApplication();
                     }
                     else if (type == "openKeyboardPanel")
                     {

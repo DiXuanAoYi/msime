@@ -658,8 +658,14 @@
         "menu"
       ]
     },
+    "openReplyStudio": {
+      "surfaces": [
+        "toolbar"
+      ]
+    },
     "voiceInput": {
       "surfaces": [
+        "toolbar",
         "menu"
       ]
     },
@@ -859,6 +865,25 @@
               "manual",
               "chat"
             ]
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "reply",
+              "rewrite",
+              "write"
+            ]
+          },
+          "length": {
+            "type": "string",
+            "enum": [
+              "short",
+              "medium",
+              "long"
+            ]
+          },
+          "relationship": {
+            "type": "string"
           }
         },
         "required": [

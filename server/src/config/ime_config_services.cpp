@@ -233,7 +233,7 @@ bool SetConfiguredTencentTmtString(const std::string &key, const std::string &va
     else if (key == "region")
         target = &g_tencent_tmt.region;
     else if (key == "target_language" && (value == "en" || value == "fr" || value == "ja" || value == "es" ||
-                                          value == "ru" || value == "de" || value == "ko"))
+                                          value == "ru" || value == "de" || value == "ko" || value == "vi"))
         target = &g_tencent_tmt.target_language;
     if (!target || !WriteConfiguredValue("tencent_tmt", key, EscapeTomlBasicString(value)))
         return false;

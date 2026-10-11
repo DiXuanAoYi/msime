@@ -46,6 +46,7 @@ export type ClientMessage =
   | { "type": "emojiSymbols"; "protocolVersion"?: 1 }
   | { "type": "keyboardPanel"; "protocolVersion"?: 1 }
   | { "type": "handwritingPanel"; "protocolVersion"?: 1 }
+  | { "type": "openReplyStudio"; "protocolVersion"?: 1 }
   | { "type": "voiceInput"; "protocolVersion"?: 1 }
   | { "type": "changeInputScheme"; "protocolVersion"?: 1; "data": "quanpin" | "shuangpin" | "wubi" }
   | { "type": "inputSchemeSubmenu"; "protocolVersion"?: 1; "data": { "open": boolean; "width": number } }
@@ -58,7 +59,7 @@ export type ClientMessage =
   | { "type": "changeCharMode"; "protocolVersion"?: 1; "data": "fullwidth" | "halfwidth" }
   | { "type": "changePuncMode"; "protocolVersion"?: 1; "data": "puncEn" | "puncCn" }
   | { "type": "vocabularyRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "overview" | "clear" | "export" } }
-  | { "type": "assistantRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "sessionId"?: string; "title"?: string; "context"?: string; "summary"?: string; "incoming"?: string; "intent"?: string; "mode"?: string; "action": "overview" | "load" | "save" | "delete" | "generate" | "summarize" | "cancel"; "count"?: 3 | 5; "retentionDays"?: 30 | 90 | 365; "kind"?: "person" | "group"; "platform"?: string; "origin"?: "manual" | "chat" } }
+  | { "type": "assistantRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "sessionId"?: string; "title"?: string; "context"?: string; "summary"?: string; "incoming"?: string; "intent"?: string; "mode"?: string; "action": "overview" | "load" | "save" | "delete" | "generate" | "summarize" | "cancel"; "count"?: 3 | 5; "retentionDays"?: 30 | 90 | 365; "kind"?: "person" | "group"; "platform"?: string; "origin"?: "manual" | "chat"; "task"?: "reply" | "rewrite" | "write"; "length"?: "short" | "medium" | "long"; "relationship"?: string } }
   | { "type": "chatRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "overview" | "scan" | "poll" | "load" | "delete" | "reset" | "cancel"; "key"?: string; "bindings"?: Array<{ "key": string; "window": string; "platform": string; "title": string; "account": string; "self": string; "kind": string }> } }
   | { "type": "localAsrRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "download" | "cancel" | "start" | "stop"; "modelId"?: string } };
 export type ServerMessage =
@@ -98,7 +99,7 @@ export type SettingsMessage =
   | { "type": "statsRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "overview" | "clearAll" | "openDirectory" } }
   | { "type": "openKeyboardPanel"; "protocolVersion"?: 1 }
   | { "type": "vocabularyRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "overview" | "clear" | "export" } }
-  | { "type": "assistantRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "sessionId"?: string; "title"?: string; "context"?: string; "summary"?: string; "incoming"?: string; "intent"?: string; "mode"?: string; "action": "overview" | "load" | "save" | "delete" | "generate" | "summarize" | "cancel"; "count"?: 3 | 5; "retentionDays"?: 30 | 90 | 365; "kind"?: "person" | "group"; "platform"?: string; "origin"?: "manual" | "chat" } }
+  | { "type": "assistantRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "sessionId"?: string; "title"?: string; "context"?: string; "summary"?: string; "incoming"?: string; "intent"?: string; "mode"?: string; "action": "overview" | "load" | "save" | "delete" | "generate" | "summarize" | "cancel"; "count"?: 3 | 5; "retentionDays"?: 30 | 90 | 365; "kind"?: "person" | "group"; "platform"?: string; "origin"?: "manual" | "chat"; "task"?: "reply" | "rewrite" | "write"; "length"?: "short" | "medium" | "long"; "relationship"?: string } }
   | { "type": "chatRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "overview" | "scan" | "poll" | "load" | "delete" | "reset" | "cancel"; "key"?: string; "bindings"?: Array<{ "key": string; "window": string; "platform": string; "title": string; "account": string; "self": string; "kind": string }> } }
   | { "type": "localAsrRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "download" | "cancel" | "start" | "stop"; "modelId"?: string } };
 declare global {

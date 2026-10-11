@@ -65,6 +65,8 @@ void CaptureVocabularySelection(int index, bool use_translation)
             continue;
         auto words = g_translation_candidates_active ? std::vector<std::string>{view.text}
                                                      : FanyImeIpc::SplitTranslationGloss(view.translation);
+        if (!g_translation_candidates_active && !view.translation_runs.empty() && words.size() > 2)
+            words.resize(2);
         batch.seen.insert(batch.seen.end(), words.begin(), words.end());
         if (i == static_cast<size_t>(index))
         {

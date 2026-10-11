@@ -221,3 +221,23 @@ TEST_CASE(reply_group_identity_and_attributed_records_survive_encryption)
     REQUIRE_EQ(loaded["session"]["context"], r["context"]);
     REQUIRE_EQ(loaded["sessions"][0]["kind"], "group");
 }
+
+TEST_CASE(reply_task_is_explicit_and_relationship_stays_in_user_data)
+{
+    auto r = Req("generate");
+    r.update({{"mode", "high_eq"},
+              {"incoming", "sample text"},
+              {"task", "rewrite"},
+              {"length", "short"},
+              {"relationship", "sample colleague"}});
+    auto payload = ReplyStudio::BuildPayload(r, "test");
+    const auto system = payload["messages"][0]["content"].get<std::string>();
+    REQUIRE(system.find("只重写原文") != std::string::npos);
+    REQUIRE(system.find("sample colleague") == std::string::npos);
+    REQUIRE(json::parse(payload["messages"][1]["content"].get<std::string>())["relationship"] == "sample colleague");
+    r["task"] = "send";
+    Reject([&] { ReplyStudio::Validate(r); });
+    r["task"] = "reply";
+    r["length"] = "bad";
+    Reject([&] { ReplyStudio::Validate(r); });
+}

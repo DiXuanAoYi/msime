@@ -1752,6 +1752,8 @@ void PostSettingsConfig()
             {"floating_toolbar_character_set", toolbar.character_set},
             {"floating_toolbar_emoji", toolbar.emoji},
             {"floating_toolbar_screen_keyboard", toolbar.screen_keyboard},
+            {"floating_toolbar_voice", toolbar.voice},
+            {"floating_toolbar_reply", toolbar.reply},
             {"floating_toolbar_settings", toolbar.settings},
             {"floating_toolbar_scale", GetConfiguredFloatingToolbarScale()},
             {"floating_toolbar_font_size", GetConfiguredFloatingToolbarFontSize()},

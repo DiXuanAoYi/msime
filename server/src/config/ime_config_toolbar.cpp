@@ -84,6 +84,10 @@ bool SetConfiguredFloatingToolbarItemEnabled(const std::string &item, bool enabl
         target = &g_floating_toolbar_items.emoji;
     else if (item == "screen_keyboard")
         target = &g_floating_toolbar_items.screen_keyboard;
+    else if (item == "voice")
+        target = &g_floating_toolbar_items.voice;
+    else if (item == "reply")
+        target = &g_floating_toolbar_items.reply;
     else if (item == "settings")
         target = &g_floating_toolbar_items.settings;
     else

@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.9"
+#define MyAppVersion   "0.9.10"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -794,6 +794,8 @@ begin
   { 输入统计库和用户词库同一条理由：Server 打开它时会留下 sidecar，只搬主库会丢掉
     最后一次写入。这个库默认不建（统计开关关闭），建了之后就只有用户自己能重建它的内容。}
   Result :=
+    (CompareText(FileName, 'user_dict.dat') = 0) or
+    (CompareText(FileName, 'clipboard_history.json') = 0) or
     (CompareText(FileName, 'reply-contexts.dat') = 0) or
     (CompareText(FileName, 'chat-records.dat') = 0) or
     (CompareText(FileName, 'vocabulary.db') = 0) or
@@ -864,6 +866,8 @@ begin
     (CompareText(FileName, 'dict_japanese.dat') = 0) or
     (CompareText(FileName, 'MOZC_DICTIONARY_LICENSE.txt') = 0) or
     (CompareText(FileName, 'english.db') = 0) or
+    (CompareText(FileName, 'qingjian-glossary.db') = 0) or
+    (CompareText(FileName, 'qingjian-glossary-sources') = 0) or
     (CompareText(FileName, 'others.db') = 0) or
     (CompareText(FileName, 'sc.lm') = 0) or
     (CompareText(FileName, 'libime-lm-NOTICE.md') = 0) or
@@ -1357,7 +1361,7 @@ begin
     ExpandConstant('{sys}\robocopy.exe'),
     '"' + RemoveBackslashUnlessRoot(OldDir) + '" "' + RemoveBackslashUnlessRoot(NewDir) + '" ' +
     'msime_user.db msime_user.db-wal msime_user.db-shm msime_user.db-journal ' +
-    'reply-contexts.dat chat-records.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
+    'user_dict.dat clipboard_history.json reply-contexts.dat chat-records.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
     'stats.db stats.db-wal stats.db-shm stats.db-journal ' +
     'config.toml config.base.toml /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
     '',

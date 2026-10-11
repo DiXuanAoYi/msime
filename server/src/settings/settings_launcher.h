@@ -2,6 +2,7 @@
 
 bool OpenSettingsApplication();
 bool OpenSettingsAboutApplication();
+bool OpenReplyStudioApplication();
 bool CloseSettingsApplication();
 bool OpenEmojiPanelApplication();
 bool CloseEmojiPanelApplication();

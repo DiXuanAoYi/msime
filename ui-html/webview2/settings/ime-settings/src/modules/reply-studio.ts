@@ -1,4 +1,5 @@
 import { setupChatReader } from "./chat-reader";
+import { quickModes, scenarios, taskDefaultMode, type WritingTask } from "./reply-workflow";
 import { onHostMessage } from "../utils/host-messages";
 import {
   serializeHostMessage,
@@ -24,7 +25,6 @@ export function setupReplyStudio(): void {
   const root = document.getElementById("replyStudio");
   if (!root || root.dataset.initialized) return;
   root.dataset.initialized = "true";
-  setupChatReader();
   const el = <T extends HTMLElement>(id: string) =>
     document.getElementById(id) as T;
   const value = (id: string) => el<HTMLInputElement>(id)?.value ?? "";
@@ -41,14 +41,41 @@ export function setupReplyStudio(): void {
     dirty = false;
   let timer: number | undefined, debounce: number | undefined;
   let descriptions = new Map<string, string>();
+  let modeNames = new Map<string, string>();
+  const task = () => (value("rsTask") || "reply") as WritingTask;
+  function renderWorkflow() {
+    el("rsIncomingLabel").textContent = task() === "reply" ? "对方刚发来的消息" : task() === "rewrite" ? "我想改写的话" : "真实素材 / 要写的事情";
+    el("rsGenerate").textContent = `生成 ${value("rsCount") || "3"} 条${task() === "reply" ? "回复" : "表达"}`;
+    el("rsQuickModes").hidden = task() !== "reply";
+    const list = el("rsQuickModes");
+    list.replaceChildren();
+    for (const id of quickModes) {
+      if (!modeNames.has(id)) continue;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = modeNames.get(id)!;
+      button.className = value("rsMode") === id ? "studio-primary" : "";
+      button.onclick = () => {
+        el<HTMLSelectElement>("rsMode").value = id;
+        changed({ target: el("rsMode") } as unknown as Event);
+        el("rsModeDescription").textContent = descriptions.get(id) ?? "";
+        renderWorkflow();
+      };
+      list.append(button);
+    }
+  }
   function preview() {
     el("rsContextSize").textContent = `（${value("rsContext").length} 字）`;
     el("rsSendPreview").textContent =
       `将发送：本条消息 ${value("rsIncoming").length} 字、要求 ${value("rsIntent").length} 字${el<HTMLInputElement>("rsUseContext").checked ? `、本会话背景 ${value("rsContext").length} 字、摘要 ${value("rsSummary").length} 字` : "；不使用历史上下文"}。`;
+    el("rsActiveContext").textContent = el<HTMLInputElement>("rsUseContext").checked
+      ? `当前对象：${value("rsTitle") || "临时会话"} · ${value("rsKind") === "group" ? "群聊" : "联系人"} · 背景 ${value("rsContext").length} 字 / 摘要 ${value("rsSummary").length} 字`
+      : "本次不使用历史上下文";
   }
   function busy(on: boolean) {
     for (const id of [
       "rsGenerate",
+      "rsRegenerate",
       "rsSummarize",
       "rsSave",
       "rsReload",
@@ -113,6 +140,9 @@ export function setupReplyStudio(): void {
         incoming,
         intent: value("rsIntent"),
         mode: value("rsMode"),
+        task: task(),
+        length: (value("rsLength") || "medium") as "short" | "medium" | "long",
+        relationship: value("rsRelationship"),
         count: Number(value("rsCount")) as 3 | 5,
       });
     if (action === "save") {
@@ -159,6 +189,7 @@ export function setupReplyStudio(): void {
       "rsSummary",
       "rsIncoming",
       "rsIntent",
+      "rsRelationship",
       "rsDraft",
       "rsPlatform",
       "rsSpeaker",
@@ -206,6 +237,25 @@ export function setupReplyStudio(): void {
     )?.click();
   };
   el("rsGenerate").onclick = () => request("generate");
+  el("rsRegenerate").onclick = () => request("generate");
+  el("rsExample").onclick = () => {
+    if ((value("rsIncoming").trim() || value("rsIntent").trim()) && !window.confirm("用示例替换当前原文和要求？已保存的上下文不受影响。")) return;
+    const example = scenarios[value("rsMode")] ?? (task() === "rewrite"
+      ? { incoming: "你这个方案还没写完，明天就要交了，能不能快一点。", intent: "保留催进度的意思，说得明确又礼貌", relationship: "同事" }
+      : scenarios.high_eq);
+    el<HTMLInputElement>("rsIncoming").value = example.incoming;
+    el<HTMLInputElement>("rsIntent").value = example.intent;
+    el<HTMLInputElement>("rsRelationship").value = example.relationship;
+    changed({ target: el("rsIntent") } as unknown as Event);
+    status("已填入示例，尚未请求模型；可修改后生成。");
+  };
+  el("rsTask").onchange = () => {
+    const next = taskDefaultMode(task());
+    if (modeNames.has(next)) el<HTMLSelectElement>("rsMode").value = next;
+    changed({ target: el("rsTask") } as unknown as Event);
+    el("rsModeDescription").textContent = descriptions.get(value("rsMode")) ?? "";
+    renderWorkflow();
+  };
   el("rsSummarize").onclick = () => request("summarize");
   el("rsSave").onclick = () => request("save");
   el("rsReload").onclick = () => request("overview");
@@ -326,7 +376,11 @@ export function setupReplyStudio(): void {
     }
   };
   function changed(event: Event) {
-    if (event.target === el("rsDraft")) draftIncoming = value("rsIncoming");
+    if (event.target === el("rsDraft")) {
+      draftIncoming = value("rsIncoming");
+      dirty = true;
+      return; // Editing a chosen draft must not erase the other suggestions.
+    }
     dirty = true;
     revision++;
     if (waitingAction === "generate" || waitingAction === "summarize") cancel();
@@ -352,6 +406,7 @@ export function setupReplyStudio(): void {
     "rsSummary",
     "rsIncoming",
     "rsIntent",
+    "rsRelationship",
     "rsTitle",
     "rsDraft",
     "rsPlatform",
@@ -366,11 +421,13 @@ export function setupReplyStudio(): void {
     "rsUseContext",
     "rsRetention",
     "rsKind",
+    "rsLength",
   ])
     el(id).addEventListener("change", (e) => {
       changed(e);
       el("rsModeDescription").textContent =
         descriptions.get(value("rsMode")) ?? "";
+      renderWorkflow();
     });
   el("rsAuto").onchange = () => {
     window.clearTimeout(debounce);
@@ -394,9 +451,12 @@ export function setupReplyStudio(): void {
         previous = mode.value;
       mode.replaceChildren();
       descriptions = new Map(message.modes.map((m) => [m.id, m.description]));
+      modeNames = new Map(message.modes.map((m) => [m.id, m.name]));
       for (const m of message.modes) mode.add(new Option(m.name, m.id));
       if (descriptions.has(previous)) mode.value = previous;
+      else if (modeNames.has(taskDefaultMode(task()))) mode.value = taskDefaultMode(task());
       el("rsModeDescription").textContent = descriptions.get(mode.value) ?? "";
+      renderWorkflow();
     }
     if (message.sessions) {
       const select = el<HTMLSelectElement>("rsSessions");
@@ -452,6 +512,7 @@ export function setupReplyStudio(): void {
         const choose = document.createElement("button");
         choose.textContent = "选为草稿";
         choose.onclick = () => {
+          if (value("rsDraft").trim() && value("rsDraft") !== row.text && !window.confirm("替换当前已编辑的草稿？")) return;
           el<HTMLTextAreaElement>("rsDraft").value = row.text;
           draftIncoming = value("rsIncoming");
           dirty = true;
@@ -464,6 +525,7 @@ export function setupReplyStudio(): void {
         card.append(title, p, buttons);
         list.append(card);
       });
+      list.scrollIntoView?.({ block: "start", behavior: "smooth" });
     }
     status(
       message.action === "save"
@@ -475,6 +537,23 @@ export function setupReplyStudio(): void {
             : "本机会话和模式已就绪。",
     );
   });
+  setupChatReader((session) => {
+    if (!confirmDiscard()) return;
+    fresh();
+    el<HTMLInputElement>("rsTitle").value = session.title;
+    el<HTMLInputElement>("rsPlatform").value = session.platform;
+    el<HTMLSelectElement>("rsKind").value = session.kind;
+    el<HTMLTextAreaElement>("rsContext").value = session.context;
+    el<HTMLTextAreaElement>("rsIncoming").value = session.incoming;
+    el<HTMLSelectElement>("rsTask").value = "reply";
+    el<HTMLInputElement>("rsUseContext").checked = true;
+    dirty = true;
+    preview();
+    renderWorkflow();
+    el("rsIncoming").scrollIntoView({ block: "center", behavior: "smooth" });
+    status("已带入这个会话的记录和最后一条对方消息，请核对后生成；尚未联网。");
+  });
+  renderWorkflow();
   preview();
   request("overview");
 }

@@ -1,0 +1,27 @@
+{
+  "repository": "https://github.com/qingjian-team/qingjian",
+  "commit": "4a3e963dfe299126574bfe3c370ff70a3f85ee77",
+  "license": "GPL-3.0-or-later",
+  "files": {
+    "glossary-en.tsv": {
+      "sha256": "59c6c33a68e434e9edcf06b8b23b13e35ae79392a82fd912de1212d20b297615",
+      "entries": 232213
+    },
+    "glossary-es.tsv": {
+      "sha256": "0d9302f9a94e0261e9068ccfc7854f5f009dabf4d1f929893954b9da47b41b01",
+      "entries": 193292
+    },
+    "glossary-ja.tsv": {
+      "sha256": "dd6df01666d5c332b0fe3287c10b9f9d92a6e1cd78d30be938e3c088a721c96a",
+      "entries": 248128
+    },
+    "glossary-vi.tsv": {
+      "sha256": "09ecdc07b7886c2b4801c8af7a9853fafe81ac0c8367a45b1b323466fcfae292",
+      "entries": 91655
+    },
+    "glossary-zh.tsv": {
+      "sha256": "cdca09fc3eec96d2e7bb9a9fee6225cdeaa4b5cd08a79d97b4fa791f53e972ca",
+      "entries": 44924
+    }
+  }
+}

@@ -54,6 +54,9 @@ try {
     Write-Fixture 'skins/unverified/skin.toml' "schema_version = 1`nid = `"unverified`"`n[license]`nassets = `"UNVERIFIED-DEMO-ONLY`"`n"
     Write-Fixture 'server/assets/tables/pinyin.txt' 'xing'
     Write-Fixture 'MetasequoiaImeDict/out/dictionary-manifest.json' '{"manifest_version":1}'
+    New-Item -ItemType Directory -Force -Path (Join-Path $fixture 'scripts'), (Join-Path $fixture 'assets') | Out-Null
+    Copy-Item (Join-Path $PSScriptRoot '../../scripts/build_bundled_glossary.py') (Join-Path $fixture 'scripts')
+    Copy-Item (Join-Path $PSScriptRoot '../../assets/qingjian-glossary') (Join-Path $fixture 'assets') -Recurse
     $english = Join-Path $fixture 'MetasequoiaImeDict/out/english.db'
     python -c "import sqlite3,sys; sqlite3.connect(sys.argv[1]).execute('CREATE TABLE english_words(word TEXT,display TEXT,weight INTEGER,PRIMARY KEY(word,display))')" $english
     if ($LASTEXITCODE -ne 0) { throw 'Failed to create packaging fixture' }
@@ -61,7 +64,7 @@ try {
     foreach ($file in @('app_data/html/webview2/shared/runtime.js', 'app_data/dictionary-manifest.json',
                          'app_data/sc.lm', 'app_data/libime-lm-NOTICE.md', 'app_data/dict_pinyin.dat',
                          'app_data/sentence-model-desktop.safetensors', 'app_data/sentence-model.safetensors',
-                         'app_data/chinese-ime-lm-NOTICE.md',
+                         'app_data/chinese-ime-lm-NOTICE.md', 'app_data/qingjian-glossary.db', 'app_data/qingjian-glossary-sources/LICENSE',
                          'tsf_dll/32/MetasequoiaImeTsf.dll', 'tsf_dll/32/MetasequoiaImeTsf.pdb',
                          'tsf_dll/64/MetasequoiaImeTsf.dll', 'tsf_dll/64/MetasequoiaImeTsf.pdb',
                          'server_exe/MetasequoiaImeServer.pdb',

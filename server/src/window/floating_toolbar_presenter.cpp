@@ -7,6 +7,7 @@
 #include "ipc/ipc.h"
 #include "log/ftb_diag_log.h"
 #include "settings/settings_launcher.h"
+#include "voice-input/voice_input_service.h"
 #include "skin/candidate_skin_catalog.h"
 #include "utils/common_utils.h"
 #include "utils/window_utils.h"
@@ -70,6 +71,8 @@ constexpr ToolbarIcon kIconSimplified = {0xE88D, L"简"};
 constexpr ToolbarIcon kIconTraditional = {0xE88C, L"繁"};
 constexpr ToolbarIcon kIconEmoji = {0xE76E, L"表"};
 constexpr ToolbarIcon kIconKeyboard = {0xE765, L"键"};
+constexpr ToolbarIcon kIconVoice = {0xE720, L"音"};
+constexpr ToolbarIcon kIconReply = {0xE8F2, L"嘴"};
 constexpr ToolbarIcon kIconSettings = {0xE713, L"设"};
 
 float ToolbarUserScale()
@@ -528,6 +531,10 @@ void FloatingToolbarPresenter::RebuildScene()
     {
         addGlyph(kIconKeyboard, []() { OpenKeyboardPanelApplication(); });
     }
+    if (items.voice)
+        addGlyph(kIconVoice, []() { VoiceInput::ToggleRecording(); });
+    if (items.reply)
+        addGlyph(kIconReply, []() { OpenReplyStudioApplication(); });
     if (items.settings)
     {
         addGlyph(kIconSettings, []() { OpenSettingsApplication(); });

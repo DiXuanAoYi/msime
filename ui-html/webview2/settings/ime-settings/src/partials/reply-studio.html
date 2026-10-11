@@ -3,100 +3,62 @@
   <section class="section studio" id="replyStudio">
     <div class="studio-heading">
       <div>
-        <h2>这句话，换个说法</h2>
-        <p>口述、粘贴或输入，准备几种合适的表达。你挑选，你发送。</p>
+        <h2>想好怎么回，再发出去</h2>
+        <p>粘贴对方的话，选一种语气，生成几条可以直接修改的回复。</p>
       </div>
       <button id="rsVoiceSettings" type="button">语音与模型配置 ↗</button>
     </div>
-    <p class="studio-note">
-      语音填写：先配置语音识别，把光标放入原文框，按住 RAlt
-      说话或使用已设置的录音快捷键。语音润色也支持下方同名风格。
-    </p>
 
-    <details id="chatReader" class="studio-monitor">
-      <summary>聊天窗口只读监测 · 微信 / QQ / 企业微信 / 钉钉 / 飞书</summary>
-      <p class="studio-note">
-        读取当前已加载的聊天文本；微信昵称、企业微信标准浅色窗口使用本机
-        OCR，可能识别有误，请先核对预览。不点击、不切换聊天、不发送。关闭设置窗口会停止。首次读取只保存基线，新消息确认后才准备回复。图片、语音和未加载内容不转写。OCR
-        不支持的主题或布局会暂停；QQ 读取当前画面中的文字气泡，无法读取未打开或未加载的消息。
-      </p>
-      <div class="studio-toolbar">
-        <button id="crScan" type="button">扫描聊天窗口</button
-        ><button id="crStart" type="button">开始只读监测</button>
-      </div>
-      <pre id="crCapabilities" class="studio-chat-preview">
-尚未扫描。请打开已登录客户端的聊天窗口。</pre
-      >
+
+    <div class="studio-grid">
+      <label>我想做什么<select id="rsTask"><option value="reply">回复对方</option><option value="rewrite">改写我的话</option><option value="write">写生活 / 工作文案</option></select></label>
+      <label>回复长度<select id="rsLength"><option value="short">简短 · 1–2 句</option><option value="medium" selected>适中 · 2–4 句</option><option value="long">详细 · 说明完整</option></select></label>
+    </div>
+    <div id="rsQuickModes" class="studio-quick-modes" aria-label="常用聊天风格"></div>
+    <div class="studio-grid">
       <label
-        >识别到的联系人 / 群聊<select id="crWindows">
-          <option value="">先扫描窗口</option>
+        >表达模式<select id="rsMode">
+          <option value="">正在读取模式…</option>
+        </select></label
+      ><label
+        >预备数量<select id="rsCount">
+          <option value="3">3 条 · 少而精</option>
+          <option value="5">5 条 · 多些选择</option>
         </select></label
       >
-      <details>
-        <summary>读取预览（最近 5 条）</summary>
-        <pre id="crPreview" class="studio-chat-preview"></pre>
-      </details>
-      <div class="studio-grid">
-        <label
-          >当前账户标识<input
-            id="crAccount"
-            maxlength="60"
-            placeholder="例如：工作微信；切换账户后请重新绑定" /></label
-        ><label
-          >我在此会话的昵称<input
-            id="crSelf"
-            maxlength="50"
-            placeholder="用于排除自己发出的消息"
-        /></label>
-      </div>
-      <div class="studio-grid">
-        <label
-          >独立会话编号<input
-            id="crKey"
-            maxlength="64"
-            placeholder="例如 work-alice / family-group" /></label
-        ><label
-          >会话类型<select id="crKind">
-            <option value="person">联系人</option>
-            <option value="group">群聊</option>
-          </select></label
-        >
-      </div>
-      <p class="studio-note">
-        首次绑定用于确认身份：客户端通常不提供稳定账户 / 联系人
-        ID。不同账号、同名聊天请用不同编号；切换账户或重启客户端后重新绑定，不会按显示名合并旧记录。类型无法识别时请手动选择。
-      </p>
-      <button id="crBind" type="button">绑定此聊天</button>
-      <div id="crBindings"></div>
-      <label class="studio-check"
+    </div>
+    <p id="rsModeDescription" class="studio-note"></p>
+    <label
+      ><span id="rsIncomingLabel">对方刚发来的消息</span><textarea
+        id="rsIncoming"
+        rows="5"
+        maxlength="4000"
+        placeholder="例如：这周末有空吗？想不想一起吃饭？"
+      ></textarea>
+    </label>
+    <div class="studio-toolbar"><button id="rsExample" type="button">填入当前场景示例</button><span class="studio-note">也可以点击输入框后按 Ctrl+F9 口述</span></div>
+    <label>你们的关系 / 称呼<input id="rsRelationship" maxlength="150" placeholder="例如：认识不久的朋友、直属领导、正在磨合的恋人（选填）"></label>
+    <label
+      >我的想法与要求<input
+        id="rsIntent"
+        maxlength="1300"
+        placeholder="例如：我想去，但想换成周日下午；轻松一点，不要太热情"
+    /></label>
+    <div class="studio-checks">
+      <label
         ><input
-          id="crAuto"
+          id="rsUseContext"
           type="checkbox"
-        />新消息自动准备回复（会将该会话近期上下文发送到“语音与模型配置”中的模型）</label
+          checked
+        />使用本会话上下文与摘要</label
+      ><label
+        ><input
+          id="rsAuto"
+          type="checkbox"
+        />新消息粘贴/输入后自动预备回复</label
       >
-      <p class="studio-note">
-        沿用下方表达模式与 3 / 5
-        条设置。未识别发言人、自发消息和读取中断不会触发自动回复。每次开启从后续新消息开始。
-      </p>
-      <p id="crStatus" role="status" aria-live="polite">监测尚未开启。</p>
-      <div id="crReplies"></div>
-      <details>
-        <summary>按会话保存的发言记录 · 导出 / 删除</summary>
-        <div class="studio-toolbar">
-          <select id="crHistory">
-            <option value="">选择已记录会话</option></select
-          ><button id="crHistoryRefresh" type="button">刷新记录列表</button
-          ><button id="crExport" type="button">导出完整 JSON</button
-          ><button id="crDelete" type="button">删除记录</button>
-        </div>
-        <p class="studio-note">
-          本机 Windows 账户加密保存，记录采集时间及客户端提供的原始时间。保留 90
-          天；每会话最多 10000 条、总文件约 30
-          MB，满后停止并提示。导出文件为明文。
-        </p>
-        <pre id="crHistoryText" class="studio-chat-preview"></pre>
-      </details>
-    </details>
+    </div>
+    <p id="rsActiveContext" class="studio-context-badge" aria-live="polite"></p>
     <div class="studio-toolbar">
       <label
         >当前会话<select id="rsSessions">
@@ -202,56 +164,14 @@
         ></textarea>
       </label>
     </details>
-    <div class="studio-grid">
-      <label
-        >表达模式<select id="rsMode">
-          <option value="">正在读取模式…</option>
-        </select></label
-      ><label
-        >预备数量<select id="rsCount">
-          <option value="3">3 条 · 少而精</option>
-          <option value="5">5 条 · 多些选择</option>
-        </select></label
-      >
-    </div>
-    <p id="rsModeDescription" class="studio-note"></p>
-    <label
-      >对方刚发来的消息 / 待改写原文<textarea
-        id="rsIncoming"
-        rows="5"
-        maxlength="4000"
-        placeholder="例如：这周末有空吗？想不想一起吃饭？"
-      ></textarea>
-    </label>
-    <label
-      >我的想法与要求<input
-        id="rsIntent"
-        maxlength="1300"
-        placeholder="例如：我想去，但想换成周日下午；轻松一点，不要太热情"
-    /></label>
-    <div class="studio-checks">
-      <label
-        ><input
-          id="rsUseContext"
-          type="checkbox"
-          checked
-        />使用本会话上下文与摘要</label
-      ><label
-        ><input
-          id="rsAuto"
-          type="checkbox"
-        />新消息粘贴/输入后自动预备回复</label
-      >
-    </div>
     <p id="rsSendPreview" class="studio-note" aria-live="polite"></p>
-    <div class="studio-toolbar">
+    <div class="studio-toolbar studio-actions">
       <button id="rsGenerate" class="studio-primary" type="button">
-        生成预备回复</button
-      ><button id="rsCancel" type="button">取消生成</button>
+        生成 3 条回复</button
+      ><button id="rsRegenerate" type="button">换一批</button><button id="rsCancel" type="button">取消生成</button>
     </div>
     <p class="studio-note">
-      生成和总结会将上述文本发送给“语音输入 →
-      润色”中配置的模型服务；自动预备只响应此框中的内容变更，不扫描聊天软件。不会自动发送消息。
+      生成和总结使用“语音与模型配置”中的文本模型，所用消息和上下文会发给该服务。语音关闭云端润色不影响这里的手动生成。不会自动发送。
     </p>
     <div id="rsStatus" role="status" aria-live="polite"></div>
     <div id="rsReplies" class="studio-replies"></div>
@@ -270,5 +190,89 @@
     <p class="studio-note">
       草稿会标记为“尚未发送”，不会被当成已作出的承诺。关闭窗口不会保存未主动保存的内容。
     </p>
+    <details id="chatReader" class="studio-monitor">
+      <summary>聊天窗口只读监测 · 微信 / QQ / 企业微信 / 钉钉 / 飞书</summary>
+      <p class="studio-note">
+        读取当前已加载的聊天文本；微信昵称、企业微信标准浅色窗口使用本机
+        OCR，可能识别有误，请先核对预览。不点击、不切换聊天、不发送。关闭设置窗口会停止。首次读取只保存基线，新消息确认后才准备回复。图片、语音和未加载内容不转写。OCR
+        不支持的主题或布局会暂停；QQ 读取当前画面中的文字气泡，无法读取未打开或未加载的消息。
+      </p>
+      <div class="studio-toolbar">
+        <button id="crScan" type="button">扫描聊天窗口</button
+        ><button id="crStart" type="button">开始只读监测</button>
+      </div>
+      <pre id="crCapabilities" class="studio-chat-preview">
+尚未扫描。请打开已登录客户端的聊天窗口。</pre
+      >
+      <label
+        >识别到的联系人 / 群聊<select id="crWindows">
+          <option value="">先扫描窗口</option>
+        </select></label
+      >
+      <details>
+        <summary>读取预览（最近 5 条）</summary>
+        <pre id="crPreview" class="studio-chat-preview"></pre>
+      </details>
+      <div class="studio-grid">
+        <label
+          >当前账户标识<input
+            id="crAccount"
+            maxlength="60"
+            placeholder="例如：工作微信；切换账户后请重新绑定" /></label
+        ><label
+          >我在此会话的昵称<input
+            id="crSelf"
+            maxlength="50"
+            placeholder="用于排除自己发出的消息"
+        /></label>
+      </div>
+      <div class="studio-grid">
+        <label
+          >独立会话编号<input
+            id="crKey"
+            maxlength="64"
+            placeholder="例如 work-alice / family-group" /></label
+        ><label
+          >会话类型<select id="crKind">
+            <option value="person">联系人</option>
+            <option value="group">群聊</option>
+          </select></label
+        >
+      </div>
+      <p class="studio-note">
+        首次绑定用于确认身份：客户端通常不提供稳定账户 / 联系人
+        ID。不同账号、同名聊天请用不同编号；切换账户或重启客户端后重新绑定，不会按显示名合并旧记录。类型无法识别时请手动选择。
+      </p>
+      <button id="crBind" type="button">绑定此聊天</button>
+      <div id="crBindings"></div>
+      <label class="studio-check"
+        ><input
+          id="crAuto"
+          type="checkbox"
+        />新消息自动准备回复（会将该会话近期上下文发送到“语音与模型配置”中的模型）</label
+      >
+      <p class="studio-note">
+        沿用下方表达模式与 3 / 5
+        条设置。未识别发言人、自发消息和读取中断不会触发自动回复。每次开启从后续新消息开始。
+      </p>
+      <p id="crStatus" role="status" aria-live="polite">监测尚未开启。</p>
+      <div id="crReplies"></div>
+      <details>
+        <summary>按会话保存的发言记录 · 导出 / 删除</summary>
+        <div class="studio-toolbar">
+          <select id="crHistory">
+            <option value="">选择已记录会话</option></select
+          ><button id="crHistoryRefresh" type="button">刷新记录列表</button
+          ><button id="crUseContext" type="button">带入回复区</button><button id="crExport" type="button">导出完整 JSON</button
+          ><button id="crDelete" type="button">删除记录</button>
+        </div>
+        <p class="studio-note">
+          本机 Windows 账户加密保存，记录采集时间及客户端提供的原始时间。保留 90
+          天；每会话最多 10000 条、总文件约 30
+          MB，满后停止并提示。导出文件为明文。
+        </p>
+        <pre id="crHistoryText" class="studio-chat-preview"></pre>
+      </details>
+    </details>
   </section>
 </div>

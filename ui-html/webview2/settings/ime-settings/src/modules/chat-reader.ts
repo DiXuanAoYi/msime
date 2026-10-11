@@ -31,7 +31,7 @@ export function chatContext(rows: Session["messages"], limit = 46000): string {
   }
   return lines.join("\n\n");
 }
-export function setupChatReader(): void {
+export function setupChatReader(useContext?: (data: {title: string; platform: string; kind: "person" | "group"; context: string; incoming: string}) => void): void {
   const root = document.getElementById("chatReader");
   if (!root || root.dataset.initialized) return;
   root.dataset.initialized = "true";
@@ -181,6 +181,8 @@ export function setupChatReader(): void {
           origin: "chat",
           requestId: generation,
           mode: value("rsMode"),
+          task: "reply",
+          length: (value("rsLength") || "medium") as "short" | "medium" | "long",
           count: Number(value("rsCount")) as 3 | 5,
           incoming,
           context,
@@ -207,6 +209,21 @@ export function setupChatReader(): void {
   }
   el("crScan").onclick = () => {
     if (send("scan")) status("正在只读扫描聊天窗口…");
+  };
+  el("crUseContext").onclick = () => {
+    if (!loaded || loaded.key !== value("crHistory")) {
+      status("先选择并读取一份会话记录，再带入回复区。");
+      return;
+    }
+    let last = loaded.messages.length - 1;
+    while (last >= 0 && (loaded.messages[last].self || !loaded.messages[last].text.trim())) --last;
+    if (last < 0) {
+      status("该会话没有可回复的对方文字消息。");
+      return;
+    }
+    useContext?.({ title: loaded.title, platform: platformNames[loaded.platform] || loaded.platform,
+      kind: loaded.kind === "group" ? "group" : "person", context: chatContext(loaded.messages.slice(0, last)),
+      incoming: chatContext([loaded.messages[last]], 11500) });
   };
   el("crWindows").onchange = () => {
     const w = windows.find(

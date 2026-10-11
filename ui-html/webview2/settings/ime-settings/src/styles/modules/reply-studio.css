@@ -158,7 +158,7 @@
   color: var(--text-secondary, #aaa);
   min-height: 22px;
 }
-@media (max-width: 900px) {
+@media (max-width: 620px) {
   .studio-heading {
     flex-direction: column;
   }
@@ -183,6 +183,30 @@
 .studio-monitor {
   margin-block: 1rem;
 }
+.studio-quick-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.studio-context-badge {
+  padding: 10px 14px;
+  border-left: 3px solid #938de3;
+  background: rgba(140, 130, 225, 0.09);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+#rsIncoming { min-height: 130px; }
+#rsGenerate { min-width: 160px; }
+#rsReplies:empty::before {
+  content: "生成后，这里会显示不同策略的回复。可以逐条复制，也可以选入草稿再修改。";
+  display: block;
+  padding: 20px;
+  border: 1px dashed rgba(140, 130, 225, 0.35);
+  border-radius: 10px;
+  color: var(--text-secondary, #999);
+  font-size: 13px;
+  line-height: 1.7;
+}
 .studio-monitor select {
   max-width: 100%;
 }
@@ -201,3 +225,5 @@
   flex: 0 0 auto;
   margin-top: 0.3rem;
 }
+
+.studio-actions { position: sticky; bottom: 0; z-index: 2; padding: 12px 0; background: var(--card-bg-solid, #222); border-top: 1px solid rgba(127,127,127,.2); }

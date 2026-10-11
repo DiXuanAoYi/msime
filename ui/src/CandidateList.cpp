@@ -639,6 +639,17 @@ void CandidateList::Render(DeviceResources &deviceResources)
         }
         if (translationLayout && translationBrush)
         {
+            // Layouts are cached by text: clear effects before applying this row's spans.
+            translationLayout->SetDrawingEffect(nullptr, {0, static_cast<UINT32>(item.translation.size())});
+            for (const auto &span : item.translationSpans)
+            {
+                if (span.start > item.translation.size() || span.length > item.translation.size() - span.start)
+                    continue;
+                auto color = span.color.a > 0.001f ? span.color : translationColor;
+                color.a *= std::clamp(span.opacity, 0.0f, 1.0f);
+                if (auto *brush = deviceResources.GetSolidColorBrush(color))
+                    translationLayout->SetDrawingEffect(brush, {span.start, span.length});
+            }
             target->DrawTextLayout(D2D1::Point2F(translationRect.x, translationRect.y), translationLayout.Get(),
                                    translationBrush, kColorClipTextOptions);
         }

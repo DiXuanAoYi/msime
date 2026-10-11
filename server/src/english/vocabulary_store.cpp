@@ -73,7 +73,7 @@ void Store::Prune(int days, int64_t now)
 }
 void Store::Record(const Batch &batch, int retention_days)
 {
-    static const std::set<std::string> languages{"en", "ja", "es", "fr", "de", "ru", "ko"};
+    static const std::set<std::string> languages{"en", "ja", "es", "fr", "de", "ru", "ko", "vi"};
     if (!languages.count(batch.language) || batch.timestamp_ms <= 0)
         return;
     std::map<std::string, Entry> counts;

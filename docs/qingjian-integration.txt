@@ -1,4 +1,4 @@
-水杉 Windows × 青简：Windows 预发布集成说明（0.9.6-qingjian.1）
+水杉 Windows × 青简：集成说明（更新至 0.9.10）
 
 交付状态
 已完成 Windows x64 Server/Settings、x64 与 x86 TSF 构建和本机真实输入验证，可生成包含词库、模型、辅助程序及调试符号的完整安装包。
@@ -15,7 +15,7 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
 1. 个人译词优先与按语言隔离：已移植设计。
    青简依据：crates/qingjian-translate/src/layered_translator.rs、personal_glossary.rs、glossary/mod.rs。
    水杉已有 english.db 和 custom_translations.txt 覆盖层，但后者是中英用途，非英语目标原来跳过本地查询。
-   新实现增加七种目标语种的个人表，并接入现有异步翻译线程；个人表优先，未命中时英语继续查原词库，最后才考虑在线服务。
+   新实现支持八种目标语种的个人表，并接入现有异步翻译线程；个人表优先，然后查询青简离线释义与原词库，最后才考虑在线服务。
 
 2. 输入优先、释义不阻塞：保留并补强水杉既有机制。
    青简依据：crates/qingjian-core/src/engine/commit/mod.rs 的 annotate 与 query 分离，engine/translator.rs。
@@ -32,7 +32,7 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
 4. 两条简短释义、可直接输入译词：适配导入，复用水杉原功能。
    青简依据：crates/qingjian-core/src/candidate/translation.rs、part_of_speech.rs、engine/commit/mod.rs。
    青简个人 TSV 可导入；取前两条释义，移除词性和竖线后的读音。水杉已有 Ctrl+Enter 译词选择，上屏仍沿用它。
-   不导入青简 .qj 二进制库、词汇等级表、输入日志、学习统计或云释义缓存；没有搬入其品牌素材或附带大型词库。
+   0.9.10 原样收录青简五份 GPL-3.0-or-later TSV，保留许可证、来源版本、原说明与 SHA256：中译英 232213、中译日 248128、中译西 193292、中译越 91655、英译中 44924 条。构建为独立的只读 qingjian-glossary.db，不修改产品锁内原 english.db。候选行保留词性、读音与两条释义，多余显示 +N；Ctrl+Enter 选择上屏时移除词性和读音。未导入 .qj、私人输入日志或旧学习历史。
 
 5. 生词熟悉度、按上屏时的候选页计数：已移植设计。
    青简依据：crates/qingjian-core/src/engine/vocabulary/mod.rs、crates/qingjian-learning/src/vocabulary_book.rs。
@@ -40,7 +40,7 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
    Server 保存实际渲染页的快照，TSF 成功插入文本后通过协商的可选能力确认；请求、客户及焦点代次必须匹配，确认只消费一次，10 秒过期。
    逐键刷新、取消、失败提交、过期或重复确认不计数。旧 DLL 未协商此能力时仍可输入，但不生成新学习统计。
    写库在后台有限队列执行；默认关闭，可选保留 30/90/365 天，最多保留 10 万条。设置页查看最近 500 条、导出全部 TSV、二次确认清空。
-   清空时间屏障阻止此前排队的记录重新出现；升级保留主库与 SQLite sidecar。没有导入青简旧学习历史，也没有复制 Rust 引擎。
+   清空时间屏障阻止此前排队的记录重新出现；升级保留主库与 SQLite sidecar。未达到 3 次曝光的译词显示橙色，词性与分隔符淡化；关闭生词统计则不显示生词着色。只统计实际展示的前两条释义，后台刷新熟悉词快照，逐键路径不访问数据库。没有导入青简旧学习历史，也没有复制 Rust 引擎。
 
 6. 整句模型、拼写纠错、跨平台 Rust 核心：本次没有替换。
    水杉 v0.9.5 本来就有本地神经重排、octagram、全拼纠错和双拼辅码。未做统一语料和逐键延迟基准前，不能认定青简模型更优。
@@ -48,7 +48,7 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
 
 三、已实现的使用流程
 进入设置 → 输入 → 候选词翻译。
-个人译词表支持英语 en、日语 ja、西班牙语 es、法语 fr、德语 de、俄语 ru、韩语 ko。
+个人译词表支持英语 en、日语 ja、西班牙语 es、法语 fr、德语 de、俄语 ru、韩语 ko、越南语 vi。
 每行以 Tab 分隔：语言代码、中文词、译词，可附第二条译词。例如随包 personal-translations.example.tsv。
 可以直接编辑，或导入 TSV / 青简个人 TSV，再点击“保存词表”。导入只进入草稿，不自动覆盖已保存配置；同语言同词最后一行生效。
 导入青简单语 TSV 前先选择目标语种；其词性和读音不保留。混合语言水杉 TSV 本身带语言列。
@@ -56,9 +56,9 @@ https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3
 总表上限 64 KiB，每个字段上限 1024 UTF-8 字节。格式错误会报告行号并阻止保存；服务器再独立校验一次。
 个人表存入 general.personal_translation_glossary，沿用现有 config.toml 原子替换与升级模板合并。适用于个人小词表，不承诺大词库性能。
 在线补全由 general.candidate_translation_cloud 控制，默认 false。旧配置没有此项时也按 false；希望继续使用在线翻译的用户需要在设置中明确开启。
-英语之外的语言没有自带完整离线译库：只会显示个人表中已有的译词；开启在线补全且服务配置有效时才尝试补全未命中词。
+英语、日语、西班牙语、越南语已有青简离线译词库；法语、德语、俄语、韩语仍使用个人词表或可选在线补全。青简上游说明这些词表为机器生成，保留其质量说明；覆盖条数不等于所有释义都准确。
 
-四、实际验证（2026-10-10）
+四、0.9.6 历史验证（2026-10-10；0.9.10 验证见随包 windows-v0910-validation.txt）
 1. 完整 Server Release 构建通过；CTest 3/3 通过，其中主套件 601 项、WebView 60 个共享契约夹具全部通过。
 2. x64、x86 TSF Release 构建通过，各 9/9 CTest 通过；真实命名管道探针两个架构均通过新旧客户端、版本拒绝、重连、可选能力协商。
 3. 设置页 18 个测试文件、114 项测试通过，TypeScript 与 Vite 生产构建通过；SQLite/工作线程专用集成套件 10 项通过。套件存在重叠，不将总数相加。

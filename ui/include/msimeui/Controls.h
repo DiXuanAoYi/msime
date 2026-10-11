@@ -499,12 +499,19 @@ class ListView : public Visual
 class CandidateList : public Visual
 {
   public:
+    struct TextSpan
+    {
+        uint32_t start = 0, length = 0;
+        float opacity = 1.0f;
+        D2D1_COLOR_F color = {}; // alpha zero inherits the surrounding text color
+    };
     struct Item
     {
         std::wstring label;
         std::wstring text;
         std::wstring annotation;
         std::wstring translation;
+        std::vector<TextSpan> translationSpans;
     };
 
     enum class Orientation

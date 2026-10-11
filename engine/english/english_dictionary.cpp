@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <set>
 #include <spdlog/spdlog.h>
 #include <utility>
 
@@ -31,6 +32,9 @@ EnglishDictionary::EnglishDictionary(std::string db_path, bool initialize_schema
 
 EnglishDictionary::~EnglishDictionary()
 {
+    sqlite3_finalize(bundled_statement_);
+    if (bundled_db_)
+        sqlite3_close(bundled_db_);
     close_database();
 }
 
@@ -101,6 +105,50 @@ std::string QueryGloss(sqlite3_stmt *statement, const std::string &key)
     sqlite3_reset(statement);
     return result;
 }
+
+// Keep Qingjian's curated order and add distinct senses from the existing table.
+// Never append to a user override, which remains authoritative.
+std::string MergeGlosses(const std::string &primary, const std::string &fallback)
+{
+    if (primary.empty())
+        return fallback;
+    std::string result;
+    std::set<std::string> seen;
+    for (const auto *source : {&primary, &fallback})
+    {
+        size_t start = 0;
+        while (start < source->size() && seen.size() < 6)
+        {
+            auto end = source->find(';', start);
+            auto sense = source->substr(start, end == std::string::npos ? end : end - start);
+            auto first = sense.find_first_not_of(" \t\r\n");
+            if (first != std::string::npos)
+            {
+                sense = sense.substr(first, sense.find_last_not_of(" \t\r\n") - first + 1);
+                auto key = sense;
+                for (const auto pos : {"n. ", "v. ", "adj. ", "adv. ", "prep. ", "pron. ", "conj. ", "int. ", "num. ",
+                                       "aux. ", "phr. ", "m. "})
+                    if (key.rfind(pos, 0) == 0)
+                    {
+                        key.erase(0, std::char_traits<char>::length(pos));
+                        break;
+                    }
+                std::transform(key.begin(), key.end(), key.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (seen.insert(key).second)
+                {
+                    if (!result.empty())
+                        result += "; ";
+                    result += sense;
+                }
+            }
+            if (end == std::string::npos)
+                break;
+            start = end + 1;
+        }
+    }
+    return result;
+}
 } // namespace
 
 std::string EnglishDictionary::query_chinese_gloss(const std::string &english)
@@ -108,6 +156,8 @@ std::string EnglishDictionary::query_chinese_gloss(const std::string &english)
     const auto custom = custom_en_zh_.find(english);
     if (custom != custom_en_zh_.end())
         return custom->second;
+    if (auto gloss = query_translation_gloss(english, "zh"); !gloss.empty())
+        return gloss;
     return english.empty() || !ensure_gloss_statements() ? std::string{} : QueryGloss(en_zh_statement_, english);
 }
 
@@ -116,7 +166,47 @@ std::string EnglishDictionary::query_english_gloss(const std::string &chinese)
     const auto custom = custom_zh_en_.find(chinese);
     if (custom != custom_zh_en_.end())
         return custom->second;
-    return chinese.empty() || !ensure_gloss_statements() ? std::string{} : QueryGloss(zh_en_statement_, chinese);
+    const auto bundled = query_translation_gloss(chinese, "en");
+    const auto fallback =
+        chinese.empty() || !ensure_gloss_statements() ? std::string{} : QueryGloss(zh_en_statement_, chinese);
+    return MergeGlosses(bundled, fallback);
+}
+
+std::string EnglishDictionary::query_translation_gloss(const std::string &word, const std::string &language)
+{
+    if (word.empty() ||
+        (language != "en" && language != "zh" && language != "ja" && language != "es" && language != "vi"))
+        return {};
+    if (!bundled_open_attempted_)
+    {
+        bundled_open_attempted_ = true;
+        const auto path = std::filesystem::u8path(db_path_).parent_path() / "qingjian-glossary.db";
+        const auto utf8 = path.u8string();
+        if (sqlite3_open_v2(reinterpret_cast<const char *>(utf8.c_str()), &bundled_db_, SQLITE_OPEN_READONLY,
+                            nullptr) != SQLITE_OK ||
+            sqlite3_prepare_v2(bundled_db_, "SELECT gloss FROM glosses WHERE word=?1 AND language=?2", -1,
+                               &bundled_statement_, nullptr) != SQLITE_OK)
+        {
+            sqlite3_finalize(bundled_statement_);
+            bundled_statement_ = nullptr;
+            sqlite3_close(bundled_db_);
+            bundled_db_ = nullptr;
+        }
+    }
+    if (!bundled_statement_)
+        return {};
+    sqlite3_reset(bundled_statement_);
+    sqlite3_clear_bindings(bundled_statement_);
+    sqlite3_bind_text(bundled_statement_, 1, word.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(bundled_statement_, 2, language.c_str(), -1, SQLITE_TRANSIENT);
+    std::string result;
+    if (sqlite3_step(bundled_statement_) == SQLITE_ROW)
+    {
+        if (const auto *text = sqlite3_column_text(bundled_statement_, 0))
+            result = reinterpret_cast<const char *>(text);
+    }
+    sqlite3_reset(bundled_statement_);
+    return result;
 }
 
 bool EnglishDictionary::upsert_gloss(const std::string &db_path, bool chinese_to_english, const std::string &key,

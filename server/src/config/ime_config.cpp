@@ -504,6 +504,8 @@ bool LoadImeConfig()
         g_floating_toolbar_items.character_set = tbl["general"]["floating_toolbar_character_set"].value_or(true);
         g_floating_toolbar_items.emoji = tbl["general"]["floating_toolbar_emoji"].value_or(true);
         g_floating_toolbar_items.screen_keyboard = tbl["general"]["floating_toolbar_screen_keyboard"].value_or(false);
+        g_floating_toolbar_items.voice = tbl["general"]["floating_toolbar_voice"].value_or(true);
+        g_floating_toolbar_items.reply = tbl["general"]["floating_toolbar_reply"].value_or(true);
         g_floating_toolbar_items.settings = tbl["general"]["floating_toolbar_settings"].value_or(true);
         {
             const double scale = tbl["general"]["floating_toolbar_scale"].value_or(1.0);
@@ -858,7 +860,7 @@ bool LoadImeConfig()
         if (g_tencent_tmt.target_language != "en" && g_tencent_tmt.target_language != "fr" &&
             g_tencent_tmt.target_language != "ja" && g_tencent_tmt.target_language != "es" &&
             g_tencent_tmt.target_language != "ru" && g_tencent_tmt.target_language != "de" &&
-            g_tencent_tmt.target_language != "ko")
+            g_tencent_tmt.target_language != "ko" && g_tencent_tmt.target_language != "vi")
             g_tencent_tmt.target_language = "en";
         g_custom_translation.enabled = tbl["custom_translation"]["enabled"].value_or(false);
         g_custom_translation.endpoint = tbl["custom_translation"]["endpoint"].value_or(std::string());

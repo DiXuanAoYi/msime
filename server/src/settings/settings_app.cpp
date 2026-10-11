@@ -60,6 +60,7 @@ constexpr wchar_t kWindowTitle[] = L"Metasequoia IME Settings";
 constexpr wchar_t kSingleInstanceMutex[] = L"Local\\MetasequoiaImeSettings.SingleInstance";
 constexpr UINT kActivateExistingWindow = WM_APP + 1;
 constexpr UINT kOpenAboutSection = WM_APP + 2;
+constexpr UINT kOpenReplyStudioSection = WM_APP + 6;
 constexpr UINT kScanSkinCatalog = WM_APP + 3;
 constexpr UINT kWorkerCompleted = WM_APP + 4;
 constexpr UINT kQuitSettings = WM_APP + 5;
@@ -80,6 +81,7 @@ bool g_maximize_button_hover = false;
 bool g_window_active = true;
 bool g_window_minimized = false;
 bool g_open_about_on_ready = false;
+bool g_open_reply_on_ready = false;
 bool g_webview_content_started = false;
 HWND g_settings_hwnd = nullptr;
 std::optional<CandidateSkinCatalog::ScanResult> g_candidate_skin_catalog;
@@ -206,6 +208,30 @@ void ShowAboutSection()
             if (!item) return false;
             if (!item.classList.contains('active')) item.click();
             const section = document.getElementById('about-settings');
+            if (!item.classList.contains('active') || !section || getComputedStyle(section).display === 'none')
+                return false;
+            item.scrollIntoView({ block: 'nearest' });
+            return true;
+        };
+        if (selectAbout()) return;
+        const retry = setInterval(() => {
+            if (selectAbout()) clearInterval(retry);
+        }, 50);
+        setTimeout(() => clearInterval(retry), 10000);
+    })())JS",
+                             nullptr);
+}
+
+void ShowReplyStudioSection()
+{
+    if (!g_webview)
+        return;
+    g_webview->ExecuteScript(LR"JS((() => {
+        const selectAbout = () => {
+            const item = document.querySelector('.sidebar .item[data-target="reply-studio"]');
+            if (!item) return false;
+            if (!item.classList.contains('active')) item.click();
+            const section = document.getElementById('reply-studio-settings');
             if (!item.classList.contains('active') || !section || getComputedStyle(section).display === 'none')
                 return false;
             item.scrollIntoView({ block: 'nearest' });
@@ -490,6 +516,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"floating_toolbar_character_set", toolbar.character_set},
             {"floating_toolbar_emoji", toolbar.emoji},
             {"floating_toolbar_screen_keyboard", toolbar.screen_keyboard},
+            {"floating_toolbar_voice", toolbar.voice},
+            {"floating_toolbar_reply", toolbar.reply},
             {"floating_toolbar_settings", toolbar.settings},
             {"floating_toolbar_scale", GetConfiguredFloatingToolbarScale()},
             {"floating_toolbar_font_size", GetConfiguredFloatingToolbarFontSize()},
@@ -1719,6 +1747,11 @@ HRESULT OnControllerCreated(HWND hwnd, HRESULT result, ICoreWebView2CompositionC
                 PostConfig();
                 ApplyWindowActivationAppearance();
                 SetFocus(hwnd);
+                if (g_open_reply_on_ready)
+                {
+                    ShowReplyStudioSection();
+                    g_open_reply_on_ready = false;
+                }
                 if (g_open_about_on_ready)
                 {
                     ShowAboutSection();
@@ -2037,6 +2070,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
         ActivateWindow(hwnd);
         ShowAboutSection();
         return 0;
+    case kOpenReplyStudioSection:
+        ActivateWindow(hwnd);
+        ShowReplyStudioSection();
+        return 0;
     case kScanSkinCatalog:
         PostConfig(true);
         return 0;
@@ -2251,6 +2288,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command_line, int show_command)
 {
     TraceStartup("wWinMain");
+    g_open_reply_on_ready = command_line && std::wstring(command_line).find(L"--reply-studio") != std::wstring::npos;
     g_open_about_on_ready = command_line && std::wstring(command_line).find(L"--about") != std::wstring::npos;
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -2265,7 +2303,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command_line, int show_
         HWND existing = FindWindowW(kWindowClass, nullptr);
         if (existing)
         {
-            PostMessageW(existing, g_open_about_on_ready ? kOpenAboutSection : kActivateExistingWindow, 0, 0);
+            PostMessageW(existing,
+                         g_open_reply_on_ready ? kOpenReplyStudioSection
+                                               : (g_open_about_on_ready ? kOpenAboutSection : kActivateExistingWindow),
+                         0, 0);
             SetForegroundWindow(existing);
         }
         return 0;

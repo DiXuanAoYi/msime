@@ -13,8 +13,8 @@ void Validate(const json &r)
     static const std::set<std::string> actions{"overview", "load", "save", "delete", "generate", "summarize", "cancel"};
     if (!actions.count(action))
         throw std::runtime_error("未知操作。");
-    for (const auto &field :
-         {"requestId", "sessionId", "title", "context", "summary", "incoming", "intent", "mode", "kind", "platform"})
+    for (const auto &field : {"requestId", "sessionId", "title", "context", "summary", "incoming", "intent", "mode",
+                              "kind", "platform", "task", "length", "relationship"})
     {
         if (r.contains(field) && !r[field].is_string())
             throw std::runtime_error("文本字段格式错误。");
@@ -22,12 +22,17 @@ void Validate(const json &r)
         const size_t limit = std::string(field) == "context"                                         ? 48000
                              : (std::string(field) == "incoming" || std::string(field) == "summary") ? 12000
                              : std::string(field) == "intent"                                        ? 4000
+                             : std::string(field) == "relationship"                                  ? 600
                                                                                                      : 160;
         if (value.size() > limit || value.find('\0') != std::string::npos)
             throw std::runtime_error("内容过长，请分段导入或先精简上下文。");
     }
     if (r.value("requestId", "").empty())
         throw std::runtime_error("缺少请求标识。");
+    if (r.contains("task") && r["task"] != "reply" && r["task"] != "rewrite" && r["task"] != "write")
+        throw std::runtime_error("写作任务无效。");
+    if (r.contains("length") && r["length"] != "short" && r["length"] != "medium" && r["length"] != "long")
+        throw std::runtime_error("回复长度无效。");
     if (r.contains("kind") && r["kind"] != "person" && r["kind"] != "group")
         throw std::runtime_error("会话类型无效。");
     if (action == "load" || action == "save" || action == "delete")
@@ -63,15 +68,25 @@ json BuildPayload(const json &r, const std::string &model)
     else
     {
         system += std::string(FindMode(r.at("mode").get<std::string>())->prompt);
-        system += "若 intent 指定改写就改写 incoming；否则依据对方 incoming 和用户 intent 给出可直接使用的回复。输出 "
-                  "count 条含义和表达有区别的备选，不重复，不附带分析或发言者前缀。每条不超过 500 字。只输出 JSON "
-                  "{\"replies\":[{\"label\":\"简短风格名\",\"text\":\"正文\"}]}。";
+        const auto task = r.value("task", r.value("mode", "") == "polish" ? "rewrite" : "reply");
+        if (task == "rewrite")
+            system += "本次任务是改写：incoming 是用户自己说的话，只重写原文，不能把它当作对方消息来回答。";
+        else if (task == "write")
+            system += "本次任务是文案：incoming 是事实素材，结合 intent 写成可直接使用的文案。";
+        else
+            system += "本次任务是回复：incoming 是对方的话，结合 relationship、intent 和上下文，以用户身份回应。";
+        const auto length = r.value("length", "medium");
+        system += length == "short"  ? "每条 1–2 句，优先 50 字以内。"
+                  : length == "long" ? "每条 100–250 字，完整说明。"
+                                     : "每条 2–4 句，优先 100 字以内。";
+        system +=
+            "像真实聊天，避免套话、说教、心理诊断和连续反问。候选要有不同沟通策略，不仅替换同义词；标签说明策略。输出 "
+            "count 条含义和表达有区别的备选，不重复，不附带分析或发言者前缀。每条不超过 500 字。只输出 JSON "
+            "{\"replies\":[{\"label\":\"简短风格名\",\"text\":\"正文\"}]}。";
     }
-    json input = {{"context", r.value("context", "")},
-                  {"summary", r.value("summary", "")},
-                  {"incoming", r.value("incoming", "")},
-                  {"intent", r.value("intent", "")},
-                  {"count", r.value("count", 3)}};
+    json input = {{"context", r.value("context", "")},           {"summary", r.value("summary", "")},
+                  {"incoming", r.value("incoming", "")},         {"intent", r.value("intent", "")},
+                  {"relationship", r.value("relationship", "")}, {"count", r.value("count", 3)}};
     return {{"model", model},
             {"stream", false},
             {"temperature", summary ? 0.2 : 0.75},

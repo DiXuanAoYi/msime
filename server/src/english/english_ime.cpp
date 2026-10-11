@@ -97,6 +97,9 @@ void WorkerLoop(uint64_t observed_generation, uint64_t observed_translation_gene
                 std::string gloss;
                 if (personal_glossary && query.direction == EnglishIme::TranslationDirection::ChineseToEnglish)
                     gloss = personal_glossary->Lookup(translation_language, query.key);
+                if (gloss.empty() && translation_language != "en" &&
+                    query.direction == EnglishIme::TranslationDirection::ChineseToEnglish)
+                    gloss = dictionary.query_translation_gloss(query.key, translation_language);
                 // English candidates still get Chinese glosses while learning Japanese, etc.
                 if (gloss.empty() && (translation_language == "en" ||
                                       query.direction == EnglishIme::TranslationDirection::EnglishToChinese))

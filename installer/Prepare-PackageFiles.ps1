@@ -177,6 +177,10 @@ else {
     Copy-Item -LiteralPath $japaneseModel -Destination (Join-Path $targetAppData 'dict_japanese.dat') -Force
     Copy-Item -LiteralPath $japaneseModelLicense -Destination (Join-Path $targetAppData 'MOZC_DICTIONARY_LICENSE.txt') -Force
     Copy-Item -LiteralPath $englishDb -Destination (Join-Path $targetAppData 'english.db') -Force
+    # Pinned source tables remain separate from the immutable base dictionary release.
+    & python (Join-Path $RepoRoot 'scripts/build_bundled_glossary.py') --output (Join-Path $targetAppData 'qingjian-glossary.db')
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to build the pinned Qingjian glossary.' }
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'assets/qingjian-glossary') -Destination (Join-Path $targetAppData 'qingjian-glossary-sources') -Recurse -Force
     Copy-Item -LiteralPath $othersDb -Destination (Join-Path $targetAppData 'others.db') -Force
     # sc.lm 落在资源目录根下，与 msime.db 同级：engine/contracts/assets 的清单就是这么
     # 声明这个资源的路径的，引擎按该清单里的文件名去找。

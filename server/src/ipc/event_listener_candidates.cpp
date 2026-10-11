@@ -20,6 +20,7 @@
 #include "engine/user_dictionary/user_dictionary_journal.h"
 #include "cloud/cloud_translation.h"
 #include "english/english_ime.h"
+#include "english/vocabulary_service.h"
 #include "config/ime_config.h"
 #include "settings/collocation_model.h"
 #include "engine/local_modes/quick_phrase_query.h"
@@ -326,6 +327,11 @@ std::string BuildCurrentCandidatePage()
             if (gloss != g_candidate_translation_glosses.end())
                 view.translation = gloss->second;
         }
+        if (!view.translation.empty())
+            DecorateCandidateTranslation(view, [&](const std::string &word) {
+                return translation_query.direction == EnglishIme::TranslationDirection::EnglishToChinese ||
+                       Vocabulary::IsFamiliar(GetConfiguredTencentTmt().target_language, word);
+            });
         const std::string visible = view.text + view.annotation + view.badge;
         const int display_length = static_cast<int>(utf8::distance(visible.begin(), visible.end()));
         candidate_string += CandidateViewHtml(view);

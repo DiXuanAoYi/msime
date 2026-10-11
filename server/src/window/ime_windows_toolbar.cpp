@@ -28,7 +28,8 @@ int ConfiguredFloatingToolbarWidth()
     const FloatingToolbarItemsConfig &items = GetConfiguredFloatingToolbarItems();
     const int optional_item_count = static_cast<int>(items.fullwidth) + static_cast<int>(items.punctuation) +
                                     static_cast<int>(items.character_set) + static_cast<int>(items.emoji) +
-                                    static_cast<int>(items.screen_keyboard) + static_cast<int>(items.settings);
+                                    static_cast<int>(items.screen_keyboard) + static_cast<int>(items.settings) +
+                                    static_cast<int>(items.voice) + static_cast<int>(items.reply);
     // 59 DIPs covers the drag handle, divider, borders, mandatory CN/EN button and
     // container padding. Each optional button adds 24 DIPs plus the 6-DIP gap.
     // User scale/font_size multiply the design size independently of system DPI.
@@ -48,7 +49,8 @@ bool FloatingToolbarItemsEqual(const FloatingToolbarItemsConfig &left, const Flo
 {
     return left.fullwidth == right.fullwidth && left.punctuation == right.punctuation &&
            left.character_set == right.character_set && left.emoji == right.emoji &&
-           left.screen_keyboard == right.screen_keyboard && left.settings == right.settings;
+           left.screen_keyboard == right.screen_keyboard && left.settings == right.settings &&
+           left.voice == right.voice && left.reply == right.reply;
 }
 } // namespace ime_windows_detail
 

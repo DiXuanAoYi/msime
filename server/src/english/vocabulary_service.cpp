@@ -5,6 +5,9 @@
 #include <deque>
 #include <mutex>
 #include <thread>
+#include <atomic>
+#include <set>
+#include <sqlite3.h>
 
 namespace Vocabulary
 {
@@ -13,6 +16,37 @@ namespace
 std::filesystem::path DatabasePath()
 {
     return std::filesystem::path(CommonUtils::get_ime_data_path_w()) / L"vocabulary.db";
+}
+using FamiliarSet = std::set<std::pair<std::string, std::string>>;
+std::shared_ptr<const FamiliarSet> familiar_snapshot = std::make_shared<FamiliarSet>();
+void RefreshFamiliar()
+{
+    auto next = std::make_shared<FamiliarSet>();
+    sqlite3 *db = nullptr;
+    const auto path = DatabasePath().u8string();
+    if (sqlite3_open_v2(path.c_str(), &db, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK)
+    {
+        sqlite3_stmt *s = nullptr;
+        if (sqlite3_prepare_v2(db, "SELECT language,word FROM vocabulary WHERE seen>=3 AND last_ms>=?", -1, &s,
+                               nullptr) == SQLITE_OK)
+        {
+            sqlite3_bind_int64(s, 1, NowMs() - int64_t(GetConfiguredVocabularyRetentionDays()) * 86400000);
+            int rc;
+            while ((rc = sqlite3_step(s)) == SQLITE_ROW)
+                next->emplace(reinterpret_cast<const char *>(sqlite3_column_text(s, 0)),
+                              reinterpret_cast<const char *>(sqlite3_column_text(s, 1)));
+            if (rc != SQLITE_DONE)
+            {
+                sqlite3_finalize(s);
+                sqlite3_close(db);
+                return;
+            }
+        }
+        sqlite3_finalize(s);
+    }
+    sqlite3_close(db);
+    std::shared_ptr<const FamiliarSet> snapshot = next;
+    std::atomic_store(&familiar_snapshot, std::move(snapshot));
 }
 class Writer
 {
@@ -40,14 +74,21 @@ class Writer
   private:
     void Run()
     {
+        RefreshFamiliar();
         for (;;)
         {
             Batch batch;
             {
                 std::unique_lock lock(mutex_);
-                cv_.wait(lock, [this] { return stopping_ || !queue_.empty(); });
+                cv_.wait_for(lock, std::chrono::seconds(10), [this] { return stopping_ || !queue_.empty(); });
                 if (queue_.empty())
-                    return;
+                {
+                    if (stopping_)
+                        return;
+                    lock.unlock();
+                    RefreshFamiliar();
+                    continue;
+                }
                 batch = std::move(queue_.front());
                 queue_.pop_front();
             }
@@ -56,6 +97,7 @@ class Writer
             try
             {
                 Store::Open(DatabasePath())->Record(batch, GetConfiguredVocabularyRetentionDays());
+                RefreshFamiliar();
             }
             catch (...)
             { /* A locked or full disk must not interrupt typing. The settings page reports read errors. */
@@ -68,13 +110,24 @@ class Writer
     bool stopping_ = false;
     std::thread thread_;
 };
+Writer &BackgroundWriter()
+{
+    static Writer writer;
+    return writer;
+}
 } // namespace
+bool IsFamiliar(const std::string &language, const std::string &word)
+{
+    if (!GetConfiguredVocabularyEnabled())
+        return true;
+    (void)BackgroundWriter();
+    return std::atomic_load(&familiar_snapshot)->count({language, word}) != 0;
+}
 void Enqueue(Batch batch)
 {
     if (!GetConfiguredVocabularyEnabled())
         return;
-    static Writer writer;
-    writer.Push(std::move(batch));
+    BackgroundWriter().Push(std::move(batch));
 }
 boost::json::object HandleRequest(const boost::json::object &data)
 {
