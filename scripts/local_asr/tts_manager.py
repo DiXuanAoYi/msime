@@ -1,6 +1,7 @@
 """Explicitly invoked local TTS. Reuses the pinned, resumable ASR downloader."""
 from __future__ import annotations
 import argparse
+from collections import OrderedDict
 import contextlib
 import http.server
 import io
@@ -43,6 +44,30 @@ def pcm_wav(samples, sample_rate):
         wav.writeframes((np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes())
     return result.getvalue()
 
+def cache_synthesis(synthesize, max_bytes=16 * 1024 * 1024, max_entries=128):
+    """Bounded process-local LRU; never persist spoken text or audio to disk.
+
+    The HTTP server handles one request at a time. A new loader/service creates
+    a new cache, so changing the model cannot reuse another model's audio.
+    """
+    cache = OrderedDict()
+    used_bytes = 0
+    def cached(text, voice, language, speed):
+        nonlocal used_bytes
+        key = (text, voice, language, speed)
+        if key in cache:
+            cache.move_to_end(key)
+            return cache[key]
+        audio = synthesize(text, voice, language, speed)
+        if max_entries > 0 and len(audio) <= max_bytes:
+            while cache and (used_bytes + len(audio) > max_bytes or len(cache) >= max_entries):
+                _, previous = cache.popitem(last=False)
+                used_bytes -= len(previous)
+            cache[key] = audio
+            used_bytes += len(audio)
+        return audio
+    return cached
+
 def load_kokoro(root, model_id):
     import sherpa_onnx
     directory = root / model_id / "active"
@@ -81,7 +106,7 @@ def serve(root, model_id, loader=load_kokoro, externally_locked=False):
         (root / "service-token.txt").write_text(token, encoding="ascii")
         support.atomic_json(state, dict(state="loading", model=model_id, message="正在加载发音模型", pid=os.getpid()))
         try:
-            synthesize = loader(root, model_id)
+            synthesize = cache_synthesis(loader(root, model_id))
             class Handler(http.server.BaseHTTPRequestHandler):
                 timeout = 15
                 def log_message(self, *args):

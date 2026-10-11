@@ -1,14 +1,14 @@
 [
   {
     "id": "kokoro",
-    "name": "Kokoro · 82M（CPU 推荐）",
+    "name": "Kokoro · 82M（中英 CPU）",
     "official": "https://huggingface.co/hexgrad/Kokoro-82M",
     "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
     "engine": "kokoro",
     "directory": "kokoro-int8-multi-lang-v1_1",
     "format": "sherpa-onnx INT8 中英运行包",
     "features": "轻量多语言模型；此运行包内置中文和英文发音。量化包体积小，CPU 即可运行。",
-    "hardware": "不需要独显；运行包约 147 MB，首次下载后可完全离线使用。",
+    "hardware": "不需要独显；运行包约 147 MB。新词 CPU 合成可能等待数秒；重复发音有内存缓存。追求即时响应建议 Windows 本机语音。",
     "downloadBytes": 147031220,
     "diskBytes": 600000000,
     "files": [
