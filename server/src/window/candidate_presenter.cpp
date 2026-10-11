@@ -967,6 +967,7 @@ std::uint64_t CandidatePresenter::FillItemsFromUi()
         item.label = std::to_wstring(i + 1);
         item.text = string_to_wstring(view.text + view.badge);
         item.annotation = string_to_wstring(view.annotation);
+        item.overline = string_to_wstring(view.reading);
         if (translationsEnabled)
         {
             item.translation = string_to_wstring(view.translation);

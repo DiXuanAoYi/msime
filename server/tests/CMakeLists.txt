@@ -13,6 +13,7 @@ target_compile_features(test_voice_control_dispatch PRIVATE cxx_std_17)
 add_test(NAME voice_control_dispatch COMMAND test_voice_control_dispatch)
 
 set(TEST_SOURCE_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vision.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_date_time_query.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_v_mode_query.cpp"
@@ -122,6 +123,14 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_speech.cpp"
     "${CMAKE_SOURCE_DIR}/src/english/speech_service.cpp"
     "${CMAKE_SOURCE_DIR}/src/english/voice_studio.cpp"
+    "${CMAKE_SOURCE_DIR}/src/english/candidate_reading.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/personal_library.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_config.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_capture.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_protocol.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_subtitles.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/local_ocr_models.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/local_tts_models.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_appearance.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_fonts.cpp"

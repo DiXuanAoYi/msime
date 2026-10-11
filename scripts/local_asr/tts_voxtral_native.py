@@ -13,7 +13,7 @@ class ModelConfig(C.Structure):
 
 
 class VoxtralNative:
-    def __init__(self, dll, model_path, threads=4):
+    def __init__(self, dll, model_path, threads=4, prefer_gpu=True):
         self.lib = C.CDLL(str(dll))
         self.registry = C.c_void_p()
         self.model = C.c_void_p()
@@ -47,8 +47,16 @@ class VoxtralNative:
             self.check(self.registry_create(None, C.byref(self.registry)))
             config = ModelConfig(b'voxtral_tts', None, None, None)
             self.check(self.model_load(self.registry, str(model_path).encode('utf-8'), C.byref(config), None, C.byref(self.model)))
-            backend = Backend(b'cpu', 0, threads)
-            self.check(self.session_create(self.model, b'tts', b'streaming', C.byref(backend), None, C.byref(self.session)))
+            self.device='cpu'
+            if prefer_gpu:
+                choose=self.lib.msime_voxtral_preferred_vulkan_device;choose.restype=C.c_int;choose.argtypes=[]
+                device=choose()
+                backend=Backend(b'vulkan',device,threads)
+                if device>=0 and self.session_create(self.model,b'tts',b'streaming',C.byref(backend),None,C.byref(self.session))==0:
+                    self.device='vulkan'
+            if not self.session:
+                backend = Backend(b'cpu', 0, threads)
+                self.check(self.session_create(self.model, b'tts', b'streaming', C.byref(backend), None, C.byref(self.session)))
         except Exception:
             self.close()
             raise

@@ -400,6 +400,17 @@ CandidateList::ItemGeometry CandidateList::MeasureItem(size_t index, float width
                                 inlineTranslation ? 0.0f : height - padBelow, translationW, translationH};
         height = std::max(height, geometry.translation.y + translationH + (inlineTranslation ? 0.0f : padBelow));
     }
+    if (!item.overline.empty())
+    {
+        const float fontSize = appearance_.fontSize * 0.55f;
+        const float above = MeasureTextHeight(item.overline, fontSize, contentWidth) + 2.0f;
+        geometry.overline = {textX, 0.0f, contentWidth, above};
+        geometry.label.y += above;
+        geometry.text.y += above;
+        geometry.annotation.y += above;
+        geometry.translation.y += above;
+        height += above;
+    }
     geometry.bounds = {0.0f, 0.0f, width, height};
     return geometry;
 }
@@ -467,7 +478,8 @@ SizeF CandidateList::Measure(const SizeF &availableSize)
                 : textWidth + (item.translation.empty() ? 0.0f : appearance_.fontSize * 0.65f + translationWidth);
         float width = appearance_.contentPadLeft + appearance_.textPadLeft +
                       std::max(EstimateTextWidth(item.label, appearance_.labelFontSize), 9.0f) + appearance_.labelGap +
-                      contentWidth + appearance_.contentPadRight;
+                      std::max(contentWidth, EstimateTextWidth(item.overline, appearance_.fontSize * 0.55f)) +
+                      appearance_.contentPadRight;
         if (horizontal)
             width = std::max(width, appearance_.minItemWidth);
         widths.push_back(std::min(width, availableWidth));
@@ -611,6 +623,13 @@ void CandidateList::Render(DeviceResources &deviceResources)
             highlighted && appearance_.rowTextSelected.a > 0.001f ? appearance_.rowTextSelected : appearance_.textColor;
         ID2D1SolidColorBrush *labelBrush = deviceResources.GetSolidColorBrush(labelColor);
         ID2D1SolidColorBrush *textBrush = deviceResources.GetSolidColorBrush(textColor);
+        if (!item.overline.empty() && textBrush)
+        {
+            const auto box = absolute(geometry.overline);
+            const auto layout = TextLayoutFor(factory, fontFamily, item.overline, appearance_.fontSize * 0.55f, box);
+            if (layout)
+                target->DrawTextLayout(D2D1::Point2F(box.x, box.y), layout.Get(), textBrush, kColorClipTextOptions);
+        }
         // 辅助码与翻译在 CSS 里都是 .text 的子节点（.cand-content / .cand-translation），
         // 颜色继承自 .text，选中行的 `.first .text { color: ... }` 会一并覆盖它们。
         // D2D 端分开绘制，所以这里显式跟随选中行文字色，translation 再乘 CSS 的 opacity .62。

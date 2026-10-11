@@ -1175,6 +1175,189 @@
         ],
         "additionalProperties": false
       }
+    },
+    "personalLibraryRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 16384
+          },
+          "group": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "application": {
+            "type": "string",
+            "maxLength": 260
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "artifactId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "section": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "putGroup",
+              "removeGroup",
+              "putClip",
+              "putRule",
+              "favorite",
+              "remove",
+              "copy",
+              "review",
+              "playFavorite",
+              "copyFavorite",
+              "study"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "grade": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "openPersonalLibrary": {
+      "surfaces": [
+        "toolbar"
+      ]
+    },
+    "localOcrRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "download",
+              "cancel",
+              "start",
+              "stop"
+            ]
+          },
+          "modelId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "visionRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "stop",
+              "finish",
+              "saveImage",
+              "import",
+              "recognize",
+              "translate",
+              "capture",
+              "longCapture",
+              "screen",
+              "subtitles"
+            ]
+          },
+          "image": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "horizontal": {
+            "type": "boolean"
+          },
+          "vertical": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "imageRevision": {
+            "type": "number"
+          },
+          "playback": {
+            "type": "boolean"
+          },
+          "translate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "server": {
@@ -2171,6 +2354,140 @@
         "ok",
         "message",
         "state"
+      ],
+      "additionalProperties": true
+    },
+    "personalLibraryResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "book": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "application": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message"
+      ],
+      "additionalProperties": true
+    },
+    "localOcrResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": true
+          }
+        },
+        "service": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "models",
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "visionResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "translation": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "frames": {
+          "type": "number"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "busy": {
+          "type": "boolean"
+        },
+        "raw": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "imageRevision": {
+          "type": "number"
+        },
+        "srt": {
+          "type": "string"
+        },
+        "subtitles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message"
       ],
       "additionalProperties": true
     }

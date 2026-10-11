@@ -14,6 +14,7 @@ constexpr wchar_t kHandwritingPanelWindowClass[] = L"msimeui.HandwritingDemo";
 constexpr UINT kActivateSettings = WM_APP + 1;
 constexpr UINT kOpenSettingsAbout = WM_APP + 2;
 constexpr UINT kOpenReplyStudio = WM_APP + 6;
+constexpr UINT kOpenPersonalLibrary = WM_APP + 7;
 constexpr UINT kQuitSettings = WM_APP + 5;
 
 bool OpenSiblingApplication(const wchar_t *executable_name, const wchar_t *window_class)
@@ -98,6 +99,24 @@ bool OpenReplyStudioApplication()
     const std::filesystem::path application_path =
         std::filesystem::path(module_path).parent_path() / L"MetasequoiaImeSettings.exe";
     const HINSTANCE result = ShellExecuteW(nullptr, L"open", application_path.c_str(), L"--reply-studio",
+                                           application_path.parent_path().c_str(), SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(result) > 32;
+}
+
+bool OpenPersonalLibraryApplication()
+{
+    if (const HWND existing_window = FindWindowW(kSettingsWindowClass, nullptr))
+        return ActivateSettingsWindow(existing_window, kOpenPersonalLibrary);
+
+    std::wstring module_path(32768, L'\0');
+    const DWORD length = GetModuleFileNameW(nullptr, module_path.data(), static_cast<DWORD>(module_path.size()));
+    if (length == 0 || length >= module_path.size())
+        return false;
+    module_path.resize(length);
+
+    const std::filesystem::path application_path =
+        std::filesystem::path(module_path).parent_path() / L"MetasequoiaImeSettings.exe";
+    const HINSTANCE result = ShellExecuteW(nullptr, L"open", application_path.c_str(), L"--personal-library",
                                            application_path.parent_path().c_str(), SW_SHOWNORMAL);
     return reinterpret_cast<INT_PTR>(result) > 32;
 }

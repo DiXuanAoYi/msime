@@ -1,3 +1,4 @@
+import { setupPromptLibrary, applyPromptLibrary } from './prompt-library';
 import { setupSpeech } from './speech';
 import { setupLocalAsr } from './local-asr';
 import { serializeHostMessage } from '../../../../shared/messages';
@@ -126,9 +127,6 @@ let currentDoubaoAuthMode = 'api_key';
 let currentAsrResourceId = 'volc.seedasr.sauc.duration';
 let currentPolishProvider = 'siliconflow';
 let polishPresets: PolishPreset[] = FALLBACK_PRESETS.slice();
-let selectedPromptId = 'cleanup';
-let customPrompts: Record<string, string> = { custom_1: '', custom_2: '', custom_3: '' };
-let applyingConfig = false;
 
 function knownValues(table: Record<string, ProviderDefaults>, field: keyof ProviderDefaults): string[] {
   return Object.values(table).map((item) => item[field]).filter(Boolean);
@@ -302,47 +300,6 @@ function builtinPrompt(id: string): string {
   return polishPresets.find((preset) => preset.id === id)?.prompt ?? '';
 }
 
-function isCustomPrompt(id: string): boolean {
-  return id === 'custom_1' || id === 'custom_2' || id === 'custom_3';
-}
-
-function customPromptPath(id: string): string {
-  return `voice_input.polish_prompt_${id}`;
-}
-
-function promptTextarea(): HTMLTextAreaElement | null {
-  return document.getElementById('voicePolishPrompt') as HTMLTextAreaElement | null;
-}
-
-function fillPromptTextarea(id: string, storedPrompt?: string): void {
-  const textarea = promptTextarea();
-  if (!textarea) return;
-  textarea.value = isCustomPrompt(id) ? (customPrompts[id] ?? '') : (storedPrompt || builtinPrompt(id));
-}
-
-function onPromptPresetSelected(id: string): void {
-  const textarea = promptTextarea();
-  if (isCustomPrompt(selectedPromptId) && textarea) {
-    customPrompts[selectedPromptId] = textarea.value;
-    updateConfig(customPromptPath(selectedPromptId), textarea.value);
-  }
-  selectedPromptId = id;
-  fillPromptTextarea(id);
-  if (!isCustomPrompt(id)) updateConfig('voice_input.polish_prompt', '');
-}
-
-function savePromptText(): void {
-  if (applyingConfig) return;
-  const textarea = promptTextarea();
-  const value = textarea?.value ?? '';
-  if (isCustomPrompt(selectedPromptId)) {
-    customPrompts[selectedPromptId] = value;
-    updateConfig(customPromptPath(selectedPromptId), value);
-  } else {
-    updateConfig('voice_input.polish_prompt', value);
-  }
-}
-
 function isToggleActive(id: string): boolean {
   return document.getElementById(id)?.classList.contains('active') ?? false;
 }
@@ -361,6 +318,7 @@ function listenMenuSelection(menuId: string, onSelect: (value: string) => void):
 
 export function setupVoiceInput(): void {
   setupSpeech();
+  setupPromptLibrary('polish','voicePromptLibrary','voicePolishPrompt');
   setupLocalAsr();
   setupToggleButton('voiceEnabled', value => updateConfig('voice_input.voice_input', value));
   setupToggleButton('voicePolishText', value => updateConfig('voice_input.polish_text', value));
@@ -417,25 +375,11 @@ export function setupVoiceInput(): void {
   // The endpoint is written by switchDoubaoEndpoint so the free-text field stays in sync.
   setupDropdownMenu('voiceDoubaoEndpointBtn', 'voiceDoubaoEndpointMenu', 'changeVoiceDoubaoEndpoint', true);
   setupDropdownMenu('voicePolishProviderBtn', 'voicePolishProviderMenu', 'changeVoicePolishProvider', true);
-  setupDropdownMenu('voicePolishPromptBtn', 'voicePolishPromptMenu', 'changeVoicePolishPrompt', true,
-    'voice_input.polish_prompt_id');
   listenMenuSelection('voiceAsrProviderMenu', switchAsrProvider);
   listenMenuSelection('voiceDoubaoAuthModeMenu', switchDoubaoAuthMode);
   listenMenuSelection('voiceDoubaoEndpointMenu', switchDoubaoEndpoint);
   document.getElementById('voiceAsrEndpoint')?.addEventListener('change', syncDoubaoEndpointUi);
   listenMenuSelection('voicePolishProviderMenu', switchPolishProvider);
-  listenMenuSelection('voicePolishPromptMenu', onPromptPresetSelected);
-  document.getElementById('voicePolishPromptReset')?.addEventListener('click', () => {
-    const id = isCustomPrompt(selectedPromptId) ? 'cleanup' : selectedPromptId;
-    if (isCustomPrompt(selectedPromptId)) {
-      selectedPromptId = 'cleanup';
-      applyDropdownValue('voicePolishPromptBtn', 'voicePolishPromptMenu', 'cleanup');
-      updateConfig('voice_input.polish_prompt_id', 'cleanup');
-    }
-    fillPromptTextarea(id);
-    updateConfig('voice_input.polish_prompt', '');
-  });
-  promptTextarea()?.addEventListener('change', savePromptText);
   Object.entries(fields).forEach(([id, path]) => {
     const element = document.getElementById(id) as HTMLInputElement | null;
     element?.addEventListener('change', () => {
@@ -473,7 +417,6 @@ function setupTokenVisibilityToggle(inputId: string, toggleId: string, tokenLabe
 }
 
 export function applyVoiceConfig(config: Record<string, unknown>): void {
-  applyingConfig = true;
   const hotkeyCheckboxes: Record<string, string> = {
     voiceHotkeyRAltCheckbox: 'hotkey_ralt',
     voiceHotkeyCtrlF9Checkbox: 'hotkey_ctrl_f9',
@@ -544,20 +487,7 @@ export function applyVoiceConfig(config: Record<string, unknown>): void {
   const polishModel = document.getElementById('voicePolishModel') as HTMLInputElement | null;
   const polishDefaults = POLISH_DEFAULTS[polishProvider];
   if (polishModel && polishDefaults?.model) polishModel.placeholder = polishDefaults.model;
-  selectedPromptId = typeof config.polish_prompt_id === 'string' ? config.polish_prompt_id : 'cleanup';
-  if (selectedPromptId === 'custom') selectedPromptId = 'custom_1';
-  customPrompts = {
-    custom_1: typeof config.polish_prompt_custom_1 === 'string'
-      ? config.polish_prompt_custom_1
-      : (typeof config.polish_prompt === 'string' ? config.polish_prompt : ''),
-    custom_2: typeof config.polish_prompt_custom_2 === 'string' ? config.polish_prompt_custom_2 : '',
-    custom_3: typeof config.polish_prompt_custom_3 === 'string' ? config.polish_prompt_custom_3 : ''
-  };
-  applyDropdownValue('voicePolishPromptBtn', 'voicePolishPromptMenu', selectedPromptId);
-  fillPromptTextarea(
-    selectedPromptId,
-    typeof config.polish_prompt === 'string' ? config.polish_prompt : undefined
-  );
+  applyPromptLibrary('polish', config, builtinPrompt(String(config.polish_prompt_id ?? 'cleanup')));
   applyDropdownValue('voiceLanguageBtn', 'voiceLanguageMenu',
     typeof config.language === 'string' ? config.language : undefined);
   applyDropdownValue('voiceCommitModeBtn', 'voiceCommitModeMenu',
@@ -577,7 +507,6 @@ export function applyVoiceConfig(config: Record<string, unknown>): void {
     applyToggleState('voiceDoubaoEnableDdc', config.doubao_enable_ddc);
   }
   syncSoundMaster();
-  applyingConfig = false;
 }
 
 const PROVIDER_LINKS: Record<string, [string,string,string]> = {

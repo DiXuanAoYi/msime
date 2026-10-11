@@ -1,5 +1,9 @@
+#include "settings/vision_service.h"
 #include "english/speech_service.h"
 #include "english/voice_studio.h"
+#include "settings/personal_library.h"
+#include "settings/vision_config.h"
+#include "settings/local_ocr_models.h"
 #include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
 #include "settings/local_tts_models.h"
@@ -65,6 +69,7 @@ constexpr wchar_t kSingleInstanceMutex[] = L"Local\\MetasequoiaImeSettings.Singl
 constexpr UINT kActivateExistingWindow = WM_APP + 1;
 constexpr UINT kOpenAboutSection = WM_APP + 2;
 constexpr UINT kOpenReplyStudioSection = WM_APP + 6;
+constexpr UINT kOpenPersonalSection = WM_APP + 7;
 constexpr UINT kScanSkinCatalog = WM_APP + 3;
 constexpr UINT kWorkerCompleted = WM_APP + 4;
 constexpr UINT kQuitSettings = WM_APP + 5;
@@ -86,6 +91,7 @@ bool g_window_active = true;
 bool g_window_minimized = false;
 bool g_open_about_on_ready = false;
 bool g_open_reply_on_ready = false;
+bool g_open_personal_on_ready = false;
 bool g_webview_content_started = false;
 HWND g_settings_hwnd = nullptr;
 std::optional<CandidateSkinCatalog::ScanResult> g_candidate_skin_catalog;
@@ -236,6 +242,30 @@ void ShowReplyStudioSection()
             if (!item) return false;
             if (!item.classList.contains('active')) item.click();
             const section = document.getElementById('reply-studio-settings');
+            if (!item.classList.contains('active') || !section || getComputedStyle(section).display === 'none')
+                return false;
+            item.scrollIntoView({ block: 'nearest' });
+            return true;
+        };
+        if (selectAbout()) return;
+        const retry = setInterval(() => {
+            if (selectAbout()) clearInterval(retry);
+        }, 50);
+        setTimeout(() => clearInterval(retry), 10000);
+    })())JS",
+                             nullptr);
+}
+
+void ShowPersonalSection()
+{
+    if (!g_webview)
+        return;
+    g_webview->ExecuteScript(LR"JS((() => {
+        const selectAbout = () => {
+            const item = document.querySelector('.sidebar .item[data-target="personal-library"]');
+            if (!item) return false;
+            if (!item.classList.contains('active')) item.click();
+            const section = document.getElementById('personal-library');
             if (!item.classList.contains('active') || !section || getComputedStyle(section).display === 'none')
                 return false;
             item.scrollIntoView({ block: 'nearest' });
@@ -522,6 +552,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"floating_toolbar_screen_keyboard", toolbar.screen_keyboard},
             {"floating_toolbar_voice", toolbar.voice},
             {"floating_toolbar_reply", toolbar.reply},
+            {"floating_toolbar_clipboard", toolbar.clipboard},
             {"floating_toolbar_settings", toolbar.settings},
             {"floating_toolbar_scale", GetConfiguredFloatingToolbarScale()},
             {"floating_toolbar_font_size", GetConfiguredFloatingToolbarFontSize()},
@@ -667,6 +698,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"polish_prompt_custom_1", voice.polish_prompt_custom_1},
             {"polish_prompt_custom_2", voice.polish_prompt_custom_2},
             {"polish_prompt_custom_3", voice.polish_prompt_custom_3},
+            {"prompt_library", voice.prompt_library},
             {"language", voice.language},
             {"start_sound", voice.start_sound},
             {"end_sound", voice.end_sound},
@@ -689,7 +721,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"prompt_id", ai.prompt_id},
             {"prompt_custom_1", ai.prompt_custom_1},
             {"prompt_custom_2", ai.prompt_custom_2},
-            {"prompt_custom_3", ai.prompt_custom_3}}},
+            {"prompt_custom_3", ai.prompt_custom_3}, {"prompt_library", ai.prompt_library}}},
           {"tencent_tmt",
            {{"secret_id", tencent_tmt.secret_id},
             {"secret_key", tencent_tmt.secret_key},
@@ -723,6 +755,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
           {"statistics",
            {{"enabled", GetConfiguredStatisticsEnabled()}, {"retention", GetConfiguredStatisticsRetention()}}}}}};
     payload["data"]["speech"] = Speech::GetConfig();
+    payload["data"]["vision"] = VisionConfig::Get();
     payload["data"]["voice_input"]["polish_presets"] = std::move(polish_presets);
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();
@@ -1051,6 +1084,9 @@ bool ApplyConfigUpdate(const json::object &data)
             return SetConfiguredVoiceInputString(key, json::value_to<std::string>(value));
         return false;
     }
+    if (path.rfind("vision.", 0) == 0)
+        return data.at("value").is_string() &&
+               VisionConfig::Set(path.substr(7), json::value_to<std::string>(data.at("value")));
     if (path.rfind("ai_assistant.", 0) == 0)
     {
         const std::string key = path.substr(13);
@@ -1584,9 +1620,27 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
             if (g_webview)
                 g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
         }
+        else if (type == "personalLibraryRequest")
+        {
+            auto response = PersonalLibrary::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
         else if (type == "voiceStudioRequest")
         {
             auto response = VoiceStudio::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "visionRequest")
+        {
+            auto response = Vision::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "localOcrRequest")
+        {
+            auto response = LocalOcr::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
             if (g_webview)
                 g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
         }
@@ -1783,6 +1837,11 @@ HRESULT OnControllerCreated(HWND hwnd, HRESULT result, ICoreWebView2CompositionC
                 PostConfig();
                 ApplyWindowActivationAppearance();
                 SetFocus(hwnd);
+                if (g_open_personal_on_ready)
+                {
+                    ShowPersonalSection();
+                    g_open_personal_on_ready = false;
+                }
                 if (g_open_reply_on_ready)
                 {
                     ShowReplyStudioSection();
@@ -2034,6 +2093,7 @@ std::optional<UINT> SettingsLingerTimeoutMs(const std::string &linger)
 // 首帧还没出来就被关掉，说明用户不想等这次冷启动，直接退出，别留一个半初始化的进程。
 void HideSettings(HWND hwnd)
 {
+    Vision::Stop();
     VoiceStudio::Stop();
     if (g_closing)
         return;
@@ -2076,6 +2136,7 @@ void HideSettings(HWND hwnd)
 
 void CloseSettings(HWND hwnd)
 {
+    Vision::Stop();
     VoiceStudio::Stop();
     if (g_closing)
         return;
@@ -2107,6 +2168,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
     case kOpenAboutSection:
         ActivateWindow(hwnd);
         ShowAboutSection();
+        return 0;
+    case kOpenPersonalSection:
+        ActivateWindow(hwnd);
+        ShowPersonalSection();
         return 0;
     case kOpenReplyStudioSection:
         ActivateWindow(hwnd);
@@ -2290,12 +2355,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
             DestroyWindow(hwnd);
         return 0;
     case WM_CLOSE:
+        Vision::Stop();
         HideSettings(hwnd);
         return 0;
     case kQuitSettings:
         CloseSettings(hwnd);
         return 0;
     case WM_DESTROY:
+        Vision::Stop();
         if (g_reply_studio)
             g_reply_studio->Stop();
         if (g_chat_model)
@@ -2326,6 +2393,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command_line, int show_command)
 {
     TraceStartup("wWinMain");
+    g_open_personal_on_ready =
+        command_line && std::wstring(command_line).find(L"--personal-library") != std::wstring::npos;
     g_open_reply_on_ready = command_line && std::wstring(command_line).find(L"--reply-studio") != std::wstring::npos;
     g_open_about_on_ready = command_line && std::wstring(command_line).find(L"--about") != std::wstring::npos;
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -2342,8 +2411,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command_line, int show_
         if (existing)
         {
             PostMessageW(existing,
-                         g_open_reply_on_ready ? kOpenReplyStudioSection
-                                               : (g_open_about_on_ready ? kOpenAboutSection : kActivateExistingWindow),
+                         g_open_personal_on_ready ? kOpenPersonalSection
+                         : g_open_reply_on_ready
+                             ? kOpenReplyStudioSection
+                             : (g_open_about_on_ready ? kOpenAboutSection : kActivateExistingWindow),
                          0, 0);
             SetForegroundWindow(existing);
         }

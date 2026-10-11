@@ -22,7 +22,7 @@ from tts_manager import serve
 
 LANGUAGES = {'zh':'Chinese','en':'English','ja':'Japanese','ko':'Korean','de':'German','fr':'French','ru':'Russian','es':'Spanish','it':'Italian','pt':'Portuguese'}
 
-def load(root, model_id):
+def load_cuda(root, model_id):
     if not torch.cuda.is_available():
         raise RuntimeError('CUDA 不可用，请检查 NVIDIA 驱动和运行依赖；没有静默切换为 CPU')
     torch.set_num_threads(2)
@@ -45,6 +45,20 @@ def load(root, model_id):
                 if len(samples):
                     emit(samples, rate)
     return StreamingSynthesizer(generate, torch.cuda.get_device_name(0) + ' · CUDA 流式', accepts_options=True)
+
+def load(root, model_id):
+    try:
+        return load_cuda(root, model_id)
+    except (RuntimeError, MemoryError) as error:
+        import gc
+        print('Qwen GPU unavailable; CPU fallback:', str(error)[:300], file=sys.stderr, flush=True)
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        from tts_qwen_worker import load as cpu_load
+        result = cpu_load(root, model_id, force_cpu=True)
+        result.device = 'CPU · GPU 初始化失败后回退 · Qwen 流式'
+        return result
 
 if __name__ == '__main__':
     serve(Path(sys.argv[1]), sys.argv[2], load, externally_locked=True)

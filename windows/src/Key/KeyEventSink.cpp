@@ -599,6 +599,11 @@ Exit:
 
 STDAPI CMetasequoiaIME::OnSetFocus(BOOL fForeground)
 {
+    if (!fForeground)
+    {
+        _ClearLastCommit();
+        _undoKeyHeld = false;
+    }
     // Activation can precede keystroke focus (Notepad TIP reload). TSF need
     // not send another document-focus callback before delivering keys.
     if (ShouldRecoverNamedpipeOnKeyFocus(fForeground != FALSE, Global::g_connected, IsNamedpipeFocusStateOwner(this)))
@@ -697,6 +702,12 @@ STDAPI CMetasequoiaIME::OnTestKeyDown(ITfContext *pContext, WPARAM wParam, LPARA
     if (pContext == nullptr || pIsEaten == nullptr)
     {
         return E_INVALIDARG;
+    }
+    if ((wParam == VK_BACK && _undoKeyHeld) || _IsUndoCommitKey(pContext, wParam))
+    {
+        _undoKeyHeld = true;
+        *pIsEaten = TRUE;
+        return S_OK;
     }
     if (IsSelfGeneratedSendInputExtraInfo(static_cast<ULONG_PTR>(GetMessageExtraInfo())))
     {
@@ -853,6 +864,14 @@ STDAPI CMetasequoiaIME::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM lP
     if (pContext == nullptr || pIsEaten == nullptr)
     {
         return E_INVALIDARG;
+    }
+    if ((wParam == VK_BACK && _undoKeyHeld) || _IsUndoCommitKey(pContext, wParam))
+    {
+        _undoKeyHeld = true;
+        *pIsEaten = TRUE;
+        if ((lParam & (1LL << 30)) == 0)
+            _RequestUndoCommit(pContext);
+        return S_OK;
     }
     if (IsSelfGeneratedSendInputExtraInfo(static_cast<ULONG_PTR>(GetMessageExtraInfo())))
     {
@@ -1328,6 +1347,12 @@ CMetasequoiaIME::KeyDownDispatchResult CMetasequoiaIME::_DispatchKeyDown(
 
 STDAPI CMetasequoiaIME::OnTestKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lParam, BOOL *pIsEaten)
 {
+    if (pIsEaten && wParam == VK_BACK && _undoKeyHeld)
+    {
+        _undoKeyHeld = false;
+        *pIsEaten = FALSE;
+        return S_OK;
+    }
     if (pContext == nullptr || pIsEaten == nullptr)
     {
         return E_INVALIDARG;
@@ -1408,6 +1433,12 @@ STDAPI CMetasequoiaIME::OnTestKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM 
 
 STDAPI CMetasequoiaIME::OnKeyUp(ITfContext *pContext, WPARAM wParam, LPARAM lParam, BOOL *pIsEaten)
 {
+    if (pIsEaten && wParam == VK_BACK && _undoKeyHeld)
+    {
+        _undoKeyHeld = false;
+        *pIsEaten = TRUE;
+        return S_OK;
+    }
     if (pContext == nullptr || pIsEaten == nullptr)
     {
         return E_INVALIDARG;

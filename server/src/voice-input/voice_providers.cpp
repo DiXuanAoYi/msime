@@ -1,4 +1,5 @@
 #include "voice_providers.h"
+#include "config/prompt_library.h"
 #include "assistant/modes.h"
 
 #include <map>
@@ -277,6 +278,8 @@ bool IsPolishPromptId(std::string_view id)
 
 std::string ResolvePolishSystemPrompt(const VoiceInputConfig &config)
 {
+    if (const auto active = PromptLibrary::Active(config.prompt_library); !active.empty())
+        return active;
     const std::string id = config.polish_prompt_id.empty() ? std::string("cleanup") : config.polish_prompt_id;
     if (id == "custom_1" || id == "custom")
     {

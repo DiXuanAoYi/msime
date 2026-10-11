@@ -66,7 +66,11 @@ export type ClientMessage =
   | { "type": "candidateSpeak"; "protocolVersion"?: 1; "data": { "index": number; "translation": boolean } }
   | { "type": "speechRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "preview" | "stop"; "text"?: string; "language"?: string } }
   | { "type": "localTtsRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "download" | "cancel" | "start" | "stop"; "modelId"?: string } }
-  | { "type": "voiceStudioRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "generate" | "stop" | "recordStart" | "recordStop" | "import" | "transcribe" | "play" | "route" | "copy" | "save"; "text"?: string; "language"?: string; "voice"?: string; "optionsJson"?: string; "rate"?: number; "deviceId"?: number; "artifactId"?: string } };
+  | { "type": "voiceStudioRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "generate" | "stop" | "recordStart" | "recordStop" | "import" | "transcribe" | "play" | "route" | "copy" | "save"; "text"?: string; "language"?: string; "voice"?: string; "optionsJson"?: string; "rate"?: number; "deviceId"?: number; "artifactId"?: string } }
+  | { "type": "personalLibraryRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "id"?: string; "name"?: string; "text"?: string; "group"?: string; "application"?: string; "code"?: string; "artifactId"?: string; "section"?: string; "language"?: string; "action": "status" | "putGroup" | "removeGroup" | "putClip" | "putRule" | "favorite" | "remove" | "copy" | "review" | "playFavorite" | "copyFavorite" | "study"; "enabled"?: boolean; "grade"?: number } }
+  | { "type": "openPersonalLibrary"; "protocolVersion"?: 1 }
+  | { "type": "localOcrRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "download" | "cancel" | "start" | "stop"; "modelId"?: string } }
+  | { "type": "visionRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "stop" | "finish" | "saveImage" | "import" | "recognize" | "translate" | "capture" | "longCapture" | "screen" | "subtitles"; "image"?: string; "task"?: string; "text"?: string; "source"?: string; "target"?: string; "horizontal"?: boolean; "vertical"?: boolean; "revision"?: number; "imageRevision"?: number; "playback"?: boolean; "translate"?: boolean } };
 export type ServerMessage =
   | { "type": "configSnapshot"; "protocolVersion"?: 1; "data": { [key: string]: unknown } }
   | { "type": "windowState"; "protocolVersion"?: 1; "data": { "isMaximized": boolean } }
@@ -81,7 +85,10 @@ export type ServerMessage =
   | { "type": "dictionaryLibraryResponse"; "protocolVersion"?: 1; "requestId": string; "ok": boolean; "message": string; "books": Array<{ "id": string; "name": string; "category": string; "language": string; "source": string; "version": string; "license": string; "note": string; "sha256": string; "entries": number; "bytes": number; "enabled": boolean; "headwords": number }> }
   | { "type": "speechResponse"; "protocolVersion"?: 1; "requestId": string; "ok": boolean; "message": string; "voices": Array<{ [key: string]: unknown }>; [key: string]: unknown }
   | { "type": "localTtsResponse"; "protocolVersion"?: 1; "requestId": string; "ok": boolean; "message": string; "models": Array<{ [key: string]: unknown }>; "service": { [key: string]: unknown } }
-  | { "type": "voiceStudioResponse"; "protocolVersion"?: 1; "requestId": string; "ok": boolean; "message": string; "state": { [key: string]: unknown }; [key: string]: unknown };
+  | { "type": "voiceStudioResponse"; "protocolVersion"?: 1; "requestId": string; "ok": boolean; "message": string; "state": { [key: string]: unknown }; [key: string]: unknown }
+  | { "type": "personalLibraryResponse"; "protocolVersion"?: 1; "requestId": string; "ok": boolean; "message": string; "book"?: { [key: string]: unknown }; "history"?: Array<string>; "application"?: string; [key: string]: unknown }
+  | { "type": "localOcrResponse"; "protocolVersion"?: 1; "requestId": string; "ok": boolean; "message": string; "models": Array<{ [key: string]: unknown }>; "service": { [key: string]: unknown } }
+  | { "type": "visionResponse"; "protocolVersion"?: 1; "requestId": string; "message": string; "error"?: string; "image"?: string; "text"?: string; "translation"?: string; "format"?: string; "revision"?: number; "width"?: number; "height"?: number; "frames"?: number; "ok": boolean; "busy"?: boolean; "raw"?: { [key: string]: unknown }; "imageRevision"?: number; "srt"?: string; "subtitles"?: Array<{ [key: string]: unknown }>; [key: string]: unknown };
 export type SettingsMessage =
   | { "type": "configRequest"; "protocolVersion"?: 1 }
   | { "type": "skinCatalogRequest"; "protocolVersion"?: 1 }
@@ -114,7 +121,10 @@ export type SettingsMessage =
   | { "type": "dictionaryLibraryRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "list" | "export"; "id"?: string } }
   | { "type": "speechRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "preview" | "stop"; "text"?: string; "language"?: string } }
   | { "type": "localTtsRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "download" | "cancel" | "start" | "stop"; "modelId"?: string } }
-  | { "type": "voiceStudioRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "generate" | "stop" | "recordStart" | "recordStop" | "import" | "transcribe" | "play" | "route" | "copy" | "save"; "text"?: string; "language"?: string; "voice"?: string; "optionsJson"?: string; "rate"?: number; "deviceId"?: number; "artifactId"?: string } };
+  | { "type": "voiceStudioRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "generate" | "stop" | "recordStart" | "recordStop" | "import" | "transcribe" | "play" | "route" | "copy" | "save"; "text"?: string; "language"?: string; "voice"?: string; "optionsJson"?: string; "rate"?: number; "deviceId"?: number; "artifactId"?: string } }
+  | { "type": "personalLibraryRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "id"?: string; "name"?: string; "text"?: string; "group"?: string; "application"?: string; "code"?: string; "artifactId"?: string; "section"?: string; "language"?: string; "action": "status" | "putGroup" | "removeGroup" | "putClip" | "putRule" | "favorite" | "remove" | "copy" | "review" | "playFavorite" | "copyFavorite" | "study"; "enabled"?: boolean; "grade"?: number } }
+  | { "type": "localOcrRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "download" | "cancel" | "start" | "stop"; "modelId"?: string } }
+  | { "type": "visionRequest"; "protocolVersion"?: 1; "data": { "requestId": string; "action": "status" | "stop" | "finish" | "saveImage" | "import" | "recognize" | "translate" | "capture" | "longCapture" | "screen" | "subtitles"; "image"?: string; "task"?: string; "text"?: string; "source"?: string; "target"?: string; "horizontal"?: boolean; "vertical"?: boolean; "revision"?: number; "imageRevision"?: number; "playback"?: boolean; "translate"?: boolean } };
 declare global {
   var MsimeProtocol: {
     validate(message: unknown, direction: 'client' | 'server', surface?: string): boolean;

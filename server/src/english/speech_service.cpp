@@ -1,4 +1,5 @@
 #include "speech_service.h"
+#include "speech_voice_catalog.h"
 #include "pcm_stream.h"
 #include "pcm_player.h"
 #include "settings/local_tts_models.h"
@@ -397,7 +398,16 @@ Request BuildRequest(const Config &c, const std::string &text, const std::string
         throw std::runtime_error("每次朗读限 2000 UTF-8 字节");
     Request r;
     const auto provider = c.at("provider");
-    const auto voice = c.at(provider + "_voice_" + (lang == "zh" ? "zh" : "en"));
+    auto voice = c.at(provider + "_voice_" + (lang == "zh" ? "zh" : "en"));
+    std::string dialect;
+    if ((provider == "azure" || provider == "volcengine") && voice.find('|') != std::string::npos)
+    {
+        const auto pos = voice.find('|');
+        dialect = voice.substr(pos + 1);
+        voice.resize(pos);
+        if (!std::regex_match(dialect, std::regex("[A-Za-z-]{2,40}")))
+            throw std::runtime_error("方言代码格式无效");
+    }
     const double rate = std::stod(c.at("rate"));
     if (!std::isfinite(rate) || rate < 0.5 || rate > 2.0)
         throw std::runtime_error("发音语速必须为 0.5–2");
@@ -413,7 +423,8 @@ Request BuildRequest(const Config &c, const std::string &text, const std::string
                      "X-Microsoft-OutputFormat: riff-24khz-16bit-mono-pcm", "User-Agent: MetasequoiaIME"};
         r.body = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='" +
                  (lang == "zh" ? std::string("zh-CN") : std::string("en-US")) + "'><voice name='" + Xml(voice) +
-                 "'><prosody rate='" + std::to_string(int((rate - 1) * 100)) + "%'>" + Xml(text) +
+                 "'><prosody rate='" + std::to_string(int((rate - 1) * 100)) + "%'>" +
+                 (dialect.empty() ? Xml(text) : "<lang xml:lang='" + Xml(dialect) + "'>" + Xml(text) + "</lang>") +
                  "</prosody></voice></speak>";
     }
     else if (provider == "elevenlabs")
@@ -466,6 +477,7 @@ Request BuildRequest(const Config &c, const std::string &text, const std::string
                       {"req_params",
                        {{"text", text},
                         {"speaker", voice},
+                        {"additions", (dialect.empty() ? json::object() : json{{"explicit_dialect", dialect}}).dump()},
                         {"audio_params",
                          {{"format", "pcm"}, {"sample_rate", 24000}, {"speech_rate", int((rate - 1) * 100)}}}}}}
                      .dump();
@@ -801,6 +813,7 @@ nlohmann::json Handle(const nlohmann::json &request)
             {"ok", true},
             {"message", status},
             {"voices", voices},
-            {"modelInfo", LocalTts::ModelInfo(GetConfig().at("local_model"))}};
+            {"modelInfo", GetConfig().at("provider") == "local" ? LocalTts::ModelInfo(GetConfig().at("local_model"))
+                                                                : CloudVoiceCatalog(GetConfig().at("provider"))}};
 }
 } // namespace Speech

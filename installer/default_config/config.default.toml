@@ -32,6 +32,7 @@ floating_toolbar_emoji = true
 floating_toolbar_screen_keyboard = false
 floating_toolbar_voice = true
 floating_toolbar_reply = true
+floating_toolbar_clipboard = true
 floating_toolbar_settings = true
 # 悬浮工具栏用户缩放（相对系统 DPI），可选：0.75 / 1.0 / 1.25 / 1.5
 floating_toolbar_scale = 1.0
@@ -449,6 +450,7 @@ polish_prompt = ""
 polish_prompt_custom_1 = ""
 polish_prompt_custom_2 = ""
 polish_prompt_custom_3 = ""
+prompt_library = ""
 language = "zh-cn"
 # 开始和结束录音提示音可分别关闭
 start_sound = true
@@ -544,6 +546,7 @@ prompt = """你是一个中文全拼输入法联想引擎。输入为已经切�
 prompt_custom_1 = ""
 prompt_custom_2 = ""
 prompt_custom_3 = ""
+prompt_library = ""
 
 #
 # Input Statistics
@@ -598,3 +601,21 @@ local_voice_zh = "zf_xiaobei"
 local_voice_en = "af_heart"
 local_options = "{}"
 local_voices = "{}"
+
+[vision]
+provider = "windows"
+local_model = "glm-ocr"
+task = "document"
+max_tokens = "4096"
+shiliu_appcode = ""
+tencent_secret_id = ""
+tencent_secret_key = ""
+tencent_region = "ap-guangzhou"
+baidu_api_key = ""
+baidu_secret_key = ""
+translation_provider = "dictionary"
+source_language = "auto"
+target_language = "en"
+capture_x = "false"
+capture_y = "true"
+screen_interval_ms = "2000"

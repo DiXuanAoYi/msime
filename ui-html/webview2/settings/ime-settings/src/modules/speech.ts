@@ -38,7 +38,9 @@ function renderFields(): void {
       const options=key==='elevenlabs_model'?[{id:'eleven_flash_v2_5',name:'Flash v2.5 · 快速'},{id:'eleven_v3',name:'Eleven v3 · 情感'}]:[{id:'',name:'按语言自动选择'},...voices];
       for(const o of options)select.add(new Option(o.name,o.id));
       if(config[key]&&!options.some(o=>o.id===config[key]))select.add(new Option(config[key]+'（当前配置）',config[key]));
-    }else{input=document.createElement('input');input.type=type??'text';input.autocomplete='off';input.spellcheck=false;}
+    }else{input=document.createElement('input');input.type=type??'text';input.autocomplete='off';input.spellcheck=false;
+      if(key.includes('_voice_')&&modelInfo.voices?.length){const list=document.createElement('datalist');list.id=`speech-choices-${key}`;for(const voice of modelInfo.voices){const option=document.createElement('option');option.value=voice.id;option.label=voice.name;list.append(option);}input.setAttribute('list',list.id);row.append(list);}
+    }
     input.value=config[key]??'';input.id=`speech-${key}`;
     input.addEventListener('change',()=>{config[key]=input.value.trim();updateConfig(`speech.${key}`,config[key]);});row.append(input);root.append(row);
   }

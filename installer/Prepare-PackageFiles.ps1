@@ -92,6 +92,7 @@ Assert-PathExists -LiteralPath $dictionaryReplayRelease -Description '用户词�
 Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\MetasequoiaLocalASR.exe') -Description '本地语音运行组件'
 Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\_internal\catalog.json') -Description '本地模型锁定目录'
 Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\_internal\tts_catalog.json') -Description '本地发音模型目录'
+Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\_internal\ocr_catalog.json') -Description '本地 OCR 模型目录'
 Assert-PathExists -LiteralPath $tsf32Release -Description '32 位 TSF Release DLL'
 Assert-PathExists -LiteralPath $tsf64Release -Description '64 位 TSF Release DLL'
 Assert-PathExists -LiteralPath $tsf32Pdb -Description '32 位 TSF Release PDB'

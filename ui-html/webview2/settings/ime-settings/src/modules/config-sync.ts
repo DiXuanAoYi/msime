@@ -461,6 +461,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
         screen_keyboard: data?.general?.floating_toolbar_screen_keyboard,
         voice: data?.general?.floating_toolbar_voice,
         reply: data?.general?.floating_toolbar_reply,
+        clipboard: data?.general?.floating_toolbar_clipboard,
         settings: data?.general?.floating_toolbar_settings
       });
       module.applyCaretStateIndicatorPosition(data?.general?.caret_state_indicator_position);

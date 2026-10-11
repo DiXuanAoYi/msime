@@ -1,6 +1,6 @@
 Metasequoia IME local ASR runtime
 
-The installer contains the CPU runtime only. Model weights are downloaded separately
+The installer contains CPU runtimes and a Vulkan-capable Voxtral backend. Model weights are downloaded separately
 from the links and immutable file digests in catalog.json. Original and converted
 models retain their respective upstream licenses; consult each official model card.
 
@@ -42,3 +42,19 @@ Voxtral model and reference embeddings: Mistral AI, CC BY-NC 4.0.
 Official model files are downloaded only by an explicit user action. No Voxtral
 model weights are bundled in the installer. Extra CPU conversion dependencies
 are installed in an isolated environment on first explicit startup.
+
+Screenshot stitching uses Pillow (HPND) and OpenCV (Apache-2.0). Their complete
+license and dependency notices are in _internal/licenses. The Vulkan loader
+license is also included there; the optional Voxtral backend uses Vulkan first
+and retains CPU fallback. No SDK development tools are distributed.
+
+MMS minority-language TTS: Meta, CC-BY-NC-4.0 (non-commercial use only).
+https://huggingface.co/facebook/mms-tts-bod
+https://huggingface.co/facebook/mms-tts-kaz
+The model catalog names the language, immutable revision, size and SHA-256.
+Weights are never bundled or automatically downloaded.
+
+Optional OCR environments: GLM-OCR (ZhipuAI), HunyuanOCR (Tencent-Hunyuan),
+PaddleOCR-VL and PP-OCRv6 (PaddlePaddle). See each catalog entry's official model
+card for its license and requirements. Source/model files are individually
+verified before local loading; all weights require an explicit download action.

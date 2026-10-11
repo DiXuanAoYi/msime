@@ -4,6 +4,30 @@
 #include "tests/includes/test_framework.h"
 #include <fstream>
 #include <cmath>
+#include "config/prompt_library.h"
+#include "settings/dictionary_manager.h"
+
+TEST_CASE(prompt_library_validates_import_and_resolves_selected_template)
+{
+    auto book = nlohmann::json{{"version", 1},
+                               {"selected", "b"},
+                               {"items",
+                                {{{"id", "a"}, {"name", "原有规则"}, {"prompt", "保留原文"}},
+                                 {{"id", "b"}, {"name", "会议纪要"}, {"prompt", "整理待办"}}}}};
+    REQUIRE(PromptLibrary::Validate(book.dump()));
+    REQUIRE(PromptLibrary::Active(book.dump()) == "整理待办");
+    book["items"][1]["id"] = "a";
+    REQUIRE(!PromptLibrary::Validate(book.dump()));
+    REQUIRE(!PromptLibrary::Validate("{bad"));
+}
+
+TEST_CASE(candidate_reading_uses_phrase_tones_without_touching_output_text)
+{
+    REQUIRE(SettingsDictionary::CandidateReading("你好") == "nǐ hǎo");
+    REQUIRE(SettingsDictionary::CandidateReading("银行") == "yín háng");
+    REQUIRE(SettingsDictionary::CandidateReading("重庆") == "chóng qìng");
+    REQUIRE(SettingsDictionary::CandidateReading("hello").empty());
+}
 
 namespace
 {
@@ -184,6 +208,24 @@ TEST_CASE(speech_local_endpoint_and_headers_reject_remote_or_injected_destinatio
     c["azure_key"] = "key\r\nInjected: value";
     RejectSpeech([&] { Speech::BuildRequest(c, "test", "en", 1); });
     RejectSpeech([&] { Speech::BuildRequest(c, std::string(2001, 'a'), "en", 1); });
+}
+TEST_CASE(speech_dialect_choices_send_real_provider_language_controls)
+{
+    auto c = Speech::Defaults();
+    c["provider"] = "azure";
+    c["azure_key"] = "fixture";
+    c["azure_voice_zh"] = "zh-CN-XiaoxiaoDialectsNeural|zh-CN-henan";
+    auto r = Speech::BuildRequest(c, "你好", "zh", 1);
+    REQUIRE(r.body.find("<lang xml:lang='zh-CN-henan'>你好</lang>") != std::string::npos);
+    REQUIRE(r.body.find("name='zh-CN-XiaoxiaoDialectsNeural'") != std::string::npos);
+    c["provider"] = "volcengine";
+    c["volcengine_app_id"] = "fixture";
+    c["volcengine_key"] = "fixture";
+    c["volcengine_voice_zh"] = "zh_female_vv_uranus_bigtts|shanghai";
+    const auto body = nlohmann::json::parse(Speech::BuildRequest(c, "你好", "zh", 1).body);
+    REQUIRE(body.at("req_params").at("speaker") == "zh_female_vv_uranus_bigtts");
+    REQUIRE(nlohmann::json::parse(body.at("req_params").at("additions").get<std::string>()).at("explicit_dialect") ==
+            "shanghai");
 }
 TEST_CASE(speech_pcm_wrapping_and_cloud_errors_do_not_play_garbage)
 {

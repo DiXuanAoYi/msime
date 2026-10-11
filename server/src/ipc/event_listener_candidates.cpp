@@ -1,6 +1,8 @@
 // 候选页的构建与发布：按输入模式查候选（PrepareCandidateList）、组页并发布给候选窗，
 // 以及调频用的排序键和翻页时的候选扩展。
 #include "ipc/event_listener_internal.h"
+#include "settings/dictionary_manager.h"
+#include "settings/personal_library.h"
 #include <Windows.h>
 #include <string>
 #include <algorithm>
@@ -142,6 +144,19 @@ void PlaceQuickPhrases(std::vector<WordItem> &items, const std::string &current_
     metasequoia::local_modes::place_quick_phrases(items, std::move(phrases), slot);
 }
 
+void PlaceApplicationWords(std::vector<WordItem> &items, const std::string &input)
+{
+    if (GlobalIme::composition.creating_word.active || g_inputSession->prefix_end() != input.size())
+        return;
+    const auto words = PersonalLibrary::AppWords(PersonalLibrary::ForegroundApplication(), input);
+    for (auto it = words.rbegin(); it != words.rend(); ++it)
+    {
+        items.erase(std::remove_if(items.begin(), items.end(), [&](const WordItem &x) { return x.word == *it; }),
+                    items.end());
+        items.insert(items.begin(), WordItem(input, *it, 1, CandidateSource::AppDictionary));
+    }
+}
+
 // 日期时间混入普通候选的唤醒词，与 Shift+T 模式同一套（rq / riqi / date、sj / shijian / time、
 // xq / xingqi / week）。整串精确匹配才算：全拼直接认原始输入；双拼的整拼要按方案换算，shijian 在
 // 小鹤里打成 uijm，所以再拿换算出的全拼认一次。
@@ -273,6 +288,7 @@ std::string BuildCurrentCandidatePage()
 
         CandidateViewItem view;
         view.text = word;
+        view.reading = SettingsDictionary::CandidateReading(word);
         if (show_autocorrect_marker && !item.corrected_from.empty())
         {
             // Correction-sourced candidates carry a light visible marker (PRD R5/AC7),
@@ -548,6 +564,7 @@ bool ExpandCandidatesKeepingPagePosition()
         [](const std::string &key, const std::string &value) { return g_inputSession->find_candidate(key, value); },
         g_inputSession->has_active_helpcode());
     PlaceQuickPhrases(expanded, g_inputSession->get_pinyin_sequence_with_cases());
+    PlaceApplicationWords(expanded, g_inputSession->get_pinyin_sequence_with_cases());
     ui.set_items(std::move(expanded));
     ui.page_index = current_page;
     ui.selected_index_in_page = current_selection;
@@ -731,6 +748,7 @@ void PrepareCandidateList(uint64_t client_id, uint64_t activation_epoch)
             [](const std::string &key, const std::string &value) { return g_inputSession->find_candidate(key, value); },
             g_inputSession->has_active_helpcode());
         PlaceQuickPhrases(items, current_input);
+        PlaceApplicationWords(items, current_input);
         fixedPosMs = segment.Split();
         if (g_inputSession->get_pinyin_sequence().size() == 1 && items.size() > 24)
             items.resize(24);

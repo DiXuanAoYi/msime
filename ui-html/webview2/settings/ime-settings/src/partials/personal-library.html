@@ -1,0 +1,71 @@
+<div class="content" id="personalLibraryPanel">
+  <h2>剪贴板与个人资料库</h2>
+  <p>
+    分组短语、应用词条和语音收藏只保存在本机。复制后由你手动粘贴，不自动发送。
+  </p>
+  <div class="local-asr-actions">
+    <button id="libraryRefresh" type="button">刷新</button
+    ><select id="libraryView">
+      <option value="clips">分组短语</option>
+      <option value="history">最近复制</option>
+      <option value="rules">按软件独立词库</option>
+      <option value="favorites">常用语音收藏</option>
+      <option value="study">学习生词复习</option>
+    </select>
+  </div>
+  <div id="libraryGroups" class="prompt-library">
+    <label>分组<select id="libraryGroup"></select></label
+    ><label
+      >分组名称<input
+        id="libraryGroupName"
+        placeholder="填写分组名后添加，或给当前分组重命名"
+    /></label>
+    <div class="local-asr-actions">
+      <button id="libraryAddGroup" type="button">添加分组</button
+      ><button id="libraryRenameGroup" type="button">重命名当前分组</button
+      ><button id="libraryRemoveGroup" type="button">删除分组并转移内容</button>
+    </div>
+  </div>
+  <div id="libraryEditor" class="prompt-library">
+    <label>标题<input id="libraryName" maxlength="80" /></label>
+    <div id="libraryAppFields">
+      <label
+        >应用程序文件名<input
+          id="libraryApplication"
+          placeholder="例如 WeChat.exe、Code.exe；仅作用于此程序" /></label
+      ><label
+        >触发编码<input
+          id="libraryCode"
+          maxlength="80"
+          placeholder="小写字母编码；只在完整匹配时出现" /></label
+      ><label
+        ><input id="libraryEnabled" type="checkbox" checked /> 启用此词条</label
+      >
+    </div>
+    <label
+      >文字内容<textarea id="libraryText" rows="4" maxlength="5000"></textarea>
+    </label>
+    <div class="local-asr-actions">
+      <button id="librarySave" type="button">保存</button
+      ><button id="libraryNew" type="button">新建</button>
+    </div>
+  </div>
+  <div id="libraryStudy" hidden>
+    <p>
+      依据已记录的学习生词安排间隔复习：忘记 10 分钟后再看，模糊 1
+      天后再看，记住则逐步延长。不会改写原来的熟悉度统计。
+    </p>
+    <button id="libraryLoadStudy" type="button">载入到期复习</button>
+    <h3 id="libraryStudyWord"></h3>
+    <p id="libraryStudyAnswer" hidden></p>
+    <div class="local-asr-actions">
+      <button id="libraryReveal" type="button">查看释义</button
+      ><button data-review="0" type="button">忘记</button
+      ><button data-review="1" type="button">模糊</button
+      ><button data-review="2" type="button">记住</button>
+    </div>
+    <p id="libraryStudyCount"></p>
+  </div>
+  <p id="libraryStatus" role="status"></p>
+  <div id="libraryRows"></div>
+</div>

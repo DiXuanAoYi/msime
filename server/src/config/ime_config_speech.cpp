@@ -69,6 +69,8 @@ bool ActivateLocalModel(const std::string &model, bool resetVoices)
                                     : model == "moss-nano"   ? "default"
                                     : model == "voxtral-tts" ? "casual_male"
                                                              : "Ryan";
+        if (model.rfind("mms-", 0) == 0)
+            changes["local_voice_zh"] = changes["local_voice_en"] = model.substr(4);
         if (remembered.contains(model) && remembered[model].is_object())
             for (const auto *lang : {"zh", "en"})
                 if (remembered[model].contains(lang) && remembered[model][lang].is_string())

@@ -16,8 +16,11 @@ Registrar::Registrar(const char *name, std::function<void()> fn)
 }
 } // namespace test
 
-int main()
+int RunVisionFixtureProbe(const char *path);
+int main(int argc, char **argv)
 {
+    if (argc == 3 && std::string(argv[1]) == "--vision-fixture")
+        return RunVisionFixtureProbe(argv[2]);
     int failures = 0;
     for (const auto &test_case : test::registry())
     {

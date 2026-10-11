@@ -138,6 +138,14 @@ std::string AsrAuthorization(const Credentials &credentials, const std::string &
 {
     return Tc3Authorization(credentials, payload, timestamp, "asr.tencentcloudapi.com", "asr", "sentencerecognition");
 }
+std::string OcrAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp,
+                             const std::string &action)
+{
+    std::string lower = action;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return Tc3Authorization(credentials, payload, timestamp, "ocr.tencentcloudapi.com", "ocr", lower.c_str());
+}
 
 std::vector<std::string> TextTranslateBatch(const Credentials &credentials, const std::vector<std::string> &texts,
                                             const std::string &source, const std::string &target)

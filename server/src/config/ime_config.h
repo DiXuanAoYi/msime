@@ -49,6 +49,7 @@ struct VoiceInputConfig
     std::string polish_prompt_id = "cleanup";
     // Legacy single custom prompt. Retained for config compatibility.
     std::string polish_prompt;
+    std::string prompt_library;
     std::string polish_prompt_custom_1;
     std::string polish_prompt_custom_2;
     std::string polish_prompt_custom_3;
@@ -87,6 +88,7 @@ struct AiAssistantConfig
     std::string prompt_custom_1;
     std::string prompt_custom_2;
     std::string prompt_custom_3;
+    std::string prompt_library;
     // Resolved active prompt. `prompt` is also retained as the legacy slot-one key.
     std::string prompt =
         R"PROMPT(你是一个中文全拼输入法联想引擎。输入为已经切分好的拼音数组、前文上下文和候选数量。
@@ -379,6 +381,7 @@ struct FloatingToolbarItemsConfig
     bool screen_keyboard = false;
     bool voice = true;
     bool reply = true;
+    bool clipboard = true;
     bool settings = true;
 };
 const FloatingToolbarItemsConfig &GetConfiguredFloatingToolbarItems();

@@ -261,12 +261,16 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
         const size_t absolute_index =
             static_cast<size_t>(Global::candidate_ui.page_index) * static_cast<size_t>(Global::candidate_ui.page_size) +
             static_cast<size_t>(index);
-        LearnQuickPhraseOrder(curWordItem, absolute_index, client_id, activation_epoch);
-        LearnEnglishSlot(curWordItem, absolute_index, client_id, activation_epoch);
+        if (curWordItem.source != CandidateSource::AppDictionary)
+        {
+            LearnQuickPhraseOrder(curWordItem, absolute_index, client_id, activation_epoch);
+            LearnEnglishSlot(curWordItem, absolute_index, client_id, activation_epoch);
+        }
         Global::candidate_ui.selected_text = Global::candidate_ui.page_words[index];
         std::string curWord = curWordItem.word;
         std::string curWordPinyin = curWordItem.pinyin;
         if (curWordItem.source == CandidateSource::EnglishDictionary ||
+            curWordItem.source == CandidateSource::AppDictionary ||
             curWordItem.source == CandidateSource::QuickPhrase || curWordItem.source == CandidateSource::Emoji ||
             curWordItem.source == CandidateSource::Kaomoji || curWordItem.source == CandidateSource::DateTime ||
             curWordItem.source == CandidateSource::Generated)

@@ -1,3 +1,4 @@
+import { setupPromptLibrary, applyPromptLibrary } from './prompt-library';
 import { applyDropdownValue, applyToggleState, setupDropdownMenu, setupToggleButton } from './shared';
 import { updateConfig } from './config-sync';
 import { setupCredentialTest } from './credential-test';
@@ -32,8 +33,6 @@ let tokens: Record<string, string> = {};
 let endpoints: Record<string, string> = {};
 let models: Record<string, string> = {};
 let currentProvider = 'deepseek';
-let currentPromptId = 'custom_1';
-let customPrompts: Record<string, string> = { custom_1: '', custom_2: '', custom_3: '' };
 
 function applyProviderFields(provider: string): void {
   const defaults = PROVIDER_DEFAULTS[provider];
@@ -80,17 +79,8 @@ function switchProvider(provider: string): void {
   applyProviderFields(provider);
 }
 
-function switchPrompt(id: string): void {
-  const prompt = document.getElementById('aiPrompt') as HTMLTextAreaElement | null;
-  if (prompt) {
-    customPrompts[currentPromptId] = prompt.value;
-    updateConfig(`ai_assistant.prompt_${currentPromptId}`, prompt.value);
-  }
-  currentPromptId = id;
-  if (prompt) prompt.value = customPrompts[id] ?? '';
-}
-
 export function setupAiSettings(): void {
+  setupPromptLibrary('association','aiPromptLibrary','aiPrompt');
   setupToggleButton('aiEnabled', value => updateConfig('ai_assistant.enabled', value));
   setupTokenVisibilityToggle();
   setupCredentialTest('aiCredentialTestButton', 'aiCredentialTestStatus', () => 'ai.assistant', () => {
@@ -105,17 +95,10 @@ export function setupAiSettings(): void {
     };
   });
   setupDropdownMenu('aiProviderBtn', 'aiProviderMenu', 'changeAiProvider', true);
-  setupDropdownMenu('aiPromptSlotBtn', 'aiPromptSlotMenu', 'changeAiPromptSlot', true,
-    'ai_assistant.prompt_id');
   document.getElementById('aiProviderMenu')?.addEventListener('click', (event) => {
     const item = (event.target as HTMLElement | null)?.closest('.dropdown-item') as HTMLElement | null;
     const provider = item?.dataset.value;
     if (provider) switchProvider(provider);
-  });
-  document.getElementById('aiPromptSlotMenu')?.addEventListener('click', (event) => {
-    const item = (event.target as HTMLElement | null)?.closest('.dropdown-item') as HTMLElement | null;
-    const id = item?.dataset.value;
-    if (id) switchPrompt(id);
   });
   Object.entries(fields).forEach(([id, key]) => {
     const element = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
@@ -137,11 +120,6 @@ export function setupAiSettings(): void {
     const value = Math.max(1, Math.min(10, Number.parseInt(limit.value, 10) || 3));
     limit.value = String(value);
     updateConfig('ai_assistant.candidate_limit', value);
-  });
-  const prompt = document.getElementById('aiPrompt') as HTMLTextAreaElement | null;
-  prompt?.addEventListener('change', () => {
-    customPrompts[currentPromptId] = prompt.value;
-    updateConfig(`ai_assistant.prompt_${currentPromptId}`, prompt.value);
   });
 }
 
@@ -183,15 +161,5 @@ export function applyAiConfig(config: Record<string, unknown>): void {
   const defaults = PROVIDER_DEFAULTS[currentProvider];
   const model = document.getElementById('aiModel') as HTMLInputElement | null;
   if (model && defaults) model.placeholder = defaults.model;
-  currentPromptId = typeof config.prompt_id === 'string' ? config.prompt_id : 'custom_1';
-  customPrompts = {
-    custom_1: typeof config.prompt_custom_1 === 'string'
-      ? config.prompt_custom_1
-      : (typeof config.prompt === 'string' ? config.prompt : ''),
-    custom_2: typeof config.prompt_custom_2 === 'string' ? config.prompt_custom_2 : '',
-    custom_3: typeof config.prompt_custom_3 === 'string' ? config.prompt_custom_3 : ''
-  };
-  applyDropdownValue('aiPromptSlotBtn', 'aiPromptSlotMenu', currentPromptId);
-  const prompt = document.getElementById('aiPrompt') as HTMLTextAreaElement | null;
-  if (prompt) prompt.value = customPrompts[currentPromptId] ?? '';
+  applyPromptLibrary('association', config);
 }

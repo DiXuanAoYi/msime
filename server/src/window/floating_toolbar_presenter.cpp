@@ -73,6 +73,7 @@ constexpr ToolbarIcon kIconEmoji = {0xE76E, L"表"};
 constexpr ToolbarIcon kIconKeyboard = {0xE765, L"键"};
 constexpr ToolbarIcon kIconVoice = {0xE720, L"音"};
 constexpr ToolbarIcon kIconReply = {0xE8F2, L"嘴"};
+constexpr ToolbarIcon kIconClipboard = {0xE77F, L"剪"};
 constexpr ToolbarIcon kIconSettings = {0xE713, L"设"};
 
 float ToolbarUserScale()
@@ -535,6 +536,8 @@ void FloatingToolbarPresenter::RebuildScene()
         addGlyph(kIconVoice, []() { VoiceInput::ToggleRecording(); });
     if (items.reply)
         addGlyph(kIconReply, []() { OpenReplyStudioApplication(); });
+    if (items.clipboard)
+        addGlyph(kIconClipboard, []() { OpenPersonalLibraryApplication(); });
     if (items.settings)
     {
         addGlyph(kIconSettings, []() { OpenSettingsApplication(); });

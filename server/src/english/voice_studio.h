@@ -7,6 +7,8 @@
 
 namespace VoiceStudio
 {
+std::string LoadSavedDraft(const std::string &filename);
+std::string TranscribeAudio(const std::vector<float> &samples, const std::function<bool()> &cancelled);
 // Local drafts and explicit user actions only; no chat send/input automation.
 nlohmann::json Handle(const nlohmann::json &request, HWND owner);
 void Stop();

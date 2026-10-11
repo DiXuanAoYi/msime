@@ -444,7 +444,19 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     void _ScheduleCandidatePresenterCleanup(_In_ CCandidateListUIPresenter *pPresenter);
     void _DrainPendingCandidatePresenterCleanup();
 
+    void _ClearLastCommit();
+    void _RememberLastCommit(TfEditCookie ec, ITfComposition *composition);
+    bool _IsUndoCommitKey(ITfContext *context, WPARAM key);
+    void _RequestUndoCommit(ITfContext *context);
+    HRESULT _UndoLastCommit(TfEditCookie ec, ITfContext *context, uint64_t token, uint64_t serial);
+
   private:
+    ITfRange *_undoRange = nullptr;
+    ITfContext *_undoContext = nullptr;
+    std::wstring _undoText;
+    uint64_t _undoFocus = 0;
+    uint64_t _undoSerial = 0;
+    bool _undoKeyHeld = false;
     // functions for the composition object.
     HRESULT _HandleCompositionInputWorker(_In_ CCompositionProcessorEngine *pCompositionProcessorEngine,
                                           TfEditCookie ec, _In_ ITfContext *pContext, uint64_t requestId);

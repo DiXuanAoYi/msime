@@ -20,6 +20,7 @@ try {
         'server/build-release/bin/Release/local-asr/MetasequoiaLocalASR.exe',
         'server/build-release/bin/Release/local-asr/_internal/catalog.json',
         'server/build-release/bin/Release/local-asr/_internal/tts_catalog.json',
+        'server/build-release/bin/Release/local-asr/_internal/ocr_catalog.json',
         'server/build-release/bin/Release/MetasequoiaImeServerTests.exe',
         'server/build-release/bin/Release/MetasequoiaImeServerTests.pdb',
         'server/build-release/bin/Release/test_webview_contract.exe',

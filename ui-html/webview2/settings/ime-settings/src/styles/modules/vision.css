@@ -1,0 +1,61 @@
+#visionPanel label {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 12px 6px 0;
+  flex-wrap: wrap;
+}
+#visionPanel select,
+#visionPanel input {
+  max-width: 100%;
+  padding: 6px;
+  border: 1px solid var(--border-color, #aaa);
+  border-radius: 6px;
+}
+#visionPanel button {
+  margin: 4px;
+  padding: 7px 12px;
+}
+#visionPanel textarea {
+  padding: 12px;
+  border: 1px solid var(--border-color, #aaa);
+  border-radius: 8px;
+  resize: vertical;
+  background: var(--input-bg, transparent);
+  color: inherit;
+}
+#visionPanel .vision-conversation {
+  display: flex;
+  gap: 16px;
+}
+#visionPanel .vision-speaker {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-color, #aaa);
+  border-radius: 10px;
+}
+#visionPanel .vision-speaker textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+#visionPanel .vision-conversation.face {
+  flex-direction: column;
+}
+#visionPanel .vision-conversation.face .opposite.rotated {
+  transform: rotate(180deg);
+}
+#visionStatus {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-color, #25282c);
+  color: var(--text-color, #eee);
+  padding: 12px;
+  border-radius: 8px;
+  z-index: 1;
+}
+@media (max-width: 750px) {
+  #visionPanel .vision-conversation {
+    flex-direction: column;
+  }
+}

@@ -13,11 +13,12 @@ from qwen_tts import Qwen3TTSModel
 from tts_manager import serve
 from tts_stream import StreamingSynthesizer
 
-def load(root, model_id):
+def load(root, model_id, force_cpu=False):
     torch.set_num_threads(4)
+    use_cuda = torch.cuda.is_available() and not force_cpu
     model = Qwen3TTSModel.from_pretrained(str(root / model_id / 'original'),
-        dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-        device_map='cuda:0' if torch.cuda.is_available() else 'cpu', attn_implementation='sdpa', local_files_only=True)
+        dtype=torch.bfloat16 if use_cuda else torch.float32,
+        device_map='cuda:0' if use_cuda else 'cpu', attn_implementation='sdpa', local_files_only=True)
     languages={'zh':'Chinese','en':'English','ja':'Japanese','ko':'Korean','de':'German','fr':'French','ru':'Russian','es':'Spanish','it':'Italian','pt':'Portuguese'}
     def synthesize(text, voice, language, speed, options, emit, cancelled):
         if language not in languages:
@@ -53,7 +54,7 @@ def load(root, model_id):
             flush()
         finally:
             handle.remove()
-    return StreamingSynthesizer(synthesize, 'CPU · Qwen 流式', accepts_options=True)
+    return StreamingSynthesizer(synthesize, ('CUDA' if use_cuda else 'CPU') + ' · Qwen 流式', accepts_options=True)
 
 if __name__ == '__main__':
     serve(Path(sys.argv[1]),sys.argv[2],load,externally_locked=True)

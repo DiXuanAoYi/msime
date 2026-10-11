@@ -24,8 +24,18 @@ class Runtime(OrtCpuRuntime):
         sessions['codec_decode_step'] = self._session(self.codec_meta_path.parent / self.codec_meta['files']['decode_step'])
         return sessions
 
-def load(root, model_id):
-    runtime = Runtime(root / model_id / 'original', thread_count=4, max_new_frames=1125)
+def load(root, model_id, prefer_gpu=False):
+    device = 'ONNX CPU · 流式'
+    if prefer_gpu:
+        try:
+            runtime = Runtime(root / model_id / 'original', thread_count=4, max_new_frames=1125, execution_provider='cuda')
+            device = 'ONNX CUDA 优先 · 不支持的算子回退 CPU · 流式'
+        except Exception as error:
+            print('MOSS GPU unavailable; CPU fallback:', str(error)[:300], file=sys.stderr, flush=True)
+            runtime = Runtime(root / model_id / 'original', thread_count=4, max_new_frames=1125)
+            device = 'ONNX CPU · GPU 初始化失败后回退 · 流式'
+    else:
+        runtime = Runtime(root / model_id / 'original', thread_count=4, max_new_frames=1125)
     tokenizer = spm.SentencePieceProcessor(model_file=str(runtime.resolve_manifest_relative_path(runtime.manifest['model_files']['tokenizer_model'])))
     voices = {v['voice']: v for v in runtime.list_builtin_voices()}
     defaults = dict(runtime.manifest['generation_defaults'])
@@ -71,7 +81,14 @@ def load(root, model_id):
             flush()
         finally:
             runtime.codec_streaming_session.reset()
-    return StreamingSynthesizer(generate, 'ONNX CPU · 流式', accepts_options=True)
+    if prefer_gpu and runtime.execution_provider == 'cuda':
+        # Prime kernels without playing or retaining a spoken-text cache. This also
+        # resolves ONNX's per-session CPU fallback before reporting readiness.
+        generate('你好。', 'Xiaoyu', 'zh', 1, {'max_new_frames':12}, lambda *args:None, lambda:False)
+        gpu = [name for name, session in runtime.sessions.items() if 'CUDAExecutionProvider' in session.get_providers()]
+        cpu = [name for name, session in runtime.sessions.items() if 'CUDAExecutionProvider' not in session.get_providers()]
+        device = 'ONNX CUDA · 流式' if gpu and not cpu else ('ONNX CUDA + CPU 回退 · 流式' if gpu else 'ONNX CPU · GPU 算子不可用后回退 · 流式')
+    return StreamingSynthesizer(generate, device, accepts_options=True)
 
 if __name__ == '__main__':
     serve(Path(sys.argv[1]), sys.argv[2], load, externally_locked=True)

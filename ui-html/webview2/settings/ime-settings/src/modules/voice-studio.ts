@@ -1,5 +1,6 @@
 import { serializeHostMessage } from '../../../../shared/messages';
 import { onHostMessage } from '../utils/host-messages';
+import { personalAction } from './personal-library';
 import { fillVoices, LANGUAGE_NAMES, parseModelOptions, renderModelControls, type SpeechModel, type VoiceChoice } from './speech-model-options';
 
 type Action='status'|'generate'|'stop'|'recordStart'|'recordStop'|'import'|'transcribe'|'play'|'route'|'copy'|'save';
@@ -23,7 +24,7 @@ export async function openVoiceStudio(text:string):Promise<void>{
 function fingerprint():string{return JSON.stringify([field<HTMLTextAreaElement>('studioText')?.value,field<HTMLSelectElement>('studioLanguage')?.value,field<HTMLSelectElement>('studioVoice')?.value,field<HTMLInputElement>('studioRate')?.value,parameters]);}
 function updateButtons():void{
   const busy=['working','recording','routing'].includes(phase);
-  for(const id of ['studioPlay','studioCopy','studioSave','studioRoute']){const button=field<HTMLButtonElement>(id);if(button)button.disabled=!artifact||dirty||busy||(id==='studioRoute'&&!field<HTMLSelectElement>('studioDevice')?.value);}
+  for(const id of ['studioPlay','studioCopy','studioSave','studioRoute','studioFavorite']){const button=field<HTMLButtonElement>(id);if(button)button.disabled=!artifact||dirty||busy||(id==='studioRoute'&&!field<HTMLSelectElement>('studioDevice')?.value);}
   for(const id of ['studioGenerate','studioImport','studioRecord']){const button=field<HTMLButtonElement>(id);if(button)button.disabled=busy;}
   const end=field<HTMLButtonElement>('studioRecordStop');if(end)end.disabled=phase!=='recording';
   const count=field('studioBytes');if(count)count.textContent=`${new TextEncoder().encode(field<HTMLTextAreaElement>('studioText')?.value??'').length} / 2000 字节 · 最长音频 90 秒`;
@@ -42,7 +43,7 @@ export function applyVoiceStudioConfig(value:Record<string,string>, info:SpeechM
   const current=language.value||'zh';
   const languages=value.provider==='local'&&info.languages?.length?info.languages:['zh','en','ja','ko','fr','de','es','it','pt','ru'];
   language.replaceChildren();for(const id of languages)language.add(new Option(LANGUAGE_NAMES[id]??id,id));language.value=languages.includes(current)?current:languages[0];
-  const choices=value.provider==='local'?(info.voices??[]):value.provider==='sapi'?sapiVoices:[];
+  const choices=value.provider==='sapi'?sapiVoices:(info.voices??[]);
   const selected=value[`${value.provider}_voice_${language.value==='zh'?'zh':'en'}`]??'';
   fillVoices(voice,choices,selected);
   parameters={...(parseModelOptions(value.local_options)[value.local_model]??{})};
@@ -55,6 +56,8 @@ export function setupVoiceStudio():void{
   const panel=field<HTMLDetailsElement>('voiceStudioPanel');if(!panel||panel.dataset.ready)return;panel.dataset.ready='1';
   for(const id of ['studioText','studioLanguage','studioVoice','studioRate'])field(id)?.addEventListener('input',()=>{dirty=true;refreshDialect();updateButtons();});
   field('studioDevice')?.addEventListener('change',updateButtons);
+  field('studioFavorite')?.addEventListener('click',()=>{if(!artifact||dirty)return;personalAction('favorite',{artifactId:artifact,name:(field<HTMLTextAreaElement>('studioText')?.value??'收藏语音').slice(0,60)});});
+  onHostMessage('personalLibraryResponse',message=>{if(message.requestId.startsWith('library-favorite-')&&field('studioStatus'))field('studioStatus')!.textContent=message.ok?'已收藏，可在“剪贴板与资料库”的语音收藏中播放、复制。':message.message;});
   field('studioGenerate')?.addEventListener('click',()=>{
     const text=field<HTMLTextAreaElement>('studioText')!.value.trim();const bytes=new TextEncoder().encode(text).length;
     if(!bytes||bytes>2000){field('studioStatus')!.textContent='请输入 1–2000 UTF-8 字节的文字，过长内容请分段。';return;}

@@ -108,6 +108,7 @@ void CMetasequoiaIME::_TerminateComposition(TfEditCookie ec, _In_ ITfContext *pC
         // the composition. The cancel path has already wiped the range, so a
         // cancelled composition classifies to zero and does not count.
         _CaptureCompositionStats(ec, terminatingComposition);
+        _RememberLastCommit(ec, terminatingComposition);
 
         // remove the display attribute from the composition range.
         _ClearCompositionDisplayAttributes(ec, pContext, terminatingComposition);
@@ -115,6 +116,7 @@ void CMetasequoiaIME::_TerminateComposition(TfEditCookie ec, _In_ ITfContext *pC
         const HRESULT endResult = SafeEndComposition(terminatingComposition, ec);
         if (FAILED(endResult) && _pComposition == terminatingComposition)
         {
+            _ClearLastCommit();
             // if we fail to EndComposition, then we need to close the reverse reading window.
             _DeleteCandidateList(TRUE, pContext);
         }

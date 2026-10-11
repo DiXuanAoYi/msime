@@ -34,6 +34,8 @@ const MODULE_IDS = [
   'tools-settings',
   'ai-settings',
   'reply-studio',
+  'personal-library',
+  'vision',
   'shortcut',
   'help-settings',
   'about-settings',

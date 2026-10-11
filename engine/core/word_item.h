@@ -29,6 +29,7 @@ enum class CandidateSource
     // 万象语法模型（octagram .gram）在词格 n-best 上重排挑中的那一句。句子仍是词格
     // 解出来的，搭配强度表只负责挑；落库/学习判定与 NeuralDesktop/NeuralKeyboard 同类。
     Collocation,
+    AppDictionary,
 };
 
 struct WordItem

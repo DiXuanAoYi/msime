@@ -22,6 +22,9 @@ struct ConfigEntry
 
 bool KeyNamesACredential(const std::string &key)
 {
+    // Generation budgets are not authentication tokens.
+    if (key == "max_tokens")
+        return false;
     return key.find("token") != std::string::npos || key.find("secret") != std::string::npos ||
            key.find("app_key") != std::string::npos;
 }

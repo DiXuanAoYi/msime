@@ -3,6 +3,8 @@
 #include "window/caret_state_indicator_policy.h"
 #include "ime_config.h"
 #include "config/ime_config_internal.h"
+#include "config/prompt_library.h"
+#include "settings/vision_config.h"
 #include <Windows.h>
 #include <algorithm>
 #include <atomic>
@@ -508,6 +510,7 @@ bool LoadImeConfig()
         g_floating_toolbar_items.screen_keyboard = tbl["general"]["floating_toolbar_screen_keyboard"].value_or(false);
         g_floating_toolbar_items.voice = tbl["general"]["floating_toolbar_voice"].value_or(true);
         g_floating_toolbar_items.reply = tbl["general"]["floating_toolbar_reply"].value_or(true);
+        g_floating_toolbar_items.clipboard = tbl["general"]["floating_toolbar_clipboard"].value_or(true);
         g_floating_toolbar_items.settings = tbl["general"]["floating_toolbar_settings"].value_or(true);
         {
             const double scale = tbl["general"]["floating_toolbar_scale"].value_or(1.0);
@@ -708,6 +711,7 @@ bool LoadImeConfig()
         }
         // Parse into a local and publish it in one step, so readers never observe half-rewritten strings or maps.
         Speech::LoadConfig(tbl);
+        VisionConfig::Load(tbl);
         VoiceInputConfig voice;
         voice.enabled = tbl["voice_input"]["voice_input"].value_or(true);
         voice.hotkey_ralt = tbl["voice_input"]["hotkey_ralt"].value_or(true);
@@ -785,6 +789,7 @@ bool LoadImeConfig()
         if (voice.polish_prompt_custom_1.empty())
             voice.polish_prompt_custom_1 = voice.polish_prompt;
         voice.polish_prompt_custom_2 = tbl["voice_input"]["polish_prompt_custom_2"].value_or(std::string());
+        voice.prompt_library = tbl["voice_input"]["prompt_library"].value_or(std::string());
         voice.polish_prompt_custom_3 = tbl["voice_input"]["polish_prompt_custom_3"].value_or(std::string());
         voice.language = tbl["voice_input"]["language"].value_or(std::string("zh-cn"));
         // notification_sound is retained as a fallback for configs written by older versions.
@@ -856,6 +861,9 @@ bool LoadImeConfig()
         g_ai_assistant.prompt = g_ai_assistant.prompt_id == "custom_2"   ? g_ai_assistant.prompt_custom_2
                                 : g_ai_assistant.prompt_id == "custom_3" ? g_ai_assistant.prompt_custom_3
                                                                          : g_ai_assistant.prompt_custom_1;
+        g_ai_assistant.prompt_library = tbl["ai_assistant"]["prompt_library"].value_or(std::string());
+        if (const auto active = PromptLibrary::Active(g_ai_assistant.prompt_library); !active.empty())
+            g_ai_assistant.prompt = active;
         g_tencent_tmt.enabled = tbl["tencent_tmt"]["enabled"].value_or(true);
         g_tencent_tmt.secret_id = tbl["tencent_tmt"]["secret_id"].value_or(std::string());
         g_tencent_tmt.secret_key = tbl["tencent_tmt"]["secret_key"].value_or(std::string());

@@ -175,6 +175,8 @@ void RenderFloatingToolbarState(ICoreWebView2 *webview)
                                         : L"window.setToolbarItem('screen-keyboard',false);");
     script.append(items.voice ? L"window.setToolbarItem('voice-input',true);"
                               : L"window.setToolbarItem('voice-input',false);");
+    script.append(items.clipboard ? L"window.setToolbarItem('clipboard-library',true);"
+                                  : L"window.setToolbarItem('clipboard-library',false);");
     script.append(items.reply ? L"window.setToolbarItem('reply-studio',true);"
                               : L"window.setToolbarItem('reply-studio',false);");
     script.append(items.settings ? L"window.setToolbarItem('settings',true);"
@@ -479,6 +481,10 @@ HRESULT OnControllerCreatedFtbWnd(      //
                     else if (type == "voiceInput")
                     {
                         VoiceInput::ToggleRecording();
+                    }
+                    else if (type == "openPersonalLibrary")
+                    {
+                        OpenPersonalLibraryApplication();
                     }
                     else if (type == "openReplyStudio")
                     {

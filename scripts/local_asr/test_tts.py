@@ -42,7 +42,7 @@ class LocalTtsTests(unittest.TestCase):
 
     def test_catalog_has_sizes_and_pinned_managed_downloads(self):
         managed=[m for m in tts.CATALOG if m['engine'] not in ('external', 'edge')]
-        self.assertEqual({m['id'] for m in managed}, {'kokoro','qwen-0.6b','qwen-1.7b','moss-nano','voxtral-tts'})
+        self.assertEqual({m['id'] for m in managed}, {'kokoro','qwen-0.6b','qwen-1.7b','moss-nano','voxtral-tts','mms-bod','mms-kaz'})
         for m in tts.CATALOG:
             if m in managed:
                 self.assertGreater(m['downloadBytes'], 0)

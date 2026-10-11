@@ -7,6 +7,7 @@
 #include <shared_mutex>
 #include <string>
 #include "voice-input/voice_providers.h"
+#include "config/prompt_library.h"
 
 using namespace ime_config_detail;
 
@@ -17,6 +18,8 @@ VoiceInputConfig GetConfiguredVoiceInput()
 
 bool SetConfiguredVoiceInputString(const std::string &key, const std::string &value)
 {
+    if (key == "prompt_library" && !PromptLibrary::Validate(value))
+        return false;
     if (key == "language" && value != "zh-cn" && value != "en" && value != "auto")
         return false;
     if (key == "commit_mode" && value != "tsf" && value != "sendinput" && value != "ctrl_v")
@@ -100,6 +103,8 @@ bool SetConfiguredVoiceInputString(const std::string &key, const std::string &va
         target = &VoiceInputConfig::polish_endpoint;
     else if (key == "polish_model")
         target = &VoiceInputConfig::polish_model;
+    else if (key == "prompt_library")
+        target = &VoiceInputConfig::prompt_library;
     else if (key == "polish_prompt_id")
         target = &VoiceInputConfig::polish_prompt_id;
     else if (key == "polish_prompt")
@@ -388,6 +393,8 @@ static std::string AiAssistantEffectiveValue(const std::string &key, const std::
 
 bool SetConfiguredAiAssistantString(const std::string &key, const std::string &value)
 {
+    if (key == "prompt_library" && !PromptLibrary::Validate(value))
+        return false;
     if (key == "prompt_id" && value != "custom_1" && value != "custom_2" && value != "custom_3")
         return false;
     if (key == "provider")
@@ -454,6 +461,8 @@ bool SetConfiguredAiAssistantString(const std::string &key, const std::string &v
     std::string *target = nullptr;
     if (key == "token")
         target = &g_ai_assistant.token;
+    else if (key == "prompt_library")
+        target = &g_ai_assistant.prompt_library;
     else if (key == "prompt_id")
         target = &g_ai_assistant.prompt_id;
     else if (key == "prompt_custom_1")
@@ -467,6 +476,8 @@ bool SetConfiguredAiAssistantString(const std::string &key, const std::string &v
     if (!target || !WriteConfiguredValue("ai_assistant", key, EscapeTomlBasicString(value)))
         return false;
     *target = value;
+    if (key == "prompt_library")
+        g_ai_assistant.prompt = PromptLibrary::Active(value);
     if (key == "prompt_custom_1")
         WriteConfiguredValue("ai_assistant", "prompt", EscapeTomlBasicString(""));
     if (key == "prompt")

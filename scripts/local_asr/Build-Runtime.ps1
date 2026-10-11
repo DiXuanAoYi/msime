@@ -15,7 +15,7 @@ if (!(Test-Path "$venv/Scripts/python.exe")) {
     if ($LASTEXITCODE) { throw 'Could not create local ASR build environment' }
 }
 $py = "$venv/Scripts/python.exe"
-foreach ($native in @('audiocpp.dll','audiocpp_gguf.exe','vcomp140.dll')) {
+foreach ($native in @('audiocpp.dll','audiocpp_gguf.exe','vcomp140.dll','vulkan-1.dll')) {
     if (!(Test-Path -LiteralPath "$PSScriptRoot/native-voxtral/$native")) {
         throw 'Run Build-Voxtral.ps1 before packaging the local runtime.'
     }
@@ -34,12 +34,20 @@ if ($LASTEXITCODE) { throw 'Local ASR tests failed' }
     --add-data "$PSScriptRoot/tts_manager.py;worker" --add-data "$PSScriptRoot/tts_qwen_worker.py;worker" `
     --add-data "$PSScriptRoot/tts_qwen_cuda_worker.py;worker" --add-data "$PSScriptRoot/tts_moss_worker.py;worker" `
     --add-data "$PSScriptRoot/tts_edge_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_moss_cuda_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_mms_worker.py;worker" --add-data "$PSScriptRoot/tts_mms_cuda_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_kokoro_cuda_worker.py;worker" `
+    --add-data "$PSScriptRoot/tts_kokoro_worker.py;worker" --add-data "$PSScriptRoot/ocr_vlm_cpu_worker.py;worker" `
+    --add-data "$PSScriptRoot/ocr_catalog.json;." --add-data "$PSScriptRoot/ocr_catalog.json;worker" `
+    --add-data "$PSScriptRoot/ocr_runtime.py;worker" --add-data "$PSScriptRoot/ocr_vlm_worker.py;worker" `
+    --add-data "$PSScriptRoot/ocr_paddle_worker.py;worker" --add-data "$PSScriptRoot/ocr_manager.py;worker" `
     --add-data "$PSScriptRoot/tts_options.py;worker" `
     --add-data "$PSScriptRoot/tts_voxtral_worker.py;worker" --add-data "$PSScriptRoot/tts_voxtral_native.py;worker" `
     --add-data "$PSScriptRoot/tts_voxtral_convert.py;worker" `
     --add-binary "$PSScriptRoot/native-voxtral/audiocpp.dll;worker/native-voxtral" `
     --add-binary "$PSScriptRoot/native-voxtral/audiocpp_gguf.exe;worker/native-voxtral" `
     --add-binary "$PSScriptRoot/native-voxtral/vcomp140.dll;worker/native-voxtral" `
+    --add-binary "$PSScriptRoot/native-voxtral/vulkan-1.dll;worker/native-voxtral" `
     --add-data "$PSScriptRoot/tts_stream.py;worker" --add-data "$PSScriptRoot/vendor;worker/vendor" `
     --add-data "$PSScriptRoot/../../engine/contracts/tts_stream.json;." --add-data "$PSScriptRoot/../../engine/contracts/tts_stream.json;worker" `
     --add-data "$PSScriptRoot/worker_dependencies.py;worker" `

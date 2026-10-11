@@ -1175,6 +1175,7 @@ STDAPI CMetasequoiaIME::OnCompositionTerminated(TfEditCookie ecWrite, _In_ ITfCo
     // Do NOT SetText(empty) note below), so this is a real commit and must be
     // counted before any teardown runs.
     _CaptureCompositionStats(ecWrite, terminatedComposition);
+    _RememberLastCommit(ecWrite, terminatedComposition);
 
     _pComposition->Release();
     _pComposition = nullptr;

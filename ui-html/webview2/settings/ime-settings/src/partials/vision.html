@@ -1,0 +1,316 @@
+<div id="visionPanel" class="content">
+  <h2>截图、OCR 与翻译</h2>
+  <p>
+    截图和识别结果可分别保存；表格使用 HTML，公式使用
+    LaTeX，代码保留换行。请对照原图检查复杂版式。
+  </p>
+  <div class="section voice-section">
+    <h3>截图与照片</h3>
+    <div class="local-asr-actions">
+      <button id="visionCapture">框选截图</button
+      ><button id="visionLong">长截图</button
+      ><label
+        ><input
+          id="visionX"
+          type="checkbox"
+          data-vision="capture_x"
+        />左右</label
+      ><label
+        ><input
+          id="visionY"
+          type="checkbox"
+          checked
+          data-vision="capture_y"
+        />上下</label
+      ><button id="visionFinish">完成长截图</button
+      ><button id="visionStop">停止 / 取消</button>
+    </div>
+    <p>
+      长截图：框选后缓慢滚动，每次保留大半画面重叠，按 Esc
+      完成。双方向请沿相邻区域逐行移动，未经过的区域不会被补造。
+    </p>
+    <div class="local-asr-actions">
+      <label
+        >导入照片
+        <input
+          id="visionFile"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/bmp" /></label
+      ><button id="visionCamera">打开摄像头</button
+      ><button id="visionShutter" disabled>拍照</button
+      ><button id="visionCameraStop" disabled>关闭摄像头</button
+      ><button id="visionSaveImage">保存原图</button>
+    </div>
+    <video
+      id="visionVideo"
+      hidden
+      autoplay
+      muted
+      playsinline
+      style="max-width: 100%; max-height: 360px"
+    ></video>
+    <img
+      id="visionImage"
+      hidden
+      alt="待识别原图"
+      style="
+        max-width: 100%;
+        max-height: 460px;
+        object-fit: contain;
+        margin-top: 12px;
+      "
+    />
+    <p id="visionDimensions"></p>
+  </div>
+  <div class="section voice-section">
+    <h3>提取与编辑</h3>
+    <label
+      >识别服务
+      <select id="visionProvider" data-vision="provider">
+        <option value="windows">Windows 本机 OCR（离线）</option>
+        <option value="local">下载的本地模型（离线）</option>
+        <option value="shiliu">石榴智能 OCR（云端）</option>
+        <option value="tencent">腾讯云 OCR</option>
+        <option value="baidu">百度智能云 OCR</option>
+      </select></label
+    >
+    <label
+      >内容
+      <select id="visionTask" data-vision="task">
+        <option value="document">混合文档</option>
+        <option value="text">文字</option>
+        <option value="table">表格 → HTML</option>
+        <option value="formula">公式 → LaTeX</option>
+        <option value="code">代码</option>
+      </select></label
+    >
+    <label
+      >本地最大输出长度
+      <input
+        type="number"
+        min="128"
+        max="8192"
+        step="128"
+        value="4096"
+        data-vision="max_tokens"
+    /></label>
+    <button id="visionRecognize">识别图片</button>
+    <p id="visionPrivacy">
+      默认本机离线；选择云端后，点击识别会把当前图片发送到所选服务。Windows 通用
+      OCR 可能丢失代码缩进、下划线和公式结构；此类内容请选文档模型并核对原图。
+    </p>
+    <textarea
+      id="visionText"
+      rows="12"
+      aria-label="可编辑的识别原文"
+      placeholder="识别结果，可编辑，也可直接粘贴文字翻译"
+      spellcheck="false"
+      style="
+        width: 100%;
+        box-sizing: border-box;
+        font-family: Consolas, &quot;Microsoft YaHei&quot;, monospace;
+      "
+    ></textarea>
+    <div class="local-asr-actions">
+      <button id="visionCopy">复制文字</button
+      ><button id="visionExport">导出编辑结果</button
+      ><button id="visionRaw">导出原始识别 JSON</button>
+    </div>
+  </div>
+  <div class="section voice-section">
+    <h3>翻译</h3>
+    <label
+      >服务
+      <select id="visionTranslationProvider" data-vision="translation_provider">
+        <option value="dictionary">本机词典（词语查询）</option>
+        <option value="text_model">已配置的文本润色 API</option>
+        <option value="tencent">已配置的腾讯翻译</option>
+        <option value="niutrans">已配置的小牛翻译</option>
+        <option value="custom">已配置的自定义翻译</option>
+      </select></label
+    >
+    <p>
+      整段翻译使用所选服务；本机词典只查询已收录的词句。云端凭据沿用语音/翻译设置，点击翻译才提交原文。
+    </p>
+    <label
+      >原文语言
+      <select id="visionSource" data-vision="source_language"></select></label
+    ><label
+      >译文语言
+      <select id="visionTarget" data-vision="target_language"></select
+    ></label>
+    <div class="local-asr-actions">
+      <button id="visionTranslate">翻译编辑后的文字</button
+      ><button id="visionScreen">框选并启动屏幕翻译</button
+      ><label
+        >刷新间隔（毫秒）<input
+          data-vision="screen_interval_ms"
+          type="number"
+          min="1500"
+          max="30000"
+          step="500"
+          value="2000"
+      /></label>
+    </div>
+    <p>
+      屏幕翻译持续读取框选区域并覆盖译文，按 Esc
+      停止；停止后可在下方继续编辑和保存。
+    </p>
+    <textarea
+      id="visionTranslation"
+      rows="9"
+      aria-label="可编辑的译文"
+      style="width: 100%; box-sizing: border-box"
+    ></textarea>
+    <div class="local-asr-actions">
+      <button id="visionCopyTranslation">复制译文</button
+      ><button id="visionExportTranslation">保存译文</button>
+    </div>
+  </div>
+  <div class="section voice-section">
+    <h3>对话翻译</h3>
+    <div class="local-asr-actions">
+      <label
+        >显示
+        <select id="conversationLayout">
+          <option value="parallel">并排</option>
+          <option value="face">面对面</option>
+        </select></label
+      ><button id="conversationFlip">翻转对面文字 180°</button
+      ><button id="conversationSwap">对调双方位置</button>
+    </div>
+    <div id="conversationCards" class="vision-conversation">
+      <div id="conversationA" class="vision-speaker">
+        <h4>我方</h4>
+        <label
+          >语言
+          <select id="conversationLangA"></select></label
+        ><textarea
+          id="conversationTextA"
+          rows="5"
+          aria-label="我方原文"
+        ></textarea
+        ><button id="conversationTranslateA">翻译给对方</button
+        ><textarea
+          id="conversationResultA"
+          rows="5"
+          aria-label="我方话语的译文"
+        ></textarea>
+      </div>
+      <div id="conversationB" class="vision-speaker">
+        <h4>对方</h4>
+        <label
+          >语言
+          <select id="conversationLangB"></select></label
+        ><textarea
+          id="conversationTextB"
+          rows="5"
+          aria-label="对方原文"
+        ></textarea
+        ><button id="conversationTranslateB">翻译给我</button
+        ><textarea
+          id="conversationResultB"
+          rows="5"
+          aria-label="对方话语的译文"
+        ></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="section voice-section">
+    <h3>声音 → 字幕 / 字幕翻译</h3>
+    <p>
+      沿用已启动的本地语音识别模型，约每 5
+      秒识别一段。开启翻译后使用上方选择的翻译服务。识别不会上屏或发送。
+    </p>
+    <label
+      >声音来源
+      <select id="subtitleSource">
+        <option value="microphone">麦克风</option>
+        <option value="playback">系统播放声音</option>
+      </select></label
+    ><label><input type="checkbox" id="subtitleTranslate" />同时翻译</label
+    ><button id="subtitleStart">开始字幕</button
+    ><button id="subtitleFinish">完成并识别最后一段</button
+    ><button id="subtitleStop">立即停止</button
+    ><textarea
+      id="subtitleSrt"
+      rows="12"
+      aria-label="可编辑的 SRT 字幕"
+      style="width: 100%; box-sizing: border-box"
+      placeholder="字幕含时间轴，可以编辑后导出"
+    ></textarea
+    ><button id="subtitleExport">导出 SRT</button
+    ><button id="subtitleCopy">复制字幕</button>
+  </div>
+  <p id="visionStatus" role="status" aria-live="polite">就绪</p>
+  <details class="section voice-section">
+    <summary>云 OCR 凭据（自动保存）</summary>
+    <p>凭据仅保存在本机配置中。没有凭据也可使用 Windows 本机 OCR。</p>
+    <p>
+      <a
+        data-open="https://market.shiliuai.com/general-ocr"
+        href="https://market.shiliuai.com/general-ocr"
+        >石榴智能：开通与购买</a
+      >
+      ·
+      <a
+        data-open="https://market.shiliuai.com/doc/general-ocr"
+        href="https://market.shiliuai.com/doc/general-ocr"
+        >接口文档</a
+      >
+    </p>
+    <label
+      >APPCODE
+      <input type="password" autocomplete="off" data-vision="shiliu_appcode"
+    /></label>
+    <p>
+      <a
+        data-open="https://console.cloud.tencent.com/ocr"
+        href="https://console.cloud.tencent.com/ocr"
+        >腾讯云 OCR 控制台</a
+      >
+    </p>
+    <label
+      >SecretId
+      <input
+        type="password"
+        autocomplete="off"
+        data-vision="tencent_secret_id" /></label
+    ><label
+      >SecretKey
+      <input
+        type="password"
+        autocomplete="off"
+        data-vision="tencent_secret_key" /></label
+    ><label
+      >地域 <input value="ap-guangzhou" data-vision="tencent_region"
+    /></label>
+    <p>
+      <a
+        data-open="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"
+        href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"
+        >百度智能云 OCR 控制台</a
+      >
+    </p>
+    <label
+      >API Key
+      <input
+        type="password"
+        autocomplete="off"
+        data-vision="baidu_api_key" /></label
+    ><label
+      >Secret Key
+      <input type="password" autocomplete="off" data-vision="baidu_secret_key"
+    /></label>
+  </details>
+  <details id="localOcrPanel" class="section voice-section">
+    <summary>本地 OCR 模型 · 按需下载</summary>
+    <p>
+      只在点击下载时获取模型。大小指权重和模型文件，首次启动的运行依赖另计；不会自动下载其他模型。
+    </p>
+    <button id="localOcrRefresh">刷新</button
+    ><button id="localOcrStop">停止本地服务</button>
+    <p id="localOcrStatus"></p>
+    <div id="localOcrModels"></div>
+  </details>
+</div>

@@ -114,7 +114,7 @@ def download(root, model_id):
             for file in entry["files"]:
                 if cancel.exists():
                     raise InterruptedError("已暂停；再次下载将续传")
-                target = dest / ("original" if entry["engine"] in ('qwen', 'moss', 'voxtral') else "archives") / file["name"]
+                target = dest / ("original" if entry["engine"] in ('qwen', 'moss', 'voxtral', 'ocr', 'mms', 'cosyvoice') else "archives") / file["name"]
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists() and target.stat().st_size == file["bytes"] and digest(target) == file["sha256"]:
                     done += file["bytes"]
@@ -156,7 +156,7 @@ def download(root, model_id):
                     part.unlink(missing_ok=True)
                     raise ValueError("模型校验失败，损坏文件已移除，请重新下载")
                 os.replace(part, target)
-            if entry["engine"] not in ('qwen', 'moss', 'voxtral'):
+            if entry["engine"] not in ('qwen', 'moss', 'voxtral', 'ocr', 'mms', 'cosyvoice'):
                 report("extracting", "校验通过，正在展开运行包")
                 staging = dest / "unpacking"
                 safe_extract(dest / "archives" / entry["files"][0]["name"], staging, entry["diskBytes"] * 2, cancel.exists)
@@ -290,36 +290,54 @@ def run_qwen(root, model_id, worker_name="qwen_worker.py", guard=lambda: True):
             return
         stop = root / "stop"
         stop.unlink(missing_ok=True)
-        atomic_json(root / "service.json", dict(state="loading", model=model_id,
+        atomic_json(root / "service.json", dict(state="loading", model=model_id, operation=os.environ.get('MSIME_TTS_OPERATION', ''),
             message="首次启动正在准备模型运行依赖（额外下载，不计入模型大小）", pid=os.getpid()))
         env = dict(os.environ, UV_CACHE_DIR=str(root / "runtime-cache"),
                    HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
         worker = BASE / "worker" if getattr(sys, "frozen", False) else BASE
         command = [str(BASE / "uv.exe"), "run", "--python", "3.12", "--no-project", "--script",
                    str(worker / worker_name), str(root), model_id]
+        fallback_worker = {
+            'tts_kokoro_cuda_worker.py':'tts_kokoro_worker.py',
+            'tts_moss_cuda_worker.py':'tts_moss_worker.py',
+            'tts_qwen_cuda_worker.py':'tts_qwen_worker.py',
+            'tts_mms_cuda_worker.py':'tts_mms_worker.py',
+            'ocr_vlm_worker.py':'ocr_vlm_cpu_worker.py',
+        }.get(worker_name)
         try:
             if getattr(sys, "frozen", False) and sys.platform == "win32":
                 # PyInstaller's DLL search directory must not leak into another Python ABI.
                 import ctypes
                 ctypes.windll.kernel32.SetDllDirectoryW(None)
             with (root / "runtime-install.log").open("w", encoding="utf-8") as output:
-                child = subprocess.Popen(command, env=env, stdout=output, stderr=output,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-                while child.poll() is None:
-                    if stop.exists():
-                        # taskkill is limited to this owned worker tree; never terminate other Python processes.
-                        subprocess.run([str(Path(os.environ["SystemRoot"]) / "System32" / "taskkill.exe"),
-                                        "/PID", str(child.pid), "/T", "/F"],
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-                        child.wait(timeout=15)
-                        atomic_json(root / "service.json", dict(state="stopped", model=model_id, message="已停止"))
-                        return
-                    time.sleep(0.5)
-                if child.returncode:
-                    raise RuntimeError("模型运行依赖安装或启动失败，详情见 runtime-install.log")
+                while True:
+                    child = subprocess.Popen(command, env=env, stdout=output, stderr=output,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                    while child.poll() is None:
+                        if stop.exists():
+                            # Only this owned worker tree; never terminate other Python processes.
+                            subprocess.run([str(Path(os.environ["SystemRoot"]) / "System32" / "taskkill.exe"),
+                                            "/PID", str(child.pid), "/T", "/F"],
+                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                            child.wait(timeout=15)
+                            atomic_json(root / "service.json", dict(state="stopped", model=model_id, message="已停止"))
+                            return
+                        time.sleep(0.5)
+                    try:state=json.loads((root/'service.json').read_text(encoding='utf8'))
+                    except (OSError,ValueError):state={}
+                    failed=child.returncode or state.get('state')=='error'
+                    if failed and fallback_worker and guard() and not stop.exists():
+                        output.write('\nGPU worker failed; retrying once on CPU.\n');output.flush()
+                        command[command.index('--script')+1]=str(worker/fallback_worker)
+                        fallback_worker=None
+                        env['MSIME_GPU_FALLBACK']='1';env['CUDA_VISIBLE_DEVICES']=''
+                        atomic_json(root/'service.json',dict(state='loading',model=model_id,operation=os.environ.get('MSIME_TTS_OPERATION',''),pid=os.getpid(),message='GPU 运行组件不兼容，正在回退 CPU'))
+                        continue
+                    if child.returncode:raise RuntimeError("模型运行依赖安装或启动失败，详情见 runtime-install.log")
+                    break
         except Exception as error:
-            atomic_json(root / "service.json", dict(state="error", model=model_id, message=str(error)[:300]))
+            atomic_json(root / "service.json", dict(state="error", model=model_id, operation=os.environ.get('MSIME_TTS_OPERATION', ''), message=str(error)[:300]))
         finally:
             (root / "service-token.txt").unlink(missing_ok=True)
 
@@ -341,7 +359,13 @@ def main():
 
 
 if __name__ == "__main__":
-    if '--tts' in sys.argv:
+    if '--image-job' in sys.argv:
+        from image_ops import run_job
+        run_job(sys.argv[sys.argv.index('--image-job')+1])
+    elif '--ocr' in sys.argv:
+        import ocr_manager
+        ocr_manager.main()
+    elif '--tts' in sys.argv:
         import tts_manager
         tts_manager.main()
     else:

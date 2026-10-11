@@ -11,6 +11,12 @@ callback facade in `native_voxtral_stream.inc`. The upstream pull-event C API
 does not expose synchronous TTS event sinks, so the facade is required to
 deliver audio during generation instead of waiting for the final result.
 
+The facade also exposes weight-free Vulkan device enumeration to prefer a
+discrete GPU. Build-Voxtral.ps1 enables Vulkan with the official LunarG x64
+loader supplied by -VulkanLoader. Failed GPU initialization or pre-audio
+allocation falls back to CPU. The loader license is distributed in
+_internal/licenses/VulkanRT-License.txt.
+
 Model files come from Mistral's official ModelScope repository at the revisions
 and SHA-256 hashes recorded in `tts_catalog.json`. They are downloaded only by
 an explicit user action. The model and embedded voice references use CC BY-NC

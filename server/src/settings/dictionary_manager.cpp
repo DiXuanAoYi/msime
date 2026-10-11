@@ -1,4 +1,5 @@
 #include "settings/dictionary_manager.h"
+#include "english/candidate_reading.h"
 #include "settings/dictionary_page.h"
 #include <set>
 
@@ -74,14 +75,7 @@ std::filesystem::path SettingsExecutableDirectory()
 
 Pinyin::Pinyin &PinyinAnnotator()
 {
-    static std::once_flag once;
-    static std::unique_ptr<Pinyin::Pinyin> engine;
-    std::call_once(once, [] {
-        const auto dict_path = SettingsExecutableDirectory() / "dict";
-        Pinyin::setDictionaryPath(dict_path);
-        engine = std::make_unique<Pinyin::Pinyin>();
-    });
-    return *engine;
+    return CandidatePhonetics::Engine();
 }
 
 std::string NormalizeAnnotatedSyllable(std::string syllable)

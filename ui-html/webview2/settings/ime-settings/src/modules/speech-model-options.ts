@@ -2,6 +2,7 @@ export type VoiceChoice = { id: string; name: string; language?: string; dialect
 export type ModelControl = { id: string; label: string; type: 'int'|'float'|'bool'|'text'|'enum'; min?:number; max?:number; step?:number; default?:unknown; values?:string[]; maxBytes?:number };
 export type SpeechModel = { id?:string; name?:string; voices?:VoiceChoice[]; controls?:ModelControl[]; languages?:string[]; dialectNote?:string; parameterNote?:string };
 export const LANGUAGE_NAMES:Record<string,string>={zh:'中文',en:'英语',ja:'日语',ko:'韩语',fr:'法语',de:'德语',es:'西班牙语',it:'意大利语',pt:'葡萄牙语',ru:'俄语',nl:'荷兰语',ar:'阿拉伯语',hi:'印地语',fa:'波斯语',hu:'匈牙利语',pl:'波兰语',cs:'捷克语',da:'丹麦语',sv:'瑞典语',el:'希腊语',tr:'土耳其语',vi:'越南语'};
+Object.assign(LANGUAGE_NAMES,{bo:'藏语',kk:'哈萨克语',ug:'维吾尔语',mn:'蒙古语'});
 export function parseModelOptions(raw:string|undefined):Record<string,Record<string,unknown>>{
   try { const v=JSON.parse(raw??'{}');return v && typeof v==='object' && !Array.isArray(v)?v:{}; } catch {return {};}
 }

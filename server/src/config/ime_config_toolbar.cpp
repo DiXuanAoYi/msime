@@ -88,6 +88,8 @@ bool SetConfiguredFloatingToolbarItemEnabled(const std::string &item, bool enabl
         target = &g_floating_toolbar_items.voice;
     else if (item == "reply")
         target = &g_floating_toolbar_items.reply;
+    else if (item == "clipboard")
+        target = &g_floating_toolbar_items.clipboard;
     else if (item == "settings")
         target = &g_floating_toolbar_items.settings;
     else

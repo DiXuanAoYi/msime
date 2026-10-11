@@ -165,7 +165,7 @@ std::string Transcribe(const std::vector<float> &samples, const std::function<bo
 {
     auto config = GetConfiguredVoiceInput();
     if (config.asr_provider != "local")
-        throw std::runtime_error("语音转方言当前使用本地 ASR；请先在下方选择并启动本地识别模型");
+        throw std::runtime_error("此功能使用本地 ASR；请先在语音设置中选择并启动本地识别模型");
     if (VoiceInput::ResolveAsrToken(config).empty())
         throw std::runtime_error("请先启动本地语音识别服务");
     const auto request = VoiceInput::BuildAsrHttpRequest(samples, config, std::time(nullptr));
@@ -442,6 +442,28 @@ class Studio
         job.path = draft_;
         return job;
     }
+    std::string LoadDraft(const std::string &filename)
+    {
+        if (filename.size() != 42 || filename.front() != '{' || filename.substr(37) != "}.wav" ||
+            filename.substr(0, 38).find_first_not_of("{}-0123456789ABCDEFabcdef") != std::string::npos)
+            throw std::runtime_error("收藏音频路径无效");
+        const auto path = metasequoia::data_directory() / "voice-outbox" / filename;
+        if (std::filesystem::file_size(path) > 18 * 1024 * 1024)
+            throw std::runtime_error("音频超过上限");
+        std::ifstream file(path, std::ios::binary);
+        const std::string bytes((std::istreambuf_iterator<char>(file)), {});
+        auto audio = Speech::ParseWav(bytes);
+        std::lock_guard lock(mutex_);
+        ++generation_;
+        pending_ = false;
+        recordStop_ = true;
+        audio_ = std::move(audio);
+        draft_ = path;
+        artifact_ = filename.substr(0, 38);
+        phase_ = "ready";
+        message_ = "已载入收藏语音。";
+        return artifact_;
+    }
 };
 std::atomic<Studio *> activeStudio{nullptr};
 Studio &Instance()
@@ -486,6 +508,14 @@ void Stop()
 {
     if (auto *studio = activeStudio.load())
         studio->Stop();
+}
+std::string LoadSavedDraft(const std::string &filename)
+{
+    return Instance().LoadDraft(filename);
+}
+std::string TranscribeAudio(const std::vector<float> &samples, const std::function<bool()> &cancelled)
+{
+    return Transcribe(samples, cancelled);
 }
 std::vector<float> ReadAudioFile(const std::filesystem::path &path, const std::function<bool()> &cancelled)
 {

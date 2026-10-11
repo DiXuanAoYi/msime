@@ -512,6 +512,7 @@ class CandidateList : public Visual
         std::wstring annotation;
         std::wstring translation;
         std::vector<TextSpan> translationSpans;
+        std::wstring overline;
     };
 
     enum class Orientation
@@ -627,6 +628,7 @@ class CandidateList : public Visual
         RectF text;
         RectF annotation;
         RectF translation;
+        RectF overline;
     };
 
     float MeasureTextHeight(const std::wstring &text, float fontSize, float width) const;

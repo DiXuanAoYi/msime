@@ -104,6 +104,7 @@ add_library(${PROJECT_NAME} SHARED
     "./src/Composition/CompositionProcessorEngine_Modes.cpp"
     "./src/Composition/CompositionProcessorEngine_PreservedKeys.cpp"
     "./src/Composition/EndComposition.cpp"
+    "./src/Composition/UndoCommit.cpp"
     "./src/Composition/StartComposition.cpp"
     # DisplayAttribute
     "./src/DisplayAttribute/DisplayAttribute.cpp"

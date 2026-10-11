@@ -95,7 +95,7 @@ def cache_synthesis(synthesize, max_bytes=16 * 1024 * 1024, max_entries=128):
         return audio
     return cached
 
-def load_kokoro(root, model_id, num_threads=2):
+def load_kokoro(root, model_id, num_threads=2, provider='cpu'):
     import sherpa_onnx
     directory = root / model_id / "active"
     config = sherpa_onnx.OfflineTtsConfig(
@@ -105,7 +105,7 @@ def load_kokoro(root, model_id, num_threads=2):
                 tokens=str(directory / "tokens.txt"), data_dir=str(directory / "espeak-ng-data"),
                 dict_dir=str(directory / "dict"),
                 lexicon=','.join(str(directory / n) for n in ['lexicon-zh.txt','lexicon-us-en.txt'])),
-            num_threads=min(num_threads, os.cpu_count() or 1), provider="cpu"),
+            num_threads=min(num_threads, os.cpu_count() or 1), provider=provider),
         rule_fsts=','.join(str(directory / n) for n in ['phone-zh.fst','date-zh.fst','number-zh.fst']),
         max_num_sentences=1)
     if not config.validate():
@@ -125,7 +125,7 @@ def load_kokoro(root, model_id, num_threads=2):
             emit(samples, model.sample_rate)
             return 1
         model.generate(text, sid=sid, speed=speed, callback=callback)
-    return StreamingSynthesizer(synthesize, accepts_options=True)
+    return StreamingSynthesizer(synthesize, 'Kokoro '+provider.upper()+' · 逐句播放', accepts_options=True)
 
 def serve(root, model_id, loader=load_kokoro, externally_locked=False, guard=lambda: True):
     state = root / "service.json"
@@ -140,6 +140,8 @@ def serve(root, model_id, loader=load_kokoro, externally_locked=False, guard=lam
         support.atomic_json(state, dict(state="loading", model=model_id, message="正在加载发音模型", pid=os.getpid()))
         try:
             loaded = loader(root, model_id)
+            if os.environ.get('MSIME_GPU_FALLBACK') and isinstance(loaded, StreamingSynthesizer):
+                loaded.device += ' · GPU 不兼容后回退 CPU'
             synthesize = loaded if isinstance(loaded, StreamingSynthesizer) else cache_synthesis(loaded)
             class Handler(http.server.BaseHTTPRequestHandler):
                 timeout = 15
@@ -184,6 +186,7 @@ def serve(root, model_id, loader=load_kokoro, externally_locked=False, guard=lam
                                 return bool(readable) and not self.connection.recv(1, socket.MSG_PEEK)
                             metrics = synthesize.stream(args, write, cancelled)
                             support.atomic_json(root / 'last-latency.json', dict(model=model_id, device=synthesize.device, **metrics))
+                            support.atomic_json(state,dict(state='running',model=model_id,operation=os.environ.get('MSIME_TTS_OPERATION',''),message='发音已就绪 · '+synthesize.device,pid=os.getpid()))
                         else:
                             audio = synthesize(*args)
                             self.reply(200, audio, "audio/wav")
@@ -194,7 +197,9 @@ def serve(root, model_id, loader=load_kokoro, externally_locked=False, guard=lam
                             self.reply(400, json.dumps({"error":str(error)[:200]}, ensure_ascii=False).encode("utf-8"))
                         # After headers, EOF without a terminal frame means failure.
                         self.close_connection = True
-            server = http.server.HTTPServer(("127.0.0.1", 18767), Handler)
+            port=int(os.environ.get('MSIME_TTS_PORT','18767'))
+            if not 1024<=port<=65535:raise ValueError('本地服务端口无效')
+            server = http.server.HTTPServer(("127.0.0.1", port), Handler)
             server.timeout = 0.5
             support.atomic_json(state, dict(state="running", model=model_id, operation=os.environ.get('MSIME_TTS_OPERATION', ''), message="发音已就绪 · " + getattr(synthesize, 'device', 'CPU'), pid=os.getpid()))
             try:
@@ -257,10 +262,17 @@ def main():
         support.download(args.root, args.id)
     else:
         def run(guard=lambda: True):
-            if model['engine'] in ('qwen', 'moss', 'edge', 'voxtral'):
-                worker = {'moss': 'tts_moss_worker.py', 'qwen': 'tts_qwen_worker.py', 'edge': 'tts_edge_worker.py', 'voxtral': 'tts_voxtral_worker.py'}[model['engine']]
+            if model['engine']=='kokoro' and nvidia_available():
+                support.run_qwen(args.root,args.id,worker_name='tts_kokoro_cuda_worker.py',guard=guard)
+                return
+            if model['engine'] in ('qwen', 'moss', 'edge', 'voxtral', 'mms'):
+                worker = {'moss': 'tts_moss_worker.py', 'qwen': 'tts_qwen_worker.py', 'edge': 'tts_edge_worker.py', 'voxtral': 'tts_voxtral_worker.py', 'mms':'tts_mms_worker.py'}[model['engine']]
                 if model['engine'] == 'qwen' and nvidia_available():
                     worker = 'tts_qwen_cuda_worker.py'
+                if model['engine'] == 'moss' and nvidia_available():
+                    worker = 'tts_moss_cuda_worker.py'
+                if model['engine'] == 'mms' and nvidia_available():
+                    worker = 'tts_mms_cuda_worker.py'
                 support.run_qwen(args.root, args.id, worker_name=worker, guard=guard)
             else:
                 serve(args.root, args.id, guard=guard)

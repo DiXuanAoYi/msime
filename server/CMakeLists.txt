@@ -178,6 +178,14 @@ set(SRC_FILES
     "./src/config/ime_config_speech.cpp"
     "./src/english/speech_service.cpp"
     "./src/english/voice_studio.cpp"
+    "./src/english/candidate_reading.cpp"
+    "./src/settings/personal_library.cpp"
+    "./src/settings/vision_config.cpp"
+    "./src/settings/vision_capture.cpp"
+    "./src/settings/vision_protocol.cpp"
+    "./src/settings/vision_service.cpp"
+    "./src/settings/vision_subtitles.cpp"
+    "./src/settings/local_ocr_models.cpp"
     "./src/config/ime_config_shuangpin.cpp"
     "./src/config/ime_config_template.cpp"
     "./src/config/ime_config_theme.cpp"
@@ -329,7 +337,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PRIVATE MetasequoiaIme::Engine MetasequoiaIme::Voice MetasequoiaIme::VoiceCapture)
 target_link_libraries(${PROJECT_NAME} PRIVATE unofficial::sqlite3::sqlite3 fmt::fmt spdlog::spdlog Boost::locale Boost::json nlohmann_json::nlohmann_json)
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenCC::OpenCC)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenCC::OpenCC cpp-pinyin::cpp-pinyin)
 add_dependencies(${PROJECT_NAME} Dictionaries)
 target_link_libraries(${PROJECT_NAME} PRIVATE winhttp)
 target_link_libraries(${PROJECT_NAME} PRIVATE CURL::libcurl)
@@ -496,6 +504,14 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/config/ime_config_speech.cpp"
     "./src/english/speech_service.cpp"
     "./src/english/voice_studio.cpp"
+    "./src/english/candidate_reading.cpp"
+    "./src/settings/personal_library.cpp"
+    "./src/settings/vision_config.cpp"
+    "./src/settings/vision_capture.cpp"
+    "./src/settings/vision_protocol.cpp"
+    "./src/settings/vision_service.cpp"
+    "./src/settings/vision_subtitles.cpp"
+    "./src/settings/local_ocr_models.cpp"
     "./src/config/ime_config_shuangpin.cpp"
     "./src/config/ime_config_template.cpp"
     "./src/config/ime_config_theme.cpp"

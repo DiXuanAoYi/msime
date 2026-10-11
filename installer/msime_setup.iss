@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.15"
+#define MyAppVersion   "0.9.16"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -801,6 +801,7 @@ begin
   Result :=
     (CompareText(FileName, 'user_dict.dat') = 0) or
     (CompareText(FileName, 'clipboard_history.json') = 0) or
+    (CompareText(FileName, 'personal-library.json') = 0) or
     (CompareText(FileName, 'reply-contexts.dat') = 0) or
     (CompareText(FileName, 'chat-records.dat') = 0) or
     (CompareText(FileName, 'vocabulary.db') = 0) or
@@ -902,6 +903,7 @@ begin
     (CompareText(FileName, 'others.db-journal') = 0) or
     (CompareText(FileName, 'user_dict.dat') = 0) or
     (CompareText(FileName, 'clipboard_history.json') = 0) or
+    (CompareText(FileName, 'personal-library.json') = 0) or
     (CompareText(FileName, 'voice_system_audio_mute_state.txt') = 0) or
     (CompareText(FileName, 'config.toml.tmp') = 0) or
     (CompareText(FileName, 'config.base.toml.tmp') = 0) or
@@ -1399,7 +1401,7 @@ begin
     ExpandConstant('{sys}\robocopy.exe'),
     '"' + RemoveBackslashUnlessRoot(OldDir) + '" "' + RemoveBackslashUnlessRoot(NewDir) + '" ' +
     'msime_user.db msime_user.db-wal msime_user.db-shm msime_user.db-journal ' +
-    'user_dict.dat clipboard_history.json reply-contexts.dat chat-records.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
+    'user_dict.dat clipboard_history.json personal-library.json reply-contexts.dat chat-records.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
     'stats.db stats.db-wal stats.db-shm stats.db-journal ' +
     'config.toml config.base.toml /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
     '',

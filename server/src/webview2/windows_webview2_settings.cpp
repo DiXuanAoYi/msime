@@ -1,5 +1,9 @@
+#include "settings/vision_service.h"
 #include "english/speech_service.h"
 #include "english/voice_studio.h"
+#include "settings/personal_library.h"
+#include "settings/vision_config.h"
+#include "settings/local_ocr_models.h"
 #include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
 #include "settings/local_tts_models.h"
@@ -1435,6 +1439,7 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         }
                         else if (value == "close")
                         {
+                            Vision::Stop();
                             VoiceStudio::Stop();
                             if (g_legacy_chat_reader)
                                 g_legacy_chat_reader->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
@@ -1542,10 +1547,29 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         if (::webviewSettingsWnd)
                             ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
                     }
+                    else if (type == "personalLibraryRequest")
+                    {
+                        auto response =
+                            PersonalLibrary::Handle(nlohmann::json::parse(json::serialize(val.at("data"))), hwnd);
+                        if (::webviewSettingsWnd)
+                            ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
                     else if (type == "voiceStudioRequest")
                     {
                         auto response =
                             VoiceStudio::Handle(nlohmann::json::parse(json::serialize(val.at("data"))), hwnd);
+                        if (::webviewSettingsWnd)
+                            ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
+                    else if (type == "visionRequest")
+                    {
+                        auto response = Vision::Handle(nlohmann::json::parse(json::serialize(val.at("data"))), hwnd);
+                        if (::webviewSettingsWnd)
+                            ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                    }
+                    else if (type == "localOcrRequest")
+                    {
+                        auto response = LocalOcr::Handle(nlohmann::json::parse(json::serialize(val.at("data"))));
                         if (::webviewSettingsWnd)
                             ::webviewSettingsWnd->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
                     }
@@ -1610,6 +1634,9 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                         {
                             const auto &data = val.at("data").as_object();
                             const std::string path = json::value_to<std::string>(data.at("path"));
+                            if (path.rfind("vision.", 0) == 0)
+                                return data.at("value").is_string() &&
+                                       VisionConfig::Set(path.substr(7), json::value_to<std::string>(data.at("value")));
                             if (path.rfind("speech.", 0) == 0)
                                 return data.at("value").is_string() &&
                                        Speech::SetConfig(path.substr(7), json::value_to<std::string>(data.at("value")));
@@ -1621,6 +1648,19 @@ HRESULT OnControllerCreatedSettingsWnd(            //
                                         ? SetConfiguredVoiceInputBool(path.substr(12), json::value_to<bool>(value))
                                         : value.is_string() && SetConfiguredVoiceInputString(
                                                                    path.substr(12), json::value_to<std::string>(value));
+                                if (changed)
+                                    PostSettingsConfig();
+                            }
+                            if (path.rfind("ai_assistant.", 0) == 0)
+                            {
+                                const auto key = path.substr(13);
+                                const auto &value = data.at("value");
+                                const bool changed =
+                                    value.is_bool() ? SetConfiguredAiAssistantBool(key, json::value_to<bool>(value))
+                                    : value.is_string()
+                                        ? SetConfiguredAiAssistantString(key, json::value_to<std::string>(value))
+                                        : value.is_int64() &&
+                                              SetConfiguredAiAssistantInt(key, static_cast<int>(value.as_int64()));
                                 if (changed)
                                     PostSettingsConfig();
                             }
@@ -1750,6 +1790,7 @@ void PostSettingsConfig()
 
     const FloatingToolbarItemsConfig &toolbar = GetConfiguredFloatingToolbarItems();
     const VoiceInputConfig &voice = GetConfiguredVoiceInput();
+    const AiAssistantConfig &ai = GetConfiguredAiAssistant();
     const TencentTmtConfig &tencent_tmt = GetConfiguredTencentTmt();
     const CustomTranslationConfig &custom_translation = GetConfiguredCustomTranslation();
     const NetworkProxyConfig network_proxy = GetConfiguredNetworkProxy();
@@ -1793,6 +1834,7 @@ void PostSettingsConfig()
             {"floating_toolbar_screen_keyboard", toolbar.screen_keyboard},
             {"floating_toolbar_voice", toolbar.voice},
             {"floating_toolbar_reply", toolbar.reply},
+            {"floating_toolbar_clipboard", toolbar.clipboard},
             {"floating_toolbar_settings", toolbar.settings},
             {"floating_toolbar_scale", GetConfiguredFloatingToolbarScale()},
             {"floating_toolbar_font_size", GetConfiguredFloatingToolbarFontSize()},
@@ -1852,6 +1894,22 @@ void PostSettingsConfig()
             {"switch_language_ctrl", GetConfiguredSwitchLanguageCtrlEnabled()},
             {"switch_language_ctrl_alt_space", GetConfiguredSwitchLanguageCtrlAltSpaceEnabled()},
             {"toggle_character_set_ctrl_shift_f", GetConfiguredCharacterSetShortcutEnabled()}}},
+          {"ai_assistant",
+           {{"enabled", ai.enabled},
+            {"provider", ai.provider},
+            {"token", ai.token},
+            {"tokens", ai.tokens},
+            {"endpoint", ai.endpoint},
+            {"model", ai.model},
+            {"endpoints", ai.endpoints},
+            {"models", ai.models},
+            {"candidate_limit", ai.candidate_limit},
+            {"prompt", ai.prompt},
+            {"prompt_id", ai.prompt_id},
+            {"prompt_custom_1", ai.prompt_custom_1},
+            {"prompt_custom_2", ai.prompt_custom_2},
+            {"prompt_custom_3", ai.prompt_custom_3},
+            {"prompt_library", ai.prompt_library}}},
           {"tencent_tmt",
            {{"secret_id", tencent_tmt.secret_id},
             {"secret_key", tencent_tmt.secret_key},
@@ -1959,6 +2017,7 @@ void PostSettingsConfig()
             {"polish_prompt_custom_1", voice.polish_prompt_custom_1},
             {"polish_prompt_custom_2", voice.polish_prompt_custom_2},
             {"polish_prompt_custom_3", voice.polish_prompt_custom_3},
+            {"prompt_library", voice.prompt_library},
             {"language", voice.language},
             {"start_sound", voice.start_sound},
             {"end_sound", voice.end_sound},
@@ -1975,6 +2034,7 @@ void PostSettingsConfig()
                                  {"name", std::string(preset.name)},
                                  {"prompt", std::string(preset.prompt)}});
     payload["data"]["speech"] = Speech::GetConfig();
+    payload["data"]["vision"] = VisionConfig::Get();
     payload["data"]["voice_input"]["polish_presets"] = std::move(voice_presets);
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();

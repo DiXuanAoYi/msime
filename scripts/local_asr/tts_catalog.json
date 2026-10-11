@@ -1,16 +1,16 @@
 [
   {
     "id": "kokoro",
-    "name": "Kokoro · 82M（中英 CPU）",
+    "name": "Kokoro · 82M（中英）",
     "official": "https://huggingface.co/hexgrad/Kokoro-82M",
     "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
     "engine": "kokoro",
     "directory": "kokoro-int8-multi-lang-v1_1",
     "format": "sherpa-onnx INT8 中英运行包",
     "features": "轻量多语言模型；此运行包内置中文和英文发音。量化包体积小，CPU 即可运行。",
-    "hardware": "不需要独显；运行包约 147 MB。新词 CPU 合成可能等待数秒；重复发音有内存缓存。追求即时响应建议 Windows 本机语音。",
+    "hardware": "优先尝试 NVIDIA CUDA；驱动、运行组件或算子不兼容时自动回退 CPU。首次启动另需运行依赖，GPU 环境可能需要数 GB；短词仍可能慢于 Windows 本机语音。",
     "downloadBytes": 147031220,
-    "diskBytes": 600000000,
+    "diskBytes": 3000000000,
     "files": [
       {
         "name": "kokoro-int8-multi-lang-v1_1.tar.bz2",
@@ -981,11 +981,11 @@
     "downloadUrl": "https://modelscope.cn/models/openmoss/MOSS-TTS-Nano-100M-ONNX",
     "revision": "44502f80dbf9743528fa921cc544d662c685ebec",
     "engine": "moss",
-    "format": "官方 ONNX CPU 流式运行包（内置音色）",
+    "format": "官方 ONNX 流式运行包（内置音色）",
     "features": "100M，多语言、48 kHz 双声道；逐帧生成并流式播放。此运行包使用内置音色，不包含录音克隆编码器。",
-    "hardware": "CPU 即可运行；含 TTS、流式音频解码器和内置音色。首次启动需额外下载 ONNX Runtime / Python 依赖。",
+    "hardware": "GPU 优先；不支持的 ONNX 算子回退 CPU，无独显也可运行。首次启动另需运行依赖，CUDA 依赖可能需要数 GB。",
     "downloadBytes": 717153306,
-    "diskBytes": 1434306612,
+    "diskBytes": 4000000000,
     "files": [
       {
         "name": "MOSS-TTS-Nano-100M-ONNX/browser_poc_manifest.json",
@@ -3300,9 +3300,9 @@
     "official": "https://docs.mistral.ai/models/voxtral-tts-26-03",
     "downloadUrl": "https://modelscope.cn/models/mistralai/Voxtral-4B-TTS-2603",
     "engine": "voxtral",
-    "format": "官方 BF16 权重 · 本地转换 Q8_0 · Windows CPU 流式",
+    "format": "官方 BF16 权重 · 本地转换 Q8_0 · Vulkan GPU / CPU 流式",
     "features": "9 种语言、20 个内置音色，真正增量生成。此版本不支持中文、方言或参考录音克隆。权重 CC BY-NC 4.0；audio.cpp 为社区运行实现。",
-    "hardware": "Windows 原生 audio.cpp CPU 推理，建议至少 16 GB 内存、26 GB 可用磁盘。首次启动在本机转换 Q8_0，需额外运行依赖与时间。未下载权重进行本机音质/速度验证。",
+    "hardware": "优先使用 Vulkan 独显，初始化失败或生成前显存不足时回退 CPU。建议至少 16 GB 内存、26 GB 可用磁盘；首次启动需本地 Q8_0 转换。未自动下载权重进行本机音质/速度验证。",
     "downloadBytes": 8037629039,
     "diskBytes": 26000000000,
     "files": [
@@ -3645,5 +3645,165 @@
     "controls": [],
     "languages": [],
     "availability": "awaiting_weights"
+  },
+  {
+    "id": "mms-bod",
+    "name": "MMS · 藏语（中部藏语）",
+    "official": "https://huggingface.co/facebook/mms-tts-bod",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-bod/tree/e5767a90abf2293827ca6f467a9b964c0dc35fc5",
+    "engine": "mms",
+    "directory": "mms-bod",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生 藏语（中部藏语） 语音合成；需输入该语言文字，不会把中文自动翻译。单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145247158,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/config.json",
+        "bytes": 1641,
+        "sha256": "469fadd8556d44b2d0c08c951d244613390507aa0a02144a9af508017f37531d"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/model.safetensors",
+        "bytes": 145244408,
+        "sha256": "a9e0e46983219fc3ac1a2d2ae6e63b72d78f34864072c68a3c0f7aaa04ace348"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/special_tokens_map.json",
+        "bytes": 49,
+        "sha256": "63112498ee16782157bf3fd9fef68319cd9392188d294d1bfadd2a7900fc777e"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/tokenizer_config.json",
+        "bytes": 289,
+        "sha256": "ac90d06c3635d69e38400526a5d2c534f7ff3d03125895bb993012c350fa4b76"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/vocab.json",
+        "bytes": 771,
+        "sha256": "75e6152acf762295a2b04f8d3e7fe1195ed391431cad2e9f4ea6c79c7a3788ae"
+      }
+    ],
+    "voices": [
+      {
+        "id": "bod",
+        "name": "藏语（中部藏语） · 官方单音色",
+        "language": "bo",
+        "dialect": "藏语（中部藏语）"
+      }
+    ],
+    "languages": [
+      "bo"
+    ],
+    "defaultVoiceZh": "bod",
+    "defaultVoiceEn": "bod",
+    "dialectNote": "支持 藏语（中部藏语） 原生文本；不是普通话变声。模型许可 CC-BY-NC-4.0，仅限非商业用途。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  },
+  {
+    "id": "mms-kaz",
+    "name": "MMS · 哈萨克语",
+    "official": "https://huggingface.co/facebook/mms-tts-kaz",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-kaz/tree/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63",
+    "engine": "mms",
+    "directory": "mms-kaz",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生 哈萨克语 语音合成；需输入该语言文字，不会把中文自动翻译。单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145233836,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/config.json",
+        "bytes": 1641,
+        "sha256": "d0378ee0c78342b0e6ccaa43a2c7d93949ca93cd6e74ea5ede0937533c8d9b2a"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/model.safetensors",
+        "bytes": 145231352,
+        "sha256": "8fb53826f6c098615b00dc6966790987a3dd02e691ba8c109febee00d6ef2449"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/special_tokens_map.json",
+        "bytes": 48,
+        "sha256": "ae51f82546e75763a54b7d41f79b1f4b82364a3a7c517eaff79d78dff23c7721"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/tokenizer_config.json",
+        "bytes": 288,
+        "sha256": "519af6d00d68718330130c4665458c7d05723e01fb2efa93a5b82368617c9ff0"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/vocab.json",
+        "bytes": 507,
+        "sha256": "398cdac95e9c7b8a4e0db84b53fe86986dd498392bc26b7af1ddad0474be1478"
+      }
+    ],
+    "voices": [
+      {
+        "id": "kaz",
+        "name": "哈萨克语 · 官方单音色",
+        "language": "kk",
+        "dialect": "哈萨克语"
+      }
+    ],
+    "languages": [
+      "kk"
+    ],
+    "defaultVoiceZh": "kaz",
+    "defaultVoiceEn": "kaz",
+    "dialectNote": "支持 哈萨克语 原生文本；不是普通话变声。模型许可 CC-BY-NC-4.0，仅限非商业用途。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
   }
 ]

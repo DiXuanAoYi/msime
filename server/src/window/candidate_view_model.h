@@ -24,6 +24,7 @@ struct CandidateViewItem
     std::string translation;
     bool fixed_position = false;
     std::vector<TranslationDisplayRun> translation_runs;
+    std::string reading;
 };
 
 // Show two senses like Qingjian. The complete gloss remains available through
@@ -119,6 +120,11 @@ inline std::string CandidateViewHtml(const CandidateViewItem &item)
     std::string html = EscapeCandidateViewHtml(item.text + item.annotation + item.badge);
     if (item.fixed_position)
         html = "<span style=\"color:#379AD3\">" + html + "</span>";
+    if (!item.reading.empty())
+        html = "<span class=\"cand-reading\" "
+               "style=\"display:inline-flex;flex-direction:column;vertical-align:middle\"><span "
+               "style=\"font-size:.55em;line-height:1.35;opacity:.8\">" +
+               EscapeCandidateViewHtml(item.reading) + "</span><span>" + html + "</span></span>";
     if (!item.translation_runs.empty())
     {
         html += "<span class=\"cand-translation\" style=\"opacity:1\">";

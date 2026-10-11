@@ -31,7 +31,7 @@
     <p id="studioStatus" role="status" class="voice-description">本地模型支持边生成边试听；Windows 本机语音及部分云服务会在生成后试听。</p>
     <div class="section-title">作为音频文件发送</div>
     <p class="voice-description">音频草稿保存在本机 voice-outbox 目录。复制后在微信、QQ、企业微信、钉钉或飞书聊天输入框粘贴，再手动发送；也可以保存 WAV 后添加为附件。</p>
-    <div class="local-asr-actions"><button id="studioCopy" type="button" class="credential-test-button" disabled>复制音频文件</button><button id="studioSave" type="button" class="credential-test-button" disabled>另存为 WAV</button></div>
+    <div class="local-asr-actions"><button id="studioCopy" type="button" class="credential-test-button" disabled>复制音频文件</button><button id="studioFavorite" type="button" class="credential-test-button" disabled>收藏语音</button><button id="studioSave" type="button" class="credential-test-button" disabled>另存为 WAV</button></div>
     <div class="section-title">作为原生语音消息发送</div>
     <p class="voice-description">需要虚拟音频设备，且聊天客户端必须具备录音入口。将聊天软件的麦克风选为虚拟设备的录音端，在下方选择对应播放端。点击后有 3 秒时间切回聊天软件并开始录音，结束录音及发送都由你手动操作。没有录音入口的客户端请使用音频文件方式。</p>
     <label class="speech-field">虚拟麦克风对应的播放设备<select id="studioDevice"><option value="">请选择虚拟音频输出设备</option></select></label>
@@ -213,27 +213,7 @@
       <button id="voicePolishTestButton" class="credential-test-button" type="button">测试配置</button>
       <span id="voicePolishTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
     </div>
-    <div class="voice-prompt-header">
-      <div class="voice-field">
-        <span>润色提示词</span>
-        <div class="dropdown">
-          <button class="dropdown-toggle" id="voicePolishPromptBtn" type="button">
-            <span>精炼整理</span>
-            <img src="./assets/arrow.svg" alt="">
-          </button>
-          <div class="dropdown-menu" id="voicePolishPromptMenu">
-            <div class="dropdown-item" data-value="cleanup">精炼整理</div>
-            <div class="dropdown-item" data-value="faithful">忠实校对</div>
-            <div class="dropdown-item" data-value="zh2en">中翻英</div>
-            <div class="dropdown-item" data-value="casual">口语整理</div>
-            <div class="dropdown-item" data-value="custom_1">自定义一</div>
-            <div class="dropdown-item" data-value="custom_2">自定义二</div>
-            <div class="dropdown-item" data-value="custom_3">自定义三</div>
-          </div>
-        </div>
-      </div>
-      <button class="voice-prompt-reset" id="voicePolishPromptReset" type="button">恢复默认</button>
-    </div>
+    <div id="voicePromptLibrary" class="prompt-library"></div>
     <textarea id="voicePolishPrompt" class="voice-prompt" autocomplete="off" spellcheck="false" placeholder="选择预设后可直接使用，也可改成自己的提示词。"></textarea>
   </div>
 

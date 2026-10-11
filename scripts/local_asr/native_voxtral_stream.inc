@@ -1,6 +1,19 @@
 // Appended to the pinned audio.cpp C ABI translation unit by Build-Voxtral.ps1.
 // Upstream's pull-event ABI cannot expose synchronous TTS sink callbacks.
 // This facade forwards each NEW PCM chunk while start_stream is generating it.
+// Enumerate without loading weights. Prefer a discrete GPU to an integrated one.
+extern "C" __declspec(dllexport) int msime_voxtral_preferred_vulkan_device()
+{
+    try {
+        int fallback = -1;
+        for (const auto &device : engine::core::list_backend_devices()) {
+            if (device.backend != "Vulkan") continue;
+            if (device.type == "GPU") return device.index;
+            if (fallback < 0) fallback = device.index;
+        }
+        return fallback;
+    } catch (...) { return -1; }
+}
 extern "C" __declspec(dllexport) int msime_voxtral_stream(
     audiocpp_session *session, const audiocpp_request *request,
     int (*callback)(const float *, size_t, int, int, void *), void *opaque)
