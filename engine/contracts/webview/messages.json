@@ -1237,7 +1237,11 @@
               "review",
               "playFavorite",
               "copyFavorite",
-              "study"
+              "study",
+              "putApplication",
+              "exportApplication",
+              "importApplication",
+              "removeLearning"
             ]
           },
           "enabled": {
@@ -1247,6 +1251,16 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 2
+          },
+          "learn": {
+            "type": "boolean"
+          },
+          "frequency": {
+            "type": "boolean"
+          },
+          "payload": {
+            "type": "string",
+            "maxLength": 4194304
           }
         },
         "required": [
@@ -1315,7 +1329,9 @@
               "capture",
               "longCapture",
               "screen",
-              "subtitles"
+              "subtitles",
+              "importSubtitles",
+              "translateSubtitles"
             ]
           },
           "image": {

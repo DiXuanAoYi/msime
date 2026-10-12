@@ -24,6 +24,27 @@ importers:
         specifier: ^5.0.2
         version: 5.0.2(@types/node@26.6.3)(vite@8.3.1(@types/node@26.6.3))
 
+  W:/msime-windows/ui-html/webview2/settings/ime-settings:
+    devDependencies:
+      '@types/chai':
+        specifier: 5.2.3
+        version: 5.2.3
+      '@types/chrome':
+        specifier: ^0.3.2
+        version: 0.3.2
+      '@types/node':
+        specifier: ^26.6.3
+        version: 26.6.3
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^8.3.1
+        version: 8.3.1(@types/node@26.6.3)
+      vitest:
+        specifier: ^5.0.2
+        version: 5.0.2(@types/node@26.6.3)(vite@8.3.1(@types/node@26.6.3))
+
 packages:
 
   '@jridgewell/resolve-uri@3.1.2':

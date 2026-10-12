@@ -195,6 +195,8 @@ void EnqueueAdjustCandidateRankingTask(bool english, bool wubi, const std::strin
                                        uint64_t activation_epoch,
                                        const std::vector<WordItem> *ranking_candidates = nullptr);
 void EnqueueLearnEnteredEnglishWordTask(const std::string &word);
+void EnqueueApplicationSelectionTask(const std::string &code, const std::string &word, bool english,
+                                     uint64_t client_id);
 // 快捷短语组的调频。word 非空：选中了组里的这一条，first_in_group 表示它本来就排在组首；
 // word 为空：越过整组选了普通候选，ordinary_rank 是它在普通候选里的名次。
 void EnqueueLearnQuickPhraseOrderTask(const std::string &code, const std::string &word, bool first_in_group,

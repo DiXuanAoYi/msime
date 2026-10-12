@@ -237,6 +237,11 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
     if (is_valid_selection)
     {
         CaptureVocabularySelection(index);
+        if (curWordItem.source != CandidateSource::Emoji && curWordItem.source != CandidateSource::Kaomoji &&
+            curWordItem.source != CandidateSource::DateTime && curWordItem.source != CandidateSource::Fallback)
+            EnqueueApplicationSelectionTask(
+                g_inputSession->get_pinyin_sequence_with_cases(), curWordItem.word,
+                g_english_input_mode || curWordItem.source == CandidateSource::EnglishDictionary, client_id);
         // Capture ranking keys before reset_state()/composition advance clears the
         // input sequence. CandidateDatabaseKey() consults get_pinyin_sequence(),
         // and for single-code lists (e.g. "n") it must keep item.pinyin ("na"/"nv")

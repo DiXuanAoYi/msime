@@ -522,6 +522,8 @@ bool SetConfiguredCandidateWindowLayout(const std::string &layout);
 bool GetConfiguredCandidateWindowFollowCursor();
 bool SetConfiguredCandidateWindowFollowCursor(bool enabled);
 // 固定排位候选词徽标：总开关 + 样式枚举（"paperclip" | "pushpin" | "dot"）。
+bool GetConfiguredCandidateShowPinyin();
+bool SetConfiguredCandidateShowPinyin(bool enabled);
 bool GetConfiguredCandidateFixedBadge();
 bool SetConfiguredCandidateFixedBadge(bool enabled);
 const std::string &GetConfiguredCandidateFixedBadgeStyle();

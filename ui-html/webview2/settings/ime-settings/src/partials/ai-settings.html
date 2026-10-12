@@ -7,7 +7,11 @@
     </div>
   </div>
   <div class="section ai-section">
-    <div class="section-title ai-heading">API 配置</div>
+    <h3 class="section-title ai-heading">AI 联想提示词模板</h3><div id="aiPromptLibrary" class="prompt-library"></div>
+    <textarea id="aiPrompt" class="ai-prompt" autocomplete="off" spellcheck="false"></textarea>
+  </div>
+
+  <details class="section ai-section"><summary class="section-title">AI 联想 API · 连接设置</summary>
     <div class="ai-description ai-api-description">DeepSeek、OpenAI、SiliconFlow、Groq 均使用 OpenAI 兼容的 Chat Completions 接口。每个提供商的 Token 分开保存。</div>
     <div class="ai-grid">
       <div class="ai-field">
@@ -50,9 +54,5 @@
       <button id="aiCredentialTestButton" class="credential-test-button" type="button">测试配置</button>
       <span id="aiCredentialTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
     </div>
-  </div>
-  <div class="section ai-section">
-    <div id="aiPromptLibrary" class="prompt-library"></div>
-    <textarea id="aiPrompt" class="ai-prompt" autocomplete="off" spellcheck="false"></textarea>
-  </div>
+  </details>
 </div>

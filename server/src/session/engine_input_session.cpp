@@ -1,5 +1,6 @@
 #include "engine_input_session.h"
 #include "config/ime_config.h"
+#include "settings/personal_library.h"
 #include "engine/common/helpcode_utils.h"
 #include "engine/core/data_path.h"
 #include "engine/core/sentence_association_options.h"
@@ -38,6 +39,7 @@ EngineInputSession::EngineInputSession(SchemeType scheme, const ShuangpinProfile
 
 void EngineInputSession::ApplyConfiguration()
 {
+    session_.set_candidate_learning_enabled(!PersonalLibrary::Policy(PersonalLibrary::InputApplication()).isolated);
     const auto scheme = session_.scheme();
     if (scheme == SchemeType::Quanpin || scheme == SchemeType::Shuangpin)
     {

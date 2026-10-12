@@ -18,7 +18,10 @@ const BACKGROUND_MODULES = [
 ] as const;
 
 const setupLoaders: Record<string, () => Promise<void>> = {
-  vision: async () => { (await import('./vision')).setupVision(); },
+  vision: async () => {
+    (await import('./vision-layout')).setupVisionLayout();
+    (await import('./vision')).setupVision();
+  },
   'personal-library': async () => { (await import('./personal-library')).setupPersonalLibrary(); },
   appearance: async () => {
     const module = await import('./appearance');

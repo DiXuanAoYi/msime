@@ -1,3 +1,4 @@
+#include "settings/config_update_dispatch.h"
 #include "settings/vision_service.h"
 #include "english/speech_service.h"
 #include "english/voice_studio.h"
@@ -339,6 +340,16 @@ static void ApplyInputSubkey(const std::string &path, const json::object &data)
 // [appearance] 段：候选窗外观、颜色、字体、徽章等
 static void ApplyAppearanceSubkey(const std::string &path, const json::object &data)
 {
+    if (const auto changed = SettingsConfig::ApplyCandidateAnnotationUpdate(data); changed.has_value())
+    {
+        if (*changed)
+        {
+            FanyNamedPipe::EnqueueRefreshCandidatePageTask();
+            PostSettingsConfig();
+        }
+        return;
+    }
+
     if (path == "appearance.tsf_preedit_style")
     {
         const std::string value = json::value_to<std::string>(data.at("value"));
@@ -1943,6 +1954,7 @@ void PostSettingsConfig()
             {"candidate_skin", GetConfiguredCandidateSkin()},
             {"candidate_window_preedit_style", GetConfiguredCandidateWindowPreeditStyle()},
             {"candidate_window_preedit_shuangpin_quanpin", GetConfiguredCandidateWindowPreeditShuangpinQuanpin()},
+            {"candidate_show_pinyin", GetConfiguredCandidateShowPinyin()},
             {"candidate_fixed_badge", GetConfiguredCandidateFixedBadge()},
             {"candidate_fixed_badge_style", GetConfiguredCandidateFixedBadgeStyle()},
             {"tsf_preedit_style", GetConfiguredTsfPreeditStyle()},

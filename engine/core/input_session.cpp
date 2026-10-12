@@ -294,7 +294,7 @@ KeyResult InputSession::handle_command(Command command)
             raw.erase(raw.begin());
         }
         std::optional<std::string> diagnostic;
-        if (dedicated_english_mode_ &&
+        if (dedicated_english_mode_ && candidate_learning_enabled_ &&
             !user_dictionary::learn_entered_english_word(path_to_utf8(paths_.dictionary(assets::english_dictionary)),
                                                          path_to_utf8(paths_.user(assets::user_journal)), raw))
         {

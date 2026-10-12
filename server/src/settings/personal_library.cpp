@@ -12,6 +12,9 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <map>
+#include <memory>
+#include <iterator>
 #include <set>
 #include <stdexcept>
 
@@ -21,6 +24,7 @@ namespace
 {
 using nlohmann::json;
 std::atomic<uint64_t> revision{0};
+thread_local std::string inputApplication;
 std::filesystem::path Path()
 {
     return metasequoia::data_directory() / "personal-library.json";
@@ -32,7 +36,9 @@ json Defaults()
             {"clips", json::array()},
             {"rules", json::array()},
             {"favorites", json::array()},
-            {"reviews", json::object()}};
+            {"reviews", json::object()},
+            {"applications", json::array()},
+            {"appLearning", json::array()}};
 }
 class Lock
 {
@@ -73,6 +79,22 @@ json Read()
     if (b.at("version") != 1 || !b.at("groups").is_array() || !b.at("clips").is_array() || !b.at("rules").is_array() ||
         !b.at("favorites").is_array() || !b.at("reviews").is_object())
         throw std::runtime_error("资料库格式无效，未修改原文件");
+    // Extend v1 in place: retain every existing phrase, voice reference and review.
+    if (!b.contains("applications"))
+    {
+        b["applications"] = json::array();
+        std::set<std::string> apps;
+        for (const auto &rule : b["rules"])
+            if (rule.contains("application") && rule["application"].is_string())
+                apps.insert(rule["application"].get<std::string>());
+        for (const auto &app : apps)
+            b["applications"].push_back(
+                {{"application", app}, {"enabled", true}, {"learn", true}, {"frequency", true}});
+    }
+    if (!b.contains("appLearning"))
+        b["appLearning"] = json::array();
+    if (!b["applications"].is_array() || !b["appLearning"].is_array())
+        throw std::runtime_error("应用词库格式无效，未修改原文件");
     return b;
 }
 void Save(const json &b)
@@ -150,13 +172,76 @@ std::string NormalizeApp(std::string s)
 }
 } // namespace
 
-std::string ForegroundApplication()
+namespace
 {
-    DWORD pid = 0;
-    GetWindowThreadProcessId(GetForegroundWindow(), &pid);
-    if (!pid)
+std::shared_ptr<const json> CachedBook()
+{
+    static std::mutex mutex;
+    static std::shared_ptr<const json> cached;
+    static ULONGLONG refreshed = 0;
+    static uint64_t seenRevision = 0;
+    static std::filesystem::file_time_type writeTime{};
+    static std::filesystem::path root;
+    std::lock_guard guard(mutex);
+    const auto now = GetTickCount64();
+    if (!cached || now - refreshed > 250 || root != Path() || seenRevision != revision)
+    {
+        std::error_code error;
+        const auto currentTime = std::filesystem::last_write_time(Path(), error);
+        if (!cached || root != Path() || currentTime != writeTime || seenRevision != revision)
+        {
+            Lock lock(0);
+            cached = std::make_shared<const json>(Read());
+            writeTime = currentTime;
+            seenRevision = revision;
+        }
+        root = Path();
+        refreshed = now;
+    }
+    return cached;
+}
+ApplicationPolicy PolicyIn(const json &book, const std::string &app)
+{
+    for (const auto &profile : book.at("applications"))
+        if (profile.value("application", "") == app)
+            return {profile.value("enabled", true), profile.value("learn", true), profile.value("frequency", true)};
+    return {};
+}
+std::string Code(std::string code)
+{
+    std::transform(code.begin(), code.end(), code.begin(), [](unsigned char ch) { return char(std::tolower(ch)); });
+    return code;
+}
+json ValidLearning(const json &row, const std::string &app)
+{
+    const auto code = Code(Text(row, "code", 80));
+    if (code.find_first_not_of("abcdefghijklmnopqrstuvwxyz' -") != std::string::npos)
+        throw std::runtime_error("学习编码无效");
+    const auto language = row.value("language", "zh");
+    if (language != "zh" && language != "en")
+        throw std::runtime_error("学习语言无效");
+    const auto rawCount = row.value("frequency", json(1));
+    if ((!rawCount.is_number_unsigned() && !rawCount.is_number_integer()) || rawCount.get<int64_t>() < 0)
+        throw std::runtime_error("使用次数必须是非负整数");
+    auto count = rawCount.get<uint64_t>();
+    return {{"id", row.value("id", Id())},
+            {"application", app},
+            {"code", code},
+            {"text", Text(row, "text", 2000)},
+            {"language", language},
+            {"frequency", std::min<uint64_t>(count, 1000000000)},
+            {"insert", row.value("insert", false)},
+            {"enabled", row.value("enabled", true)},
+            {"deleted", row.value("deleted", false)},
+            {"pinned", row.value("pinned", false)},
+            {"position", std::clamp(row.value("position", 0), 0, 9)}};
+}
+} // namespace
+std::string ProcessApplication(uint32_t process_id)
+{
+    if (!process_id)
         return {};
-    HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
     if (!h)
         return {};
     wchar_t name[32768]{};
@@ -167,6 +252,66 @@ std::string ForegroundApplication()
         return {};
     return wstring_to_string(std::filesystem::path(name).filename().wstring());
 }
+std::string ForegroundApplication()
+{
+    DWORD pid = 0;
+    GetWindowThreadProcessId(GetForegroundWindow(), &pid);
+    return ProcessApplication(pid);
+}
+void BindInputApplication(std::string application)
+{
+    inputApplication = std::move(application);
+}
+const std::string &InputApplication()
+{
+    return inputApplication;
+}
+ApplicationPolicy Policy(const std::string &application)
+{
+    if (application.empty())
+        return {};
+    try
+    {
+        return PolicyIn(*CachedBook(), NormalizeApp(application));
+    }
+    catch (...)
+    {
+        return {true, false, false};
+    }
+}
+void RecordSelection(const std::string &application, const std::string &code, const std::string &word,
+                     const std::string &language, bool insert)
+{
+    if (application.empty() || code.empty() || word.empty())
+        return;
+    Lock lock;
+    auto book = Read();
+    const auto app = NormalizeApp(application);
+    const auto policy = PolicyIn(book, app);
+    if (!policy.isolated || (!policy.learn && insert) || (!policy.frequency && !insert))
+        return;
+    auto &items = book["appLearning"];
+    const auto normalized = Code(code);
+    auto it = std::find_if(items.begin(), items.end(), [&](const json &x) {
+        return x.value("application", "") == app && x.value("code", "") == normalized && x.value("text", "") == word &&
+               x.value("language", "zh") == language;
+    });
+    if (it == items.end())
+    {
+        if (items.size() >= 10000)
+            throw std::runtime_error("应用学习记录已达 10000 条，可先导出并整理");
+        items.push_back(
+            ValidLearning({{"code", normalized}, {"text", word}, {"language", language}, {"insert", insert}}, app));
+    }
+    else
+    {
+        if (policy.frequency)
+            (*it)["frequency"] = std::min<uint64_t>(1000000000, it->value("frequency", uint64_t(0)) + 1);
+        if (insert && policy.learn)
+            (*it)["insert"] = true;
+    }
+    Save(book);
+}
 std::vector<std::string> AppWords(const std::string &application, const std::string &code)
 {
     if (application.empty() || code.empty())
@@ -174,30 +319,13 @@ std::vector<std::string> AppWords(const std::string &application, const std::str
     try
     {
         const auto app = NormalizeApp(application);
-        static std::mutex mutex;
-        static json cached;
-        static ULONGLONG refreshed = 0;
-        static uint64_t seenRevision = 0;
-        static std::filesystem::file_time_type writeTime{};
-        static std::filesystem::path root;
-        std::lock_guard guard(mutex);
-        const auto now = GetTickCount64();
-        if (cached.is_null() || now - refreshed > 250 || root != Path() || seenRevision != revision)
-        {
-            std::error_code error;
-            const auto currentTime = std::filesystem::last_write_time(Path(), error);
-            if (cached.is_null() || root != Path() || currentTime != writeTime || seenRevision != revision)
-            {
-                Lock lock(0);
-                cached = Read();
-                writeTime = currentTime;
-                seenRevision = revision;
-            }
-            root = Path();
-            refreshed = now;
-        }
+        const auto snapshot = CachedBook();
+        const auto &book = *snapshot;
+        for (const auto &profile : book.at("applications"))
+            if (profile.value("application", "") == app && !profile.value("enabled", true))
+                return {};
         std::vector<std::string> out;
-        for (const auto &rule : cached.at("rules"))
+        for (const auto &rule : book.at("rules"))
             if (rule.value("enabled", true) && rule.value("application", "") == app && rule.value("code", "") == code)
             {
                 auto text = rule.value("text", "");
@@ -213,6 +341,120 @@ std::vector<std::string> AppWords(const std::string &application, const std::str
         return {};
     }
 }
+void ApplyApplicationCandidates(const std::string &application, const std::string &code,
+                                std::vector<WordItem> &candidates, bool english, const std::string &canonical_code)
+{
+    if (application.empty() || code.empty())
+        return;
+    try
+    {
+        const auto app = NormalizeApp(application);
+        const auto snapshot = CachedBook();
+        const auto &book = *snapshot;
+        const auto policy = PolicyIn(book, app);
+        if (!policy.isolated)
+            return;
+        const auto normalized = Code(code);
+        auto canonical = Code(canonical_code);
+        canonical.erase(std::remove(canonical.begin(), canonical.end(), '\''), canonical.end());
+        const auto language = english ? "en" : "zh";
+        std::map<std::string, uint64_t> counts;
+        std::set<std::string> hidden, pinned;
+        std::map<std::string, int> fixed;
+        for (const auto &item : book.at("appLearning"))
+            if (item.value("application", "") == app &&
+                (item.value("code", "") == normalized ||
+                 (item.value("insert", false) &&
+                  (english ? item.value("code", "").find(normalized) == 0
+                           : (!canonical.empty() && item.value("code", "") == canonical)))) &&
+                item.value("language", "zh") == language && item.value("enabled", true))
+            {
+                const auto word = item.value("text", "");
+                if (item.value("deleted", false))
+                {
+                    hidden.insert(word);
+                    continue;
+                }
+                if (item.value("pinned", false))
+                    pinned.insert(word);
+                if (item.value("position", 0) > 0)
+                    fixed[word] = item.value("position", 0);
+                counts[word] = item.value("frequency", uint64_t(0));
+                if (item.value("insert", false) && candidates.size() < 200 &&
+                    std::none_of(candidates.begin(), candidates.end(),
+                                 [&](const WordItem &x) { return x.word == word; }))
+                    candidates.emplace_back(code, word, 1, CandidateSource::AppDictionary);
+            }
+        candidates.erase(std::remove_if(candidates.begin(), candidates.end(),
+                                        [&](const WordItem &x) { return hidden.count(x.word) != 0; }),
+                         candidates.end());
+        if (policy.frequency || !pinned.empty())
+            std::stable_sort(candidates.begin(), candidates.end(), [&](const WordItem &a, const WordItem &b) {
+                if (pinned.count(a.word) != pinned.count(b.word))
+                    return pinned.count(a.word) != 0;
+                if (!policy.frequency)
+                    return false;
+                const auto ca = counts.find(a.word), cb = counts.find(b.word);
+                return (ca == counts.end() ? 0 : ca->second) > (cb == counts.end() ? 0 : cb->second);
+            });
+        for (const auto &[word, position] : fixed)
+        {
+            auto it =
+                std::find_if(candidates.begin(), candidates.end(), [&](const WordItem &x) { return x.word == word; });
+            if (it == candidates.end())
+                continue;
+            WordItem item = *it;
+            candidates.erase(it);
+            candidates.insert(candidates.begin() + std::min<size_t>(position - 1, candidates.size()), std::move(item));
+        }
+    }
+    catch (...)
+    { /* An unavailable overlay never writes into the global dictionary. */
+    }
+}
+void SetCandidatePreference(const std::string &application, const std::string &code, const std::string &word,
+                            bool english, const std::string &action, int position)
+{
+    if (action != "pin" && action != "delete" && action != "fix" && action != "clear")
+        throw std::runtime_error("未知应用候选操作");
+    Lock lock;
+    auto book = Read();
+    const auto app = NormalizeApp(application);
+    if (!PolicyIn(book, app).isolated)
+        return;
+    auto item = ValidLearning({{"code", code}, {"text", word}, {"language", english ? "en" : "zh"}}, app);
+    auto &rows = book["appLearning"];
+    auto it = std::find_if(rows.begin(), rows.end(), [&](const json &x) {
+        return x.at("application") == app && x.at("code") == item.at("code") && x.at("text") == word &&
+               x.value("language", "zh") == item.at("language");
+    });
+    if (it == rows.end())
+    {
+        if (rows.size() >= 10000)
+            throw std::runtime_error("应用记录已达上限");
+        rows.push_back(item);
+        it = std::prev(rows.end());
+    }
+    if (action == "delete")
+        (*it)["deleted"] = true;
+    else if (action == "pin")
+    {
+        (*it)["deleted"] = false;
+        (*it)["pinned"] = true;
+    }
+    else if (action == "fix")
+    {
+        if (position < 1 || position > 9)
+            throw std::runtime_error("固定位置须为 1–9");
+        (*it)["position"] = position;
+    }
+    else
+    {
+        (*it)["position"] = 0;
+        (*it)["pinned"] = false;
+    }
+    Save(book);
+}
 nlohmann::json Handle(const nlohmann::json &r, HWND owner)
 {
     json response = {{"type", "personalLibraryResponse"},
@@ -226,7 +468,112 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
         Lock lock;
         auto book = Read();
         bool changed = false;
-        if (action == "putGroup")
+        if (action == "putApplication")
+        {
+            const auto app = NormalizeApp(Text(r, "application", 260));
+            auto &profiles = book["applications"];
+            auto it = std::find_if(profiles.begin(), profiles.end(),
+                                   [&](const json &x) { return x.at("application") == app; });
+            json profile = {{"application", app},
+                            {"enabled", r.value("enabled", true)},
+                            {"learn", r.value("learn", true)},
+                            {"frequency", r.value("frequency", true)}};
+            if (it != profiles.end())
+                *it = profile;
+            else
+            {
+                if (profiles.size() >= 200)
+                    throw std::runtime_error("独立软件词库最多 200 个");
+                profiles.push_back(profile);
+            }
+            changed = true;
+        }
+        else if (action == "exportApplication")
+        {
+            const auto app = NormalizeApp(Text(r, "application", 260));
+            json exported = {{"version", 1},
+                             {"kind", "msime-application-dictionary"},
+                             {"application", app},
+                             {"rules", json::array()},
+                             {"learning", json::array()}};
+            for (const auto &x : book["applications"])
+                if (x.at("application") == app)
+                    exported["profile"] = x;
+            for (const auto &x : book["rules"])
+                if (x.at("application") == app)
+                    exported["rules"].push_back(x);
+            for (const auto &x : book["appLearning"])
+                if (x.at("application") == app)
+                    exported["learning"].push_back(x);
+            response["exported"] = exported.dump(2);
+            response["message"] = "已导出此软件的词条和学习记录";
+        }
+        else if (action == "importApplication")
+        {
+            const auto source = json::parse(Text(r, "payload", 4 * 1024 * 1024));
+            if (source.value("version", 0) != 1 || source.value("kind", "") != "msime-application-dictionary" ||
+                !source.at("rules").is_array() || !source.at("learning").is_array())
+                throw std::runtime_error("请选择水杉应用词库 JSON 文件");
+            const auto app = NormalizeApp(Text(r, "application", 260));
+            size_t added = 0;
+            for (auto row : source.at("rules"))
+            {
+                const auto code = Text(row, "code", 80);
+                if (code.find_first_not_of("abcdefghijklmnopqrstuvwxyz'") != std::string::npos)
+                    throw std::runtime_error("导入词条编码无效");
+                json item = {{"id", Id()},
+                             {"application", app},
+                             {"name", Text(row, "name", 240)},
+                             {"code", code},
+                             {"text", Text(row, "text", 2000)},
+                             {"enabled", row.value("enabled", true)}};
+                if (std::none_of(book["rules"].begin(), book["rules"].end(), [&](const json &x) {
+                        return x.at("application") == app && x.at("code") == code && x.at("text") == item.at("text");
+                    }))
+                {
+                    book["rules"].push_back(item);
+                    ++added;
+                }
+            }
+            for (const auto &row : source.at("learning"))
+            {
+                auto item = ValidLearning(row, app);
+                item["id"] = Id();
+                auto &items = book["appLearning"];
+                const auto it = std::find_if(items.begin(), items.end(), [&](const json &x) {
+                    return x.at("application") == app && x.at("code") == item.at("code") &&
+                           x.at("text") == item.at("text") && x.value("language", "zh") == item.at("language");
+                });
+                if (it == items.end())
+                {
+                    items.push_back(item);
+                    ++added;
+                }
+            }
+            if (book["rules"].size() > 2000 || book["appLearning"].size() > 10000)
+                throw std::runtime_error("导入后记录超过上限，原资料保持不变");
+            // Import is additive. Never change existing switches or existing global dictionaries.
+            if (std::none_of(book["applications"].begin(), book["applications"].end(),
+                             [&](const json &x) { return x.at("application") == app; }))
+            {
+                if (book["applications"].size() >= 200)
+                    throw std::runtime_error("独立软件词库最多 200 个");
+                book["applications"].push_back(
+                    {{"application", app}, {"enabled", true}, {"learn", true}, {"frequency", true}});
+            }
+            changed = true;
+            response["message"] = "已合并 " + std::to_string(added) + " 条应用记录，原有内容保留";
+        }
+        else if (action == "removeLearning")
+        {
+            const auto app = NormalizeApp(Text(r, "application", 260)), id = Text(r, "id", 100);
+            auto &items = book["appLearning"];
+            items.erase(std::remove_if(items.begin(), items.end(),
+                                       [&](const json &x) { return x.at("application") == app && x.at("id") == id; }),
+                        items.end());
+            changed = true;
+        }
+        else if (action == "putGroup")
         {
             auto id = r.value("id", "");
             auto name = Text(r, "name", 160);
@@ -281,6 +628,16 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
                     throw std::runtime_error("编码请使用小写字母或拼音分隔符");
                 entry["text"] = Text(r, "text", 2000);
                 entry["enabled"] = r.value("enabled", true);
+                if (std::none_of(book["applications"].begin(), book["applications"].end(),
+                                 [&](const json &x) { return x.at("application") == entry["application"]; }))
+                {
+                    if (book["applications"].size() >= 200)
+                        throw std::runtime_error("独立软件词库最多 200 个");
+                    book["applications"].push_back({{"application", entry["application"]},
+                                                    {"enabled", true},
+                                                    {"learn", true},
+                                                    {"frequency", true}});
+                }
             }
             if (action == "favorite")
             {

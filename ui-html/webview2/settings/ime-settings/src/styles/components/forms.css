@@ -1,4 +1,5 @@
 select {
+  color-scheme: inherit;
   padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
@@ -6,6 +7,13 @@ select {
   color: var(--text-color);
   font-size: 14px;
   transition: border 0.2s, background 0.2s;
+}
+
+/* Native popups cannot composite translucent surfaces over their owner. */
+select option,
+select optgroup {
+  background-color: var(--card-bg-solid);
+  color: var(--text-color);
 }
 
 select:focus {

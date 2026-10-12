@@ -40,6 +40,7 @@ if ($LASTEXITCODE) { throw 'Local ASR tests failed' }
     --add-data "$PSScriptRoot/tts_kokoro_worker.py;worker" --add-data "$PSScriptRoot/ocr_vlm_cpu_worker.py;worker" `
     --add-data "$PSScriptRoot/ocr_catalog.json;." --add-data "$PSScriptRoot/ocr_catalog.json;worker" `
     --add-data "$PSScriptRoot/ocr_runtime.py;worker" --add-data "$PSScriptRoot/ocr_vlm_worker.py;worker" `
+    --add-data "$PSScriptRoot/ocr_layout.py;worker" `
     --add-data "$PSScriptRoot/ocr_paddle_worker.py;worker" --add-data "$PSScriptRoot/ocr_manager.py;worker" `
     --add-data "$PSScriptRoot/tts_options.py;worker" `
     --add-data "$PSScriptRoot/tts_voxtral_worker.py;worker" --add-data "$PSScriptRoot/tts_voxtral_native.py;worker" `

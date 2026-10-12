@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdint>
 #include <utility>
+#include <algorithm>
 #include "ipc.h"
 #include "ipc/selection_replay_guard.h"
 #include "ipc/async_request_origin.h"
@@ -23,6 +24,7 @@
 #include "config/ime_config.h"
 #include "window/window_hook.h"
 #include "session/session_factory.h"
+#include "settings/personal_library.h"
 #include "log/candidate_diag_log.h"
 #include "log/ftb_diag_log.h"
 #include "voice-input/voice_input_service.h"
@@ -255,6 +257,9 @@ void WorkerThread()
             continue;
         }
 
+        if (task.client_id != 0)
+            PersonalLibrary::BindInputApplication(
+                PersonalLibrary::ProcessApplication(static_cast<uint32_t>(task.client_id >> 32)));
         if (task.has_pipe_data)
         {
             namedpipeData = task.pipe_data;
@@ -668,6 +673,31 @@ void WorkerThread()
                 break;
             }
 
+            const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(task.client_id >> 32));
+            if (PersonalLibrary::Policy(application).isolated)
+            {
+                const std::string action = task.type == TaskType::UiPinCandidate           ? "pin"
+                                           : task.type == TaskType::UiDeleteCandidate      ? "delete"
+                                           : task.type == TaskType::UiFixCandidatePosition ? "fix"
+                                                                                           : "clear";
+                auto localCode = g_inputSession->get_pinyin_sequence_with_cases();
+                if (IsYModeInput(localCode))
+                    localCode = localCode.substr(1);
+                try
+                {
+                    PersonalLibrary::SetCandidatePreference(
+                        application, localCode, item.word,
+                        g_english_input_mode || IsYModeInput(g_inputSession->get_pinyin_sequence_with_cases()) ||
+                            item.source == CandidateSource::EnglishDictionary,
+                        action, task.fixed_position);
+                }
+                catch (...)
+                { /* A failed application preference must never modify the shared DB. */
+                }
+                PrepareCandidateList(task.client_id, task.activation_epoch);
+                RequestShowCandidateWindow();
+                break;
+            }
             const bool english_candidate = item.source == CandidateSource::EnglishDictionary;
             const auto ranking_keys = RankingKeysForCandidate(item);
             const std::string context_key = english_candidate ? EnglishRankingContextKey() : ranking_keys.first;
@@ -967,8 +997,45 @@ void EnqueueMixedCandidates(MixedCandidates::Result result, const std::string &i
     pipe_queueCv.notify_one();
 }
 
+namespace
+{
+SerialTaskRunner &DictionaryWriter();
+}
+void EnqueueApplicationSelectionTask(const std::string &code, const std::string &word, bool english, uint64_t client_id)
+{
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (!PersonalLibrary::Policy(application).isolated)
+        return;
+    const auto localCode = english && IsYModeInput(code) ? code.substr(1) : code;
+    DictionaryWriter().Post([application, localCode, word, english] {
+        try
+        {
+            PersonalLibrary::RecordSelection(application, localCode, word, english ? "en" : "zh");
+        }
+        catch (...)
+        { /* Never fall through to the shared dictionary on an overlay failure. */
+        }
+    });
+}
 void EnqueueStoreUserPhraseTask(const std::string &pinyin, const std::string &word, bool pinyin_is_canonical)
 {
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+    {
+        std::string code = pinyin;
+        code.erase(std::remove(code.begin(), code.end(), '\''), code.end());
+        DictionaryWriter().Post([application, code, word] {
+            try
+            {
+                PersonalLibrary::RecordSelection(application, code, word, "zh", true);
+            }
+            catch (...)
+            {
+            }
+        });
+        return;
+    }
     {
         std::lock_guard lock(queueMutex);
         Task task;
@@ -1003,6 +1070,9 @@ void EnqueueAdjustCandidateRankingTask(bool english, bool wubi, const std::strin
                                        const std::string &entry_key, const std::string &word, uint64_t client_id,
                                        uint64_t activation_epoch, const std::vector<WordItem> *ranking_candidates)
 {
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string replay_key =
         std::string(english ? "e" : (wubi ? "w" : "p")) + '\x1f' + context_key + '\x1f' + entry_key + '\x1f' + word;
@@ -1039,6 +1109,9 @@ void EnqueueAdjustCandidateRankingTask(bool english, bool wubi, const std::strin
 void EnqueueLearnQuickPhraseOrderTask(const std::string &code, const std::string &word, bool first_in_group,
                                       int ordinary_rank, uint64_t client_id, uint64_t activation_epoch)
 {
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string replay_key = "q\x1f" + code + '\x1f' + (word.empty() ? std::to_string(ordinary_rank) : word);
     if (code.empty() || !replay_guard.should_apply(replay_key, client_id, activation_epoch, GetTickCount64()))
@@ -1063,6 +1136,9 @@ void EnqueueLearnQuickPhraseOrderTask(const std::string &code, const std::string
 void EnqueueLearnEnglishSlotTask(const std::string &code, int english_index, std::optional<int> selected_index,
                                  uint64_t client_id, uint64_t activation_epoch)
 {
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string replay_key = "s\x1f" + code + '\x1f' + std::to_string(english_index) + '\x1f' +
                                    (selected_index ? std::to_string(*selected_index) : std::string("english"));
@@ -1087,6 +1163,9 @@ void EnqueueLearnEnglishSlotTask(const std::string &code, int english_index, std
 // 日期时间格式的顺序同样每次现查，写完不用清缓存。
 void EnqueueLearnDateTimeOrderTask(const std::string &format_id, uint64_t client_id, uint64_t activation_epoch)
 {
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string keyword = DateTimeKeywordForFormat(format_id);
     if (keyword.empty() ||
@@ -1104,6 +1183,21 @@ void EnqueueLearnDateTimeOrderTask(const std::string &format_id, uint64_t client
 
 void EnqueueLearnEnteredEnglishWordTask(const std::string &word)
 {
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+    {
+        DictionaryWriter().Post([application, word] {
+            try
+            {
+                PersonalLibrary::RecordSelection(application, word, word, "en", true);
+            }
+            catch (...)
+            {
+            }
+        });
+        return;
+    }
     if (word.empty())
         return;
     DictionaryWriter().Post([word] {

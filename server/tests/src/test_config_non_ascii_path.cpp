@@ -1,6 +1,8 @@
 #include "tests/includes/test_framework.h"
 
 #include "config/ime_config.h"
+#include "engine/contracts/webview/validator.h"
+#include "settings/config_update_dispatch.h"
 
 #include <windows.h>
 
@@ -141,6 +143,81 @@ TEST_CASE(config_round_trips_under_non_ascii_profile_path)
     }
 
     fs::remove_all(unique_root, ec);
+}
+
+TEST_CASE(candidate_pinyin_display_defaults_on_and_survives_profile_reload)
+{
+    namespace fs = std::filesystem;
+    const fs::path root = MakeProfileRoot() / L"candidate-pinyin";
+    const fs::path data = root / L"metasequoiaime";
+    std::error_code ec;
+    fs::remove_all(root, ec);
+    SeedTemplate(data);
+    // An old profile has no annotation key: preserve the current visible default.
+    WriteText(data / L"config.toml", "[appearance]\npage_size = 6\n");
+    {
+        ScopedConfigLocation location(root);
+        InitImeConfig();
+        REQUIRE(GetConfiguredCandidateShowPinyin());
+        for (const bool enabled : {false, true, false})
+        {
+            REQUIRE(SetConfiguredCandidateShowPinyin(enabled));
+            InitImeConfig();
+            REQUIRE_EQ(GetConfiguredCandidateShowPinyin(), enabled);
+        }
+        REQUIRE(ReadText(data / L"config.toml").find("candidate_show_pinyin = false") != std::string::npos);
+    }
+    fs::remove_all(root, ec);
+}
+
+TEST_CASE(candidate_pinyin_json_dispatch_persists_for_both_settings_hosts)
+{
+    namespace fs = std::filesystem;
+    for (const bool embedded : {false, true})
+    {
+        const fs::path root = MakeProfileRoot() / (embedded ? L"embedded-dispatch" : L"standalone-dispatch");
+        const fs::path data = root / L"metasequoiaime";
+        std::error_code ec;
+        fs::remove_all(root, ec);
+        SeedTemplate(data);
+        {
+            ScopedConfigLocation location(root);
+            InitImeConfig();
+            for (const bool enabled : {false, true, false})
+            {
+                // Serialize and parse the same validated JSON envelope received by WebView2.
+                boost::json::object envelope = {
+                    {"type", "configUpdate"},
+                    {"protocolVersion", metasequoia::webview::Version},
+                    {"data", {{"path", "appearance.candidate_show_pinyin"}, {"value", enabled}}}};
+                const auto received = boost::json::parse(boost::json::serialize(envelope));
+                REQUIRE(metasequoia::webview::Validate(received, "client", "settings"));
+                const auto &payload = received.at("data").as_object();
+                if (embedded)
+                {
+                    const auto saved = SettingsConfig::ApplyCandidateAnnotationUpdate(payload);
+                    REQUIRE(saved.has_value());
+                    REQUIRE(*saved);
+                }
+                else
+                    REQUIRE(SettingsConfig::ApplyConfigUpdate(payload));
+                InitImeConfig();
+                REQUIRE_EQ(GetConfiguredCandidateShowPinyin(), enabled);
+                const auto stored = toml::parse(ReadText(data / L"config.toml"));
+                REQUIRE_EQ(stored["appearance"]["candidate_show_pinyin"].value_or(!enabled), enabled);
+            }
+            const boost::json::object invalid = {{"path", "appearance.candidate_show_pinyin"}, {"value", "true"}};
+            REQUIRE(!SettingsConfig::ApplyConfigUpdate(invalid));
+            const auto rejected = SettingsConfig::ApplyCandidateAnnotationUpdate(invalid);
+            REQUIRE(rejected.has_value());
+            REQUIRE(!*rejected);
+            InitImeConfig();
+            REQUIRE(!GetConfiguredCandidateShowPinyin());
+            REQUIRE(!SettingsConfig::ApplyCandidateAnnotationUpdate({{"path", "appearance.unknown"}, {"value", true}})
+                         .has_value());
+        }
+        fs::remove_all(root, ec);
+    }
 }
 
 TEST_CASE(ai_provider_configuration_round_trips_without_mixing_credentials)

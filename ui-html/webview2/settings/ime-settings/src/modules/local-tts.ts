@@ -16,6 +16,7 @@ export function setupLocalTts(): void {
   let timer = 0;
   let activeModel = "";
   let renderedModels = '';
+  const descriptionOpen = new Map<string,boolean>();
   const send = (action: 'status' | 'download' | 'cancel' | 'start' | 'stop', modelId?: string) => {
     const requestId = `local-tts-${++counter}`;
     window.chrome?.webview?.postMessage(serializeHostMessage({type:'localTtsRequest', data:{requestId, action, ...(modelId ? {modelId} : {})}}));
@@ -55,8 +56,14 @@ export function setupLocalTts(): void {
       const online = row.engine === 'edge';
       const awaiting = row.availability === 'awaiting_weights';
       add(card, 'p', awaiting ? `${row.format} · 等待官方权重，下载大小尚不可核实` : `${row.format} · ${online ? '无需下载模型权重' : `下载 ${formatModelBytes(Number(row.downloadBytes))}`} · 建议磁盘预留 ${formatModelBytes(Number(row.diskBytes))}`, 'local-asr-size');
-      add(card, 'p', String(row.features));
-      add(card, 'p', String(row.hardware), 'voice-description');
+      const description = add(card, 'details', '', 'model-description');
+      (description as HTMLDetailsElement).open=descriptionOpen.get(id)??false;
+      description.addEventListener('toggle',()=>descriptionOpen.set(id,(description as HTMLDetailsElement).open));
+      add(description, 'summary', '模型特点、语言与运行要求');
+      add(description, 'p', String(row.features));
+      add(description, 'p', String(row.hardware), 'voice-description');
+      if(row.dialectNote) add(description,'p',String(row.dialectNote),'voice-description');
+      if(row.parameterNote) add(description,'p',String(row.parameterNote),'voice-description');
       const links = add(card, 'div', '', 'local-asr-actions');
       const link = add(links, 'a', '官方介绍 / 原版下载') as HTMLAnchorElement;
       link.href = String(row.official); link.addEventListener('click', event => {

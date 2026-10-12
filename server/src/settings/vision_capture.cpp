@@ -13,6 +13,12 @@
 #include <winrt/Windows.Storage.Streams.h>
 #include <algorithm>
 #include <atomic>
+#include <cmath>
+#include <cctype>
+#include <cstring>
+#include <initializer_list>
+#include <utility>
+#include <limits>
 #include <mutex>
 #include <stdexcept>
 #include <string_view>
@@ -106,7 +112,7 @@ class Overlay
     std::atomic<HWND> window_{nullptr};
     std::mutex mutex_;
     RECT bounds_{};
-    std::wstring text_;
+    std::vector<OverlayBlock> blocks_;
     bool shown_ = false;
     std::atomic<bool> quitting_{false};
     static LRESULT CALLBACK Proc(HWND h, UINT m, WPARAM w, LPARAM l)
@@ -139,23 +145,51 @@ class Overlay
             auto dc = BeginPaint(h, &ps);
             RECT r{};
             GetClientRect(h, &r);
-            HBRUSH brush = CreateSolidBrush(RGB(25, 28, 33));
+            // Black is the color key. Only recognised text boxes obscure the source screen.
+            HBRUSH brush = CreateSolidBrush(RGB(0, 0, 0));
             FillRect(dc, &r, brush);
             DeleteObject(brush);
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, RGB(245, 245, 245));
             const int dpi = GetDpiForWindow(h);
-            HFONT font = CreateFontW(-MulDiv(16, dpi, 96), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                                     OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH,
-                                     L"Microsoft YaHei");
-            auto old = SelectObject(dc, font);
-            InflateRect(&r, -MulDiv(8, dpi, 96), -MulDiv(8, dpi, 96));
             {
                 std::lock_guard lock(p->mutex_);
-                DrawTextW(dc, p->text_.c_str(), -1, &r, DT_WORDBREAK | DT_NOPREFIX);
+                for (const auto &block : p->blocks_)
+                {
+                    RECT box = block.bounds;
+                    RECT clipped{};
+                    if (block.text.empty() || !IntersectRect(&clipped, &box, &r))
+                        continue;
+                    auto background = CreateSolidBrush(RGB(25, 28, 33));
+                    FillRect(dc, &clipped, background);
+                    DeleteObject(background);
+                    const auto text = string_to_wstring(OverlayDisplayText(block.text, block.format));
+                    const int minimum = MulDiv(9, dpi, 96);
+                    int size = std::clamp(int((clipped.bottom - clipped.top) * .75), minimum, MulDiv(20, dpi, 96));
+                    HFONT font = nullptr;
+                    HGDIOBJ old = nullptr;
+                    for (;;)
+                    {
+                        font = CreateFontW(-size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+                                           OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH,
+                                           L"Microsoft YaHei");
+                        old = SelectObject(dc, font);
+                        RECT measured = clipped;
+                        DrawTextW(dc, text.c_str(), -1, &measured, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+                        if (measured.bottom - measured.top <= clipped.bottom - clipped.top || size <= minimum)
+                            break;
+                        SelectObject(dc, old);
+                        DeleteObject(font);
+                        --size;
+                    }
+                    const int saved = SaveDC(dc);
+                    IntersectClipRect(dc, clipped.left, clipped.top, clipped.right, clipped.bottom);
+                    DrawTextW(dc, text.c_str(), -1, &clipped, DT_WORDBREAK | DT_NOPREFIX | DT_END_ELLIPSIS);
+                    RestoreDC(dc, saved);
+                    SelectObject(dc, old);
+                    DeleteObject(font);
+                }
             }
-            SelectObject(dc, old);
-            DeleteObject(font);
             EndPaint(h, &ps);
             return 0;
         }
@@ -187,7 +221,7 @@ class Overlay
                                      this);
             if (!h)
                 return;
-            SetLayeredWindowAttributes(h, 0, 230, LWA_ALPHA);
+            SetLayeredWindowAttributes(h, RGB(0, 0, 0), 240, LWA_COLORKEY | LWA_ALPHA);
             SetWindowDisplayAffinity(h, WDA_EXCLUDEFROMCAPTURE);
             window_ = h;
             PostMessageW(h, WM_APP + 1, 0, 0);
@@ -210,16 +244,25 @@ class Overlay
         if (thread_.joinable())
             thread_.join();
     }
-    void Set(RECT bounds, std::wstring text, bool show)
+    void Set(RECT bounds, std::vector<OverlayBlock> blocks, bool show)
     {
         {
             std::lock_guard lock(mutex_);
             bounds_ = bounds;
-            text_ = std::move(text);
+            blocks_ = std::move(blocks);
             shown_ = show;
         }
         if (auto h = window_.load())
-            PostMessageW(h, WM_APP + 1, 0, 0);
+        {
+            if (show)
+                PostMessageW(h, WM_APP + 1, 0, 0);
+            else
+            {
+                DWORD_PTR result = 0;
+                // Capture waits for the overlay thread to hide it; no self-OCR feedback loop.
+                SendMessageTimeoutW(h, WM_APP + 1, 0, 0, SMTO_ABORTIFHUNG, 500, &result);
+            }
+        }
     }
 };
 Overlay &OverlayWindow()
@@ -285,8 +328,8 @@ RECT PickRectangle(HWND owner)
 Image CaptureRectangle(RECT r)
 {
     const int w = r.right - r.left, h = r.bottom - r.top;
-    if (w <= 0 || h <= 0 || int64_t(w) * h > 16000000)
-        throw std::runtime_error("截图区域超过 1600 万像素");
+    if (w <= 0 || h <= 0 || uint64_t(w) * h > MaxImagePixels)
+        throw std::runtime_error("截图区域超过 6400 万像素，请分区截图");
     HDC screen = GetDC(nullptr), memory = CreateCompatibleDC(screen);
     BITMAPINFO info{};
     info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -323,6 +366,8 @@ Image CaptureRectangle(RECT r)
 }
 Image DecodeImage(const std::string &bytes)
 {
+    if (bytes.empty() || bytes.size() > MaxEncodedImageBytes)
+        throw std::runtime_error("图片文件为空或超过 25 MB，请缩小后导入");
     using namespace winrt::Windows;
     Storage::Streams::InMemoryRandomAccessStream stream;
     Storage::Streams::DataWriter writer(stream);
@@ -332,8 +377,8 @@ Image DecodeImage(const std::string &bytes)
     writer.DetachStream();
     stream.Seek(0);
     auto decoder = Graphics::Imaging::BitmapDecoder::CreateAsync(stream).get();
-    if (uint64_t(decoder.PixelWidth()) * decoder.PixelHeight() > 32000000)
-        throw std::runtime_error("图像超过 3200 万像素，请裁剪后导入");
+    if (uint64_t(decoder.PixelWidth()) * decoder.PixelHeight() > MaxImagePixels)
+        throw std::runtime_error("图像超过 6400 万像素，请裁剪后导入");
     auto bitmap =
         decoder
             .GetSoftwareBitmapAsync(Graphics::Imaging::BitmapPixelFormat::Bgra8,
@@ -374,7 +419,7 @@ std::string EncodePng(const Image &image)
     Check(GetHGlobalFromStream(stream.Get(), &memory));
     STATSTG stat{};
     Check(stream->Stat(&stat, STATFLAG_NONAME));
-    if (stat.cbSize.QuadPart > 25 * 1024 * 1024)
+    if (stat.cbSize.QuadPart > MaxEncodedImageBytes)
         throw std::runtime_error("PNG 图像过大，请缩小区域");
     void *p = GlobalLock(memory);
     if (!p)
@@ -407,41 +452,243 @@ std::wstring NormalizeChineseOcrSpacing(const std::wstring &text)
     }
     return out;
 }
-nlohmann::json WindowsOcr(const Image &image)
+std::string OverlayDisplayText(const std::string &text, const std::string &format)
+{
+    if (format != "html")
+        return text;
+    // A plain Win32 overlay never executes or renders HTML. Keep the original HTML in the editor/export.
+    std::string readable;
+    for (size_t i = 0; i < text.size();)
+    {
+        if (text[i] == '<')
+        {
+            const auto end = text.find('>', i + 1);
+            if (end == std::string::npos)
+            {
+                readable.append(text, i, std::string::npos);
+                break;
+            }
+            auto tag = text.substr(i + 1, end - i - 1);
+            std::transform(tag.begin(), tag.end(), tag.begin(), [](unsigned char c) { return std::tolower(c); });
+            const auto space = tag.find_first_of(" \t\r\n");
+            if (space != std::string::npos)
+                tag.resize(space);
+            if (tag == "/tr" || tag == "br" || tag == "br/" || tag == "/p")
+            {
+                while (!readable.empty() && readable.back() == '\t')
+                    readable.pop_back();
+                if (!readable.empty() && readable.back() != '\n')
+                    readable += '\n';
+            }
+            else if (tag == "/td" || tag == "/th")
+                readable += '\t';
+            i = end + 1;
+        }
+        else
+            readable += text[i++];
+    }
+    std::string decoded;
+    for (size_t i = 0; i < readable.size();)
+    {
+        if (readable[i] == '&')
+        {
+            bool found = false;
+            for (const auto &[entity, replacement] :
+                 std::initializer_list<std::pair<std::string_view, std::string_view>>{{"&lt;", "<"},
+                                                                                      {"&gt;", ">"},
+                                                                                      {"&amp;", "&"},
+                                                                                      {"&quot;", "\""},
+                                                                                      {"&apos;", "'"},
+                                                                                      {"&#39;", "'"},
+                                                                                      {"&nbsp;", " "}})
+                if (readable.compare(i, entity.size(), entity) == 0)
+                {
+                    decoded += replacement;
+                    i += entity.size();
+                    found = true;
+                    break;
+                }
+            if (found)
+                continue;
+        }
+        decoded += readable[i++];
+    }
+    while (!decoded.empty() && (decoded.back() == '\n' || decoded.back() == '\t'))
+        decoded.pop_back();
+    return decoded;
+}
+std::vector<RECT> ImageTileRegions(unsigned width, unsigned height, unsigned tileSize, unsigned overlap)
+{
+    if (!width || !height || uint64_t(width) * height > MaxImagePixels || tileSize <= overlap || tileSize < 128)
+        throw std::runtime_error("图像或 OCR 分块参数无效");
+    std::vector<RECT> tiles;
+    const unsigned stride = tileSize - overlap;
+    for (unsigned y = 0; y < height; y += stride)
+    {
+        for (unsigned x = 0; x < width; x += stride)
+        {
+            if (tiles.size() >= 128)
+                throw std::runtime_error("长图需要过多 OCR 分块，请分段识别");
+            tiles.push_back(
+                {LONG(x), LONG(y), LONG(std::min(width, x + tileSize)), LONG(std::min(height, y + tileSize))});
+            if (x + tileSize >= width)
+                break;
+        }
+        if (y + tileSize >= height)
+            break;
+    }
+    return tiles;
+}
+std::vector<OverlayBlock> OverlayBlocksForImage(const nlohmann::json &result, unsigned width, unsigned height)
+{
+    if (!width || !height || uint64_t(width) * height > MaxImagePixels)
+        throw std::runtime_error("屏幕翻译图像尺寸无效");
+    std::vector<OverlayBlock> blocks;
+    if (result.contains("blocks") && result.at("blocks").is_array())
+        for (const auto &block : result.at("blocks"))
+        {
+            if (blocks.size() >= 256)
+                break;
+            if (!block.is_object() || !block.contains("box") || !block.at("box").is_array())
+                continue;
+            double left = width, top = height, right = 0, bottom = 0;
+            bool valid = true;
+            const auto &points = block.at("box");
+            if (points.size() < 4)
+                continue;
+            for (const auto &point : points)
+            {
+                double x = 0, y = 0;
+                if (point.is_array() && point.size() == 2 && point[0].is_number() && point[1].is_number())
+                {
+                    x = point[0].get<double>();
+                    y = point[1].get<double>();
+                }
+                else if (point.is_object() && point.contains("x") && point.contains("y") && point["x"].is_number() &&
+                         point["y"].is_number())
+                {
+                    x = point["x"].get<double>();
+                    y = point["y"].get<double>();
+                }
+                else
+                {
+                    valid = false;
+                    break;
+                }
+                if (!std::isfinite(x) || !std::isfinite(y))
+                {
+                    valid = false;
+                    break;
+                }
+                left = std::min(left, x);
+                top = std::min(top, y);
+                right = std::max(right, x);
+                bottom = std::max(bottom, y);
+            }
+            if (!valid || right <= left || bottom <= top || right <= 0 || bottom <= 0 || left >= width || top >= height)
+                continue;
+            // Reconstructed indentation belongs in the editor; the original box already has its screen x offset.
+            const auto source = block.value("ocr_text", block.value("text", std::string()));
+            if (source.empty())
+                continue;
+            OverlayBlock out;
+            out.bounds = {LONG(std::floor(std::clamp(left, 0.0, double(width)))),
+                          LONG(std::floor(std::clamp(top, 0.0, double(height)))),
+                          LONG(std::ceil(std::clamp(right, 0.0, double(width)))),
+                          LONG(std::ceil(std::clamp(bottom, 0.0, double(height))))};
+            out.source = source;
+            out.region = block.value("region", false);
+            out.format = block.value("format", result.value("format", "text"));
+            blocks.push_back(std::move(out));
+        }
+    if (blocks.empty())
+    {
+        auto text = result.value("text", std::string());
+        if (!text.empty())
+            blocks.push_back({{0, 0, LONG(width), LONG(height)}, text, "", true, result.value("format", "text")});
+    }
+    return blocks;
+}
+nlohmann::json WindowsOcr(const Image &image, const std::function<bool()> &cancelled)
 {
     using namespace winrt::Windows;
     auto engine = Media::Ocr::OcrEngine::TryCreateFromUserProfileLanguages();
     if (!engine)
         throw std::runtime_error("本机未安装 OCR 语言包，请选择本地模型或云 OCR");
-    if (image.width > Media::Ocr::OcrEngine::MaxImageDimension() ||
-        image.height > Media::Ocr::OcrEngine::MaxImageDimension())
-        throw std::runtime_error("Windows OCR 图像尺寸过大，请分区截图或选择文档 OCR 模型");
-    auto buffer = Security::Cryptography::CryptographicBuffer::CreateFromByteArray(image.pixels);
-    auto bitmap = Graphics::Imaging::SoftwareBitmap::CreateCopyFromBuffer(
-        buffer, Graphics::Imaging::BitmapPixelFormat::Bgra8, image.width, image.height,
-        Graphics::Imaging::BitmapAlphaMode::Ignore);
-    auto result = engine.RecognizeAsync(bitmap).get();
-    nlohmann::json out = {
-        {"text", winrt::to_string(result.Text())}, {"blocks", nlohmann::json::array()}, {"format", "text"}};
-    std::string text;
-    for (const auto &line : result.Lines())
+    if (image.pixels.size() != uint64_t(image.width) * image.height * 4)
+        throw std::runtime_error("OCR 图像像素数据无效");
+    const unsigned size = std::min(2048u, Media::Ocr::OcrEngine::MaxImageDimension());
+    const auto tiles = ImageTileRegions(image.width, image.height, size, 96);
+    nlohmann::json out = {{"text", ""},
+                          {"blocks", nlohmann::json::array()},
+                          {"format", "text"},
+                          {"width", image.width},
+                          {"height", image.height}};
+    auto raw = nlohmann::json::array();
+    for (const auto &tile : tiles)
     {
-        std::string value = wstring_to_string(NormalizeChineseOcrSpacing(std::wstring(line.Text())));
+        if (cancelled && cancelled())
+            return {};
+        const unsigned w = tile.right - tile.left, h = tile.bottom - tile.top;
+        std::vector<uint8_t> pixels(size_t(w) * h * 4);
+        for (unsigned row = 0; row < h; ++row)
+            std::memcpy(pixels.data() + size_t(row) * w * 4,
+                        image.pixels.data() + (size_t(tile.top + row) * image.width + tile.left) * 4, size_t(w) * 4);
+        auto buffer = Security::Cryptography::CryptographicBuffer::CreateFromByteArray(pixels);
+        auto bitmap = Graphics::Imaging::SoftwareBitmap::CreateCopyFromBuffer(
+            buffer, Graphics::Imaging::BitmapPixelFormat::Bgra8, w, h, Graphics::Imaging::BitmapAlphaMode::Ignore);
+        auto result = engine.RecognizeAsync(bitmap).get();
+        raw.push_back({{"text", winrt::to_string(result.Text())}, {"x", tile.left}, {"y", tile.top}});
+        for (const auto &line : result.Lines())
+        {
+            double left = w, top = h, right = 0, bottom = 0;
+            for (const auto &word : line.Words())
+            {
+                const auto r = word.BoundingRect();
+                left = std::min(left, double(r.X));
+                top = std::min(top, double(r.Y));
+                right = std::max(right, double(r.X + r.Width));
+                bottom = std::max(bottom, double(r.Y + r.Height));
+            }
+            if (right <= left || bottom <= top)
+                continue;
+            const double cx = (left + right) / 2, cy = (top + bottom) / 2;
+            if ((tile.left && cx < 48) || (tile.top && cy < 48) || (tile.right < LONG(image.width) && cx >= w - 48) ||
+                (tile.bottom < LONG(image.height) && cy >= h - 48))
+                continue;
+            left += tile.left;
+            right += tile.left;
+            top += tile.top;
+            bottom += tile.top;
+            const auto value = wstring_to_string(NormalizeChineseOcrSpacing(std::wstring(line.Text())));
+            out["blocks"].push_back({{"text", value},
+                                     {"kind", "text"},
+                                     {"format", "text"},
+                                     {"box", {{left, top}, {right, top}, {right, bottom}, {left, bottom}}}});
+        }
+    }
+    auto &blocks = out["blocks"];
+    std::stable_sort(blocks.begin(), blocks.end(), [](const auto &a, const auto &b) {
+        const auto ay = a.at("box")[0][1].template get<double>(), by = b.at("box")[0][1].template get<double>();
+        return ay != by ? ay < by : a.at("box")[0][0].template get<double>() < b.at("box")[0][0].template get<double>();
+    });
+    std::string text;
+    for (const auto &block : blocks)
+    {
         if (!text.empty())
             text += '\n';
-        text += value;
-        out["blocks"].push_back({{"text", value}});
+        text += block.at("text").get<std::string>();
     }
     out["text"] = text;
-    out["raw"] = {{"text", winrt::to_string(result.Text())}};
+    out["raw"] = {{"tiles", raw}};
     return out;
 }
-void ShowTranslationOverlay(RECT rectangle, const std::string &text)
+void ShowTranslationOverlay(RECT rectangle, const std::vector<OverlayBlock> &blocks)
 {
-    OverlayWindow().Set(rectangle, string_to_wstring(text), true);
+    OverlayWindow().Set(rectangle, blocks, !blocks.empty());
 }
 void HideTranslationOverlay()
 {
-    OverlayWindow().Set({}, L"", false);
+    OverlayWindow().Set({}, {}, false);
 }
 } // namespace Vision

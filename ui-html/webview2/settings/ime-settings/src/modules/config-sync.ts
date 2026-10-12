@@ -41,28 +41,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
           theme_handwriting: data?.appearance?.theme_handwriting,
           theme_voice: data?.appearance?.theme_voice
         },
-        {
-          font: data?.appearance?.font,
-          fallback_fonts: data?.appearance?.fallback_fonts,
-          fallback_font_css_families: data?.appearance?.fallback_font_css_families,
-          font_css_family: data?.appearance?.font_css_family,
-          english_font: data?.appearance?.english_font,
-          english_font_css_family: data?.appearance?.english_font_css_family,
-          default_font: data?.appearance?.default_font,
-          default_font_css_family: data?.appearance?.default_font_css_family,
-          font_size: data?.appearance?.font_size,
-          candidate_window_preedit_font_size: data?.appearance?.candidate_window_preedit_font_size,
-          cand_text_color: data?.appearance?.cand_text_color,
-          page_size: data?.appearance?.page_size,
-          candidate_window_follow_cursor: data?.appearance?.candidate_window_follow_cursor,
-          candidate_fixed_badge: data?.appearance?.candidate_fixed_badge,
-          candidate_fixed_badge_style: data?.appearance?.candidate_fixed_badge_style,
-          candidate_window_preedit_shuangpin_quanpin: data?.appearance?.candidate_window_preedit_shuangpin_quanpin,
-          tsf_preedit_shuangpin_quanpin: data?.appearance?.tsf_preedit_shuangpin_quanpin,
-          ui_backend: data?.appearance?.ui_backend,
-          settings_window_linger: data?.appearance?.settings_window_linger,
-          system_fonts: data?.appearance?.system_fonts
-        }
+        data?.appearance
       );
       module.updateCandidatePreviewHelpcode({
         input_schema: data?.input?.schema,

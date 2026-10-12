@@ -23,6 +23,10 @@ try {
         'server/build-release/bin/Release/local-asr/_internal/ocr_catalog.json',
         'server/build-release/bin/Release/MetasequoiaImeServerTests.exe',
         'server/build-release/bin/Release/MetasequoiaImeServerTests.pdb',
+        'server/build-release/bin/Release/MetasequoiaTtsStreamProbe.exe',
+        'server/build-release/bin/Release/MetasequoiaTtsStreamProbe.pdb',
+        'server/build-release/bin/Release/MetasequoiaVisionLiveProbe.exe',
+        'server/build-release/bin/Release/MetasequoiaVisionLiveProbe.pdb',
         'server/build-release/bin/Release/test_webview_contract.exe',
         'server/build-release/bin/Release/test_webview_contract.pdb',
         'windows/build32-release/Release/MetasequoiaImeTsf.dll',
@@ -122,6 +126,10 @@ try {
     foreach ($testFile in @(
         'server_exe/MetasequoiaImeServerTests.exe',
         'server_exe/MetasequoiaImeServerTests.pdb',
+        'server_exe/MetasequoiaTtsStreamProbe.exe',
+        'server_exe/MetasequoiaTtsStreamProbe.pdb',
+        'server_exe/MetasequoiaVisionLiveProbe.exe',
+        'server_exe/MetasequoiaVisionLiveProbe.pdb',
         'server_exe/test_webview_contract.exe',
         'server_exe/test_webview_contract.pdb'
     )) {

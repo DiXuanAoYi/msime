@@ -1,6 +1,7 @@
 import { serializeHostMessage } from "../../../../shared/messages";
 import { onHostMessage } from "../utils/host-messages";
 import "../styles/modules/prompt-library.css";
+import "../styles/modules/workbench-layout.css";
 type Action =
   | "status"
   | "putGroup"
@@ -13,7 +14,11 @@ type Action =
   | "review"
   | "playFavorite"
   | "copyFavorite"
-  | "study";
+  | "study"
+  | "putApplication"
+  | "exportApplication"
+  | "importApplication"
+  | "removeLearning";
 const el = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const value = (id: string) => el<HTMLInputElement>(id)?.value ?? "";
@@ -40,20 +45,34 @@ type Entry = {
   application?: string;
   code?: string;
   enabled?: boolean;
+  language?: string;
+  frequency?: number;
+  deleted?: boolean;
+  pinned?: boolean;
 };
+export function libraryPage(entries: Entry[], query: string, page: number, pageSize = 12): {items:Entry[];total:number;page:number;pages:number} {
+  const needle=query.trim().toLocaleLowerCase();
+  const filtered=needle?entries.filter(x=>[x.name,x.text,x.application,x.code].some(value=>value?.toLocaleLowerCase().includes(needle))):entries;
+  const size=Number.isInteger(pageSize)&&pageSize>0?Math.min(pageSize,100):12;
+  const pages=Math.max(1,Math.ceil(filtered.length/size));
+  const current=Math.max(0,Math.min(Number.isFinite(page)?Math.floor(page):0,pages-1));
+  return {items:filtered.slice(current*size,(current+1)*size),total:filtered.length,page:current,pages};
+}
 type Book = {
   groups: { id: string; name: string }[];
   clips: Entry[];
   rules: Entry[];
   favorites: Entry[];
+  applications: {application:string;enabled:boolean;learn:boolean;frequency:boolean}[];
+  appLearning: Entry[];
 };
 export function setupPersonalLibrary(): void {
   const root = document.getElementById("personalLibraryPanel");
   if (!root || root.dataset.ready) return;
   root.dataset.ready = "1";
-  let book: Book = { groups: [], clips: [], rules: [], favorites: [] },
+  let book: Book = { groups: [], clips: [], rules: [], favorites: [], applications:[],appLearning:[] },
     history: string[] = [],
-    editing = "";
+    editing = "", page = 0;
   let study: { word: string; language: string; gloss: string }[] = [],
     reviewed = 0;
   const status = (s: string) => {
@@ -74,7 +93,7 @@ export function setupPersonalLibrary(): void {
   };
   const card = () => {
     const c = document.createElement("div");
-    c.className = "section voice-section";
+    c.className = "library-card";
     return c;
   };
   const render = () => {
@@ -82,9 +101,19 @@ export function setupPersonalLibrary(): void {
       isClip = view === "clips",
       isRule = view === "rules";
     el("libraryGroups").hidden = !isClip;
+    el("libraryApplicationManager").hidden = !isRule && view !== "learning";
+    const appSelect=el<HTMLSelectElement>("libraryApplicationSelect");
+    const app=value("libraryScope").trim().toLowerCase();
+    appSelect.replaceChildren(new Option("选择或填写新软件", ""),...(book.applications??[]).map(x=>new Option(x.application+(x.enabled?" · 已启用":" · 已关闭"),x.application)));
+    appSelect.value=app;
+    const profile=(book.applications??[]).find(x=>x.application===app);
+    if(profile){el<HTMLInputElement>("libraryIsolation").checked=profile.enabled;el<HTMLInputElement>("libraryAutoLearn").checked=profile.learn;el<HTMLInputElement>("libraryFrequency").checked=profile.frequency;}
     el("libraryEditor").hidden = !isClip && !isRule;
     el("libraryAppFields").hidden = !isRule;
     el("libraryStudy").hidden = view !== "study";
+    el("librarySearchArea").hidden = view === "study";
+    el("libraryPager").hidden = view === "study";
+    el("libraryNew").hidden = !isClip && !isRule;
     const group = el<HTMLSelectElement>("libraryGroup");
     const old = group.value;
     group.replaceChildren(...book.groups.map((g) => new Option(g.name, g.id)));
@@ -100,9 +129,16 @@ export function setupPersonalLibrary(): void {
         : view === "clips"
           ? book.clips.filter((x) => x.group === group.value)
           : view === "rules"
-            ? book.rules
-            : book.favorites;
-    if (!entries.length) {
+            ? book.rules.filter(x=>!app||x.application===app)
+            : view === "learning"
+              ? (book.appLearning??[]).filter(x=>!app||x.application===app).map(x=>({...x,name:`${x.language??"zh"} · ${x.frequency??0} 次${x.deleted?' · 本软件已隐藏':''}${x.pinned?' · 本软件置顶':''}`}))
+              : book.favorites;
+    const visible=libraryPage(entries,value("librarySearch"),page);page=visible.page;
+    el("libraryResultCount").textContent=`共 ${visible.total} 条`;
+    el("libraryPage").textContent=`${page+1} / ${visible.pages}`;
+    el<HTMLButtonElement>("libraryPrevious").disabled=page===0;
+    el<HTMLButtonElement>("libraryNext").disabled=page+1>=visible.pages;
+    if (!visible.items.length) {
       const p = document.createElement("p");
       p.textContent =
         view === "favorites"
@@ -110,14 +146,14 @@ export function setupPersonalLibrary(): void {
           : "暂无内容。";
       rows.append(p);
     }
-    for (const x of entries) {
+    for (const x of visible.items) {
       const c = card(),
         title = document.createElement("strong"),
         text = document.createElement("pre"),
         actions = document.createElement("div");
       title.textContent =
         x.name +
-        (view === "rules"
+        ((view === "rules" || view === "learning")
           ? ` · ${x.application} / ${x.code}${x.enabled === false ? " · 已停用" : ""}`
           : "");
       text.textContent = x.text ?? "";
@@ -147,6 +183,7 @@ export function setupPersonalLibrary(): void {
               el<HTMLInputElement>("libraryEnabled").checked =
                 x.enabled !== false;
             }
+            el<HTMLDetailsElement>("libraryEditor").open=true;
             el("libraryEditor").scrollIntoView({ block: "start" });
           }),
         );
@@ -165,7 +202,9 @@ export function setupPersonalLibrary(): void {
       if (view !== "history")
         actions.append(
           button("删除", () =>
-            personalAction("remove", { section: view, id: x.id }),
+            view === "learning"
+              ? personalAction("removeLearning", {application:x.application,id:x.id})
+              : personalAction("remove", { section: view, id: x.id }),
           ),
         );
       c.append(title, text, actions);
@@ -185,16 +224,41 @@ export function setupPersonalLibrary(): void {
       .querySelectorAll<HTMLButtonElement>("[data-review]")
       .forEach((b) => (b.disabled = !x));
   };
+  const applyScope=()=>{
+    el<HTMLInputElement>("libraryApplication").value=value("libraryScope").trim();
+    page=0;reset();render();
+  };
+  el("libraryApplicationSelect").onchange=()=>{el<HTMLInputElement>("libraryScope").value=value("libraryApplicationSelect");applyScope();};
+  el("libraryScope").onchange=applyScope;
+  el("librarySaveApplication").onclick=()=>personalAction("putApplication",{
+    application:value("libraryScope").trim(),enabled:el<HTMLInputElement>("libraryIsolation").checked,
+    learn:el<HTMLInputElement>("libraryAutoLearn").checked,frequency:el<HTMLInputElement>("libraryFrequency").checked,
+  });
+  el("libraryExportApplication").onclick=()=>personalAction("exportApplication",{application:value("libraryScope").trim()});
+  const importFile=el<HTMLInputElement>("libraryImportFile");
+  el("libraryImportApplication").onclick=()=>{
+    if(!value("libraryScope").trim()){status("请先填写导入目标软件文件名");return;}importFile.click();
+  };
+  importFile.onchange=async()=>{
+    try {const file=importFile.files?.[0];if(!file)return;if(file.size>4*1024*1024)throw Error("应用词库文件限4MB");
+      personalAction("importApplication",{application:value("libraryScope").trim(),payload:(await file.text()).replace(/^\uFEFF/,"")});
+    }catch(error){status(String(error));}finally{importFile.value="";}
+  };
   el("libraryRefresh").onclick = () => personalAction("status");
   el("libraryView").onchange = () => {
+    page=0;el<HTMLInputElement>("librarySearch").value="";
     reset();
     render();
   };
   el("libraryGroup").onchange = () => {
+    page=0;
     reset();
     render();
   };
-  el("libraryNew").onclick = reset;
+  el("libraryNew").onclick = ()=>{reset();el<HTMLDetailsElement>("libraryEditor").open=true;el("libraryEditor").scrollIntoView({block:"start"});};
+  el("librarySearch").oninput=()=>{page=0;render();};
+  el("libraryPrevious").onclick=()=>{page--;render();};
+  el("libraryNext").onclick=()=>{page++;render();};
   el("libraryAddGroup").onclick = () =>
     personalAction("putGroup", { name: value("libraryGroupName").trim() });
   el("libraryRenameGroup").onclick = () =>
@@ -254,6 +318,10 @@ export function setupPersonalLibrary(): void {
       study.shift();
       reviewed++;
       renderStudy();
+    }
+    if(typeof message.exported==="string"){
+      const url=URL.createObjectURL(new Blob([message.exported],{type:"application/json"}));
+      const link=document.createElement("a");link.href=url;link.download=`水杉-${value("libraryScope").trim()||"应用"}-词库.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     }
     book = (message.book ?? book) as unknown as Book;
     history = message.history ?? history;

@@ -3,20 +3,34 @@
   <p>
     分组短语、应用词条和语音收藏只保存在本机。复制后由你手动粘贴，不自动发送。
   </p>
-  <div class="local-asr-actions">
-    <button id="libraryRefresh" type="button">刷新</button
-    ><select id="libraryView">
+  <div class="library-toolbar">
+    <label>资料类型<select id="libraryView">
       <option value="clips">分组短语</option>
       <option value="history">最近复制</option>
       <option value="rules">按软件独立词库</option>
+      <option value="learning">按软件学习记录</option>
       <option value="favorites">常用语音收藏</option>
       <option value="study">学习生词复习</option>
-    </select>
+    </select></label>
+    <div class="local-asr-actions"><button id="libraryNew" type="button">新建词条 / 短语</button><button id="libraryRefresh" type="button">刷新</button></div>
+  </div>
+  <p id="libraryStatus" role="status" aria-live="polite"></p>
+  <div id="libraryApplicationManager" class="prompt-library" hidden>
+    <p>启用软件独立学习后，新造词、英文回车学习与候选使用次数仅保存在此软件；原有全局词典继续作为基础词库。关闭独立学习可恢复原有共享行为，已经记录的内容仍保留。</p>
+    <label>已配置的软件<select id="libraryApplicationSelect"><option value="">选择或填写新软件</option></select></label>
+    <label>软件文件名<input id="libraryScope" placeholder="例如 WeChat.exe、Code.exe" maxlength="260" /></label>
+    <div class="local-asr-actions library-flags">
+      <label><input id="libraryIsolation" type="checkbox" checked /> 独立词库与学习</label>
+      <label><input id="libraryAutoLearn" type="checkbox" checked /> 自动学习新词</label>
+      <label><input id="libraryFrequency" type="checkbox" checked /> 按本软件使用次数排序</label>
+    </div>
+    <div class="local-asr-actions"><button id="librarySaveApplication" type="button">保存软件开关</button><button id="libraryExportApplication" type="button">导出此软件词库</button><button id="libraryImportApplication" type="button">导入并合并到此软件</button><input id="libraryImportFile" type="file" accept="application/json,.json" hidden /></div>
+    <p>导入会合并并去重，不覆盖已有词条、软件开关和全局用户词典。学习记录可逐条删除；建议先导出备份。</p>
   </div>
   <div id="libraryGroups" class="prompt-library">
-    <label>分组<select id="libraryGroup"></select></label
-    ><label
-      >分组名称<input
+    <label>分组<select id="libraryGroup"></select></label>
+    <details class="workbench-details"><summary>管理分组 · 添加、重命名和转移</summary>
+    <label>分组名称<input
         id="libraryGroupName"
         placeholder="填写分组名后添加，或给当前分组重命名"
     /></label>
@@ -24,9 +38,9 @@
       <button id="libraryAddGroup" type="button">添加分组</button
       ><button id="libraryRenameGroup" type="button">重命名当前分组</button
       ><button id="libraryRemoveGroup" type="button">删除分组并转移内容</button>
-    </div>
+    </div></details>
   </div>
-  <div id="libraryEditor" class="prompt-library">
+  <details id="libraryEditor" class="prompt-library"><summary>编辑短语 / 软件词条</summary>
     <label>标题<input id="libraryName" maxlength="80" /></label>
     <div id="libraryAppFields">
       <label
@@ -46,10 +60,9 @@
       >文字内容<textarea id="libraryText" rows="4" maxlength="5000"></textarea>
     </label>
     <div class="local-asr-actions">
-      <button id="librarySave" type="button">保存</button
-      ><button id="libraryNew" type="button">新建</button>
+      <button id="librarySave" type="button">保存到本机</button>
     </div>
-  </div>
+  </details>
   <div id="libraryStudy" hidden>
     <p>
       依据已记录的学习生词安排间隔复习：忘记 10 分钟后再看，模糊 1
@@ -66,6 +79,7 @@
     </div>
     <p id="libraryStudyCount"></p>
   </div>
-  <p id="libraryStatus" role="status"></p>
+  <div id="librarySearchArea" class="library-search-row"><input id="librarySearch" type="search" maxlength="160" placeholder="搜索标题、文字、软件或编码" aria-label="搜索当前资料" /><span id="libraryResultCount" class="voice-description"></span></div>
   <div id="libraryRows"></div>
+  <div id="libraryPager" class="library-pager"><button id="libraryPrevious" type="button">上一页</button><span id="libraryPage"></span><button id="libraryNext" type="button">下一页</button></div>
 </div>

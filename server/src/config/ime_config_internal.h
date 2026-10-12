@@ -64,7 +64,11 @@ class ConfigFileLock
         {
             const DWORD result = WaitForSingleObject(handle_, 5000);
             locked_ = result == WAIT_OBJECT_0 || result == WAIT_ABANDONED;
+            if (!locked_)
+                error_ = result == WAIT_FAILED ? GetLastError() : result;
         }
+        else
+            error_ = GetLastError();
     }
 
     ~ConfigFileLock()
@@ -80,9 +84,15 @@ class ConfigFileLock
         return locked_;
     }
 
+    DWORD error() const
+    {
+        return error_;
+    }
+
   private:
     HANDLE handle_ = nullptr;
     bool locked_ = false;
+    DWORD error_ = ERROR_SUCCESS;
 };
 
 SchemeType ParseScheme(const std::string &value);
@@ -220,6 +230,7 @@ extern std::string g_ui_backend;
 extern std::string g_ui_backend_active;
 extern std::string g_candidate_skin;
 extern std::string g_candidate_window_preedit_style;
+extern bool g_candidate_show_pinyin;
 extern bool g_candidate_fixed_badge;
 extern std::string g_candidate_fixed_badge_style;
 extern std::string g_settings_window_linger;

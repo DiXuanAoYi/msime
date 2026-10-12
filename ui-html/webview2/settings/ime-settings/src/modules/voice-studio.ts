@@ -1,3 +1,4 @@
+import { activateVoicePane } from "./voice-navigation";
 import { serializeHostMessage } from '../../../../shared/messages';
 import { onHostMessage } from '../utils/host-messages';
 import { personalAction } from './personal-library';
@@ -18,7 +19,7 @@ export async function openVoiceStudio(text:string):Promise<void>{
   const panel=field<HTMLDetailsElement>('voiceStudioPanel');
   const input=field<HTMLTextAreaElement>('studioText');
   if(!panel||!input)return;
-  panel.open=true;input.value=text;dirty=true;updateButtons();
+  activateVoicePane('studio');panel.open=true;input.value=text;dirty=true;updateButtons();
   panel.scrollIntoView({block:'start'});input.focus();
 }
 function fingerprint():string{return JSON.stringify([field<HTMLTextAreaElement>('studioText')?.value,field<HTMLSelectElement>('studioLanguage')?.value,field<HTMLSelectElement>('studioVoice')?.value,field<HTMLInputElement>('studioRate')?.value,parameters]);}

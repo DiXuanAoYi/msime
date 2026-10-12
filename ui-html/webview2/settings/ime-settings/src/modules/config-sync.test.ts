@@ -21,7 +21,7 @@ vi.mock('./shared', () => ({
 // dynamic imports. This test covers only the backfill guard, so keep their DOM
 // side effects out of it with no-op consumers.
 vi.mock('./appearance', () => ({ applyAppearanceConfig: vi.fn(), updateCandidatePreviewHelpcode: vi.fn() }));
-vi.mock('./skin', () => ({ applyCandidateSkin: vi.fn(), applyCandidateSkinCatalog: vi.fn() }));
+vi.mock('./skin', () => ({ applyBuiltinSkinPageArrows: vi.fn(), applyCandidateSkin: vi.fn(), applyCandidateSkinCatalog: vi.fn() }));
 vi.mock('./input', () => ({
   applyCustomShuangpinSchemas: vi.fn(),
   applyCustomTranslationConfig: vi.fn(),
@@ -51,7 +51,7 @@ beforeEach(() => {
   handlers.clear();
   vi.clearAllMocks();
   vi.stubGlobal('document', {
-    getElementById: () => ({}),
+    getElementById: () => ({ contains: () => true }),
     querySelector: () => null,
     querySelectorAll: () => [],
     addEventListener: vi.fn()

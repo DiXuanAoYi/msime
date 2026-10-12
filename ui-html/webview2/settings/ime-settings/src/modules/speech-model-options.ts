@@ -17,7 +17,7 @@ export function renderModelControls(root:HTMLElement, model:SpeechModel, values:
   const note=document.createElement('p');note.className='voice-description';note.textContent=(model.dialectNote??'仅显示当前模型已接入的参数；其他参数保持运行组件默认值。')+(model.parameterNote?' '+model.parameterNote:'');root.append(note);
   const grid=document.createElement('div');grid.className='speech-fields';root.append(grid);
   for(const item of model.controls??[]){
-    const label=document.createElement('label');label.className='speech-field';label.append(document.createTextNode(item.label));
+    const label=document.createElement('label');label.className='speech-field'+(item.type==='bool'?' model-control-bool':'');label.append(document.createTextNode(item.label));
     let input:HTMLInputElement|HTMLSelectElement;
     if(item.type==='enum'){
       const select=document.createElement('select');for(const value of item.values??[])select.add(new Option(value,value));input=select;

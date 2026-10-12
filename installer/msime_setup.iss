@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.16"
+#define MyAppVersion   "0.9.17"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -977,6 +977,10 @@ begin
   StopProcess('{#MyWatchdogName}');
   StopProcess('{#MyAppExeName}');
   StopSettingsProcess;
+  { ASR / TTS / OCR supervisors can outlive Server. Stop their own process trees
+    after the UI and watchdog, before replacing the frozen runtime.
+    Do not kill generic python.exe or uv.exe used by other programs. }
+  StopProcess('MetasequoiaLocalASR.exe');
   { 面板通常是 Server 的子进程、随 /T 一起走；Server 若已崩溃它们会变成孤儿，
     同样占着 server 目录里的 exe，所以显式再收一遍。}
   StopProcess('{#MyEmojiPanelExeName}');

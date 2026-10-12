@@ -33,6 +33,7 @@ export type CandidateAppearanceConfig = {
   cand_text_color?: string;
   page_size?: number;
   candidate_window_follow_cursor?: boolean;
+  candidate_show_pinyin?: boolean;
   candidate_fixed_badge?: boolean;
   candidate_fixed_badge_style?: string;
   candidate_window_preedit_shuangpin_quanpin?: boolean;
@@ -510,6 +511,8 @@ export function applyAppearanceConfig(
   if (typeof candidateAppearance?.candidate_window_follow_cursor === 'boolean') {
     applyToggleState('candidateFollowCursorToggleBtn', candidateAppearance.candidate_window_follow_cursor);
   }
+  const pinyinToggle = document.getElementById('candidateShowPinyinCheckbox') as HTMLInputElement | null;
+  if (pinyinToggle) pinyinToggle.checked = candidateAppearance?.candidate_show_pinyin !== false;
   if (typeof candidateAppearance?.candidate_fixed_badge === 'boolean') {
     applyToggleState('candidateFixedBadgeToggleBtn', candidateAppearance.candidate_fixed_badge);
   }
@@ -596,6 +599,9 @@ export async function setupAppearance() {
   setupDropdownMenu('arrangeBtn', 'arrangeMenu', 'changeCandidateArrange');
   setupToggleButton('candidateFollowCursorToggleBtn', (active) => {
     postConfigUpdate('appearance.candidate_window_follow_cursor', active);
+  });
+  document.getElementById('candidateShowPinyinCheckbox')?.addEventListener('change', (event) => {
+    postConfigUpdate('appearance.candidate_show_pinyin', (event.target as HTMLInputElement).checked);
   });
   setupToggleButton('candidateFixedBadgeToggleBtn', (active) => {
     postConfigUpdate('appearance.candidate_fixed_badge', active);

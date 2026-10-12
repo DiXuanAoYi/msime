@@ -3,6 +3,8 @@ import { applyAppearanceConfig, onCandidateSurfaceThemeChanged, setupAppearance 
 
 const transforms = vi.hoisted(() => new Map<string, (value: string) => string>());
 vi.mock('./shared', () => ({
+  applyCandidateArrange: vi.fn(), applyCollocationModelStatus: vi.fn(),
+  setFuzzyRuleOptionsDisabled: vi.fn(), setMixedCandidateOptionsDisabled: vi.fn(), setSmartPunctuationOptionsDisabled: vi.fn(),
   applyDropdownValue: vi.fn(), applyToggleState: vi.fn(), populateDropdownMenu: vi.fn(),
   registerDropdownPreparer: vi.fn(), setupToggleButton: vi.fn(),
   setupDropdownMenu: (_button: string, menu: string, _action: string, _stop: boolean,
@@ -10,6 +12,7 @@ vi.mock('./shared', () => ({
 }));
 vi.mock('./theme', () => ({ applyThemeConfig: vi.fn(), setCandidateSurfaceThemeListener: vi.fn() }));
 vi.mock('../utils/common-utils', () => ({ loadHTML: async () => '' }));
+vi.mock('./skin', () => ({ applyBuiltinSkinPageArrows: vi.fn(), applyCandidateSkin: vi.fn(), applyCandidateSkinCatalog: vi.fn() }));
 
 class Element extends EventTarget {
   children: Element[] = [];
@@ -37,20 +40,25 @@ let list: Element;
 let preview: Element;
 let caretPreview: Element;
 let root: Element;
+let pinyinCheckbox: Element;
 let postMessage: ReturnType<typeof vi.fn>;
+let hostMessage: ((event: Event & { data?: unknown }) => void) | undefined;
 beforeEach(() => {
   list = new Element();
   preview = new Element();
   root = new Element();
   caretPreview = new Element();
+  pinyinCheckbox = new Element();
+  pinyinCheckbox.id = 'candidateShowPinyinCheckbox';
   caretPreview.id = 'caretStatePreviewHost';
   postMessage = vi.fn();
-  vi.stubGlobal('window', { chrome: { webview: { postMessage } } });
+  hostMessage = undefined;
+  vi.stubGlobal('window', { chrome: { webview: { postMessage, addEventListener: (_type: string, listener: typeof hostMessage) => { hostMessage = listener; } } } });
   vi.stubGlobal('document', {
     getElementById: (id: string) => {
       const find = (element: Element): Element | undefined => element.id === id ? element : element.children.map(find).find(Boolean);
       return id === 'candFallbackFontList' ? list : id.startsWith('candidate-wnd-') ? preview
-        : id === 'caretStatePreviewHost' ? caretPreview : find(list);
+        : id === 'caretStatePreviewHost' ? caretPreview : id === 'candidateShowPinyinCheckbox' ? pinyinCheckbox : find(list);
     },
     documentElement: root,
     addEventListener: vi.fn(),
@@ -59,12 +67,50 @@ beforeEach(() => {
     createElement: () => new Element()
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(async () => { await vi.dynamicImportSettled(); vi.unstubAllGlobals(); });
 
 function selects() { return list.children.filter((element) => element.className === 'dropdown fallback-font-dropdown').map((element) => element.children[0]); }
 function labels() { return selects().map((button) => button.children[0].value).filter(Boolean); }
 function choose(index: number, value: string) { return transforms.get(`fallbackFontMenu${index}`)!(value); }
 function family() { return (preview.style as unknown as { fontFamily: string }).fontFamily; }
+
+it('restores the candidate pinyin checkbox and submits a boolean setting on change', async () => {
+  const checkbox = pinyinCheckbox;
+  const input = checkbox as unknown as HTMLInputElement;
+  applyAppearanceConfig(undefined, undefined, undefined, { candidate_show_pinyin: false });
+  expect(input.checked).toBe(false);
+  await setupAppearance();
+  input.checked = true;
+  checkbox.dispatchEvent(new Event('change'));
+  expect(JSON.parse(postMessage.mock.calls.at(-1)![0])).toMatchObject({
+    type: 'configUpdate', data: { path: 'appearance.candidate_show_pinyin', value: true }
+  });
+  applyAppearanceConfig(undefined, undefined, undefined, { candidate_show_pinyin: true });
+  expect(input.checked).toBe(true);
+});
+
+it('keeps pinyin toggles in sync through actual host parsing, config-sync and appearance rendering', async () => {
+  const { setupConfigSync, notifySettingsModuleReady } = await import('./config-sync');
+  await setupAppearance();
+  setupConfigSync();
+  notifySettingsModuleReady('appearance');
+  const input = pinyinCheckbox as unknown as HTMLInputElement;
+  const deliver = async (enabled: boolean) => {
+    hostMessage!({ data: JSON.stringify({ type: 'configSnapshot', protocolVersion: 1,
+      data: { appearance: { candidate_show_pinyin: enabled, page_size: 6, font_size: 18 } } }) } as Event & { data?: unknown });
+    await vi.dynamicImportSettled();
+    expect(input.checked).toBe(enabled);
+  };
+  for (const enabled of [false, true, false]) {
+    await deliver(enabled);
+    input.checked = !enabled;
+    pinyinCheckbox.dispatchEvent(new Event('change'));
+    expect(JSON.parse(postMessage.mock.calls.at(-1)![0])).toMatchObject({
+      type: 'configUpdate', data: { path: 'appearance.candidate_show_pinyin', value: !enabled }
+    });
+    await deliver(!enabled);
+  }
+});
 
 it('shows ordered selectors without separators and saves replacement/removal', () => {
   applyAppearanceConfig(undefined, undefined, undefined, {

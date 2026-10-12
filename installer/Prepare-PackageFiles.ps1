@@ -117,7 +117,7 @@ if (Test-Path -LiteralPath $tsfHeader) {
 }
 $serverExecutables = @(
     Get-ChildItem -LiteralPath $serverRelease -Recurse -File -Filter '*.exe' |
-        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.BaseName -ne 'MetasequoiaTtsStreamProbe' -and $_.FullName -notlike (Join-Path $serverRelease 'local-asr\*') }
+        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.BaseName -notin @('MetasequoiaTtsStreamProbe', 'MetasequoiaVisionLiveProbe') -and $_.FullName -notlike (Join-Path $serverRelease 'local-asr\*') }
 )
 $missingServerPdb = @(
     $serverExecutables |
@@ -325,7 +325,7 @@ Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter '*Tests.exe' |
     Remove-Item -Force
 Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter 'test_*.exe' |
     Remove-Item -Force
-foreach ($probeName in @('MetasequoiaTtsStreamProbe.exe', 'MetasequoiaTtsStreamProbe.pdb')) {
+foreach ($probeName in @('MetasequoiaTtsStreamProbe.exe', 'MetasequoiaTtsStreamProbe.pdb', 'MetasequoiaVisionLiveProbe.exe', 'MetasequoiaVisionLiveProbe.pdb')) {
     $probePath = Join-Path $targetServer $probeName
     if (Test-Path -LiteralPath $probePath) { Remove-Item -LiteralPath $probePath -Force }
 }

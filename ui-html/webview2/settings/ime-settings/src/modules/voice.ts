@@ -1,3 +1,5 @@
+import { setupVoiceNavigation } from "./voice-navigation";
+import "../styles/modules/workbench-layout.css";
 import { setupPromptLibrary, applyPromptLibrary } from './prompt-library';
 import { setupSpeech } from './speech';
 import { setupLocalAsr } from './local-asr';
@@ -317,6 +319,7 @@ function listenMenuSelection(menuId: string, onSelect: (value: string) => void):
 }
 
 export function setupVoiceInput(): void {
+  setupVoiceNavigation();
   setupSpeech();
   setupPromptLibrary('polish','voicePromptLibrary','voicePolishPrompt');
   setupLocalAsr();

@@ -201,6 +201,25 @@ int run_test()
                 "Learned dedicated English was not journaled for upgrade replay.");
     }
     {
+        // An isolated application's host disables shared learning. Raw Enter must
+        // still commit the word, without inserting it in either shared database.
+        metasequoia::InputSession isolated(SchemeType::Quanpin);
+        isolated.set_dedicated_english_mode(true);
+        isolated.set_candidate_learning_enabled(false);
+        type(isolated, "ScopeGuardFixture");
+        const auto result = isolated.handle_command(metasequoia::Command::CommitRaw);
+        require(result.handled && result.commit == "ScopeGuardFixture" && !result.diagnostic &&
+                    isolated.dedicated_english_mode() && !isolated.has_composition(),
+                "Disabling shared learning prevented raw English commit or changed the mode.");
+        Database english(english_mode_directory / "english.db");
+        require(english.query_integer("SELECT COUNT(*) FROM english_words WHERE word='scopeguardfixture'") == 0,
+                "Raw English commit ignored the disabled learning flag and changed the shared dictionary.");
+        Database journal(english_mode_directory / "msime_user.db");
+        require(journal.query_integer("SELECT COUNT(*) FROM user_dictionary_operations WHERE dictionary='english' "
+                                      "AND key='scopeguardfixture'") == 0,
+                "Raw English commit was journaled even though shared learning was disabled.");
+    }
+    {
         // A busy user dictionary must not leave english.db carrying a weight that no journal row can replay: the boost
         // would be reverted at the next dictionary upgrade even though the dictionary already showed it.
         const std::string english_db = metasequoia::path_to_utf8(english_mode_directory / "english.db");

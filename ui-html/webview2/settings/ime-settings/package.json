@@ -12,6 +12,7 @@
   },
   "packageManager": "pnpm@10.34.5",
   "devDependencies": {
+    "@types/chai": "5.2.3",
     "@types/chrome": "^0.3.2",
     "@types/node": "^26.6.3",
     "typescript": "~7.0.2",

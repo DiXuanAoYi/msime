@@ -5,23 +5,159 @@
   margin: 6px 12px 6px 0;
   flex-wrap: wrap;
 }
+#visionPanel {
+  container-type: inline-size;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+#visionPanel h2 { font-size: 20px; margin: 0 0 12px; }
+#visionPanel h3 { font-size: 16px; margin: 0 0 16px; }
+#visionPanel p { color: var(--text-secondary); overflow-wrap: anywhere; }
+#visionPanel :is(button, input, select, textarea) { font: inherit; }
+#visionPanel [hidden] {
+  display: none !important;
+}
+#visionPanel .vision-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 0;
+  margin: 0;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--control-border);
+}
+#visionPanel .vision-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--chrome-bg);
+  margin: 12px 0;
+  border-radius: 8px;
+}
+#visionPanel .vision-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+#visionPanel .vision-status-bar p { margin: 0; font-size: 13px; }
+#visionPanel .vision-status-bar #visionStatus { flex: 1; padding: 4px; background: transparent; }
+#visionPanel .vision-status-bar #visionWarning { flex-basis: 100%; max-height: 100px; overflow: auto; }
+#visionPanel .vision-tabs button {
+  flex: 1;
+  min-width: max-content;
+  margin: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control-bg);
+  color: var(--text-color);
+}
+#visionPanel .vision-tabs button[aria-selected="true"] {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background: var(--accent-soft);
+}
+#visionPanel button:focus-visible {
+  outline: 2px solid var(--accent-color) !important;
+  outline-offset: 2px;
+}
+#visionPanel .vision-service-bar {
+  border: 1px solid var(--control-border);
+  background: var(--card-bg-solid);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+#visionPanel .vision-service-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+}
+#visionPanel .vision-service-grid label {
+  display: grid;
+  margin: 0;
+  min-width: 0;
+}
+#visionPanel .vision-service-grid select {
+  width: 100%;
+  min-width: 0;
+}
+#visionPanel summary {
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--text-secondary);
+}
+#visionPanel .vision-source-editor label {
+  display: block;
+}
+#visionPanel .vision-source-editor textarea {
+  min-height: 240px;
+  tab-size: 4;
+  white-space: pre;
+}
+#visionPanel .local-asr-actions {
+  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+#visionPanel input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+}
+#visionPanel input[type="file"] {
+  min-width: 0;
+  width: 100%;
+}
+#visionPanel input::file-selector-button {
+  padding: 6px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  background: var(--surface-raised);
+  color: var(--text-color);
+}
+@container (min-width: 760px) {
+  #vision-pane-image {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+}
 #visionPanel select,
 #visionPanel input {
   max-width: 100%;
   padding: 6px;
-  border: 1px solid var(--border-color, #aaa);
+  border: 1px solid var(--control-border);
   border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text-color);
 }
 #visionPanel button {
   margin: 4px;
   padding: 7px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  min-height: 34px;
+  max-width: 100%;
+}
+#visionPanel button:hover:not(:disabled) { background: var(--surface-subtle); }
+#visionPanel button:disabled { opacity: .5; cursor: default; }
+#visionPanel :is(#visionCapture, #visionRecognize, #visionTranslate, #subtitleStart) {
+  background: var(--accent-soft); border-color: var(--accent-color);
 }
 #visionPanel textarea {
   padding: 12px;
-  border: 1px solid var(--border-color, #aaa);
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   resize: vertical;
-  background: var(--input-bg, transparent);
+  background: var(--control-bg);
   color: inherit;
 }
 #visionPanel .vision-conversation {
@@ -32,7 +168,7 @@
   flex: 1;
   min-width: 0;
   padding: 12px;
-  border: 1px solid var(--border-color, #aaa);
+  border: 1px solid var(--control-border);
   border-radius: 10px;
 }
 #visionPanel .vision-speaker textarea {
@@ -48,14 +184,53 @@
 #visionStatus {
   position: sticky;
   bottom: 0;
-  background: var(--bg-color, #25282c);
-  color: var(--text-color, #eee);
+  background: var(--card-bg-solid);
+  color: var(--text-color);
   padding: 12px;
   border-radius: 8px;
   z-index: 1;
 }
-@media (max-width: 750px) {
-  #visionPanel .vision-conversation {
-    flex-direction: column;
-  }
+#visionPanel .subtitle-segments {
+  max-height: 520px;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
 }
+#visionPanel .vision-warning {
+  padding: 10px 12px;
+  border-left: 4px solid var(--warning-color, #c27a18);
+  white-space: pre-line;
+}
+#visionPanel .subtitle-segment {
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+#visionPanel .subtitle-segment label {
+  display: grid;
+  margin: 0;
+}
+#visionPanel .subtitle-segment textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+#visionPanel .subtitle-advanced {
+  margin: 14px 0;
+}
+#visionPanel .vision-conversation:not(.face) {
+  overflow-x: auto;
+}
+#visionPanel .vision-conversation:not(.face) .vision-speaker {
+  min-width: 250px;
+}
+#visionPanel .vision-help {
+  padding: 8px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  margin: 10px 0;
+  font-size: 13px;
+}
+#visionPanel .vision-help p { margin: 6px 0; }

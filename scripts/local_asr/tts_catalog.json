@@ -3805,5 +3805,245 @@
         "default": 0.8
       }
     ]
+  },
+  {
+    "id": "mms-mon",
+    "name": "MMS · 蒙古语（西里尔文字）",
+    "official": "https://huggingface.co/facebook/mms-tts-mon",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-mon/tree/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d",
+    "engine": "mms",
+    "directory": "mms-mon",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生蒙古语（西里尔文字）语音合成；需输入该语言对应文字，不会把中文自动翻译。官方单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145250188,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/config.json",
+        "bytes": 1641,
+        "sha256": "6a6693ead8338f60cf5889109843756d9ce6633acc9c48dabe100e1b18cdaf6f"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/model.safetensors",
+        "bytes": 145247480,
+        "sha256": "e93d285d4a143e0bfa95115f934b6aa35afb51bb3f986c76a8951ac26ed167f1"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/special_tokens_map.json",
+        "bytes": 47,
+        "sha256": "845f635933c404f060a1d7a2f4c4494bf4a91f8ebec99a41108778d026426dfc"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/tokenizer_config.json",
+        "bytes": 287,
+        "sha256": "6b0db79c703d0b6d4b261efa0aba8f853e522582219e80709f26557e784fe9e1"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/vocab.json",
+        "bytes": 733,
+        "sha256": "049762139e9cb5f9ed6600c04ffd01e53b7ddc8702536344b0a75e81dc6ab5fb"
+      }
+    ],
+    "voices": [
+      {
+        "id": "mon",
+        "name": "蒙古语（西里尔文字） · 官方单音色",
+        "language": "mn",
+        "dialect": "蒙古语（西里尔文字）"
+      }
+    ],
+    "languages": [
+      "mn"
+    ],
+    "defaultVoiceZh": "mon",
+    "defaultVoiceEn": "mon",
+    "dialectNote": "支持蒙古语（西里尔文字）原生文本；不是普通话变声。CC-BY-NC-4.0，仅限非商业用途。未下载权重，真实音质待用户试听。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  },
+  {
+    "id": "mms-uig-script_arabic",
+    "name": "MMS · 维吾尔语（阿拉伯文字）",
+    "official": "https://huggingface.co/facebook/mms-tts-uig-script_arabic",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/tree/841e7f1ecaf58844f45c9025ba0e05c241781923",
+    "engine": "mms",
+    "directory": "mms-uig-script_arabic",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生维吾尔语（阿拉伯文字）语音合成；需输入该语言对应文字，不会把中文自动翻译。官方单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145232283,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/config.json",
+        "bytes": 1641,
+        "sha256": "e7dbd6e0ec39b90fd3b0a58e8d6604110efbaf189b84e876f9c86b124944fd69"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/model.safetensors",
+        "bytes": 145229816,
+        "sha256": "60e5a59c178fa010860ec48c46ee843153ed9f9ea1bf09fb506986b844bb8e28"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/special_tokens_map.json",
+        "bytes": 48,
+        "sha256": "f92ea9306cfd4e78fb484e06b1ca9fff9818fb5e7b66c87a441e9af14ed3289b"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/tokenizer_config.json",
+        "bytes": 302,
+        "sha256": "a94c75de9ae421ea8110cc17766e940dc23d60bd96120d351eb7f2879ca9b200"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/vocab.json",
+        "bytes": 476,
+        "sha256": "9841286a37eeb98ef323aab2a188fbe09bef91ff9897556e9c90805ee83455bb"
+      }
+    ],
+    "voices": [
+      {
+        "id": "uig-script_arabic",
+        "name": "维吾尔语（阿拉伯文字） · 官方单音色",
+        "language": "ug",
+        "dialect": "维吾尔语（阿拉伯文字）"
+      }
+    ],
+    "languages": [
+      "ug"
+    ],
+    "defaultVoiceZh": "uig-script_arabic",
+    "defaultVoiceEn": "uig-script_arabic",
+    "dialectNote": "支持维吾尔语（阿拉伯文字）原生文本；不是普通话变声。CC-BY-NC-4.0，仅限非商业用途。未下载权重，真实音质待用户试听。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  },
+  {
+    "id": "mms-adx",
+    "name": "MMS · 藏语（安多藏语）",
+    "official": "https://huggingface.co/facebook/mms-tts-adx",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-adx/tree/420733a96cd1ce5d560a45ffd634b67904042a19",
+    "engine": "mms",
+    "directory": "mms-adx",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生藏语（安多藏语）语音合成；需输入该语言对应文字，不会把中文自动翻译。官方单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145246375,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/config.json",
+        "bytes": 1641,
+        "sha256": "6ddfc6a127aaacaf66f30a60d2802f1f7fda486ed03b8ba9e2928691c9e6fb73"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/model.safetensors",
+        "bytes": 145243640,
+        "sha256": "cf9cc18b1e71a6ee40f6b9ee63b8bd01209302854d1d49621e43e2a844473746"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/special_tokens_map.json",
+        "bytes": 49,
+        "sha256": "58391abac4223e90090b7059a4a8b15775123ba529c0cd8de973553e8983394d"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/tokenizer_config.json",
+        "bytes": 289,
+        "sha256": "3ebb993e876b54ac617667f9407357bdef63e870b55fe1f88da6d007c53b5023"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/vocab.json",
+        "bytes": 756,
+        "sha256": "bc42e812675c177daf8d27a226ea68f5eeffa39ad4f840c6cd9aaeac1133a097"
+      }
+    ],
+    "voices": [
+      {
+        "id": "adx",
+        "name": "藏语（安多藏语） · 官方单音色",
+        "language": "bo",
+        "dialect": "藏语（安多藏语）"
+      }
+    ],
+    "languages": [
+      "bo"
+    ],
+    "defaultVoiceZh": "adx",
+    "defaultVoiceEn": "adx",
+    "dialectNote": "支持藏语（安多藏语）原生文本；不是普通话变声。CC-BY-NC-4.0，仅限非商业用途。未下载权重，真实音质待用户试听。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
   }
 ]

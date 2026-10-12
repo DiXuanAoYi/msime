@@ -148,13 +148,16 @@ void PlaceApplicationWords(std::vector<WordItem> &items, const std::string &inpu
 {
     if (GlobalIme::composition.creating_word.active || g_inputSession->prefix_end() != input.size())
         return;
-    const auto words = PersonalLibrary::AppWords(PersonalLibrary::ForegroundApplication(), input);
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    const auto words = PersonalLibrary::AppWords(application, input);
     for (auto it = words.rbegin(); it != words.rend(); ++it)
     {
         items.erase(std::remove_if(items.begin(), items.end(), [&](const WordItem &x) { return x.word == *it; }),
                     items.end());
         items.insert(items.begin(), WordItem(input, *it, 1, CandidateSource::AppDictionary));
     }
+    PersonalLibrary::ApplyApplicationCandidates(application, input, items, false, g_inputSession->get_quanpin());
 }
 
 // 日期时间混入普通候选的唤醒词，与 Shift+T 模式同一套（rq / riqi / date、sj / shijian / time、
@@ -288,7 +291,8 @@ std::string BuildCurrentCandidatePage()
 
         CandidateViewItem view;
         view.text = word;
-        view.reading = SettingsDictionary::CandidateReading(word);
+        if (GetConfiguredCandidateShowPinyin())
+            view.reading = SettingsDictionary::CandidateReading(word);
         if (show_autocorrect_marker && !item.corrected_from.empty())
         {
             // Correction-sourced candidates carry a light visible marker (PRD R5/AC7),

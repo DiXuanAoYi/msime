@@ -39,15 +39,8 @@ inline nlohmann::json CloudVoiceCatalog(const std::string &provider)
     else if (provider == "volcengine")
     {
         voices.push_back({{"id", "zh_female_vv_uranus_bigtts"}, {"name", "Vivi · 普通话"}, {"language", "zh"}});
-        for (const auto &[code, name] :
-             std::initializer_list<std::pair<const char *, const char *>>{{"beijing", "北京话"},
-                                                                          {"dongbei", "东北话"},
-                                                                          {"henan", "河南话"},
-                                                                          {"shaanxi", "陕西话"},
-                                                                          {"shanghai", "上海话"},
-                                                                          {"sichuan", "四川话"},
-                                                                          {"tianjin", "天津话"},
-                                                                          {"yue", "粤语"}})
+        for (const auto &[code, name] : std::initializer_list<std::pair<const char *, const char *>>{
+                 {"dongbei", "东北话"}, {"shaanxi", "陕西话"}, {"sichuan", "四川话"}})
             voices.push_back({{"id", std::string("zh_female_vv_uranus_bigtts|") + code},
                               {"name", std::string("Vivi · ") + name},
                               {"language", "zh"},
@@ -56,7 +49,10 @@ inline nlohmann::json CloudVoiceCatalog(const std::string &provider)
     }
     return {{"id", provider},
             {"voices", voices},
-            {"dialectNote", "方言由所选服务音色与资源权限决定；苏州话尚无已核实的内置音色，上海话不能替代苏州话。藏语请"
-                            "选本地 MMS 藏语模型并输入藏文。"}};
+            {"dialectNote",
+             "方言由所选服务音色与资源权限决定；Vivi 预置仅列已核实的东北、陕西、四川。火山其他方言需搭配控制台"
+             "明确支持该方言的音色，可填写 音色ID|方言代码。苏州话尚无已核实的内置音色，上海话不能替代苏州话。藏语请"
+             "选本地 MMS 藏语模型并输入藏文。另有按需下载的维吾尔语（阿拉伯文字）、蒙古语（西里尔文字）和哈萨克语；"
+             "自部署兼容服务可使用已登记的参考音色 ID，但音色克隆不等于新增语言或方言能力。"}};
 }
 } // namespace Speech

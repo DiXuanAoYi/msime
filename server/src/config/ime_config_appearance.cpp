@@ -284,6 +284,18 @@ bool SetConfiguredCandidateWindowPreeditShuangpinQuanpin(bool enabled)
     return true;
 }
 
+bool GetConfiguredCandidateShowPinyin()
+{
+    return g_candidate_show_pinyin;
+}
+bool SetConfiguredCandidateShowPinyin(bool enabled)
+{
+    if (!WriteConfiguredValue("appearance", "candidate_show_pinyin", enabled ? "true" : "false"))
+        return false;
+    g_candidate_show_pinyin = enabled;
+    return true;
+}
+
 bool GetConfiguredCandidateFixedBadge()
 {
     return g_candidate_fixed_badge;

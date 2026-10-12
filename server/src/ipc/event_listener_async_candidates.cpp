@@ -1,6 +1,7 @@
 // 异步候选结果回到任务线程后的合并：云联想、AI 联想、神经重排、专用英文、译文，以及混输
 // （英文、emoji、颜文字、日期时间）。
 #include "ipc/event_listener_internal.h"
+#include "settings/personal_library.h"
 #include <Windows.h>
 #include <string>
 #include <algorithm>
@@ -232,6 +233,9 @@ void ApplyEnglishCandidates(std::vector<WordItem> candidates, const std::string 
         // and therefore must not participate in dictionary mutations.
         candidates.emplace_back("", input, 0, CandidateSource::Generated);
     }
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    PersonalLibrary::ApplyApplicationCandidates(application, input, candidates, true);
     items = std::move(candidates);
     Global::candidate_ui.item_total_count = static_cast<int>(items.size());
     Global::candidate_ui.page_index = 0;
@@ -394,6 +398,9 @@ void ApplyMixedCandidates(MixedCandidates::Result result, const std::string &inp
     if (!changed && items.size() == size_before)
         return;
     FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, CurrentEnglishPlacement(items));
+    PersonalLibrary::ApplyApplicationCandidates(
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32)), input,
+        items);
 
     Global::candidate_ui.item_total_count = static_cast<int>(items.size());
     Global::candidate_ui.page_index = 0;

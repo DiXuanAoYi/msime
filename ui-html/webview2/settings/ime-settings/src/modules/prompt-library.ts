@@ -1,5 +1,6 @@
 import { updateConfig } from "./config-sync";
 import "../styles/modules/prompt-library.css";
+import "../styles/modules/workbench-layout.css";
 
 export type PromptItem = { id: string; name: string; prompt: string };
 export type PromptBook = { version: 1; selected: string; items: PromptItem[] };
@@ -157,6 +158,37 @@ export function validateBook(value: unknown): PromptBook {
   if (!ids.has(b.selected)) throw Error("当前模板不存在。");
   return structuredClone(b);
 }
+function preservedTemplateName(scope: Scope, prompt: string, slot: number): string {
+  const purpose = prompt.slice(0, 240);
+  const suffix = String.fromCharCode(64 + slot);
+  if (scope === "association") {
+    if (/双拼|shuangpin/i.test(purpose)) return `原有双拼联想（${suffix}）`;
+    if (/中文|汉字|拼音|pinyin/i.test(purpose)) return `原有中文拼音联想（${suffix}）`;
+    if (/英文|英语|english/i.test(purpose)) return `原有英文联想（${suffix}）`;
+    return `原有联想模板${suffix}`;
+  }
+  if (/翻译|中译英|英译中/.test(purpose)) return `原有翻译润色（${suffix}）`;
+  if (/校对|纠错/.test(purpose)) return `原有校对润色（${suffix}）`;
+  if (/会议|纪要/.test(purpose)) return `原有会议整理（${suffix}）`;
+  return `原有润色模板${suffix}`;
+}
+
+export function normalizePreservedNames(scope: Scope, current: PromptBook, config: Record<string, unknown>): PromptBook {
+  const book = validateBook(current);
+  const prefix = scope === "polish" ? "polish_" : "";
+  for (const item of book.items) {
+    const slot = /^preserved-([123])$/.exec(item.id);
+    if (!slot) continue;
+    const i = Number(slot[1]);
+    const original = String(config[`${prefix}prompt_custom_${i}`] ?? item.prompt);
+    const oldTitle = original.replace(/\s+/g, " ").replace(/^[你您]是(?:一个)?/, "").slice(0, 30);
+    const oldName = `原有 · ${oldTitle || "已保存提示词"}${i > 1 ? ` (${i})` : ""}`;
+    // Only repair our previous generated name. A user's name and every prompt body stay intact.
+    if (item.name === oldName) item.name = preservedTemplateName(scope, original, i);
+  }
+  return book;
+}
+
 export function migrateBook(
   scope: Scope,
   config: Record<string, unknown>,
@@ -170,13 +202,9 @@ export function migrateBook(
     const prompt = String(config[`${prefix}prompt_custom_${i}`] ?? "");
     if (!prompt.trim()) continue;
     const id = `preserved-${i}`;
-    const title = prompt
-      .replace(/\s+/g, " ")
-      .replace(/^[你您]是(?:一个)?/, "")
-      .slice(0, 30);
     items.push({
       id,
-      name: `原有 · ${title || "已保存提示词"}${i > 1 ? ` (${i})` : ""}`,
+      name: preservedTemplateName(scope, prompt, i),
       prompt,
     });
     if (oldId === `custom_${i}` || (oldId === "custom" && i === 1))
@@ -234,7 +262,8 @@ export function setupPromptLibrary(
     editor = document.getElementById(editorId) as HTMLTextAreaElement | null;
   if (!root || !editor || states.has(scope)) return;
   root.innerHTML =
-    '<label>模板<select data-role="select"></select></label><label>名称<input data-role="name" maxlength="80"></label><div class="local-asr-actions"><button type="button" data-action="add">添加</button><button type="button" data-action="duplicate">复制为新模板</button><button type="button" data-action="delete">删除</button><button type="button" data-action="undo" disabled>撤销删除</button><button type="button" data-action="export">导出模板</button><button type="button" data-action="import">导入模板</button><input data-role="file" type="file" accept="application/json,.json" hidden></div><p data-role="status" role="status">自动保存；导入会合并，不覆盖已有内容。</p>';
+    '<div class="prompt-library-fields"><label>当前模板<select data-role="select"></select></label><label>模板名称<input data-role="name" maxlength="80"></label></div><div class="local-asr-actions prompt-library-primary"><button type="button" data-action="add">添加模板</button><button type="button" data-action="duplicate">复制为新模板</button></div><p data-role="status" role="status" aria-live="polite">自动保存；导入会合并，不覆盖已有内容。</p><label class="prompt-editor">提示词内容</label><details class="prompt-library-management"><summary>模板管理 · 导入、导出与删除</summary><div class="local-asr-actions"><button type="button" data-action="export">导出模板</button><button type="button" data-action="import">导入模板</button><button type="button" data-action="delete">删除当前模板</button><button type="button" data-action="undo" disabled>撤销删除</button><input data-role="file" type="file" accept="application/json,.json" hidden></div></details>';
+  root.querySelector('.prompt-editor')!.append(editor);
   const state: State = {
     book: { version: 1, selected: "", items: [] },
     raw: "",
@@ -415,13 +444,14 @@ export function applyPromptLibrary(
   }
   if (state.editing || (raw === state.raw && state.book.items.length)) return;
   try {
-    const book = raw
+    const parsed = raw
       ? validateBook(JSON.parse(raw))
       : migrateBook(scope, config, legacyDefault);
+    const book = normalizePreservedNames(scope, parsed, config);
     state.book = book;
     state.raw = JSON.stringify(book);
     state.root.dispatchEvent(new Event("prompt-library-render"));
-    if (!raw) {
+    if (!raw || JSON.stringify(parsed) !== state.raw) {
       state.pending = state.raw;
       updateConfig(fields[scope], state.raw);
     } else

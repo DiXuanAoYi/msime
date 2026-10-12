@@ -12,6 +12,8 @@
 #include <fstream>
 #include <mutex>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #pragma comment(lib, "comdlg32.lib")
 namespace Vision
 {
@@ -25,7 +27,7 @@ struct State
     std::atomic<bool> cancel{false}, finish{false};
     bool busy = false;
     unsigned revision = 0, imageRevision = 0;
-    std::string message = "就绪", error, image, text, translation, format = "text";
+    std::string message = "就绪", error, warning, image, text, translation, format = "text";
     json raw = json::object();
     json subtitles = json::array();
     std::string srt;
@@ -80,6 +82,7 @@ void UpdateImage(const Image &im, bool clear = true)
         s.text.clear();
         s.translation.clear();
         s.raw = json::object();
+        s.warning.clear();
     }
     ++s.imageRevision;
     ++s.revision;
@@ -100,25 +103,48 @@ void Status(std::string message)
     s.message = std::move(message);
     ++s.revision;
 }
-std::string Ocr(const Image &im, const std::string &task)
+void ResetSubtitles()
+{
+    auto &s = Current();
+    std::lock_guard lock(s.mutex);
+    if (s.busy)
+        throw std::runtime_error("请先停止当前任务");
+    s.subtitles = json::array();
+    s.srt.clear();
+    ++s.revision;
+}
+void UpdateSubtitles(const json &lines, const std::string &srt)
+{
+    auto &s = Current();
+    std::lock_guard lock(s.mutex);
+    s.subtitles = lines;
+    s.srt = srt;
+    ++s.revision;
+}
+json Ocr(const Image &im, const std::string &task)
 {
     const auto config = VisionConfig::Get();
     if (config.at("provider") == "windows" && (task == "table" || task == "formula"))
         throw std::runtime_error("Windows OCR 仅提取文字。结构化表格与公式请在下方选择文档模型或云服务。");
-    auto result = config.at("provider") == "windows" ? WindowsOcr(im)
+    auto result = config.at("provider") == "windows" ? WindowsOcr(im, Cancelled)
                                                      : RecognizeRemote(config, Base64(EncodePng(im)), task, Cancelled);
     if (Cancelled())
         return {};
+    if (config.at("provider") == "windows" && task == "code")
+        ReconstructCodeIndentation(result);
     auto text = result.value("text", "");
     {
         auto &s = Current();
         std::lock_guard lock(s.mutex);
         s.text = text;
         s.format = result.value("format", "text");
-        s.raw = std::move(result);
+        s.raw = result;
+        s.warning = result.value("warning", std::string());
+        if (result.value("truncated", false) && s.warning.empty())
+            s.warning = "识别结果达到输出长度上限，内容不完整；请提高输出长度或缩小识别区域。";
         ++s.revision;
     }
-    return text;
+    return result;
 }
 std::wstring Quote(const std::filesystem::path &p)
 {
@@ -181,7 +207,7 @@ Image Stitch(const std::vector<std::string> &frames, bool x, bool y)
     auto result = json::parse(Read(dir / "stitch.result.json", 65536));
     if (!result.value("ok", false))
         throw std::runtime_error(result.value("error", "拼接失败"));
-    return DecodeImage(Read(dir / "stitch.png", 20 * 1024 * 1024));
+    return DecodeImage(Read(dir / "stitch.png", MaxEncodedImageBytes));
 }
 void Start(std::function<void()> work, HWND restore = nullptr)
 {
@@ -199,6 +225,7 @@ void Start(std::function<void()> work, HWND restore = nullptr)
         std::lock_guard lock(s.mutex);
         s.busy = true;
         s.error.clear();
+        s.warning.clear();
         s.message = "正在处理…";
         ++s.revision;
     }
@@ -259,24 +286,53 @@ json Handle(const json &request, HWND owner)
         {
             const bool playback = request.value("playback", false), translate = request.value("translate", false);
             const auto source = request.value("source", "auto"), target = request.value("target", "en");
+            ResetSubtitles();
             Start([playback, translate, source, target] {
-                {
-                    auto &s = Current();
-                    std::lock_guard lock(s.mutex);
-                    s.subtitles = json::array();
-                    s.srt.clear();
-                    ++s.revision;
-                }
                 Status("字幕采集中：每约 5 秒识别一次，点击完成保留最后一段，停止立即取消");
                 RunSubtitles(
                     playback, translate, source, target, Cancelled, [] { return Current().finish.load(); },
-                    [](const json &lines, const std::string &srt) {
-                        auto &s = Current();
-                        std::lock_guard lock(s.mutex);
-                        s.subtitles = lines;
-                        s.srt = srt;
-                        ++s.revision;
-                    });
+                    UpdateSubtitles);
+            });
+        }
+        else if (action == "importSubtitles" || action == "translateSubtitles")
+        {
+            auto lines = ParseSubtitleDocument(request.at("text").get<std::string>());
+            const auto source = request.value("source", "auto"), target = request.value("target", "en");
+            ResetSubtitles();
+            Start([action, lines = std::move(lines), source, target] {
+                UpdateSubtitles(lines, SubtitleDocumentToSrt(lines));
+                if (action == "translateSubtitles")
+                {
+                    Status("正在逐段翻译字幕，保留时间轴；可以停止并保留已完成结果");
+                    size_t cursor = 0;
+                    std::unordered_map<std::string, std::string> prefetched;
+                    TranslateSubtitleSegments(
+                        lines,
+                        [&](const std::string &text) {
+                            auto found = prefetched.find(text);
+                            if (found == prefetched.end())
+                            {
+                                std::vector<std::string> batch;
+                                std::unordered_set<std::string> seen;
+                                while (cursor < lines.size() && batch.size() < 32)
+                                {
+                                    const auto value = lines[cursor++].at("text").get<std::string>();
+                                    if (!prefetched.count(value) && seen.insert(value).second)
+                                        batch.push_back(value);
+                                }
+                                const auto translated = TranslateBlocks(batch, source, target, Cancelled);
+                                if (Cancelled())
+                                    return std::string();
+                                for (size_t i = 0; i < batch.size(); ++i)
+                                    prefetched.emplace(batch[i], translated[i]);
+                                found = prefetched.find(text);
+                            }
+                            if (found == prefetched.end() || found->second.empty())
+                                throw std::runtime_error("离线词典未收录此字幕段，请选择整段翻译服务");
+                            return found->second;
+                        },
+                        Cancelled, UpdateSubtitles);
+                }
             });
         }
         else if (action == "saveImage")
@@ -362,21 +418,29 @@ json Handle(const json &request, HWND owner)
                         {
                             std::vector<std::string> frames;
                             size_t bytes = 0;
-                            while (!Cancelled() && !Current().finish && frames.size() < 60)
+                            const auto until = std::chrono::steady_clock::now() + std::chrono::minutes(3);
+                            while (!Cancelled() && !Current().finish && frames.size() < 60 &&
+                                   std::chrono::steady_clock::now() < until)
                             {
                                 if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
                                     break;
                                 auto png = EncodePng(CaptureRectangle(r));
-                                bytes += png.size();
-                                if (bytes > 120 * 1024 * 1024)
-                                    throw std::runtime_error("截图缓存达到 120 MB，请分段截图");
-                                frames.push_back(std::move(png));
+                                if (frames.empty() || png != frames.back())
+                                {
+                                    bytes += png.size();
+                                    if (bytes > 120 * 1024 * 1024)
+                                        throw std::runtime_error("截图缓存达到 120 MB，请分段截图");
+                                    if (frames.empty())
+                                        UpdateImage(DecodeImage(png));
+                                    frames.push_back(std::move(png));
+                                }
                                 {
                                     auto &s = Current();
                                     std::lock_guard lock(s.mutex);
                                     s.frames = static_cast<unsigned>(frames.size());
                                 }
-                                Status("长截图捕获中：缓慢滚动，Esc 完成");
+                                Status("长截图捕获中：" + std::to_string(frames.size()) +
+                                       " 个不同画面；缓慢滚动，Esc 完成（最多 3 分钟）");
                                 Pause(900);
                             }
                             if (Cancelled() || frames.empty())
@@ -385,7 +449,10 @@ json Handle(const json &request, HWND owner)
                             UpdateImage(Stitch(frames, x, y));
                             return;
                         }
-                        std::string previous;
+                        std::unordered_map<std::string, std::string> translations;
+                        std::string cachedProvider;
+                        std::string previousText;
+                        bool firstFrame = true;
                         while (!Cancelled())
                         {
                             if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
@@ -396,31 +463,81 @@ json Handle(const json &request, HWND owner)
                                 break;
                             auto im = CaptureRectangle(r);
                             UpdateImage(im, false);
-                            auto text = Ocr(im, task);
-                            if (!text.empty())
+                            auto result = Ocr(im, task);
+                            if (Cancelled())
+                                break;
+                            const auto recognized = result.value("text", std::string());
+                            if (firstFrame || recognized != previousText)
                             {
-                                if (text != previous)
-                                {
-                                    auto out = Translate(text, source, target, Cancelled);
-                                    if (Cancelled())
-                                        break;
-                                    {
-                                        auto &s = Current();
-                                        std::lock_guard lock(s.mutex);
-                                        s.translation = out;
-                                        ++s.revision;
-                                    }
-                                    previous = text;
-                                }
-                                std::string out;
-                                {
-                                    auto &s = Current();
-                                    std::lock_guard lock(s.mutex);
-                                    out = s.translation;
-                                }
-                                ShowTranslationOverlay(r, out);
+                                auto &s = Current();
+                                std::lock_guard lock(s.mutex);
+                                s.translation.clear();
+                                ++s.revision;
+                                firstFrame = false;
+                                previousText = recognized;
                             }
-                            Status("屏幕翻译中 · Esc 停止");
+                            auto blocks = OverlayBlocksForImage(result, im.width, im.height);
+                            const auto supplied = result.contains("blocks") && result.at("blocks").is_array()
+                                                      ? result.at("blocks").size()
+                                                      : size_t(0);
+                            if (supplied > blocks.size())
+                            {
+                                auto &s = Current();
+                                std::lock_guard lock(s.mutex);
+                                if (!s.warning.empty())
+                                    s.warning += '\n';
+                                s.warning += "部分文字缺少有效坐标或超过 256 "
+                                             "块；不会伪造定位，请缩小框选区域，完整原文可在编辑区查看。";
+                            }
+                            const auto provider = VisionConfig::Get().at("translation_provider");
+                            if (provider != cachedProvider || translations.size() > 1024)
+                            {
+                                translations.clear();
+                                cachedProvider = provider;
+                            }
+                            std::vector<std::string> missing;
+                            std::unordered_set<std::string> missingSet;
+                            for (const auto &block : blocks)
+                                if (!translations.count(block.source) && missingSet.insert(block.source).second)
+                                    missing.push_back(block.source);
+                            const auto translated = TranslateBlocks(missing, source, target, Cancelled);
+                            if (Cancelled())
+                                break;
+                            for (size_t i = 0; i < missing.size(); ++i)
+                                translations.emplace(missing[i], translated[i]);
+                            size_t unavailable = 0, regions = 0;
+                            std::string combined;
+                            for (auto &block : blocks)
+                            {
+                                if (Cancelled())
+                                    break;
+                                if (block.region)
+                                    ++regions;
+                                block.text = translations.at(block.source);
+                                if (block.text.empty())
+                                    ++unavailable;
+                                else
+                                {
+                                    if (!combined.empty())
+                                        combined += '\n';
+                                    combined += block.text;
+                                }
+                            }
+                            if (Cancelled())
+                                break;
+                            {
+                                auto &s = Current();
+                                std::lock_guard lock(s.mutex);
+                                s.translation = combined;
+                                ++s.revision;
+                            }
+                            ShowTranslationOverlay(r, blocks);
+                            Status("屏幕翻译中：" + std::to_string(blocks.size()) + " 个定位块" +
+                                   (regions ? "；文档模型仅提供区域定位" : "") +
+                                   (unavailable
+                                        ? "；离线词典未收录 " + std::to_string(unavailable) + " 块，请选择整段翻译服务"
+                                        : "") +
+                                   " · Esc 停止");
                             Pause(static_cast<unsigned>(std::stoi(VisionConfig::Get().at("screen_interval_ms"))));
                         }
                     },
@@ -441,6 +558,7 @@ json Handle(const json &request, HWND owner)
             response["imageRevision"] = s.imageRevision;
             response["message"] = s.message;
             response["error"] = s.error;
+            response["warning"] = s.warning;
             if (request.value("revision", -1) != static_cast<int>(s.revision))
             {
                 response["text"] = s.text;

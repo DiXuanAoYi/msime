@@ -187,6 +187,7 @@ std::string g_ui_backend = "d2d";
 std::string g_ui_backend_active = "d2d";
 std::string g_candidate_skin = "fluent";
 std::string g_candidate_window_preedit_style = "pinyin";
+bool g_candidate_show_pinyin = true;
 bool g_candidate_fixed_badge = true;
 std::string g_candidate_fixed_badge_style = "paperclip";
 std::string g_settings_window_linger = "off";
@@ -670,6 +671,7 @@ bool LoadImeConfig()
         }
         g_candidate_window_preedit_shuangpin_quanpin =
             tbl["appearance"]["candidate_window_preedit_shuangpin_quanpin"].value_or(false);
+        g_candidate_show_pinyin = tbl["appearance"]["candidate_show_pinyin"].value_or(true);
         g_candidate_fixed_badge = tbl["appearance"]["candidate_fixed_badge"].value_or(true);
         {
             // 非法样式一律回退到默认徽标，避免手改配置后出现无法删除的畸形标记
