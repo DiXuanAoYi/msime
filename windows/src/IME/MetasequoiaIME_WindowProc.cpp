@@ -235,6 +235,10 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
 
     switch (message)
     {
+    case NativeCommitUndo::CaptureMessage:
+        pIME->_CaptureNativeLastCommit(static_cast<uint64_t>(static_cast<uint32_t>(wParam)) |
+                                       (static_cast<uint64_t>(static_cast<uint32_t>(lParam)) << 32));
+        return 0;
     case WM_BareShiftRelease:
         pIME->_HandleHookedBareShiftRelease(static_cast<UINT>(wParam));
         return 0;

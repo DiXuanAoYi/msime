@@ -709,6 +709,11 @@ STDAPI CMetasequoiaIME::OnTestKeyDown(ITfContext *pContext, WPARAM wParam, LPARA
         *pIsEaten = TRUE;
         return S_OK;
     }
+    // A new edit/navigation command consumes the undo opportunity, even when
+    // this TIP will pass the key to the host. Modifier presses alone do not.
+    if (wParam != VK_CONTROL && wParam != VK_LCONTROL && wParam != VK_RCONTROL && wParam != VK_MENU &&
+        wParam != VK_LMENU && wParam != VK_RMENU && wParam != VK_SHIFT && wParam != VK_LSHIFT && wParam != VK_RSHIFT)
+        _ClearLastCommit();
     if (IsSelfGeneratedSendInputExtraInfo(static_cast<ULONG_PTR>(GetMessageExtraInfo())))
     {
         _capsLockTestKeyDownPending = false;

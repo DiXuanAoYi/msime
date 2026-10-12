@@ -152,6 +152,15 @@ try {
     & (Join-Path $installer 'Prepare-PackageFiles.ps1') -RepoRoot $fixture -TsfDirectory windows -ServerDirectory server -UiHtmlDirectory ui-html -NoticesDirectory . -Light
     if ([IO.File]::ReadAllText($database) -ne 'preserved user data') { throw 'Light package replaced dictionary data' }
     if (-not (Test-Path (Join-Path $installer 'app_data/html/webview2/shared/runtime.js'))) { throw 'Light package lost shared contracts' }
+    Write-Fixture 'windows/src/IME/MetasequoiaIME.h'
+    Write-Fixture 'windows/build64-release/MetasequoiaImeTsf.dir/Release/ThreadMgrEventSink.obj'
+    $staleObject = Join-Path $fixture 'windows/build64-release/MetasequoiaImeTsf.dir/Release/ThreadMgrEventSink.obj'
+    (Get-Item -LiteralPath $staleObject).LastWriteTimeUtc = [DateTime]::UtcNow.AddDays(-1)
+    $rejected = $false
+    try { & (Join-Path $installer 'Prepare-PackageFiles.ps1') -RepoRoot $fixture -Light } catch { $rejected = $_.Exception.Message -match 'TSF 类布局对象文件过期' }
+    if (-not $rejected) { throw 'Stale TSF class-layout object was accepted' }
+    if ([IO.File]::ReadAllText($database) -ne 'preserved user data') { throw 'Stale-object rejection damaged previous staging' }
+    Remove-Item -LiteralPath $staleObject -Force
     # 完整包必须带 sc.lm。缺了它引擎是静默降级的：整句候选只是变差，不会报错，所以打包
     # 这一步是唯一能挡住它的地方。轻量包本来就不带数据文件，不受影响。
     $languageModelFixture = Join-Path $fixture 'language-model/sc.lm'

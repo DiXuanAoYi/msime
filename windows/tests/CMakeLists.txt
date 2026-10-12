@@ -54,6 +54,11 @@ add_test(NAME focus_announcement_policy COMMAND test_focus_announcement_policy)
 
 # Exercises the exact shared classifier used by both immediate and deferred TSF paths.
 if(WIN32 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    add_executable(test_native_commit_undo native_commit_undo.cpp)
+    target_include_directories(test_native_commit_undo PRIVATE ../src)
+    target_compile_features(test_native_commit_undo PRIVATE cxx_std_17)
+    target_link_libraries(test_native_commit_undo PRIVATE user32)
+    add_test(NAME native_commit_undo COMMAND test_native_commit_undo)
     add_executable(test_english_candidate_keys english_candidate_keys.cpp)
     target_include_directories(test_english_candidate_keys PRIVATE ../src ../src/Header ../src/IME)
     target_compile_features(test_english_candidate_keys PRIVATE cxx_std_17)

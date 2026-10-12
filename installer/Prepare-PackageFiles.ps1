@@ -97,6 +97,24 @@ Assert-PathExists -LiteralPath $tsf32Release -Description '32 位 TSF Release DL
 Assert-PathExists -LiteralPath $tsf64Release -Description '64 位 TSF Release DLL'
 Assert-PathExists -LiteralPath $tsf32Pdb -Description '32 位 TSF Release PDB'
 Assert-PathExists -LiteralPath $tsf64Pdb -Description '64 位 TSF Release PDB'
+# Local MSBuild incremental caches can retain an old class layout after a header
+# edit, even when the final DLL itself has just been linked. Check the objects,
+# not the DLL timestamp. Artifact-only CI staging has no intermediate objects.
+$tsfHeader = Join-Path $RepoRoot (Join-Path $TsfDirectory 'src\IME\MetasequoiaIME.h')
+if (Test-Path -LiteralPath $tsfHeader) {
+    $headerTime = (Get-Item -LiteralPath $tsfHeader).LastWriteTimeUtc
+    foreach ($build in @('build32-release', 'build64-release')) {
+        $objects = Join-Path $RepoRoot (Join-Path $TsfDirectory "$build\MetasequoiaImeTsf.dir\Release")
+        if (-not (Test-Path -LiteralPath $objects)) { continue }
+        $stale = @(Get-ChildItem -LiteralPath $objects -Filter '*.obj' -File | Where-Object {
+            $_.BaseName -in @('MetasequoiaIME', 'ThreadMgrEventSink', 'KeyEventSink', 'Composition', 'EndComposition', 'UndoCommit') -and
+            $_.LastWriteTimeUtc -lt $headerTime
+        })
+        if ($stale.Count) {
+            throw "TSF 类布局对象文件过期：$build / $($stale.Name -join ', ')。请使用 cmake --build --clean-first 完整重建后再打包。"
+        }
+    }
+}
 $serverExecutables = @(
     Get-ChildItem -LiteralPath $serverRelease -Recurse -File -Filter '*.exe' |
         Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.BaseName -ne 'MetasequoiaTtsStreamProbe' -and $_.FullName -notlike (Join-Path $serverRelease 'local-asr\*') }

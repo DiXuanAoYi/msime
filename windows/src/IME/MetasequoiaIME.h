@@ -4,6 +4,7 @@
 #include "MetasequoiaIMEBaseStructure.h"
 #include "Ipc.h"
 #include "DeferredKeyFailurePolicy.h"
+#include "../Composition/NativeCommitUndo.h"
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -446,6 +447,7 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
 
     void _ClearLastCommit();
     void _RememberLastCommit(TfEditCookie ec, ITfComposition *composition);
+    void _CaptureNativeLastCommit(uint64_t serial);
     bool _IsUndoCommitKey(ITfContext *context, WPARAM key);
     void _RequestUndoCommit(ITfContext *context);
     HRESULT _UndoLastCommit(TfEditCookie ec, ITfContext *context, uint64_t token, uint64_t serial);
@@ -917,4 +919,5 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
 
     // Support the search integration
     ITfFnSearchCandidateProvider *_pITfFnSearchCandidateProvider;
+    NativeCommitUndo::Snapshot _nativeUndo;
 };
