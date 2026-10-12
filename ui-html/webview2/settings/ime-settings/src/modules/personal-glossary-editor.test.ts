@@ -72,3 +72,22 @@ it('retains the draft on validation failure or a missing host acknowledgement', 
   expect(get('personalGlossaryText').value).toBe('en\t苹果\tapple');
   expect(handlers.size).toBe(0);
 });
+it('imports all sense columns, exports the full draft and reimports it without losing meanings', async()=>{
+  module.setupPersonalGlossaryEditor(vi.fn());module.applyPersonalGlossaryConfig('','en');
+  const source='你好\tint. hello\tint. hi\tphr. how do you do\twelcome\tgreetings\tsalutations\tgood day';
+  const encoded=new TextEncoder().encode(source);
+  Object.assign(get('personalGlossaryFile'),{files:[{size:encoded.length,arrayBuffer:async()=>encoded.buffer}]});
+  await get('personalGlossaryFile').events.get('change')?.();
+  const imported=get('personalGlossaryText').value;
+  expect(imported).toContain('salutations; good day');
+  let exported:Blob|undefined;
+  vi.stubGlobal('URL',{createObjectURL:(blob:Blob)=>{exported=blob;return 'blob:owned-fixture';},revokeObjectURL:vi.fn()});
+  vi.stubGlobal('document',{getElementById:(id:string)=>elements.get(id),createElement:()=>({href:'',download:'',click:vi.fn()})});
+  get('personalGlossaryExport').emit('click');
+  expect(await exported?.text()).toBe(imported);
+  get('personalGlossaryText').value='';get('personalGlossaryText').emit('input');
+  const bytes=new TextEncoder().encode(await exported!.text());
+  Object.assign(get('personalGlossaryFile'),{files:[{size:bytes.length,arrayBuffer:async()=>bytes.buffer}]});
+  await get('personalGlossaryFile').events.get('change')?.();
+  expect(get('personalGlossaryText').value).toBe(imported);
+});

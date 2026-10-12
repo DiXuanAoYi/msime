@@ -1,6 +1,8 @@
 #include "engine_input_session.h"
 #include "config/ime_config.h"
 #include "settings/personal_library.h"
+#include "settings/neural_models.h"
+#include "ipc/input_privacy_policy.h"
 #include "engine/common/helpcode_utils.h"
 #include "engine/core/data_path.h"
 #include "engine/core/sentence_association_options.h"
@@ -39,7 +41,11 @@ EngineInputSession::EngineInputSession(SchemeType scheme, const ShuangpinProfile
 
 void EngineInputSession::ApplyConfiguration()
 {
-    session_.set_candidate_learning_enabled(!PersonalLibrary::Policy(PersonalLibrary::InputApplication()).isolated);
+    session_.set_candidate_learning_enabled(FanyImeIpc::InputLearningAllowed() &&
+                                            !PersonalLibrary::Policy(PersonalLibrary::InputApplication()).isolated);
+    const auto domains = GetConfiguredEnabledDomainDictionaries();
+    session_.set_enabled_domain_dictionaries(PersonalLibrary::EffectiveDomainDictionaries(
+        PersonalLibrary::InputApplication(), domains ? *domains : std::string{}));
     const auto scheme = session_.scheme();
     if (scheme == SchemeType::Quanpin || scheme == SchemeType::Shuangpin)
     {
@@ -77,6 +83,7 @@ void EngineInputSession::ApplyConfiguration()
     association.word_lattice = GetConfiguredAssocSentenceWordLattice();
     association.google = GetConfiguredAssocSentenceGoogle();
     association.neural_desktop = GetConfiguredAssocSentenceNeuralDesktop();
+    association.neural_desktop_model = NeuralModels::EffectiveDesktopModelPath();
     association.neural_keyboard = GetConfiguredAssocSentenceNeuralKeyboard();
     association.show_next_on_duplicate = GetConfiguredAssocSentenceShowNextOnDuplicate();
     // octagram 语法模型总开关：开关关时连模型路径都不解析。引擎侧的加成分由 collocation_model
@@ -88,6 +95,7 @@ void EngineInputSession::ApplyConfiguration()
     association.collocation_weight = GetConfiguredAssocSentenceCollocationWeight();
     association.collocation_rerank = collocation_enabled && !association.collocation_model.empty();
     association.collocation_rerank_weight = GetConfiguredAssocSentenceCollocationRerankWeight();
+    association.collocation_grammar = GetConfiguredCollocationGrammar();
     session_.set_sentence_association(association);
     session_.set_shuangpin_preedit_uses_raw(GetConfiguredShuangpinPreeditMode() == "shuangpin");
     // 五笔拼音混输与 z 键角色是两个独立设置：混输是「同时给五笔和拼音候选」，z 键角色只管
@@ -102,6 +110,11 @@ void EngineInputSession::handle_key(UINT vk, UINT modifiers_down, WCHAR wch)
 {
     ApplyConfiguration();
     return session_.handle_engine_key(vk, modifiers_down, wch);
+}
+
+void EngineInputSession::set_enabled_domain_dictionaries(const std::string &domains)
+{
+    session_.set_enabled_domain_dictionaries(domains);
 }
 
 void EngineInputSession::recompute_candidates()

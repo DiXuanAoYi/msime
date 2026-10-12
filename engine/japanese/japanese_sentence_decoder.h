@@ -38,6 +38,8 @@ class JapaneseSentenceDecoder
     std::vector<SentenceCandidate> Decode(const std::string &reading, size_t limit = 8) const;
     std::vector<JapaneseLemma> ExactLemmas(const std::string &reading, size_t limit = 32) const;
     std::vector<JapaneseLemma> PrefixLemmas(const std::string &reading_prefix, size_t limit = 32) const;
+    // Like PrefixLemmas, but only lemmas whose reading is strictly longer than the prefix.
+    std::vector<JapaneseLemma> LongerPrefixLemmas(const std::string &reading_prefix, size_t limit = 32) const;
     std::vector<JapaneseLemma> PrefixLemmasContinuing(const std::string &reading_prefix,
                                                       const std::vector<std::string> &next_kana,
                                                       size_t limit = 32) const;

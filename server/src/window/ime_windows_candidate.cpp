@@ -14,6 +14,7 @@
 #include <string>
 #include <fmt/xchar.h>
 #include "webview2/windows_webview2.h"
+#include "webview2/candidate_window_template.h"
 #include "utils/window_utils.h"
 #include "ipc/event_listener.h"
 #include "utils/ime_utils.h"
@@ -118,8 +119,9 @@ LRESULT CALLBACK WndProcCandWindow(HWND hwnd, UINT message, WPARAM wParam, LPARA
         // g_candidate_force_layout marks the cases (DPI / display change) where
         // the same content must still be re-laid out, so never dedup through it.
         const std::wstring frameSignature =
-            fmt::format(L"{}|{}|{},{}|{}", preedit, candidatePage->candidate_string, layoutCaret.x, layoutCaret.y,
-                        candidatePage->selected_index_in_page);
+            fmt::format(L"{}|{}|{},{}|{}|{}|{}|{}", preedit, candidatePage->candidate_string, layoutCaret.x,
+                        layoutCaret.y, candidatePage->selected_index_in_page, candidatePage->page_index,
+                        candidatePage->has_previous_page, candidatePage->has_next_page);
         if (::is_global_wnd_cand_shown && !g_candidate_force_layout.load() &&
             frameSignature == g_last_rendered_candidate_signature &&
             updateStartedTick - g_last_rendered_candidate_tick < kCandidateShowDedupWindowMs)
@@ -175,7 +177,7 @@ LRESULT CALLBACK WndProcCandWindow(HWND hwnd, UINT message, WPARAM wParam, LPARA
         }
         RaiseCandidateHostForShow(L"show-candidate");
 
-        std::wstring str = preedit + L"," + candidatePage->candidate_string;
+        std::wstring str = BuildCandidateTemplatePayload(preedit, candidatePage->html_items);
         const bool sameCaret = g_last_placed_caret_x == layoutCaret.x && g_last_placed_caret_y == layoutCaret.y;
         const bool alreadyVisible = IsCandidateHostPaintedVisible(hwnd);
         const bool layoutInflight = g_candidate_layout_inflight.load();
@@ -428,7 +430,6 @@ LRESULT CALLBACK WndProcCandWindow(HWND hwnd, UINT message, WPARAM wParam, LPARA
         UpdateFtbCharacterSetState(::webviewFtbWnd);
         FloatingToolbarPresenter::Instance().ApplyTheme();
         FanyNamedPipe::EnqueueRefreshCandidatePageTask();
-        PostSettingsConfig();
         return 0;
     }
 

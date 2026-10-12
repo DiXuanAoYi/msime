@@ -4,9 +4,17 @@ param(
     [string]$BuildDirectory = "$PSScriptRoot/../../work/audio-cpp-build",
     [string]$CMake = 'cmake',
     [ValidateSet('cpu','vulkan')][string]$Backend = 'vulkan',
-    [string]$VulkanLoader = ''
+    [string]$VulkanLoader = '',
+    [string]$VulkanSdkRoot = ''
 )
 $ErrorActionPreference = 'Stop'
+if ($Backend -eq 'vulkan') {
+    if ($VulkanSdkRoot) { $env:VULKAN_SDK = [IO.Path]::GetFullPath($VulkanSdkRoot) }
+    if (!$env:VULKAN_SDK -or !(Test-Path -LiteralPath "$env:VULKAN_SDK/Bin/glslc.exe")) {
+        throw 'Vulkan SDK is missing. Explicitly run Ensure-VulkanDependencies.ps1 or pass -VulkanSdkRoot.'
+    }
+    if (!$VulkanLoader) { $VulkanLoader = $env:MSIME_VULKAN_LOADER }
+}
 $revision = '96269554d00621fb0fca6b52b58919749eba1c8d'
 if (!(Test-Path -LiteralPath (Join-Path $SourceDirectory '.git'))) {
     $env:GIT_LFS_SKIP_SMUDGE = '1'
@@ -24,7 +32,7 @@ $bridge = Get-Content -LiteralPath "$PSScriptRoot/native_voxtral_stream.inc" -Ra
 $vulkan = if ($Backend -eq 'vulkan') { 'ON' } else { 'OFF' }
 & $CMake -S $SourceDirectory -B $BuildDirectory -A x64 -DAUDIOCPP_MODEL_SET=custom -DAUDIOCPP_MODELS=voxtral_tts -DAUDIOCPP_BUILD_C_API=ON -DAUDIOCPP_DEPLOYMENT_BUILD=ON -DENGINE_ENABLE_NATIVE_CPU=OFF -DENGINE_ENABLE_CUDA=OFF "-DENGINE_ENABLE_VULKAN=$vulkan" -DBUILD_SHARED_LIBS=OFF -DAUDIOCPP_VERSION=96269554
 if ($LASTEXITCODE) { throw 'Voxtral native configure failed' }
-& $CMake --build $BuildDirectory --config Release --target audiocpp audiocpp_gguf --parallel 8
+& $CMake --build $BuildDirectory --config Release --target audiocpp audiocpp_gguf --parallel 2
 if ($LASTEXITCODE) { throw 'Voxtral native build failed' }
 $output = Join-Path $PSScriptRoot 'native-voxtral'
 New-Item -ItemType Directory -Force $output | Out-Null

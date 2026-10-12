@@ -1,3 +1,5 @@
+vi.mock('./input-advanced',()=>({applyInputAdvanced:vi.fn()}));
+vi.mock('./theme', () => ({applyThemeConfig: vi.fn()}));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 // 捕获 setupConfigSync 注册的 configSnapshot 处理器后直接喂快照，验证回填守卫。
@@ -21,7 +23,7 @@ vi.mock('./shared', () => ({
 // dynamic imports. This test covers only the backfill guard, so keep their DOM
 // side effects out of it with no-op consumers.
 vi.mock('./appearance', () => ({ applyAppearanceConfig: vi.fn(), updateCandidatePreviewHelpcode: vi.fn() }));
-vi.mock('./skin', () => ({ applyBuiltinSkinPageArrows: vi.fn(), applyCandidateSkin: vi.fn(), applyCandidateSkinCatalog: vi.fn() }));
+vi.mock('./skin', () => ({ applyCandidateFitContentMode:vi.fn(),applyBuiltinSkinFitContent:vi.fn(),applyBuiltinSkinPageArrows: vi.fn(), applyCandidateSkin: vi.fn(), applyCandidateSkinCatalog: vi.fn() }));
 vi.mock('./input', () => ({
   applyCustomShuangpinSchemas: vi.fn(),
   applyCustomTranslationConfig: vi.fn(),
@@ -37,6 +39,7 @@ vi.mock('./voice', () => ({ applyVoiceConfig: vi.fn() }));
 vi.mock('./ai-settings', () => ({ applyAiConfig: vi.fn() }));
 vi.mock('./floating-toolbar', () => ({
   applyCaretStateIndicatorPosition: vi.fn(),
+  applyFloatingToolbarShadow: vi.fn(),
   applyFloatingToolbarAppearanceConfig: vi.fn(),
   applyFloatingToolbarAutoHideConfig: vi.fn(),
   applyFloatingToolbarItemsConfig: vi.fn()
@@ -46,6 +49,7 @@ vi.mock('./shortcut', () => ({ applyShortcutConfig: vi.fn() }));
 
 import { applyToggleState, setMixedCandidateOptionsDisabled } from './shared';
 import { setupConfigSync } from './config-sync';
+import {applyThemeConfig} from './theme';
 
 beforeEach(() => {
   handlers.clear();
@@ -100,4 +104,10 @@ it('greys out the mixed candidate sub-switches when the master switch is off', (
   expect(applyToggleState).toHaveBeenCalledWith('dateTimeMenuToggleBtn', false);
   snapshot({ data: { utility: { mixed_candidates: true } } });
   expect(setMixedCandidateOptionsDisabled).toHaveBeenLastCalledWith(false);
+});
+
+it('applies the complete shell theme before the appearance module is ready', () => {
+  const appearance = {theme_mode: 'dark', theme_settings: 'light', theme_cand: 'dark', theme_ftb: 'light'};
+  handlers.get('configSnapshot')!({data: {appearance}});
+  expect(applyThemeConfig).toHaveBeenLastCalledWith(appearance);
 });

@@ -90,6 +90,10 @@ class IInputSession
     {
     }
 
+    virtual void set_enabled_domain_dictionaries(const std::string &)
+    {
+    }
+
     virtual void set_pinyin_sequence(const std::string &pinyin_sequence) = 0;
     virtual void set_pinyin_sequence_with_cases(const std::string &pinyin_sequence) = 0;
 

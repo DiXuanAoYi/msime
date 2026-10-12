@@ -59,7 +59,7 @@
       gap: calc(var(--ftb-gap) * var(--ftb-scale));
 
       border: 1.4px solid rgba(255, 255, 255, 0.15);
-      box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--msime-ftb-shadow, 4px 4px 4px rgba(0, 0, 0, 0.4));
       backdrop-filter: blur(8px);
     }
 
@@ -405,6 +405,7 @@
 
   // Tell the host the first frame is ready so it can stop the paint-grace show
   // and apply the real visibility decision (IME active / configured / etc.).
+  window.setToolbarShadowEnabled = function (enabled) {document.documentElement.style.setProperty('--msime-ftb-shadow',enabled === false ? 'none' : '4px 4px 4px rgba(0,0,0,.4)');};
   function notifyToolbarReady() {
     if (!window.chrome || !window.chrome.webview) return;
     window.chrome.webview.postMessage(serializeHostMessage({ type: 'ready' }));

@@ -30,6 +30,19 @@ constexpr bool IsEnglishModeToggleKey(uint32_t keycode, uint32_t modifiers_down)
     return keycode == static_cast<uint32_t>('E') && (modifiers_down & kKeyModifierMask) == kEnglishModeToggleModifiers;
 }
 
+constexpr bool IsPinyinCommitKey(uint32_t keycode, uint32_t modifiers_down)
+{
+    return keycode == 0x0D && (modifiers_down & kKeyModifierMask) == kModifierShift;
+}
+
+inline std::string EnteredPinyinText(const std::string &raw, std::string quanpin, bool convert_shuangpin)
+{
+    if (!convert_shuangpin || quanpin.empty())
+        return raw;
+    quanpin.erase(std::remove(quanpin.begin(), quanpin.end(), '\''), quanpin.end());
+    return quanpin;
+}
+
 // Return -1 / +1 for the first / last Han character, or zero for an ordinary key.
 constexpr int WordToCharacterDirection(uint32_t keycode, uint32_t character, uint32_t modifiers, bool enabled,
                                        bool minus_equal)
@@ -65,26 +78,28 @@ constexpr bool ShouldResetCompositionForImeMode(int previous_snapshot, bool chin
 }
 
 // A complete four-letter wubi code the table answered with exactly one candidate is committed as
-// soon as the fourth letter lands, so the user never has to press space. This is unconditional:
-// there is no user setting for it (industry wubi IMEs default this on). The wubi engine's own
+// soon as the fourth letter lands, so the user never has to press space. The switch defaults on.
+// The wubi engine's own
 // report that the code is complete, table-answered and unique is the only gate. A word being
 // created keeps the composition open: the raw belongs to the prefix the user is still assembling,
 // and committing it would end that word early.
-constexpr bool ShouldAutoCommitCompleteWubiCode(bool unique_four_code, bool creating_word_active)
+constexpr bool ShouldAutoCommitCompleteWubiCode(bool auto_commit_enabled, bool unique_four_code,
+                                                bool creating_word_active)
 {
-    return unique_four_code && !creating_word_active;
+    return auto_commit_enabled && unique_four_code && !creating_word_active;
 }
 
 // The user is typing past a complete four-letter wubi code (a letter key with the caret at the end
 // of a four-letter table-answered code). The first candidate is committed and the key that was just
-// typed starts the next composition instead of being dropped. This one is deliberately not gated by
-// the setting: the setting decides whether a unique code commits without an extra key, never whether
-// an extra key loses input. Committing the first candidate matches the user, who is already typing
-// the next word and is not looking at the candidate window.
-constexpr bool ShouldCommitCompleteWubiCodeOnNextKey(bool four_code_is_complete, bool key_is_letter, bool caret_at_end,
+// typed starts the next composition instead of being dropped. Turning the independent fifth-code
+// switch off only has somewhere to put that letter when mixed pinyin is enabled. Otherwise the
+// engine clips to four letters, so safe top-commit takes priority over the switch to preserve input.
+constexpr bool ShouldCommitCompleteWubiCodeOnNextKey(bool top_commit_enabled, bool mixed_pinyin_enabled,
+                                                     bool four_code_is_complete, bool key_is_letter, bool caret_at_end,
                                                      bool creating_word_active)
 {
-    return four_code_is_complete && key_is_letter && caret_at_end && !creating_word_active;
+    return (top_commit_enabled || !mixed_pinyin_enabled) && four_code_is_complete && key_is_letter && caret_at_end &&
+           !creating_word_active;
 }
 
 // Enter commits the raw composition instead of choosing a special-mode

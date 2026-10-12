@@ -25,8 +25,8 @@ const CALENDAR_MIN_CELL_PX = 9;
 const CALENDAR_MIN_WEEKS = 53;
 /** 超宽窗口也不渲染数年空网格。 */
 const CALENDAR_MAX_WEEKS = 200;
-/** 按日明细只展示最近 30 天（overview.daily 是全量历史）。 */
-const DETAIL_DAYS = 30;
+/** 默认仍显示最近 30 条日记录，其余历史通过明细分页查看。 */
+const DETAIL_PAGE_SIZE = 30;
 const STATUS_TIMEOUT_MS = 4000;
 /** 统计页可见时的轮询间隔：一次查询只是 Server 端的一次 SQLite 只读快照。 */
 const OVERVIEW_POLL_MS = 5000;
@@ -41,10 +41,15 @@ let lastOverviewSignature = '';
 let calendarWeeks = CALENDAR_MIN_WEEKS;
 let calendarCellPx = CALENDAR_CELL_PX;
 let calendarObserver: ResizeObserver | null = null;
+let calendarUserScrolled=false;
+let renderedCalendarStart:Date|null=null;
 let requestCounter = 0;
 let statusTimer: number | null = null;
 let lastOverviewRequestAt = 0;
 let overviewPollTimer: number | null = null;
+let detailPageIndex = 0;
+let detailFromDayKey = 0;
+let detailToDayKey = 0;
 const pendingRequests = new Map<string, StatsRequest['action']>();
 
 // ------------------------------------------------------------------ 纯函数（单测覆盖）
@@ -178,6 +183,23 @@ export function detailRows(daily: StatsDailyRow[], days: number): StatsDailyRow[
   return daily.slice(-days).reverse();
 }
 
+/** 日历输入必须是真实日期；不把 2 月 31 日静默滚到 3 月。空值表示不限制。 */
+export function detailDateKey(value: string): number | null {
+  if (!value) return 0;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const key = Number(value.replaceAll('-', ''));
+  return key > 0 && formatDayKey(dateToDayKey(dayKeyToDate(key))) === value ? key : null;
+}
+
+export function detailPageOf(daily: StatsDailyRow[], page: number, from = 0, to = 0) {
+  const filtered = daily.filter(row => (!from || row.dayKey >= from) && (!to || row.dayKey <= to))
+    .sort((left, right) => right.dayKey - left.dayKey);
+  const pages = Math.ceil(filtered.length / DETAIL_PAGE_SIZE);
+  const index = Math.max(0, Math.min(Math.trunc(page), Math.max(0, pages - 1)));
+  return {rows: filtered.slice(index * DETAIL_PAGE_SIZE, (index + 1) * DETAIL_PAGE_SIZE),
+    total: filtered.length, page: index, pages};
+}
+
 /** 配置回填的守卫：只接受契约枚举内的值，其余一律丢弃。 */
 export function retentionValueOf(value: string): RetentionValue | null {
   return (RETENTION_VALUES as readonly string[]).includes(value) ? (value as RetentionValue) : null;
@@ -215,7 +237,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 function renderEmptyState(): void {
   const hasData = lastOverview?.hasData === true;
-  setHidden('statsNoDataEmpty', !(statisticsEnabled && !hasData));
+  setHidden('statsNoDataEmpty', !(statisticsEnabled && lastOverview !== null && !hasData));
   setHidden('statsDisabledEmpty', statisticsEnabled);
   const disabledText = byId('statsDisabledText');
   if (disabledText) {
@@ -236,11 +258,9 @@ function renderOverview(overview: StatsOverview): void {
     return;
   }
   renderEmptyState();
-  const hasData = overview.hasData;
-  setHidden('statsContent', !hasData);
-  if (!hasData) {
-    return;
-  }
+  // 收到有效的空快照也展示完整框架，避免无数据的测试目录看起来像功能被删减。
+  // 数字和空格子均来自真实空快照；不生成日期记录、活跃时间或示例数据。
+  setHidden('statsContent', false);
   // 重建热力图会把滚动位置打回 0，列数没变时原样放回去。
   const calendarBox = byId('statsCalendar');
   const calendarScroll = calendarBox?.scrollLeft ?? 0;
@@ -251,10 +271,20 @@ function renderOverview(overview: StatsOverview): void {
   renderCategories(overview);
   renderDetails(overview);
   if (calendarBox) {
-    calendarBox.scrollLeft = calendarScroll;
+    calendarBox.scrollLeft = calendarUserScrolled ? calendarScroll : Math.max(0,calendarBox.scrollWidth-calendarBox.clientWidth);
   }
 }
 
+export function calendarScrollAfterResize(previousScroll:number,oldCell:number,nextCell:number,addedWeeks:number,maxScroll:number,history:boolean):number {
+  if(!history)return Math.max(0,maxScroll);
+  return Math.max(0,Math.min(maxScroll,(previousScroll/(oldCell+CALENDAR_GAP_PX)+addedWeeks)*(nextCell+CALENDAR_GAP_PX)));
+}
+export function calendarMonthLabel(date:Date,column:number,lastLabeledColumn:number,cell:number):string {
+  if(date.getDate()!==1)return '';
+  const label=date.getMonth()===0?`${date.getFullYear()}/1`:`${date.getMonth()+1}月`;
+  const needed=Math.ceil((label.length*6+8)/(cell+CALENDAR_GAP_PX));
+  return column-lastLabeledColumn>=needed?label:'';
+}
 function statCard(title: string, value: string, unit: string, note: string): HTMLElement {
   const node = el('div', 'stats-card');
   const valueRow = el('div', 'stats-card-value');
@@ -271,7 +301,7 @@ function renderCards(overview: StatsOverview): void {
   container.replaceChildren(
     statCard('今日输入', formatNumber(overview.todayChars), '字', `活跃 ${formatDuration(overview.todayActiveMs)}`),
     statCard('累计输入', formatNumber(overview.totalChars), '字', `共记录 ${overview.days} 天`),
-    statCard('日均输入', formatNumber(overview.averagePerDay), '字', `自 ${formatDayKey(overview.firstDayKey)}`),
+    statCard('日均输入', formatNumber(overview.averagePerDay), '字', overview.firstDayKey ? `自 ${formatDayKey(overview.firstDayKey)}` : '暂无记录'),
     statCard('连续输入', formatNumber(overview.currentStreak), '天', `历史最长 ${overview.longestStreak} 天`)
   );
 }
@@ -323,13 +353,16 @@ function renderCalendar(overview: StatsOverview): void {
   const monthFragment = document.createDocumentFragment();
   const gridFragment = document.createDocumentFragment();
   let weekStart = calendarStart(today, calendarWeeks);
+  renderedCalendarStart=weekStart;
+  let column=0,lastLabeledColumn=-100;
   while (weekStart.getTime() <= today.getTime()) {
     // 只在列内出现某月 1 日时标注月份，保证标签与该月的列对齐。
     const label = el('span', 'stats-month-label');
     for (let i = 0; i < 7; i++) {
       const date = addDays(weekStart, i);
       if (date.getDate() === 1) {
-        label.textContent = `${date.getMonth() + 1}月`;
+        label.textContent = calendarMonthLabel(date,column,lastLabeledColumn,calendarCellPx);
+        if(label.textContent)lastLabeledColumn=column;
         break;
       }
     }
@@ -348,6 +381,7 @@ function renderCalendar(overview: StatsOverview): void {
       gridFragment.append(cell);
     }
     weekStart = addDays(weekStart, 7);
+    column++;
   }
 
   months.replaceChildren(monthFragment);
@@ -418,7 +452,9 @@ function renderDetails(overview: StatsOverview): void {
   head.append(headRow);
 
   const body = el('tbody');
-  for (const row of detailRows(overview.daily ?? [], DETAIL_DAYS)) {
+  const page = detailPageOf(overview.daily ?? [], detailPageIndex, detailFromDayKey, detailToDayKey);
+  detailPageIndex = page.page;
+  for (const row of page.rows) {
     const tr = el('tr');
     tr.append(el('td', 'mono', formatDayKey(row.dayKey)));
     tr.append(el('td', 'mono strong', formatNumber(totalOf(row))));
@@ -429,8 +465,60 @@ function renderDetails(overview: StatsOverview): void {
     tr.append(el('td', undefined, formatSpeed(speedOf(row))));
     body.append(tr);
   }
+  if (page.rows.length === 0) {
+    const tr = el('tr');
+    const empty = el('td', 'stats-detail-empty', overview.hasData ? '所选日期范围内没有记录。' : '暂无按日记录；启用统计后正常输入即可积累数据。');
+    empty.colSpan = 9;
+    tr.append(empty);
+    body.append(tr);
+  }
   table.append(head, body);
   container.replaceChildren(table);
+  const summary = byId('statsDetailPage');
+  if (summary) {
+    summary.textContent = page.total
+      ? `显示 ${page.page * DETAIL_PAGE_SIZE + 1}–${page.page * DETAIL_PAGE_SIZE + page.rows.length} 条，共 ${page.total} 天 · 第 ${page.page + 1}/${page.pages} 页`
+      : '共 0 天记录';
+  }
+  const previous = byId<HTMLButtonElement>('statsDetailPrevious');
+  const next = byId<HTMLButtonElement>('statsDetailNext');
+  if (previous) previous.disabled = page.page === 0;
+  if (next) next.disabled = page.pages === 0 || page.page + 1 >= page.pages;
+}
+
+function applyDetailRange(): void {
+  const from = detailDateKey(byId<HTMLInputElement>('statsDetailFrom')?.value ?? '');
+  const to = detailDateKey(byId<HTMLInputElement>('statsDetailTo')?.value ?? '');
+  const status = byId('statsDetailRangeStatus');
+  if (from === null || to === null || (from && to && from > to)) {
+    if (status) status.textContent = '请选择有效日期，开始日期不能晚于结束日期。';
+    return;
+  }
+  if (status) status.textContent = '';
+  detailFromDayKey = from;
+  detailToDayKey = to;
+  detailPageIndex = 0;
+  if (lastOverview) renderDetails(lastOverview);
+}
+
+function setupDetailNavigation(): void {
+  byId('statsDetailFrom')?.addEventListener('change', applyDetailRange);
+  byId('statsDetailTo')?.addEventListener('change', applyDetailRange);
+  byId('statsDetailReset')?.addEventListener('click', () => {
+    for (const id of ['statsDetailFrom', 'statsDetailTo']) {
+      const input = byId<HTMLInputElement>(id);
+      if (input) input.value = '';
+    }
+    applyDetailRange();
+  });
+  byId('statsDetailPrevious')?.addEventListener('click', () => {
+    detailPageIndex = Math.max(0, detailPageIndex - 1);
+    if (lastOverview) renderDetails(lastOverview);
+  });
+  byId('statsDetailNext')?.addEventListener('click', () => {
+    detailPageIndex++;
+    if (lastOverview) renderDetails(lastOverview);
+  });
 }
 
 // ---------------------------------------------------------------- 请求与反馈
@@ -493,6 +581,10 @@ function handleResponse(response: StatsResponse, action: StatsRequest['action'])
   }
   if (response.overview) {
     renderOverview(response.overview);
+    if (action === 'overview') {
+      const status = byId('statsStatus');
+      if (status?.classList.contains('is-error')) status.hidden = true;
+    }
   }
   if (action === 'openDirectory') {
     showStatus(response.message || '已打开数据目录', true);
@@ -543,9 +635,11 @@ function setupCalendarResize(): void {
     // 按 weeks + 1 计算格子尺寸才能保证热图不出现横向滚动条。
     const nextCell = computeCalendarCellSize(width, nextWeeks + 1);
     if (nextWeeks === calendarWeeks && nextCell === calendarCellPx) {
+      if(!calendarUserScrolled)box.scrollLeft=Math.max(0,box.scrollWidth-box.clientWidth);
       return;
     }
     const previousWeeks = calendarWeeks;
+    const previousCell=calendarCellPx, previousStart=renderedCalendarStart;
     calendarWeeks = nextWeeks;
     calendarCellPx = nextCell;
     root.style.setProperty('--stats-cal-cell', `${nextCell}px`);
@@ -555,8 +649,10 @@ function setupCalendarResize(): void {
     // 新列在左侧追加，按宽度差平移滚动位置，保持用户正在看的日期不跳。
     const previousScroll = box.scrollLeft;
     renderCalendar(lastOverview);
-    box.scrollLeft = Math.max(0, previousScroll + (nextWeeks - previousWeeks) * CALENDAR_COLUMN_PX);
+    const addedWeeks=previousStart&&renderedCalendarStart?Math.round((previousStart.getTime()-renderedCalendarStart.getTime())/(7*86400000)):nextWeeks-previousWeeks;
+    box.scrollLeft = calendarScrollAfterResize(previousScroll,previousCell,nextCell,addedWeeks,box.scrollWidth-box.clientWidth,calendarUserScrolled);
   };
+  box.addEventListener('scroll',()=>{calendarUserScrolled=box.scrollWidth-box.clientWidth-box.scrollLeft>4;},{passive:true});
   calendarObserver?.disconnect();
   calendarObserver = new ResizeObserver(applyMetrics);
   calendarObserver.observe(box);
@@ -666,6 +762,7 @@ export function setupStats(): void {
   byId('statsOpenDirectoryButton')?.addEventListener('click', () => post('openDirectory'));
 
   setupCalendarResize();
+  setupDetailNavigation();
   setupOverviewRefresh();
 
   onHostMessage('statsResponse', (payload) => {

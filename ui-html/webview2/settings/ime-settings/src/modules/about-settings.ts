@@ -1,13 +1,13 @@
 import { serializeHostMessage } from '../../../../shared/messages';
 import { updateConfig } from './config-sync';
 import { setupToggleButton } from './shared';
-import type { UpdateManifest, ValidatedUpdate } from './update-manifest';
-import { compareVersions, describeInstallerTrust, parseVersion, validateManifest } from './update-manifest';
+import type { ValidatedUpdate } from './update-manifest';
+import { compareVersions, describeInstallerTrust, installedProductVersion, selectProductRelease,
+  PRODUCT_RELEASES_URL, PRODUCT_RELEASE_API } from './update-manifest';
 
-const UPDATE_MANIFEST_URL = 'https://msime.app/update.json';
-const RELEASES_PAGE_URL = 'https://github.com/metasequoiaime/MSIME-Windows/releases';
-const LICENSE_URL = 'https://github.com/metasequoiaime/MSIME-Windows/blob/main/LICENSE';
-const PRIVACY_URL = 'https://github.com/metasequoiaime/MSIME-Windows/blob/main/PRIVACY.md';
+const RELEASES_PAGE_URL = PRODUCT_RELEASES_URL;
+const LICENSE_URL = 'https://github.com/DiXuanAoYi/msime/blob/feature/voice-reply-studio/LICENSE';
+const PRIVACY_URL = 'https://github.com/DiXuanAoYi/msime/blob/feature/voice-reply-studio/PRIVACY.md';
 const REQUEST_TIMEOUT_MS = 10000;
 
 function postExternalUrl(url: string): void {
@@ -126,7 +126,7 @@ export function setupAboutSettings(): void {
   });
 
   checkButton.addEventListener('click', async () => {
-    const currentVersion = parseVersion(versionLabel.textContent ?? '');
+    const currentVersion = installedProductVersion(versionLabel.textContent ?? '');
     if (!currentVersion) {
       setStatus('无法识别当前版本', 'error');
       return;
@@ -140,18 +140,18 @@ export function setupAboutSettings(): void {
     const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch(`${UPDATE_MANIFEST_URL}?t=${Date.now()}`, {
+      const response = await fetch(PRODUCT_RELEASE_API, {
         cache: 'no-store',
+        headers: { Accept: 'application/vnd.github+json' },
         signal: controller.signal
       });
       if (!response.ok) {
-        throw new Error(`Update manifest returned ${response.status}`);
+        throw new Error(`Release query returned ${response.status}`);
       }
 
-      const manifest = await response.json() as UpdateManifest;
-      const update = validateManifest(manifest, RELEASES_PAGE_URL);
+      const update = selectProductRelease(await response.json());
       if (!update) {
-        throw new Error('Invalid update manifest');
+        throw new Error('No compatible personal-channel release');
       }
 
       const latest = update.version;
@@ -166,7 +166,7 @@ export function setupAboutSettings(): void {
       }
     } catch (error) {
       console.warn('[about] update check failed:', error);
-      setStatus('检查失败，请稍后重试', 'error');
+      setStatus('检查失败，可在你的仓库 Release 查看个人分支版本', 'error');
     } finally {
       window.clearTimeout(timeout);
       checkButton.disabled = false;

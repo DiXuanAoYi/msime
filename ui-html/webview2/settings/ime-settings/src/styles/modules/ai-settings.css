@@ -61,6 +61,8 @@
 }
 
 .ai-grid input,
+.ai-grid select,
+.ai-grid textarea,
 .ai-prompt {
   box-sizing: border-box;
   width: 100%;
@@ -72,6 +74,20 @@
   outline: none;
   font: inherit;
 }
+
+.model-combo { position:relative; display:flex; width:100%; }
+.model-combo input { padding-right:38px; }
+.model-combo>button { position:absolute;right:3px;top:3px;bottom:3px;width:32px;border:0;background:transparent;color:var(--text-color);border-radius:5px;cursor:pointer; }
+.model-menu { display:none;position:absolute;z-index:100;top:calc(100% + 3px);left:0;right:0;max-height:240px;overflow:auto;border:1px solid var(--control-border);border-radius:6px;background:var(--surface-raised);box-shadow:0 6px 20px #0003;padding:4px; }
+.model-menu.open { display:block; }
+.model-option { display:block;width:100%;padding:8px 10px;text-align:left;color:var(--text-color);background:var(--control-bg);border:0;border-radius:4px;cursor:pointer;overflow-wrap:anywhere; }
+.model-option[hidden] { display:none; }
+.model-option:hover,.model-option.active { background:var(--dropdown-item-hover-bg);color:var(--accent-color); }
+.ai-actions { display:flex;gap:10px;margin:12px 0; }
+.ai-answer { display:grid;gap:6px;padding:12px 0;border-bottom:1px solid var(--control-border); }
+.ai-answer span { color:var(--text-secondary);font-size:12px; }
+.ai-answer textarea { box-sizing:border-box;width:100%;min-height:70px;resize:vertical;padding:9px;color:var(--text-color);background:var(--control-bg);border:1px solid var(--control-border);border-radius:6px; }
+.ai-answer button { justify-self:start; }
 
 .ai-grid input::placeholder,
 .ai-prompt::placeholder {
@@ -163,3 +179,27 @@
 .ai-prompt::-webkit-scrollbar-thumb {
   cursor: default;
 }
+
+.domain-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.domain-catalog .domain-pack-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  align-content: start;
+}
+.domain-catalog .domain-pack-card > * { min-width: 0; }
+.domain-catalog .domain-pack-title { display: flex; align-items: center; gap: 8px; }
+.domain-catalog small {
+  display: block;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.domain-catalog .domain-pack-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.domain-catalog .domain-pack-actions a { min-width: 0; overflow-wrap: anywhere; }
+.domain-checks { display: flex; flex-wrap: wrap; gap: 12px; }

@@ -106,7 +106,8 @@ int main()
     CHECK((FanyImeProtocol::Negotiate(hello, restoreCapabilities).capabilities & FanyImeProtocol::CompositionRestore) ==
           0); // old client/new server
     CHECK(FanyImeReplyType::CompositionRestored == 14);
-    CHECK(FanyImeReplyType::MaxKnown == FanyImeReplyType::CompositionRestored);
+    CHECK(FanyImeReplyType::TrilingualCycle == 15);
+    CHECK(FanyImeReplyType::MaxKnown == FanyImeReplyType::TrilingualCycle);
     CHECK(FanyImeReplyType::TransportUnavailable > FanyImeReplyType::MaxKnown);
 
     hello.wch += 1;
@@ -154,7 +155,9 @@ int main()
     CHECK(!FanyImeVocabulary::Decode(L"-9223372036854775809\thello"));
     CHECK(!FanyImeVocabulary::Decode(L"9223372036854775809\t"));
     CHECK(FanyImeWorkerReplyType::VocabularyCommitCandidate == 33);
-    CHECK(FanyImeWorkerReplyType::MaxKnown == FanyImeWorkerReplyType::VocabularyCommitCandidate);
+    CHECK(FanyImeWorkerReplyType::RuntimeSettingsSnapshot == 34);
+    CHECK(FanyImeWorkerReplyType::TrilingualCycleChanged == 35);
+    CHECK(FanyImeWorkerReplyType::MaxKnown == FanyImeWorkerReplyType::TrilingualCycleChanged);
     CHECK(FanyImePipeEventType::VocabularyCommitConfirmed == 17);
     const auto learning = FanyImeProtocol::Capabilities | FanyImeProtocol::VocabularyCommit;
     const auto learningHello = FanyImeProtocol::Hello(1, 2, learning);

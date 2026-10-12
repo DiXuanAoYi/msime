@@ -42,6 +42,8 @@ void BeginVocabularyTranslationPage(int index)
 }
 void CaptureVocabularySelection(int index, bool use_translation)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
     if (!GetConfiguredVocabularyEnabled() || !GetConfiguredCandidateTranslationsEnabled() || IsUiLessMode() ||
         !Global::candidate_window_rendered_visible.load() ||
         Global::candidate_page_generation.load() != Global::rendered_candidate_page_generation.load())
@@ -86,6 +88,11 @@ void ArmVocabularySelection(uint64_t client, uint64_t epoch, uint64_t request)
 }
 void ConfirmVocabularySelection(uint64_t client, uint64_t epoch, uint64_t request)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+    {
+        ResetVocabularySelections();
+        return;
+    }
     if (!GetConfiguredVocabularyEnabled())
     {
         ResetVocabularySelections();

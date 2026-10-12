@@ -6,12 +6,14 @@ import { setupLocalAsr } from './local-asr';
 import { serializeHostMessage } from '../../../../shared/messages';
 import { applyDropdownValue, applyToggleState, setupDropdownMenu, setupToggleButton } from './shared';
 import { updateConfig } from './config-sync';
+import { setupModelFetch } from './model-fetch';
 import { setupCredentialTest } from './credential-test';
 
 type ProviderDefaults = { endpoint: string; model: string };
 type PolishPreset = { id: string; name: string; prompt: string };
 
 const fields: Record<string, string> = {
+  voiceAsrResourceId: 'voice_input.asr_resource_id',
   voiceAsrAppKey: 'voice_input.asr_app_key',
   voiceTencentSecretId: 'voice_input.tencent_secret_id',
   voiceAsrToken: 'voice_input.asr_token',
@@ -128,6 +130,8 @@ let currentAsrProvider = 'doubao';
 let currentDoubaoAuthMode = 'api_key';
 let currentAsrResourceId = 'volc.seedasr.sauc.duration';
 let currentPolishProvider = 'siliconflow';
+let resetPolishModels=()=>{};
+function syncThinkingUi():void {setHidden('voiceThinkingField',currentPolishProvider!=='deepseek');}
 let polishPresets: PolishPreset[] = FALLBACK_PRESETS.slice();
 
 function knownValues(table: Record<string, ProviderDefaults>, field: keyof ProviderDefaults): string[] {
@@ -169,7 +173,7 @@ function asrTestConfig(): Record<string, string> {
     token: fieldValue('voiceAsrToken'),
     endpoint: fieldValue('voiceAsrEndpoint') || defaults?.endpoint || '',
     model: fieldValue('voiceAsrModel') || defaults?.model || '',
-    resourceId: currentAsrResourceId
+    resourceId: document.getElementById('voiceAsrResourceId') ? fieldValue('voiceAsrResourceId') || 'volc.seedasr.sauc.duration' : currentAsrResourceId
   };
 }
 
@@ -222,6 +226,7 @@ function switchPolishProvider(provider: string): void {
   if (input) input.value = next;
   updateConfig('voice_input.polish_provider', provider);
   applyPolishProviderDefaults(provider);
+  syncThinkingUi();resetPolishModels();
 }
 
 function syncAsrProviderUi(provider: string): void {
@@ -230,6 +235,7 @@ function syncAsrProviderUi(provider: string): void {
   setHidden('voiceAsrTokenField', provider === 'local');
   renderProviderLinks('voiceAsrLinks', provider, false);
   setHidden('voiceDoubaoAuthModeField', !doubao);
+  setHidden('voiceAsrResourceIdField', !doubao);
   // The new console issues a single API Key, so App ID only applies to the legacy console.
   setHidden('voiceAsrAppKeyField', !doubao || currentDoubaoAuthMode !== 'legacy');
   setHidden('voiceAsrModelField', doubao);
@@ -334,6 +340,8 @@ export function setupVoiceInput(): void {
   setupTokenVisibilityToggle('voicePolishToken', 'voicePolishTokenVisibility', 'API Token');
   setupCredentialTest('voiceAsrTestButton', 'voiceAsrTestStatus', () => 'voice.asr', asrTestConfig);
   setupCredentialTest('voicePolishTestButton', 'voicePolishTestStatus', () => 'voice.polish', polishTestConfig);
+  resetPolishModels=setupModelFetch({inputId:'voicePolishModel',arrowId:'voicePolishModelArrow',menuId:'voicePolishModelMenu',buttonId:'voicePolishModelFetch',statusId:'voicePolishModelStatus',service:()=> 'voice.polish',readConfig:polishTestConfig});
+  setupDropdownMenu('voiceThinkingBtn','voiceThinkingMenu','',true,'voice_input.polish_thinking');
   setupToggleButton('voiceSoundEnabled', value => {
     applyToggleState('voiceStartSound', value);
     applyToggleState('voiceEndSound', value);
@@ -395,6 +403,7 @@ export function setupVoiceInput(): void {
       if (id === 'voicePolishToken') {
         polishTokens[currentPolishProvider] = value;
         updateConfig(`voice_input.polish_token_${currentPolishProvider}`, value);
+        resetPolishModels();
         return;
       }
       updateConfig(path, value);
@@ -473,6 +482,8 @@ export function applyVoiceConfig(config: Record<string, unknown>): void {
   );
   const polishProvider = typeof config.polish_provider === 'string' ? config.polish_provider : 'siliconflow';
   currentPolishProvider = polishProvider;
+  syncThinkingUi();
+  if(typeof config.polish_thinking==='string')applyDropdownValue('voiceThinkingBtn','voiceThinkingMenu',config.polish_thinking);
   renderProviderLinks('voicePolishLinks', polishProvider, true);
   polishTokens = readTokenMap(
     config.polish_tokens,

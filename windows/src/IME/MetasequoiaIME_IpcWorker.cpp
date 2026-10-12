@@ -1,4 +1,5 @@
 #include "../../../engine/contracts/vocabulary_commit.h"
+#include "../../../engine/contracts/input_runtime_settings.h"
 // Worker pipe side: IpcWorkerThread, which validates and dispatches Server frames, and the
 // token tables that hand its commits, voice snapshots and compartment switches to the TSF thread.
 
@@ -352,6 +353,14 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
         }
 
         bool validFrame = true;
+        std::optional<FanyImeRuntimeSettings::Snapshot> runtimeSettings;
+        if (buf.msg_type == FanyImeWorkerReplyType::RuntimeSettingsSnapshot)
+        {
+            const auto terminator = std::find(std::begin(buf.data), std::end(buf.data), L'\0');
+            if (terminator != std::end(buf.data))
+                runtimeSettings = FanyImeRuntimeSettings::Decode(std::wstring_view(buf.data, terminator - buf.data));
+            validFrame = runtimeSettings.has_value();
+        }
         if (buf.msg_type == FanyImeWorkerReplyType::VocabularyCommitCandidate ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCurCandidate ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCandidateAndContinue ||
@@ -490,7 +499,8 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
                 pIME->_ResetVoiceCompositionAssemble();
             }
             // Soft config/control frames: drop without killing the worker pipe.
-            if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::PagingCommaPeriodChanged ||
+            if (buf.msg_type == FanyImeWorkerReplyType::RuntimeSettingsSnapshot ||
+                buf.msg_type == Global::DataToTsfWorkerThreadMsgType::PagingCommaPeriodChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::SmartPunctuationChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::SmartPunctuationRepeatToChineseChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::SmartPunctuationSpaceConvertChanged ||
@@ -531,8 +541,30 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
             pIME->_ResetVoiceCompositionAssemble();
         }
 
-        if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::FocusSessionReady)
+        if (buf.msg_type == FanyImeWorkerReplyType::RuntimeSettingsSnapshot && runtimeSettings)
         {
+            // Apply atomically before the ordered focus-ready fence wakes the
+            // first-letter classifier. COM/document work remains on the owner.
+            if (FanyImeRuntimeSettings::ShouldApply(*runtimeSettings, workerGeneration,
+                                                    pIME->_runtimeSettingsPipeGeneration.load(),
+                                                    pIME->_runtimeSettingsRevision.load()))
+            {
+                pIME->_runtimeSettingsPipeGeneration.store(workerGeneration);
+                pIME->_runtimeSettingsFlags.store(runtimeSettings->flags, std::memory_order_release);
+                pIME->_runtimeSettingsRevision.store(runtimeSettings->revision, std::memory_order_release);
+                PostMessage(pIME->_msgWndHandle, WM_ApplyRuntimeSettings, workerGeneration, 0);
+            }
+        }
+        else if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::FocusSessionReady)
+        {
+            if (pIME->_runtimeSettingsPipeGeneration.load() != workerGeneration)
+            {
+                // Legacy peers do not send the optional snapshot. Reset only
+                // their compatibility defaults; modern snapshots precede this fence.
+                pIME->_runtimeSettingsFlags.store(FanyImeRuntimeSettings::EnglishCandidates, std::memory_order_release);
+                pIME->_runtimeSettingsRevision.store(0);
+                pIME->_runtimeSettingsPipeGeneration.store(workerGeneration);
+            }
             const uint64_t expectedToken = pIME->_expectedWorkerFocusToken.load(std::memory_order_acquire);
             if (expectedToken != 0 && focusToken == expectedToken)
             {

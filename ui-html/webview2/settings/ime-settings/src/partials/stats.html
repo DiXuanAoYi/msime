@@ -84,9 +84,22 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title">按日明细</div>
-        <div class="stats-note">最近 30 天</div>
+        <div class="stats-note">默认最近 30 条；日期筛选与翻页可查看全部保留历史，不影响上方总览</div>
       </div>
+      <div class="stats-detail-filters">
+        <label for="statsDetailFrom">开始日期</label>
+        <input id="statsDetailFrom" type="date" />
+        <label for="statsDetailTo">结束日期</label>
+        <input id="statsDetailTo" type="date" />
+        <button class="stats-btn" id="statsDetailReset" type="button">全部日期</button>
+      </div>
+      <div class="stats-detail-range-status" id="statsDetailRangeStatus" role="status" aria-live="polite"></div>
       <div class="stats-details" id="statsDetails"></div>
+      <div class="stats-detail-navigation">
+        <span id="statsDetailPage" role="status" aria-live="polite"></span>
+        <button class="stats-btn" id="statsDetailPrevious" type="button" disabled>上一页</button>
+        <button class="stats-btn" id="statsDetailNext" type="button" disabled>下一页</button>
+      </div>
     </div>
   </div>
 

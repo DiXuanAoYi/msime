@@ -466,10 +466,11 @@ SizeF CandidateList::Measure(const SizeF &availableSize)
     const float gap = appearance_.itemGap;
     const bool horizontal = orientation_ == Orientation::Horizontal;
     std::vector<float> widths;
-    float maxWidth = 80.0f;
+    float maxWidth = appearance_.fitContent ? 0.0f : 80.0f;
     for (const auto &item : items_)
     {
-        const float textWidth = EstimateTextWidth(item.text, appearance_.fontSize) + 6.0f +
+        const float textSlack = !appearance_.fitContent ? 6.0f : (item.annotation.empty() ? 0.0f : 4.0f);
+        const float textWidth = EstimateTextWidth(item.text, appearance_.fontSize) + textSlack +
                                 EstimateTextWidth(item.annotation, appearance_.annotationFontSize);
         const float translationWidth = EstimateTextWidth(item.translation, appearance_.fontSize * 0.78f);
         const float contentWidth =
@@ -670,6 +671,8 @@ void CandidateList::Render(DeviceResources &deviceResources)
                 if (span.start > item.translation.size() || span.length > item.translation.size() - span.start)
                     continue;
                 auto color = span.color.a > 0.001f ? span.color : translationColor;
+                if (selected && span.selectedColor.a > 0.001f)
+                    color = span.selectedColor;
                 color.a *= std::clamp(span.opacity, 0.0f, 1.0f);
                 if (auto *brush = deviceResources.GetSolidColorBrush(color))
                     translationLayout->SetDrawingEffect(brush, {span.start, span.length});

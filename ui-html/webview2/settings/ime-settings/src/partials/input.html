@@ -273,7 +273,7 @@
       <div class="input-option-divider"></div>
       <div class="personal-glossary-editor">
         <label class="section-title" for="personalGlossaryText">个人译词表</label>
-        <div class="input-setting-description" id="personalGlossaryHelp">每行：语言代码、中文词、译词，可加第二释义，用 Tab 分隔。支持 en / ja / es / fr / de / ru / ko。相同语言和中文词以最后一行为准；清空并保存可删除全部个人译词。</div>
+        <div class="input-setting-description" id="personalGlossaryHelp">每行用 Tab 分隔：语言代码、中文词、译词，可加第四列。译词列可用分号保存全部义项。支持 en / ja / es / fr / de / ru / ko / vi / th / it。青简单语种多列文件导入时保留所有译义，第三条以后的译义并入第四列；相同语言和中文词以最后一行为准。</div>
         <textarea id="personalGlossaryText" rows="6" spellcheck="false" aria-describedby="personalGlossaryHelp" placeholder="en&#9;开发&#9;development&#10;ja&#9;开发&#9;開発&#10;es&#9;开发&#9;desarrollo"></textarea>
         <div class="personal-glossary-actions">
           <button id="personalGlossarySave" class="credential-test-button" type="button">保存词表</button>
@@ -281,7 +281,7 @@
           <button id="personalGlossaryExport" class="credential-test-button" type="button">导出 TSV</button>
           <input id="personalGlossaryFile" type="file" accept=".tsv,.txt" hidden>
         </div>
-        <div class="input-setting-description">仅保存在本机。青简单语词表按下方目标语种导入，去除词性与读音，保留前两条译词。导入后需点击保存。</div>
+        <div class="input-setting-description">仅保存在本机。青简单语词表按下方目标语种导入，去除词性与读音，保留全部译义。导入后需点击保存。</div>
         <div id="personalGlossaryStatus" class="input-setting-description" role="status" aria-live="polite"></div>
       </div>
       <div class="input-option-divider"></div>
@@ -307,16 +307,19 @@
       <div class="section-header translation-language-row" id="translationOnlineProvider" hidden>
         <div>
           <div class="section-title">在线翻译服务</div>
-          <div class="input-setting-description">可使用腾讯云、小牛翻译，或填写自己部署的 DeepLX 兼容接口</div>
+          <div class="input-setting-description">每次仅使用所选的一种服务：腾讯云、小牛、DeepLX 或 AI。升级先沿用原选择；本地词典始终优先。</div>
         </div>
         <div class="dropdown">
           <button class="dropdown-toggle translation-language-toggle" id="translationProviderBtn">
             <span>腾讯云</span><img src="./assets/arrow.svg" alt="▼">
           </button>
           <div class="dropdown-menu translation-language-menu" id="translationProviderMenu">
+            <div class="dropdown-item" data-value="legacy">沿用原选择 · 升级保留</div>
+            <div class="dropdown-item" data-value="dictionary">仅本地词典和个人译词</div>
             <div class="dropdown-item" data-value="tencent">腾讯云</div>
             <div class="dropdown-item" data-value="niutrans">小牛翻译</div>
             <div class="dropdown-item" data-value="custom">自定义 DeepLX</div>
+            <div class="dropdown-item" data-value="ai">AI 翻译 · 独立配置</div>
           </div>
         </div>
       </div>
@@ -339,11 +342,23 @@
             <div class="dropdown-item" data-value="ru">俄语</div>
             <div class="dropdown-item" data-value="de">德语</div>
             <div class="dropdown-item" data-value="ko">韩语</div>
+            <div class="dropdown-item" data-value="th">泰语</div>
+            <div class="dropdown-item" data-value="it">意大利语</div>
           </div>
         </div>
       </div>
       <div class="input-option-divider"></div>
       <div id="translationOnlineCredentials" hidden>
+      <div id="candidateAiTranslationFields" class="ai-section" hidden>
+        <h3 class="section-title">AI 候选翻译 · 独立配置</h3>
+        <p class="input-setting-description">和 AI 联想、语音润色、截图翻译分别保存。本地/个人释义优先，未命中才请求；仍受“在线补全”总开关控制。译文不会覆盖词典。DeepSeek 思考关闭以降低延迟。</p>
+        <div class="ai-grid">
+          <label><span>AI 提供商</span><select id="candidateAiProvider"><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option><option value="siliconflow">SiliconFlow</option><option value="groq">Groq</option><option value="custom">Custom · 独立槽</option><option value="local">本地文本模型 · Token 可选</option></select></label>
+          <label class="ai-wide"><span>接口地址</span><input id="candidateAiEndpoint" type="url" autocomplete="off" spellcheck="false"></label>
+          <label><span>API Token</span><input id="candidateAiToken" type="password" autocomplete="off" spellcheck="false"></label>
+          <div class="ai-field"><label for="candidateAiModel">模型 · 可直接输入</label><div class="model-combo"><input id="candidateAiModel" type="text" autocomplete="off" spellcheck="false"><button id="candidateAiModelArrow" type="button" aria-label="展开或查询模型">⌄</button><div id="candidateAiModelMenu" class="model-menu"></div></div><button id="candidateAiModelFetch" type="button">查询模型</button><span id="candidateAiModelStatus" role="status"></span></div>
+        </div>
+      </div>
       <div id="tencentTranslationFields">
         <div class="translation-api-heading">
           <div class="section-title">腾讯云 API 凭据</div>
@@ -754,4 +769,7 @@
       </div>
     </div>
   </div>
+  <div class="section"><div class="section-header"><div><div class="section-title">英文状态候选</div><p class="input-setting-description">水杉切到“英”时显示单词、句子和释义。按软件的规则可覆盖全局开关。</p></div><div id="englishCandidatesToggle" class="ftb-toggle-btn" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div><div class="input-app-rule"><input id="englishRuleApp" placeholder="软件进程名，如 code.exe"><button id="englishRuleAdd" type="button">添加软件</button></div><p id="englishRuleStatus" role="status"></p><div id="englishRules"></div><p class="input-setting-description">首次安装或 TSF DLL 更新后，完整退出并重开已运行的软件以加载新版；日常中英切换无需重启。</p></div>
+  <div class="section chinese-scheme-settings"><div class="section-header"><span class="section-title">五笔四码唯一自动上屏</span><div id="wubiFourAutoToggle" class="ftb-toggle-btn" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div><div class="section-header"><span>第五码顶屏</span><div id="wubiFifthTopToggle" class="ftb-toggle-btn" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div><p class="input-setting-description">仅五笔编码生效；通配与混输按候选引擎的安全条件判断。</p></div>
+  <div class="section"><h3 class="section-title">Vim 软件</h3><p class="input-setting-description">每行填写一个软件进程名，Esc 后切换英文便于命令模式；只影响列出的软件。</p><textarea id="vimModeApps" class="advanced-text" rows="3" placeholder="例如 neovim.exe"></textarea></div>
 </div>

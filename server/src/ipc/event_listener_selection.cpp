@@ -234,6 +234,16 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
         return;
     }
 
+    if (is_valid_selection &&
+        (curWordItem.source == CandidateSource::AiCompletion || curWordItem.source == CandidateSource::AiQuestion))
+    {
+        const auto text = string_to_wstring(CandidateTextForOutput(curWordItem.word));
+        ClearState();
+        Global::MsgTypeToTsf = Global::DataFromServerMsgType::Normal;
+        Global::candidate_ui.selected_text = text;
+        return;
+    }
+
     if (is_valid_selection)
     {
         CaptureVocabularySelection(index);

@@ -1,4 +1,5 @@
 #pragma once
+#include "../domain_dictionary/domain_dictionary.h"
 #include "../core/runtime_paths.h"
 #include "../core/pinyin_decoder.h"
 #include "../core/data_path.h"
@@ -89,6 +90,7 @@ class QuanpinDictionary
 
     // 设置整句候选来源与去重补位选项。值发生变化时清一次缓存，避免旧候选被继续复用。
     void set_sentence_association(const SentenceAssociationOptions &options);
+    void set_enabled_domain_dictionaries(const std::string &csv);
 
     // 光标前已上屏的文本，作为神经重排给模型看的上下文。宿主能拿到应用里的前文就给它，
     // 拿不到就不设——空上下文照样能排，只是模型只看句子本身、看不到上文。
@@ -138,6 +140,12 @@ class QuanpinDictionary
         const std::string &raw_input, const std::string &primary_segmentation,
         const quanpin::Segments &primary_segments, const std::vector<quanpin::Segments> &alternative_segmentations,
         std::vector<WordItem> result);
+    // 合法输入的等音节数字面切分（yi'ba'nan'zhao / yi'ban'an'zhao）按整句打分争领衔。
+    // leading_segments 返回领衔的字面切分，交给 arbitrate_legal_corrections 当原读法。
+    std::vector<WordItem> arbitrate_literal_segmentations(const std::string &raw_input,
+                                                          const quanpin::Segments &segments,
+                                                          std::vector<WordItem> result,
+                                                          quanpin::Segments &leading_segments);
     std::vector<WordItem> arbitrate_legal_corrections(const std::string &raw_input,
                                                       const quanpin::Segments &plain_segments,
                                                       const std::vector<quanpin::AutocorrectCut> &corrected_cuts,
@@ -145,6 +153,14 @@ class QuanpinDictionary
     // 词格对一条完整切分的最佳路径分（加载了 sc.lm 时是 log10，否则是启发式的 ln）。
     // 与整句候选开关无关；单音节也能打分。不是全合法音节或解不出路径时为空。
     std::optional<double> lattice_best_path_score(const quanpin::Segments &cut);
+    // 同上，返回整条最佳路径。按切分缓存：一次按键里同一条切分会被字面切分与纠错两轮裁决各打一次分。
+    std::optional<quanpin::LatticePath> lattice_best_path(const quanpin::Segments &cut);
+    // 词格的跨度查询，套一层按（跨度, limit）的缓存：每多敲一个字母整句都要重解，同一输入的
+    // 几种字面切分、主切与纠错读法之间也大量共用跨度，不缓存就一遍遍打同样的 SQL。结果与
+    // 直查逐行相同；随 reset_cache 清空（词库被写或换了开关时）。with_fuzzy 为假时不收模糊读音，
+    // 见 lattice_best_path。
+    quanpin::WordLatticeLookup lattice_lookup(int limit, bool with_fuzzy = true);
+    void set_fuzzy_pinyin(metasequoia::FuzzyPinyinOptions options);
     bool user_prefers_reading(const std::string &key);
     static void append_unique_words(std::vector<WordItem> &result, const std::vector<WordItem> &extra);
     void mark_autocorrect_candidates(std::vector<WordItem> &candidates, const std::string &raw_input);
@@ -179,9 +195,14 @@ class QuanpinDictionary
     // cleared with the dictionary caches: its value depends only on the input
     // and the static correction tables, never on dictionary rows.
     CircularBuffer<std::string, SeriesQueryResolution> resolution_cache_;
+    // 见 lattice_best_path。随 reset_cache 清空：分数取决于词库行和整句选项（搭配模型）。
+    CircularBuffer<std::string, std::optional<quanpin::LatticePath>> lattice_best_path_cache_;
+    // 见 lattice_lookup。
+    std::unordered_map<std::string, std::vector<quanpin::LatticeLexeme>> lattice_span_cache_;
     sqlite3 *db_ = nullptr;
     sqlite3_int64 data_version_ = -1;
     metasequoia::RuntimePaths paths_;
+    domain_dictionary::Dictionary domain_;
     metasequoia::PinyinDecoder decoder_;
     // 词格整句的打分模型（kenlm 三元），按资源路径进程内共享、只读。缺模型时
     // valid() 为假，word_lattice 退回旧的启发式打分：整句候选只是变差，不会消失。
@@ -191,13 +212,16 @@ class QuanpinDictionary
     // shared_ptr 持有：设置侧删除模型包 evict 缓存并清掉这里的引用后，映射即可
     // 释放，被删的文件能被物理清扫。
     std::shared_ptr<const gram::GramDb> collocation_db_ = nullptr;
-    // 神经整句模型（chinese-ime-lm），按资源路径进程内共享、只读。两档可同时参与打分；
+    // 神经整句模型（chinese-ime-lm），按路径进程内共享、只读。两档可同时参与打分；
     // 缺文件时对应的整句候选不出，不影响其它候选。对应开关第一次生效时才载入，
-    // 关着的那档不占内存。
+    // 关着的那档不占内存。快速档随安装包在资源目录；高精度档按需下载，路径由
+    // set_sentence_association 下发，未下载时为空。
     neural::LazySentenceModel neural_desktop_model_;
     neural::LazySentenceModel neural_keyboard_model_;
     // 整句候选来源与去重补位选项，默认全关；由 set_sentence_association 随请求更新。
     SentenceAssociationOptions sentence_association_;
+    // 词格跨度查询带的模糊音规则，由 query 随请求更新，变化时清缓存（整句与裁决都按它算）。
+    metasequoia::FuzzyPinyinOptions fuzzy_pinyin_;
     // 神经重排的上下文（光标前已上屏的文本）。宿主没给就是空串。
     std::string rescoring_context_;
     std::unordered_map<std::string, sqlite3_stmt *> statement_cache_;

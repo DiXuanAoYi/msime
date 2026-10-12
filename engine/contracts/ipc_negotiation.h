@@ -27,6 +27,9 @@ constexpr std::uint32_t CompositionRestore = 1u << 4;
 // Server acknowledged this bit.
 constexpr std::uint32_t CaretStateIndicator = 1u << 5;
 constexpr std::uint32_t VocabularyCommit = 1u << 6;
+constexpr std::uint32_t RuntimeSettings = 1u << 7;
+constexpr std::uint32_t FieldPrivacy = 1u << 8;
+constexpr std::uint32_t TrilingualCycle = 1u << 9;
 constexpr std::uint32_t Capabilities = RequestIds | FocusEpochs | FramedVoice;
 constexpr std::uint32_t RequiredCapabilities = RequestIds | FocusEpochs;
 

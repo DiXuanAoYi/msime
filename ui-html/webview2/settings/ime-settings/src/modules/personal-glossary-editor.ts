@@ -67,7 +67,7 @@ export function setupPersonalGlossaryEditor(save: (text: string) => void): void 
       // A native multilingual table already has a language column. Otherwise
       // interpret it as Qingjian's per-language personal glossary.
       const firstRow = text.replace(/^\uFEFF/, '').split(/\r?\n/).find(row => row.trim() && !row.trim().startsWith('#')) ?? '';
-      const isMultilingual = /^(en|ja|es|fr|de|ru|ko)\t/u.test(firstRow.trim());
+      const isMultilingual = /^(en|ja|es|fr|de|ru|ko|vi|th|it)\t/u.test(firstRow.trim());
       const imported = isMultilingual || validatePersonalGlossary(text) === null ? text : importQingjianGlossary(text, language);
       const combined = before.trimEnd() + (before.trim() && imported.trim() ? '\n' : '') + imported;
       const error = validatePersonalGlossary(combined);

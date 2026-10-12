@@ -59,6 +59,40 @@ HalfScreenDipLimits QueryHalfScreenDipLimitsForPoint(POINT pt);
 double ClampWidthDipToHalfScreen(double widthDip, const HalfScreenDipLimits &limits);
 double ClampHeightDipToHalfScreen(double heightDip, const HalfScreenDipLimits &limits);
 
+// Host placement on mixed-DPI multi-monitor setups (floating toolbar).
+// MonitorFromWindow follows the monitor the window currently sits on, so
+// clamping against it pins the host to the screen it came from and makes a
+// caption drag across a seam bounce back. The visible region is the union of
+// every monitor's area: a host may straddle a seam, and is only pulled back
+// when part of it leaves that region.
+enum class ScreenArea
+{
+    Monitor,  // full monitor rect; a host may overlap the taskbar
+    WorkArea, // rcWork; excludes the taskbar and app bars
+};
+// Leaves `rect` alone while it lies inside the visible region; otherwise fits
+// it (size preserved) into the monitor nearest to its center. Returns true
+// when the rect was moved; `monitor` then receives the monitor used.
+// `offscreenInsets` (physical px per side) is transparent margin, such as a
+// drop shadow, that may hang off the screen: only the rect deflated by it has
+// to stay visible, so the visible part can sit flush with an edge.
+bool KeepRectOnVisibleScreens(RECT &rect, ScreenArea area, HMONITOR *monitor = nullptr,
+                              const RECT &offscreenInsets = {});
+// Clips `hwnd` to the part of it inside the visible region, so margin hanging
+// off an edge or over the taskbar is neither drawn nor hit-tested there.
+// Clears the region again once the whole window is visible.
+void ClipWindowToVisibleScreens(HWND hwnd, ScreenArea area);
+// True while `hwnd` is inside a native move/size loop (caption drag).
+bool IsWindowInMoveSizeLoop(HWND hwnd);
+// Top-left for a host about to be resized to `width` x `height` physical px.
+// Starts from WM_DPICHANGED's `suggestedRect` when given, else the current
+// position. Outside a move loop the result is kept on the visible monitors;
+// during a caption drag the loop owns the position and nothing is clamped.
+// `previousInsets`: the offscreenInsets the host currently has. When they
+// differ, the visible part keeps its position and is kept in the work area.
+POINT PlaceResizedHost(HWND hwnd, int width, int height, const RECT *suggestedRect, const RECT &offscreenInsets = {},
+                       const RECT *previousInsets = nullptr);
+
 int AdjustCandidateWindowPosition(        //
     const POINT *point,                   //
     const std::pair<double, double> &,    //

@@ -107,30 +107,49 @@ std::vector<WordItem> JapaneseCandidateProvider::query(const QueryRequest &reque
         const auto pending_kana = japanese::KanaForRomajiPrefix(conversion.pending);
         if (!conversion.hiragana.empty() && !conversion.pending.empty())
         {
-            const std::string typed = request.raw_input;
             for (const auto &kana : pending_kana)
             {
+                // The kana prefix already matches the typed reading. Converting it
+                // back to one romaji spelling would reject nn/n' and other aliases.
                 for (const auto &lemma : sentence_decoder_->PrefixLemmas(conversion.hiragana + kana, 24))
                 {
-                    const std::string romaji = japanese::HiraganaToRomaji(lemma.reading);
-                    if (romaji.size() < typed.size() || romaji.compare(0, typed.size(), typed) != 0)
-                        continue;
                     AppendUnique(candidates, seen, request.raw_input_with_cases, lemma.surface,
                                  980000 - lemma.word_cost, CandidateSource::Database);
                 }
             }
         }
-        else if (conversion.pending.empty() && conversion.hiragana.size() >= 6)
+        japanese::JapaneseMatrixSearch search(*sentence_decoder_);
+        const auto sentences = search.SearchConverted(conversion, 12);
+        size_t next_sentence = 0;
+        // Once the reading is complete, convert what was typed before predicting
+        // longer words: the best whole-reading path and exact lemmas, then
+        // predictions, then the remaining sentence tail (other paths, kana
+        // fallbacks and lemmas covering only a prefix of the reading). Keep the
+        // prediction-first path above for pending romaji.
+        if (conversion.pending.empty() && conversion.hiragana.size() >= 6)
         {
-            for (const auto &lemma : sentence_decoder_->PrefixLemmas(conversion.hiragana, 16))
-                AppendUnique(candidates, seen, request.raw_input_with_cases, lemma.surface, 980000 - lemma.word_cost,
+            std::int64_t weight_floor = 980000;
+            const auto append_exact = [&](const std::string &text, std::int64_t weight) {
+                const size_t before = candidates.size();
+                AppendUnique(candidates, seen, request.raw_input_with_cases, text, weight, CandidateSource::Database);
+                if (candidates.size() != before)
+                    weight_floor = (std::min)(weight_floor, weight);
+            };
+            if (!sentences.empty())
+                append_exact(sentences[next_sentence++].text, 900000 - sentences.front().cost);
+            for (const auto &lemma : sentence_decoder_->ExactLemmas(conversion.hiragana, 16))
+                append_exact(lemma.surface, 900000 - lemma.word_cost);
+            // Predictions must not outweigh the conversions above them, or a
+            // weight-based re-sort would undo this order.
+            for (const auto &lemma : sentence_decoder_->LongerPrefixLemmas(conversion.hiragana, 16))
+                AppendUnique(candidates, seen, request.raw_input_with_cases, lemma.surface,
+                             (std::min)(weight_floor, 980000 - static_cast<std::int64_t>(lemma.word_cost)),
                              CandidateSource::Database);
         }
-        japanese::JapaneseMatrixSearch search(*sentence_decoder_);
-        for (const auto &sentence : search.SearchConverted(conversion, 12))
+        for (; next_sentence < sentences.size(); ++next_sentence)
         {
-            AppendUnique(candidates, seen, request.raw_input_with_cases, sentence.text, 900000 - sentence.cost,
-                         CandidateSource::Database);
+            AppendUnique(candidates, seen, request.raw_input_with_cases, sentences[next_sentence].text,
+                         900000 - sentences[next_sentence].cost, CandidateSource::Database);
         }
     }
 

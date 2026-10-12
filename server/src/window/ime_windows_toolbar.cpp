@@ -50,103 +50,72 @@ bool FloatingToolbarItemsEqual(const FloatingToolbarItemsConfig &left, const Flo
 {
     return left.fullwidth == right.fullwidth && left.punctuation == right.punctuation &&
            left.character_set == right.character_set && left.emoji == right.emoji &&
-           left.screen_keyboard == right.screen_keyboard && left.settings == right.settings &&
-           left.voice == right.voice && left.reply == right.reply && left.clipboard == right.clipboard;
+           left.screen_keyboard == right.screen_keyboard && left.settings == right.settings;
 }
 } // namespace ime_windows_detail
 
 namespace
 {
-BOOL CALLBACK AddMonitorWorkAreaToRegion(HMONITOR monitor, HDC, LPRECT, LPARAM data)
+// Transparent shadow margin that may hang off a screen edge, so the visible bar
+// can sit flush with it like the Windows language bar. ClipWindowToVisibleScreens
+// then keeps that overhang from drawing or swallowing clicks over the taskbar.
+RECT FloatingToolbarShadowInsetsPx(int hostWidthPx, int hostHeightPx, FLOAT scale)
 {
-    auto visibleRegion = reinterpret_cast<HRGN>(data);
-    if (!visibleRegion)
+    if (FloatingToolbarPresenter::Instance().IsBound())
     {
-        return FALSE;
+        return FloatingToolbarPresenter::Instance().ShadowInsetsPx(hostWidthPx, hostHeightPx, scale);
     }
-
-    MONITORINFO info{sizeof(info)};
-    if (!GetMonitorInfo(monitor, &info))
+    if (scale <= 0.0f)
     {
-        return TRUE;
+        return {};
     }
-
-    HRGN workAreaRegion = CreateRectRgnIndirect(&info.rcWork);
-    if (workAreaRegion)
+    // The page pins .status-bar (border included) to the top-left, so the margin
+    // is right/bottom only: the host minus the bar, shadow and the 1-DIP
+    // rounding pad included.
+    double barWidthDip = ::FTB_CONTENT_WIDTH_DIP;
+    double barHeightDip = ::FTB_CONTENT_HEIGHT_DIP;
+    if (barWidthDip <= 1.0 || barHeightDip <= 1.0)
     {
-        CombineRgn(visibleRegion, visibleRegion, workAreaRegion, RGN_OR);
-        DeleteObject(workAreaRegion);
+        const int shadowWidth = GetConfiguredFloatingToolbarShadow() ? ::FTB_WND_SHADOW_WIDTH : 0;
+        barWidthDip = static_cast<double>(hostWidthPx) / scale - shadowWidth;
+        barHeightDip = static_cast<double>(hostHeightPx) / scale - shadowWidth;
     }
-    return TRUE;
-}
-
-bool IsRectInsideVisibleMonitorWorkAreas(const RECT &rect)
-{
-    HRGN visibleRegion = CreateRectRgn(0, 0, 0, 0);
-    HRGN windowRegion = CreateRectRgnIndirect(&rect);
-    HRGN outsideRegion = CreateRectRgn(0, 0, 0, 0);
-    if (!visibleRegion || !windowRegion || !outsideRegion)
-    {
-        if (visibleRegion)
-            DeleteObject(visibleRegion);
-        if (windowRegion)
-            DeleteObject(windowRegion);
-        if (outsideRegion)
-            DeleteObject(outsideRegion);
-        return true;
-    }
-
-    EnumDisplayMonitors(nullptr, nullptr, AddMonitorWorkAreaToRegion, reinterpret_cast<LPARAM>(visibleRegion));
-    const int outsideType = CombineRgn(outsideRegion, windowRegion, visibleRegion, RGN_DIFF);
-    DeleteObject(outsideRegion);
-    DeleteObject(windowRegion);
-    DeleteObject(visibleRegion);
-    return outsideType == NULLREGION;
+    const auto inset = [scale](int hostPx, double barDip) {
+        return (std::max)(0L, static_cast<LONG>(hostPx - std::ceil(barDip * static_cast<double>(scale))));
+    };
+    return {0, 0, inset(hostWidthPx, barWidthDip), inset(hostHeightPx, barHeightDip)};
 }
 
 void KeepFloatingToolbarInsideVisibleScreens(HWND hwnd)
 {
-    if (!hwnd)
-    {
-        return;
-    }
-
     RECT rect{};
-    if (!GetWindowRect(hwnd, &rect) || IsRectInsideVisibleMonitorWorkAreas(rect))
+    if (!hwnd || !GetWindowRect(hwnd, &rect))
     {
         return;
     }
 
-    // MonitorFromRect chooses the monitor with the largest intersection, or the
-    // nearest monitor when the toolbar was dragged completely beyond all screens.
-    HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
-    MONITORINFO info{sizeof(info)};
-    if (!monitor || !GetMonitorInfo(monitor, &info))
+    // Pull the toolbar back on the monitor nearest to its center. Picking the
+    // monitor with MonitorFromRect's largest intersection made a toolbar that
+    // straddles a seam (mixed-DPI setups, or a secondary screen taller than the
+    // primary) snap back to the screen it came from.
+    const RECT before = rect;
+    HMONITOR monitor = nullptr;
+    if (!KeepRectOnVisibleScreens(
+            rect, ScreenArea::WorkArea, &monitor,
+            FloatingToolbarShadowInsetsPx(rect.right - rect.left, rect.bottom - rect.top, GetWindowScale(hwnd))))
     {
+        ClipWindowToVisibleScreens(hwnd, ScreenArea::WorkArea);
         return;
     }
 
-    const int width = rect.right - rect.left;
-    const int height = rect.bottom - rect.top;
-    const int workLeft = static_cast<int>(info.rcWork.left);
-    const int workTop = static_cast<int>(info.rcWork.top);
-    const int workRight = static_cast<int>(info.rcWork.right);
-    const int workBottom = static_cast<int>(info.rcWork.bottom);
-    const int oldX = static_cast<int>(rect.left);
-    const int oldY = static_cast<int>(rect.top);
-    const int maxX = (std::max)(workLeft, workRight - width);
-    const int maxY = (std::max)(workTop, workBottom - height);
-    const int x = (std::max)(workLeft, (std::min)(oldX, maxX));
-    const int y = (std::max)(workTop, (std::min)(oldY, maxY));
-    if (x == rect.left && y == rect.top)
-    {
-        return;
-    }
-
-    SetWindowPos(hwnd, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(hwnd, nullptr, rect.left, rect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    ClipWindowToVisibleScreens(hwnd, ScreenArea::WorkArea);
     SyncHostWebViewBounds(::webviewControllerFtbWnd.Get(), hwnd);
-    FTB_DIAG_LOGF(L"ftb drag clamped from ({},{}) to ({},{}) work=({},{})-({},{})", rect.left, rect.top, x, y,
-                  info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom);
+
+    MONITORINFO info{sizeof(info)};
+    GetMonitorInfo(monitor, &info);
+    FTB_DIAG_LOGF(L"ftb drag clamped from ({},{}) to ({},{}) work=({},{})-({},{})", before.left, before.top, rect.left,
+                  rect.top, info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom);
 }
 
 // Recompute FTB outer HWND from design DIPs * current DPI. Placement used to be
@@ -159,7 +128,12 @@ void KeepFloatingToolbarInsideVisibleScreens(HWND hwnd)
 //
 // scaleOverride>0: use that factor (WM_DPICHANGED's wParam) instead of
 // GetWindowScale, which can briefly lag the message's new DPI.
-void LayoutFloatingToolbar(HWND hwnd, bool reset_to_default_corner, FLOAT scaleOverride = 0.0f)
+//
+// suggestedRect: WM_DPICHANGED's recommended placement (lParam). Windows
+// computes it for the new DPI, keeping the toolbar under the cursor during a
+// caption drag without flipping back and forth across the seam.
+void LayoutFloatingToolbar(HWND hwnd, bool reset_to_default_corner, FLOAT scaleOverride = 0.0f,
+                           const RECT *suggestedRect = nullptr)
 {
     if (!hwnd)
     {
@@ -192,6 +166,11 @@ void LayoutFloatingToolbar(HWND hwnd, bool reset_to_default_corner, FLOAT scaleO
     HalfScreenDipLimits limits = QueryWebViewHalfScreenDipLimitsForHwnd(hwnd);
     if (scaleOverride > 0.0f)
     {
+        if (suggestedRect)
+        {
+            // The host is about to land on the suggested rect's monitor.
+            limits.monitor = QueryHalfScreenDipLimitsForPoint({suggestedRect->left, suggestedRect->top}).monitor;
+        }
         const double monitorWidthPx = static_cast<double>((std::max)(1, limits.monitor.right - limits.monitor.left));
         const double monitorHeightPx = static_cast<double>((std::max)(1, limits.monitor.bottom - limits.monitor.top));
         limits.scale = scale;
@@ -202,45 +181,42 @@ void LayoutFloatingToolbar(HWND hwnd, bool reset_to_default_corner, FLOAT scaleO
         static_cast<int>(std::ceil(ClampWidthDipToHalfScreen(static_cast<double>(::FTB_WND_WIDTH), limits)));
     ::FTB_WND_HEIGHT =
         static_cast<int>(std::ceil(ClampHeightDipToHalfScreen(static_cast<double>(::FTB_WND_HEIGHT), limits)));
-    const int shadowWidth = d2d ? 0 : ::FTB_WND_SHADOW_WIDTH;
+    // D2D measures its shadow margin into the scene. With the shadow off the
+    // WebView2 host drops its margin too, so the bar can sit flush with an edge.
+    const int shadowWidth = d2d || !GetConfiguredFloatingToolbarShadow() ? 0 : ::FTB_WND_SHADOW_WIDTH;
     const int width = static_cast<int>(std::ceil((::FTB_WND_WIDTH + shadowWidth) * static_cast<double>(scale)));
     const int height = static_cast<int>(std::ceil((::FTB_WND_HEIGHT + shadowWidth) * static_cast<double>(scale)));
     const int cornerInset = static_cast<int>(std::lround(10.0 * static_cast<double>(scale)));
+    const RECT shadowInsets = FloatingToolbarShadowInsetsPx(width, height, scale);
     int posX = 0;
     int posY = 0;
     if (reset_to_default_corner)
     {
+        // The inset is measured from the visible bar, not the shadow margin.
         MonitorCoordinates coordinates = GetMainMonitorCoordinates();
         const int taskbarHeight = GetTaskbarHeight();
-        posX = coordinates.right - width - cornerInset;
-        posY = coordinates.bottom - height - taskbarHeight - cornerInset;
+        posX = coordinates.right - width + shadowInsets.right - cornerInset;
+        posY = coordinates.bottom - height + shadowInsets.bottom - taskbarHeight - cornerInset;
     }
     else
     {
-        RECT rc{};
-        GetWindowRect(hwnd, &rc);
-        posX = rc.left;
-        posY = rc.top;
-
         // When optional buttons are added, the toolbar grows to the right from
-        // the existing top-left. Clamp it back onto the current monitor so the
-        // resized host stays fully reachable.
-        HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO monitorInfo{sizeof(monitorInfo)};
-        if (monitor && GetMonitorInfo(monitor, &monitorInfo))
-        {
-            const int monitorLeft = static_cast<int>(monitorInfo.rcMonitor.left);
-            const int monitorTop = static_cast<int>(monitorInfo.rcMonitor.top);
-            const int maxX = static_cast<int>(monitorInfo.rcMonitor.right) - width;
-            const int maxY = static_cast<int>(monitorInfo.rcMonitor.bottom) - height;
-            posX = (std::max)(monitorLeft, (std::min)(posX, maxX));
-            posY = (std::max)(monitorTop, (std::min)(posY, maxY));
-        }
+        // the existing top-left; keep the resized host reachable without
+        // pinning it to the monitor it currently sits on.
+        // Toggling the shadow changes the margin, not the bar: the previous
+        // insets keep the bar itself in place and inside the work area.
+        const POINT pos = PlaceResizedHost(hwnd, width, height, suggestedRect, shadowInsets,
+                                           ::FTB_HOST_INSETS_VALID ? &::FTB_HOST_INSETS_PX : nullptr);
+        posX = pos.x;
+        posY = pos.y;
     }
     // Never touch Z-order here: HWND_TOP would cover an open tray menu. Topmost
     // for the toolbar is owned by EnsureSmallWindowsTopmost / lazy pin order.
     SetLastError(0);
     const BOOL ok = SetWindowPos(hwnd, nullptr, posX, posY, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+    ::FTB_HOST_INSETS_PX = shadowInsets;
+    ::FTB_HOST_INSETS_VALID = true;
+    ClipWindowToVisibleScreens(hwnd, ScreenArea::WorkArea);
     if (!d2d)
     {
         SyncHostWebViewBounds(::webviewControllerFtbWnd.Get(), hwnd);
@@ -671,6 +647,25 @@ void ApplyConfiguredFloatingToolbarSize()
     });
 }
 
+namespace
+{
+void RemeasureFloatingToolbarAfterDpiChange(HWND hwnd)
+{
+    if (FloatingToolbarPresenter::Instance().IsBound())
+    {
+        FloatingToolbarPresenter::Instance().RelayoutHost();
+    }
+    else if (::webviewFtbWnd)
+    {
+        ApplyConfiguredFloatingToolbarSize();
+    }
+    else
+    {
+        SetTimer(hwnd, TIMER_ID_FTB_DPI_REMEASURE, 100, nullptr);
+    }
+}
+} // namespace
+
 LRESULT CALLBACK WndProcFtbWindow(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     // The floating toolbar is persistent, so it cannot rely on being re-themed
@@ -715,6 +710,10 @@ LRESULT CALLBACK WndProcFtbWindow(HWND hwnd, UINT message, WPARAM wParam, LPARAM
         UpdateFtbEnglishInputModeState(::webviewFtbWnd, wParam != 0 ? 1 : 0);
         break;
 
+    case UPDATE_FTB_INPUT_MODE:
+        UpdateFtbInputModeState(::webviewFtbWnd, wParam != 0 ? 1 : 0);
+        break;
+
     case UPDATE_FTB_CAPS_LOCK:
         UpdateFtbCapsLockState(::webviewFtbWnd, wParam != 0 ? 1 : 0);
         BroadcastToTsfWorkerThreadViaNamedpipe(Global::DataFromServerMsgTypeToTsfWorkerThread::CapsLockChanged,
@@ -724,15 +723,35 @@ LRESULT CALLBACK WndProcFtbWindow(HWND hwnd, UINT message, WPARAM wParam, LPARAM
     case WM_EXITSIZEMOVE:
         // Native caption dragging runs a modal move loop. Clamp only after that
         // loop ends so movement remains smooth and crossing to another monitor
-        // is never blocked.
+        // is never blocked. A remeasure still pending from a mid-drag DPI change
+        // runs first, so the clamp sees the final size and the toolbar does not
+        // jump a second time when the timer fires.
+        if (KillTimer(hwnd, TIMER_ID_FTB_DPI_REMEASURE))
+        {
+            RemeasureFloatingToolbarAfterDpiChange(hwnd);
+        }
         KeepFloatingToolbarInsideVisibleScreens(hwnd);
         return 0;
 
+    case WM_WINDOWPOSCHANGED: {
+        // Follow the caption drag live, so the shadow shows again as soon as the
+        // bar leaves an edge and is trimmed as soon as it reaches one.
+        const auto *pos = reinterpret_cast<const WINDOWPOS *>(lParam);
+        if (pos && (pos->flags & (SWP_NOMOVE | SWP_NOSIZE)) != (SWP_NOMOVE | SWP_NOSIZE))
+        {
+            ClipWindowToVisibleScreens(hwnd, ScreenArea::WorkArea);
+        }
+        return DefWindowProc(hwnd, message, wParam, lParam);
+    }
+
     case WM_DPICHANGED: {
         const FLOAT scale = HIWORD(wParam) / 96.0f;
+        // Apply Windows' recommended placement, also mid-drag: it keeps the
+        // toolbar under the cursor so the DPI does not flip back and forth.
+        const RECT *suggested = reinterpret_cast<const RECT *>(lParam);
         if (FloatingToolbarPresenter::Instance().IsBound())
         {
-            FloatingToolbarPresenter::Instance().RelayoutHost(scale);
+            FloatingToolbarPresenter::Instance().RelayoutHost(scale, suggested);
             ScheduleFloatingToolbarDpiRemeasure(hwnd);
             return 0;
         }
@@ -741,7 +760,7 @@ LRESULT CALLBACK WndProcFtbWindow(HWND hwnd, UINT message, WPARAM wParam, LPARAM
         // fractional undersize cannot leave Chromium scrollbars over 中/简.
         ::FTB_CONTENT_WIDTH_DIP = 0.0;
         ::FTB_CONTENT_HEIGHT_DIP = 0.0;
-        LayoutFloatingToolbar(hwnd, false, scale > 0.0f ? scale : 0.0f);
+        LayoutFloatingToolbar(hwnd, false, scale > 0.0f ? scale : 0.0f, suggested);
         ScheduleFloatingToolbarDpiRemeasure(hwnd);
         return 0;
     }
@@ -789,18 +808,7 @@ LRESULT CALLBACK WndProcFtbWindow(HWND hwnd, UINT message, WPARAM wParam, LPARAM
         if (wParam == TIMER_ID_FTB_DPI_REMEASURE)
         {
             KillTimer(hwnd, TIMER_ID_FTB_DPI_REMEASURE);
-            if (FloatingToolbarPresenter::Instance().IsBound())
-            {
-                FloatingToolbarPresenter::Instance().RelayoutHost();
-            }
-            else if (::webviewFtbWnd)
-            {
-                ApplyConfiguredFloatingToolbarSize();
-            }
-            else
-            {
-                SetTimer(hwnd, TIMER_ID_FTB_DPI_REMEASURE, 100, nullptr);
-            }
+            RemeasureFloatingToolbarAfterDpiChange(hwnd);
             break;
         }
         break;

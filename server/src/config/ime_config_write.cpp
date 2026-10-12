@@ -57,9 +57,10 @@ bool WriteConfiguredValues(const std::vector<ConfigValueUpdate> &updates)
     std::string text = ReadFileText(g_config_path);
     if (!TomlTextIsParseable(text))
     {
-        if (config_exists && config_size > 0 && text.empty())
+        if (config_exists && config_size > 0)
         {
-            TraceConfigWrite("read-failed", updates, GetLastError());
+            // Startup salvage archives damaged files. A setting write cannot silently replace user data.
+            TraceConfigWrite("existing-config-invalid", updates, GetLastError());
             return false;
         }
         text = ReadFileText(g_config_path.parent_path() / kConfigTemplateFileName);
@@ -72,8 +73,14 @@ bool WriteConfiguredValues(const std::vector<ConfigValueUpdate> &updates)
 
     for (const auto &update : updates)
     {
-        if (!ReplaceTomlValuePreservingFormatting(text, update.section, update.key, update.value) &&
-            !InsertTomlValuePreservingFormatting(text, update.section, update.key, update.value))
+        const auto protected_value = ProtectCredentialLiteral(update.key, update.value);
+        if (!protected_value)
+        {
+            TraceConfigWrite("credential-protection-failed", updates);
+            return false;
+        }
+        if (!ReplaceTomlValuePreservingFormatting(text, update.section, update.key, *protected_value) &&
+            !InsertTomlValuePreservingFormatting(text, update.section, update.key, *protected_value))
         {
             TraceConfigWrite("replace-failed", updates);
             return false;

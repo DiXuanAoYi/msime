@@ -116,6 +116,8 @@ class CCompositionProcessorEngine
 
     // Toggle IME Mode
     void ToggleIMEMode(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId);
+    void SyncPunctuationWithCapsLock(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId, bool capsLockEnabled);
+    HRESULT SetIMEModeForLanguageCycle(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId, BOOL bOpen);
     void SetIMEMode(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId, BOOL bOpen);
     BOOL CCompositionProcessorEngine::GetIMEMode(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId);
     // Apply CN/EN compartment change deferred until after composition commit.
@@ -321,6 +323,8 @@ class CCompositionProcessorEngine
     BOOL _defendConfiguredImeMode;
     BOOL _hasPendingImeModeAfterCompositionCommit;
     BOOL _pendingImeModeAfterCompositionCommit;
+    bool _capsLockPunctuationKnown = false;
+    bool _capsLockPunctuationApplied = false;
 
     // Configuration data.
     // Not bit-fields: BOOL is a signed int, so a one-bit field holds only -1 and 0 and every

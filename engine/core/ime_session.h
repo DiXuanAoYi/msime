@@ -47,6 +47,7 @@ class ImeSession
     {
         sentence_association_ = options;
     }
+    void set_enabled_domain_dictionaries(const std::string &csv);
     // 本会话最近上屏的文本，随查询下发给神经重排当前文。
     void set_rescoring_context(std::string context)
     {
@@ -133,6 +134,7 @@ class ImeSession
     unsigned quanpin_autocorrect_types_ = 0;
     metasequoia::FuzzyPinyinOptions fuzzy_pinyin_;
     SentenceAssociationOptions sentence_association_;
+    std::string enabled_domain_dictionaries_;
     std::string rescoring_context_;
     metasequoia::WubiInputOptions wubi_options_;
     // Resolved when the scheme changes rather than on every keystroke.

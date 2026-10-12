@@ -11,6 +11,7 @@
 #include "session/input_session.h"
 #include "english/english_ime.h"
 #include "mixed/mixed_candidates.h"
+#include "ai/ai_task.h"
 
 inline std::condition_variable pipe_queueCv;
 inline std::atomic_bool pipe_running = true;
@@ -50,12 +51,13 @@ void ClearState();
 void RegisterStatusSnapshotWindow(HWND toolbar_window);
 void EnqueueCloudCandidate(const std::string &candidate, const std::string &pinyin, uint64_t generation);
 void EnqueueAiCandidate(const std::string &candidate, const std::string &identity, uint64_t generation);
+void EnqueueAiTaskResult(const AiAssistant::Result &result);
 // 神经整句重排的后台线程算完一批后调这个；见 event_listener_async_candidates.cpp 的 ApplyRescoredOrder。
 void EnqueueRescoredCandidates();
 void CancelCloudCandidateRequest();
 void EnqueueEnglishCandidates(std::vector<WordItem> candidates, const std::string &input, uint64_t generation);
 void EnqueueCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation,
-                                  bool merge = false);
+                                  bool merge = false, const std::string &cloud_scope = {});
 void EnqueueMixedCandidates(MixedCandidates::Result result, const std::string &input, uint64_t generation);
 void EnqueueCandidateUiAction(CandidateUiAction action, int one_based_index, int fixed_position = 0);
 // Paging carries a step count rather than a candidate index. Steps coalesce
@@ -69,6 +71,9 @@ void EnqueueApplyCandidatePageSizeTask();
 void EnqueueRefreshCandidatePageTask();
 void EnqueueResetInputSessionCacheTask();
 void EnqueueExitEnglishInputModeTask();
+void EnqueueRuntimeSettingsRefresh();
+void EnqueueToolbarLanguageToggleTask(bool from_ime_enabled);
+void SendRuntimeSettingsSnapshot(uint64_t client, uint64_t epoch = 0);
 // Finishes the learning writes still queued (frequency adjustments, entered English words) and
 // stops their thread. Call after the worker thread has been joined, so nothing posts new writes.
 void ShutdownDictionaryWriter();

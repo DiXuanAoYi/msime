@@ -153,12 +153,10 @@ jobs:
     name: Build TSF ${{ matrix.name }}
     needs: [prepare, dependencies]
     if: ${{ needs.prepare.outputs.should_publish == 'true' }}
-    runs-on: [self-hosted, Windows, X64, msime-windows]
+    # SignPath provenance is built on GitHub-hosted Windows. Other signing modes keep the existing private runners.
+    runs-on: ${{ vars.WINDOWS_SIGNING_PROVIDER == 'signpath' && 'windows-2025' || fromJSON('["self-hosted","Windows","X64","msime-windows"]') }}
     env:
-      # Each self-hosted runner has a different default vcpkg installation.
-      # Keep every matrix job aligned with the registry selected below even
-      # when GitHub schedules x64 and Win32 on different runner instances.
-      VCPKG_ROOT: ${{ matrix.vcpkg_root }}
+      SCCACHE_GHA_ENABLED: "true"
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -166,11 +164,13 @@ jobs:
         include:
           - name: x64
             architecture: x64
+            msvc_arch: x64
             triplet: x64-windows-static
             build_dir: windows/build64-release
             vcpkg_root: E:\msime-runner\vcpkg-1
           - name: Win32
             architecture: Win32
+            msvc_arch: amd64_x86
             triplet: x86-windows-static
             build_dir: windows/build32-release
             vcpkg_root: E:\msime-runner\vcpkg-2
@@ -181,6 +181,17 @@ jobs:
           ref: ${{ needs.prepare.outputs.target_sha }}
           submodules: recursive
           persist-credentials: false
+
+      - name: Select the installed runner registry
+        shell: pwsh
+        run: ./scripts/ci/select-vcpkg.ps1 -SelfHostedRoot '${{ matrix.vcpkg_root }}'
+      - name: Set up installed MSVC
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: ${{ matrix.msvc_arch }}
+      - name: Set up optional compiler cache
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
       # Some runner instances leave _work owned by SYSTEM while the job itself
       # runs as `runner`. checkout still succeeds, so the first plain git call
@@ -221,17 +232,18 @@ jobs:
       - name: Verify the selected vcpkg root
         shell: pwsh
         run: |
-          $expected = '${{ matrix.vcpkg_root }}'
-          if ($env:VCPKG_ROOT -ne $expected) {
-            throw "VCPKG_ROOT is '$env:VCPKG_ROOT'; expected '$expected' for ${{ matrix.name }} on runner '$env:RUNNER_NAME'"
+          if ($env:VCPKG_ROOT -ne $env:VCPKG_INSTALLATION_ROOT) {
+            throw 'The dependency installer and CMake selected different vcpkg registries.'
           }
 
       - name: Configure
         shell: pwsh
-        run: >
-          cmake -S windows -B ${{ matrix.build_dir }} -A ${{ matrix.architecture }}
-          -DCMAKE_TOOLCHAIN_FILE="${{ matrix.vcpkg_root }}/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+        run: |
+          . ./scripts/ci/compiler-cache.ps1
+          $cache = @(Get-MsimeCompilerCacheArguments -BuildDirectory '${{ matrix.build_dir }}' -Enable)
+          cmake -S windows -B ${{ matrix.build_dir }} -G "Ninja Multi-Config" `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} @cache
 
       - name: Build
         shell: pwsh
@@ -257,9 +269,9 @@ jobs:
     name: Build Server
     needs: [prepare, dependencies]
     if: ${{ needs.prepare.outputs.should_publish == 'true' }}
-    runs-on: [self-hosted, Windows, X64, msime-windows]
+    runs-on: ${{ vars.WINDOWS_SIGNING_PROVIDER == 'signpath' && 'windows-2025' || fromJSON('["self-hosted","Windows","X64","msime-windows"]') }}
     env:
-      VCPKG_INSTALLATION_ROOT: E:\\msime-runner\\vcpkg-3
+      SCCACHE_GHA_ENABLED: "true"
     timeout-minutes: 90
     steps:
       - name: Check out release commit
@@ -268,6 +280,19 @@ jobs:
           ref: ${{ needs.prepare.outputs.target_sha }}
           submodules: recursive
           persist-credentials: false
+
+      - name: Select the installed runner registry
+        shell: pwsh
+        run: ./scripts/ci/select-vcpkg.ps1 -SelfHostedRoot 'E:\msime-runner\vcpkg-3'
+      - name: Set up installed MSVC
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Set up Python for the local runtime build
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Set up optional compiler cache
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
 
       # Some runner instances leave _work owned by SYSTEM while the job itself
       # runs as `runner`. checkout still succeeds, so the first plain git call
@@ -297,10 +322,12 @@ jobs:
       # The package job stages these outputs into the installer's expected directory.
       - name: Configure
         shell: pwsh
-        run: >
-          cmake -S server -B server/build-release -A x64
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-windows
+        run: |
+          . ./scripts/ci/compiler-cache.ps1
+          $cache = @(Get-MsimeCompilerCacheArguments -BuildDirectory server/build-release -Enable)
+          cmake -S server -B server/build-release -G "Ninja Multi-Config" `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows @cache
 
       - name: Build
         shell: pwsh
@@ -310,13 +337,17 @@ jobs:
         shell: pwsh
         run: ./scripts/ci/check-server-binaries.ps1 -BuildDir server/build-release/bin/Release
 
-      - name: Build the Voxtral native CPU adapter (no model weights)
+      - name: Prepare the pinned Vulkan developer dependencies (no model weights or driver install)
         shell: pwsh
-        run: ./scripts/local_asr/Build-Voxtral.ps1 -SourceDirectory "$env:RUNNER_TEMP/audio-cpp" -BuildDirectory "$env:RUNNER_TEMP/audio-cpp-build"
+        run: ./scripts/local_asr/Ensure-VulkanDependencies.ps1 -CacheDirectory "$env:RUNNER_TEMP/vulkan-sdk" -GithubEnvironmentFile $env:GITHUB_ENV
+
+      - name: Build the Voxtral native Vulkan adapter (no model weights)
+        shell: pwsh
+        run: ./scripts/local_asr/Build-Voxtral.ps1 -SourceDirectory "$env:RUNNER_TEMP/audio-cpp" -BuildDirectory "$env:RUNNER_TEMP/audio-cpp-build" -Backend vulkan -VulkanSdkRoot "$env:VULKAN_SDK" -VulkanLoader "$env:MSIME_VULKAN_LOADER"
 
       - name: Build the local speech CPU runtime (models download separately)
         shell: pwsh
-        run: ./scripts/local_asr/Build-Runtime.ps1 -WorkDirectory "$env:RUNNER_TEMP/local-asr-build"
+        run: ./scripts/local_asr/Build-Runtime.ps1 -WorkDirectory "$env:RUNNER_TEMP/local-asr-build" -VulkanLoader "$env:MSIME_VULKAN_LOADER"
 
       - name: Test Server with the release's exact dictionaries
         shell: pwsh
@@ -395,7 +426,7 @@ jobs:
     # that spends a signature, so the condition that stops it belongs here rather than being a
     # consequence of four other jobs' conditions that a later edit could quietly undo.
     if: ${{ needs.prepare.outputs.should_publish == 'true' }}
-    runs-on: [self-hosted, Windows, X64, msime-windows]
+    runs-on: ${{ vars.WINDOWS_SIGNING_PROVIDER == 'signpath' && 'windows-2025' || fromJSON('["self-hosted","Windows","X64","msime-windows"]') }}
     # A SignPath signing request waits for an approver, twice per release, so that path gets room for both approvals on top of the build.
     timeout-minutes: ${{ vars.WINDOWS_SIGNING_PROVIDER == 'signpath' && 150 || 60 }}
     permissions:
@@ -421,6 +452,13 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.target_sha }}
           persist-credentials: false
+
+      - name: Set up installed MSVC for the language-model converter
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Set up Python for the dictionary and manifest tools
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
 
       # Some runner instances leave _work owned by SYSTEM while the job itself
       # runs as `runner`. checkout still succeeds, so the first plain git call
@@ -487,12 +525,10 @@ jobs:
         shell: pwsh
         run: ./scripts/build-language-model.ps1
 
-      # The neural sentence models are downloaded from the chinese-ime-lm release pinned in
-      # neural-model/lock.json and checked against the SHA256 recorded there. Prepare-PackageFiles.ps1
-      # asserts they exist, so this has to run before the payload is collected.
-      - name: Download the neural sentence models
+      # Only the bundled speed model is fetched. Desktop/QJM/speech/OCR model weights remain user-initiated.
+      - name: Prepare the pinned keyboard sentence model
         shell: pwsh
-        run: ./scripts/fetch-neural-model.ps1
+        run: ./scripts/fetch-neural-model.ps1 -Profile keyboard
 
       - name: Decide the signing mode
         id: signing
@@ -700,6 +736,7 @@ jobs:
       #
       # No event condition: the enclosing job already only runs when a release is being published, and gating this on workflow_dispatch limited the notification to the repair path -- the one branch of this workflow that almost never runs. Every release from the normal push path published in silence, MSIME-Web received no dispatch at all, and the site waited for a cron that GitHub delivers roughly seven times a day rather than the forty-eight the schedule asks for. 0.8.0 reached msime.app a day late that way.
       - name: Refresh the download manifest on msime.app
+        if: ${{ github.repository == 'metasequoiaime/msime-windows' }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}

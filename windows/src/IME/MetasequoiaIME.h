@@ -5,6 +5,7 @@
 #include "Ipc.h"
 #include "DeferredKeyFailurePolicy.h"
 #include "../Composition/NativeCommitUndo.h"
+#include "../../../engine/contracts/field_privacy.h"
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -51,6 +52,8 @@ const DWORD WM_CommitVoiceComposition = WM_USER + 25;
 const DWORD WM_CancelVoiceComposition = WM_USER + 26;
 const DWORD WM_ApplyPunctuationLock = WM_USER + 27;
 const DWORD WM_CommitCandidateAndContinue = WM_USER + 28;
+const DWORD WM_ApplyRuntimeSettings = WM_USER + 29;
+const DWORD WM_AsyncCycleInputMode = WM_USER + 30;
 constexpr ULONG_PTR SMART_PUNCTUATION_SENDINPUT_EXTRA_INFO = 0x4D535050u;
 constexpr ULONG_PTR PAIRED_PUNCTUATION_SENDINPUT_EXTRA_INFO = 0x4D535051u;
 // Synthetic input that this tip generates carries a marker meaning "this tip
@@ -253,7 +256,8 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
 
     // functions for the composition object.
     void _SetComposition(_In_ ITfComposition *pComposition);
-    void _TerminateComposition(TfEditCookie ec, _In_ ITfContext *pContext, BOOL isCalledFromDeactivate = FALSE);
+    void _TerminateComposition(TfEditCookie ec, _In_ ITfContext *pContext, BOOL isCalledFromDeactivate = FALSE,
+                               _Out_opt_ HRESULT *endStatus = nullptr);
     void _SaveCompositionContext(_In_ ITfContext *pContext);
     // Reads the committed text of a terminating composition and queues one
     // statistics event for it. Safe to call from both composition exits; only
@@ -262,12 +266,16 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
 
     // key event handlers for composition/candidate/phrase common objects.
     HRESULT _HandleComplete(TfEditCookie ec, _In_ ITfContext *pContext);
-    HRESULT _HandleCompleteCommitFirst(TfEditCookie ec, _In_ ITfContext *pContext);
+    HRESULT _HandleCompleteCommitFirst(TfEditCookie ec, _In_ ITfContext *pContext, bool requireSuccessfulEnd = false);
     HRESULT _HandleCancel(TfEditCookie ec, _In_ ITfContext *pContext);
     HRESULT _HandleEscapeCancel(TfEditCookie ec, _In_ ITfContext *pContext, uint64_t requestId);
     HRESULT _HandleToogleIMEMode(TfEditCookie ec, _In_ ITfContext *pContext);
     void _ClearCreatingWordState();
     HRESULT _HandleInsertText(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &text);
+    HRESULT _HandleCycleInputMode(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &payload);
+    bool _IsTrilingualCycleEnabled() const;
+    bool _IsAiTaskShortcut(UINT code, UINT modifiers, bool composition) const;
+    void _ApplyVimModeEscape(WPARAM key, LPARAM flags, bool eaten);
     HRESULT _HandleCommitCandidateAndContinue(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &payload);
     HRESULT _HandleUpdateVoiceComposition(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &text);
     HRESULT _HandleCommitVoiceComposition(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &text);
@@ -451,6 +459,7 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     bool _IsUndoCommitKey(ITfContext *context, WPARAM key);
     void _RequestUndoCommit(ITfContext *context);
     HRESULT _UndoLastCommit(TfEditCookie ec, ITfContext *context, uint64_t token, uint64_t serial);
+    void _RefreshInputFieldPrivacy(ITfContext *context);
 
   private:
     ITfRange *_undoRange = nullptr;
@@ -459,6 +468,13 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     uint64_t _undoFocus = 0;
     uint64_t _undoSerial = 0;
     bool _undoKeyHeld = false;
+    FanyImeFieldPrivacy::State _fieldPrivacy = FanyImeFieldPrivacy::State::Unknown;
+    ITfContext *_fieldPrivacyContext = nullptr; // identity only; never dereferenced
+    uint64_t _fieldPrivacyFocusGeneration = UINT64_MAX;
+    bool _fieldPrivacyAnnounced = false;
+    std::atomic<uint64_t> _runtimeSettingsRevision{0};
+    std::atomic<UINT> _runtimeSettingsPipeGeneration{0};
+    std::atomic<uint32_t> _runtimeSettingsFlags{1};
     // functions for the composition object.
     HRESULT _HandleCompositionInputWorker(_In_ CCompositionProcessorEngine *pCompositionProcessorEngine,
                                           TfEditCookie ec, _In_ ITfContext *pContext, uint64_t requestId);
@@ -870,6 +886,7 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     uint64_t _nextDeferredKeyReplayToken;
     bool _deferredKeyProjectionValid;
     bool _deferredProjectedImeOpen;
+    bool _deferredProjectedJapaneseMode = false;
     bool _deferredProjectedPunctuationOpen;
     bool _deferredProjectedDoubleSingleByteOpen;
     size_t _deferredProjectedInputLength;

@@ -244,6 +244,24 @@ TEST_CASE(horizontal_candidate_translation_uses_a_second_line)
     REQUIRE_NEAR(list.MeasureInLayout({1000.0f, 1000.0f}).height, plain.height);
 }
 
+TEST_CASE(candidate_fit_content_releases_minimum_but_keeps_pinyin_and_translation_width)
+{
+    CandidateList list(28.0f);
+    CandidateList::Appearance normal;
+    list.SetAppearance(normal);
+    list.SetItems({{L"1", L"你", L"", L"", {}, L"nǐ"}});
+    const auto oldWidth = list.MeasureInLayout({1000.0f, 1000.0f}).width;
+    auto compact = normal;
+    compact.fitContent = true;
+    list.SetAppearance(compact);
+    const auto shortWidth = list.MeasureInLayout({1000.0f, 1000.0f}).width;
+    REQUIRE(shortWidth < oldWidth);
+    list.SetItems({{L"1", L"你", L"", L"n. a long translation that must remain visible", {}, L"nǐ"}});
+    REQUIRE(list.MeasureInLayout({1000.0f, 1000.0f}).width > shortWidth);
+    list.SetItems({{L"1", L"你", L"", L"", {}, L"a long tonal pinyin overline"}});
+    REQUIRE(list.MeasureInLayout({1000.0f, 1000.0f}).width > shortWidth);
+}
+
 TEST_CASE(horizontal_candidate_translation_keeps_the_row_bottom_padding_below_it)
 {
     // 行高里的底部内边距挪到翻译下面，而不是夹在候选与翻译之间；挪动不应让整行变高。

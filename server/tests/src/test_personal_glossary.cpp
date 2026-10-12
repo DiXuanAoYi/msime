@@ -52,3 +52,24 @@ TEST_CASE(personal_glossary_preserves_unicode_and_punctuation)
     REQUIRE_EQ(glossary.Lookup("fr", "咖啡"), std::string("café"));
     REQUIRE_EQ(glossary.Lookup("ko", "你好"), std::string("안녕하세요"));
 }
+TEST_CASE(personal_glossary_new_candidate_languages_preserve_user_override)
+{
+    PersonalGlossary glossary;
+    REQUIRE(glossary.Parse("th\t你好\tสวัสดี\nit\t你好\tciao\nvi\t你好\txin chào"));
+    REQUIRE_EQ(glossary.Lookup("th", "你好"), std::string("สวัสดี"));
+    REQUIRE_EQ(glossary.Lookup("it", "你好"), std::string("ciao"));
+    REQUIRE_EQ(glossary.Lookup("vi", "你好"), std::string("xin chào"));
+    REQUIRE(glossary.Lookup("en", "你好").empty());
+}
+TEST_CASE(personal_glossary_full_senses_survive_compatible_multilingual_export)
+{
+    PersonalGlossary glossary;
+    const std::string exported = "en\t你好\thello\thi; how do you do; welcome; greetings; salutations; good day";
+    REQUIRE(glossary.Parse(exported));
+    REQUIRE_EQ(glossary.Source(), exported);
+    REQUIRE_EQ(glossary.Lookup("en", "你好"),
+               std::string("hello; hi; how do you do; welcome; greetings; salutations; good day"));
+    PersonalGlossary reimported;
+    REQUIRE(reimported.Parse(glossary.Source()));
+    REQUIRE_EQ(reimported.Lookup("en", "你好"), glossary.Lookup("en", "你好"));
+}

@@ -109,3 +109,23 @@ TEST_CASE(voice_cloud_asr_parses_business_errors_even_on_http_success)
     }
     REQUIRE(rejected);
 }
+
+TEST_CASE(voice_polish_thinking_levels_keep_the_user_prompt_and_raise_only_deepseek_budget)
+{
+    VoiceInputConfig config;
+    config.polish_provider = "deepseek";
+    config.polish_prompt = "保留原用户模板";
+    for (const std::string mode : {"low", "high", "max"})
+    {
+        config.polish_thinking = mode;
+        auto body = nlohmann::json::parse(VoiceInput::BuildBatchPolish("自有测试文本", config));
+        REQUIRE(body["thinking"]["type"] == "enabled");
+        REQUIRE(body["reasoning_effort"] == mode);
+        REQUIRE(body["max_tokens"] == 8192);
+        REQUIRE(body["messages"][0]["content"] == config.polish_prompt);
+    }
+    config.polish_provider = "openai";
+    auto body = nlohmann::json::parse(VoiceInput::BuildBatchPolish("测试", config));
+    REQUIRE(!body.contains("thinking"));
+    REQUIRE(!body.contains("reasoning_effort"));
+}

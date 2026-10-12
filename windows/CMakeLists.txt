@@ -26,6 +26,13 @@ if(BUILD_TESTING)
     add_executable(test_windows_ipc_contract
         ../engine/contracts/tests/windows_ipc_contract.cpp)
     target_compile_features(test_windows_ipc_contract PRIVATE cxx_std_17)
+    # The top-level contract target does not inherit tests/'s directory options.
+    # Its runtime ABI/negotiation assertions must execute in Release as well.
+    if(MSVC)
+        target_compile_options(test_windows_ipc_contract PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(test_windows_ipc_contract PRIVATE -UNDEBUG)
+    endif()
     add_test(NAME windows_ipc_contract COMMAND test_windows_ipc_contract)
     add_subdirectory(tests)
 endif()
@@ -149,6 +156,7 @@ add_library(${PROJECT_NAME} SHARED
     # Key
     "./src/Key/DeferredKeyFailurePolicy.h"
     "./src/Key/KeyEventSink.cpp"
+    "./src/Key/InputFieldPrivacy.cpp"
     "./src/Key/KeyEventSink_DeferredKeys.cpp"
     "./src/Key/KeyEventSink_Hotkeys.cpp"
     "./src/Key/KeyEventSinkInternal.h"

@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.9.17"
+#define MyAppVersion   "0.10.2"
 #define MyAppPublisher "Metasequoia"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
@@ -92,6 +92,9 @@ Name: "{commonappdata}\metasequoiaime\webview2"; Permissions: users-modify
 Name: "{commonappdata}\metasequoiaime\webview2-settings"; Permissions: users-modify
 
 [Files]
+; Profile icon lives outside version directories, so upgrades never invalidate its path.
+Source: "{#MySourceRoot}\MetasequoiaImeTip.ico"; DestDir: "{commonpf64}\metasequoiaime"; Flags: ignoreversion
+Source: "{#MySourceRoot}\MetasequoiaImeTip.ico"; DestDir: "{commonpf32}\metasequoiaime"; Flags: ignoreversion
 ; 独立安装应用图标，供 Windows“已安装的应用”列表稳定显示。
 Source: "{#MySourceRoot}\MetasequoiaIME.ico"; \
     DestDir: "{commonpf64}\metasequoiaime"; Flags: ignoreversion
@@ -152,7 +155,7 @@ Source: "{#MySourceRoot}\app_data\html\*"; \
 #else
 ; 包内故意不带 config.toml。通配复制再排除一次，防止以后又把用户配置打进包内。
 Source: "{#MySourceRoot}\app_data\*"; DestDir: "{code:GetDataDir}"; \
-    Excludes: "\config.toml,\config.base.toml,\config.default.toml"; \
+    Excludes: "\config.toml,\config.base.toml,\config.default.toml,\sentence-model.safetensors"; \
     Flags: ignoreversion recursesubdirs createallsubdirs uninsneveruninstall
 
 ; 用户配置只在首次安装时从出厂模板生成。升级时绝不覆盖已有 config.toml；
@@ -163,6 +166,8 @@ Source: "{#MySourceRoot}\app_data\config.default.toml"; \
 Source: "{#MySourceRoot}\app_data\config.default.toml"; \
     DestDir: "{code:GetDataDir}"; DestName: "config.default.toml"; \
     Flags: ignoreversion uninsneveruninstall
+Source: "{#MySourceRoot}\app_data\sentence-model.safetensors"; DestDir: "{code:GetDataDir}"; \
+    Flags: onlyifdoesntexist uninsneveruninstall
 #endif
 
 [Icons]
@@ -204,10 +209,10 @@ const
   { 安装器界面本身就是中文（InitializeSetup 在选语言对话框之前跑，拿不到用户选的语言），
     下载页也统一给简体中文版，省得用户落到英文页上再自己切。}
   WebView2DownloadUrl =
-    'https://developer.microsoft.com/zh-cn/microsoft-edge/webview2';
+    'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
   VCRuntimeKey = 'Software\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
   VCRuntimeDownloadUrl =
-    'https://learn.microsoft.com/zh-cn/cpp/windows/latest-supported-vc-redist?view=msvc-170';
+    'https://aka.ms/vs/17/release/vc_redist.x64.exe';
 
 var
   VersionDirName: String;
@@ -249,7 +254,7 @@ end;
 // {sysnative} 对 64 位安装器又不可用。注册表访问没有这个问题，HKLM32 / HKLM64
 // 两个视图都是显式指定的。
 //
-// x64 redist 的安装状态就记在这个键里。要求 14.20 以上（VC++ 2019 起）：server_exe
+// x64 redist 的安装状态就记在这个键里。要求 14.40 以上（本版编译工具最低匹配版本）：server_exe
 // 里每个 exe 都导入了 vcruntime140_1.dll，而它是从那一版才开始随 redist 分发的，
 // 只装了 2015/2017 版的机器同样有 Installed=1，却照样起不来。
 // 32 位 TSF DLL 用的是静态 CRT（windows/CMakeLists.txt 里的
@@ -267,7 +272,7 @@ begin
     (Installed = 1) and
     RegQueryDWordValue(RootKey, VCRuntimeKey, 'Major', Major) and
     RegQueryDWordValue(RootKey, VCRuntimeKey, 'Minor', Minor) and
-    ((Major > 14) or ((Major = 14) and (Minor >= 20)));
+    ((Major > 14) or ((Major = 14) and (Minor >= 40)));
 end;
 
 { redist 的安装包是 32 位的，键通常落在 WOW6432Node 下，但较新的版本两个视图都写，
@@ -858,6 +863,8 @@ begin
     IsUserShuangpinDirectory(FileName) or
     IsCollocationModelDirectory(FileName) or
     (CompareText(FileName, 'voice-outbox') = 0) or
+    (CompareText(FileName, 'sentence-model-desktop.safetensors') = 0) or
+    (CompareText(FileName, 'sentence-model.safetensors') = 0) or
     (CompareText(FileName, DataDirMarkerName) = 0);
 end;
 
@@ -877,11 +884,11 @@ begin
     (CompareText(FileName, 'industry-learning.db') = 0) or
     (CompareText(FileName, 'translation-library') = 0) or
     (CompareText(FileName, 'qingjian-glossary-sources') = 0) or
+    (CompareText(FileName, 'domain-input.db') = 0) or
+    (CompareText(FileName, 'domain-input-sources') = 0) or
     (CompareText(FileName, 'others.db') = 0) or
     (CompareText(FileName, 'sc.lm') = 0) or
     (CompareText(FileName, 'libime-lm-NOTICE.md') = 0) or
-    (CompareText(FileName, 'sentence-model-desktop.safetensors') = 0) or
-    (CompareText(FileName, 'sentence-model.safetensors') = 0) or
     (CompareText(FileName, 'chinese-ime-lm-NOTICE.md') = 0) or
     (CompareText(FileName, 'config.default.toml') = 0) or
     (CompareText(FileName, 'helpcodes') = 0) or
@@ -1407,7 +1414,7 @@ begin
     'msime_user.db msime_user.db-wal msime_user.db-shm msime_user.db-journal ' +
     'user_dict.dat clipboard_history.json personal-library.json reply-contexts.dat chat-records.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
     'stats.db stats.db-wal stats.db-shm stats.db-journal ' +
-    'config.toml config.base.toml /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
+    'config.toml config.base.toml sentence-model.safetensors sentence-model-desktop.safetensors /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
     '',
     SW_HIDE,
     ewWaitUntilTerminated,

@@ -3,6 +3,7 @@
 #include "defines/globals.h"
 #include "ipc/ipc.h"
 #include "webview_utils.h"
+#include "window/toolbar_placement_policy.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -77,6 +78,189 @@ FLOAT ScaleFromMonitor(HMONITOR hMonitor)
     return static_cast<FLOAT>(dpiX) / static_cast<FLOAT>(USER_DEFAULT_SCREEN_DPI);
 }
 } // namespace
+
+namespace
+{
+const RECT &ScreenAreaRect(const MONITORINFO &info, ScreenArea area)
+{
+    return area == ScreenArea::WorkArea ? info.rcWork : info.rcMonitor;
+}
+
+struct VisibleRegionBuilder
+{
+    HRGN region = nullptr;
+    ScreenArea area = ScreenArea::WorkArea;
+};
+
+BOOL CALLBACK AddMonitorAreaToRegion(HMONITOR monitor, HDC, LPRECT, LPARAM data)
+{
+    auto *builder = reinterpret_cast<VisibleRegionBuilder *>(data);
+    MONITORINFO info{sizeof(info)};
+    if (!GetMonitorInfo(monitor, &info))
+    {
+        return TRUE;
+    }
+
+    HRGN areaRegion = CreateRectRgnIndirect(&ScreenAreaRect(info, builder->area));
+    if (areaRegion)
+    {
+        CombineRgn(builder->region, builder->region, areaRegion, RGN_OR);
+        DeleteObject(areaRegion);
+    }
+    return TRUE;
+}
+
+bool IsRectInsideVisibleScreens(const RECT &rect, ScreenArea area)
+{
+    HRGN visibleRegion = CreateRectRgn(0, 0, 0, 0);
+    HRGN windowRegion = CreateRectRgnIndirect(&rect);
+    HRGN outsideRegion = CreateRectRgn(0, 0, 0, 0);
+    bool inside = true;
+    if (visibleRegion && windowRegion && outsideRegion)
+    {
+        VisibleRegionBuilder builder{visibleRegion, area};
+        EnumDisplayMonitors(nullptr, nullptr, AddMonitorAreaToRegion, reinterpret_cast<LPARAM>(&builder));
+        inside = CombineRgn(outsideRegion, windowRegion, visibleRegion, RGN_DIFF) == NULLREGION;
+    }
+    if (visibleRegion)
+        DeleteObject(visibleRegion);
+    if (windowRegion)
+        DeleteObject(windowRegion);
+    if (outsideRegion)
+        DeleteObject(outsideRegion);
+    return inside;
+}
+} // namespace
+
+bool KeepRectOnVisibleScreens(RECT &rect, ScreenArea area, HMONITOR *monitor, const RECT &offscreenInsets)
+{
+    const RECT content = toolbar_placement::VisibleContent(rect, offscreenInsets);
+    if (IsRectInsideVisibleScreens(content, area))
+    {
+        return false;
+    }
+
+    // Nearest monitor of the rect's center instead of MonitorFromRect: a host
+    // straddling a seam must keep the side the user dropped it on, and a host
+    // beyond every screen must come back towards where it was pushed.
+    const POINT center = toolbar_placement::Center(content);
+    const HMONITOR target = MonitorFromPoint(center, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{sizeof(info)};
+    if (!target || !GetMonitorInfo(target, &info))
+    {
+        return false;
+    }
+    if (monitor)
+    {
+        *monitor = target;
+    }
+
+    const RECT &bounds = ScreenAreaRect(info, area);
+    const RECT fitted = toolbar_placement::FitVisibleContent(rect, bounds, offscreenInsets);
+    if (EqualRect(&rect, &fitted))
+    {
+        return false;
+    }
+    rect = fitted;
+    return true;
+}
+
+void ClipWindowToVisibleScreens(HWND hwnd, ScreenArea area)
+{
+    RECT rect{};
+    if (!hwnd || !GetWindowRect(hwnd, &rect))
+    {
+        return;
+    }
+    HRGN visible = CreateRectRgn(0, 0, 0, 0);
+    HRGN clipped = CreateRectRgnIndirect(&rect);
+    HRGN whole = CreateRectRgnIndirect(&rect);
+    HRGN current = CreateRectRgn(0, 0, 0, 0);
+    if (visible && clipped && whole && current)
+    {
+        VisibleRegionBuilder builder{visible, area};
+        EnumDisplayMonitors(nullptr, nullptr, AddMonitorAreaToRegion, reinterpret_cast<LPARAM>(&builder));
+        const int kind = CombineRgn(clipped, clipped, visible, RGN_AND);
+        const bool hasRegion = GetWindowRgn(hwnd, current) != ERROR;
+        // Nothing visible means the host is mid-drag between screens; the
+        // clamp at the end of the drag brings it back, so leave it alone.
+        if (kind == NULLREGION || kind == ERROR || EqualRgn(clipped, whole))
+        {
+            if (hasRegion && kind != NULLREGION)
+            {
+                SetWindowRgn(hwnd, nullptr, TRUE);
+            }
+        }
+        else
+        {
+            OffsetRgn(clipped, -rect.left, -rect.top);
+            // SetWindowRgn repaints, and it runs on every move during a drag.
+            if (!hasRegion || !EqualRgn(current, clipped))
+            {
+                // The system owns the region once it is set.
+                if (SetWindowRgn(hwnd, clipped, TRUE))
+                {
+                    clipped = nullptr;
+                }
+            }
+        }
+    }
+    for (HRGN region : {visible, clipped, whole, current})
+    {
+        if (region)
+        {
+            DeleteObject(region);
+        }
+    }
+}
+
+bool IsWindowInMoveSizeLoop(HWND hwnd)
+{
+    // Ask USER32 instead of mirroring WM_ENTERSIZEMOVE/WM_EXITSIZEMOVE in a
+    // flag: a mirrored flag stays set forever if the HWND is torn down while
+    // the loop runs and never sees WM_EXITSIZEMOVE.
+    const DWORD thread = hwnd ? GetWindowThreadProcessId(hwnd, nullptr) : 0;
+    GUITHREADINFO info{sizeof(info)};
+    return thread != 0 && GetGUIThreadInfo(thread, &info) && (info.flags & GUI_INMOVESIZE) != 0 &&
+           info.hwndMoveSize == hwnd;
+}
+
+POINT PlaceResizedHost(HWND hwnd, int width, int height, const RECT *suggestedRect, const RECT &offscreenInsets,
+                       const RECT *previousInsets)
+{
+    RECT target{};
+    if (suggestedRect)
+    {
+        target = *suggestedRect;
+    }
+    else
+    {
+        GetWindowRect(hwnd, &target);
+    }
+    // Keep the visible part still when the margin around it changes size;
+    // anchoring the host's own top-left would shift it by the difference.
+    const bool insetsChanged = previousInsets && !suggestedRect && !EqualRect(previousInsets, &offscreenInsets);
+    if (insetsChanged)
+    {
+        const auto origin =
+            toolbar_placement::KeepVisibleOrigin({target.left, target.top}, *previousInsets, offscreenInsets);
+        target.left = origin.x;
+        target.top = origin.y;
+    }
+    target.right = target.left + width;
+    target.bottom = target.top + height;
+    // A caption drag owns the position until it ends (WM_EXITSIZEMOVE clamps
+    // then). Clamping mid-drag fights the move loop and snaps the host back to
+    // the screen it came from.
+    if (!IsWindowInMoveSizeLoop(hwnd))
+    {
+        // A changed margin re-checks the visible part against the work area,
+        // as the end of a drag does, so rounding cannot tuck it under the taskbar.
+        KeepRectOnVisibleScreens(target, insetsChanged ? ScreenArea::WorkArea : ScreenArea::Monitor, nullptr,
+                                 offscreenInsets);
+    }
+    return {target.left, target.top};
+}
 
 FLOAT GetWindowScale(HWND hwnd)
 {

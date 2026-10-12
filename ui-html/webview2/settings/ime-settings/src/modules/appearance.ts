@@ -1,3 +1,4 @@
+import {applyCandidateFitContentMode} from './skin';
 import { serializeHostMessage } from '../../../../shared/messages';
 import {
   applyDropdownValue,
@@ -8,7 +9,7 @@ import {
   setupToggleButton
 } from './shared';
 import { loadHTML } from '../utils/common-utils';
-import { applyThemeConfig, setCandidateSurfaceThemeListener, type ResolvedTheme, type ThemeConfig } from './theme';
+import { applyThemeConfig, setSurfaceTheme, setCandidateSurfaceThemeListener, type ResolvedTheme, type ThemeConfig } from './theme';
 
 function postConfigUpdate(path: string, value: string | number | boolean): void {
   window.chrome?.webview?.postMessage(
@@ -39,6 +40,7 @@ export type CandidateAppearanceConfig = {
   candidate_window_preedit_shuangpin_quanpin?: boolean;
   tsf_preedit_shuangpin_quanpin?: boolean;
   ui_backend?: string;
+  candidate_fit_content?: string;
   settings_window_linger?: string;
   system_fonts?: string[];
 };
@@ -524,6 +526,8 @@ export function applyAppearanceConfig(
     applyToggleState('tsfPreeditShuangpinQuanpinToggleBtn', candidateAppearance.tsf_preedit_shuangpin_quanpin);
   }
   applyDropdownValue('uiBackendBtn', 'uiBackendMenu', candidateAppearance?.ui_backend);
+  applyDropdownValue('candidateFitContentBtn','candidateFitContentMenu',candidateAppearance?.candidate_fit_content);
+  applyCandidateFitContentMode(candidateAppearance?.candidate_fit_content);
   applyDropdownValue('settingsLingerBtn', 'settingsLingerMenu', candidateAppearance?.settings_window_linger);
   populateFontMenus(candidateAppearance?.system_fonts);
   renderFallbackFonts();
@@ -575,6 +579,11 @@ export async function setupAppearance() {
     themeSurfaceDetails?.classList.toggle('open', expanded);
   });
 
+  document.getElementById('settingsThemeFollowBtn')?.addEventListener('click', () => {
+    setSurfaceTheme('settings', 'follow');
+    postConfigUpdate('appearance.theme_settings', 'follow');
+  });
+
   // 分表面主题
   setupDropdownMenu(
     'settingsThemeBtn',
@@ -606,6 +615,7 @@ export async function setupAppearance() {
   setupToggleButton('candidateFixedBadgeToggleBtn', (active) => {
     postConfigUpdate('appearance.candidate_fixed_badge', active);
   });
+  setupDropdownMenu('candidateFitContentBtn','candidateFitContentMenu','',true,'appearance.candidate_fit_content',value=>{applyCandidateFitContentMode(value);return value;});
   setupDropdownMenu('candFixedBadgeStyleBtn', 'candFixedBadgeStyleMenu', '', true, 'appearance.candidate_fixed_badge_style');
 
   // 候选窗样式

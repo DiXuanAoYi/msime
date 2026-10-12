@@ -43,6 +43,7 @@ set(METASEQUOIA_IME_ENGINE_SOURCES
     direct_helpcode/direct_lattice.cpp
     direct_helpcode/direct_resolver.cpp
     direct_helpcode/spelling_graph.cpp
+    domain_dictionary/domain_dictionary.cpp
     english/english_dictionary.cpp
     japanese/japanese_matrix_search.cpp
     japanese/japanese_sentence_decoder.cpp
@@ -231,6 +232,14 @@ if(BUILD_TESTING)
     add_executable(test_fuzzy_pinyin tests/src/test_fuzzy_pinyin.cpp)
     target_link_libraries(test_fuzzy_pinyin PRIVATE MetasequoiaIme::Engine)
     add_test(NAME fuzzy_pinyin COMMAND test_fuzzy_pinyin)
+
+    add_executable(test_domain_input tests/src/test_domain_input.cpp)
+    target_link_libraries(test_domain_input PRIVATE MetasequoiaIme::Engine)
+    add_test(NAME domain_input COMMAND test_domain_input)
+
+    add_executable(test_octagram_scoring tests/src/test_octagram_scoring.cpp)
+    target_link_libraries(test_octagram_scoring PRIVATE MetasequoiaIme::Engine)
+    add_test(NAME octagram_scoring COMMAND test_octagram_scoring)
 
     add_executable(test_engine_smoke tests/src/test_engine_smoke.cpp)
     target_link_libraries(test_engine_smoke PRIVATE MetasequoiaIme::Engine)

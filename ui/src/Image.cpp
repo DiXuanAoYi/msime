@@ -6,6 +6,7 @@
 #include "ControlsInternal.h"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 #include <wincodec.h>
 
@@ -34,6 +35,37 @@ SizeF ReadImageSize(const std::wstring &filePath)
     UINT height = 0;
     return SUCCEEDED(frame->GetSize(&width, &height)) ? SizeF{static_cast<float>(width), static_cast<float>(height)}
                                                       : SizeF{};
+}
+
+// At 1:1, fractional device origins blend neighbouring pixels. Returns the DIP offset that moves the origin onto the
+// device pixel grid, or zero when the mapping is not 1:1 or the transform is not axis-aligned.
+D2D1_POINT_2F NativeSizeSnapOffset(ID2D1RenderTarget *target, const RectF &destination, const D2D1_SIZE_F &sourcePixels)
+{
+    float dpiX = 0.0f;
+    float dpiY = 0.0f;
+    target->GetDpi(&dpiX, &dpiY);
+    D2D1_MATRIX_3X2_F transform = {};
+    target->GetTransform(&transform);
+    if (dpiX <= 0.0f || dpiY <= 0.0f || transform._12 != 0.0f || transform._21 != 0.0f || transform._11 <= 0.0f ||
+        transform._22 <= 0.0f)
+    {
+        return {};
+    }
+
+    const float dpiScaleX = dpiX / 96.0f;
+    const float dpiScaleY = dpiY / 96.0f;
+    const float pixelsPerDipX = transform._11 * dpiScaleX;
+    const float pixelsPerDipY = transform._22 * dpiScaleY;
+    // Tolerate only DIP conversion rounding
+    if (std::fabs(destination.width * pixelsPerDipX - sourcePixels.width) >= 0.01f ||
+        std::fabs(destination.height * pixelsPerDipY - sourcePixels.height) >= 0.01f)
+    {
+        return {};
+    }
+
+    const float deviceX = (destination.x * transform._11 + transform._31) * dpiScaleX;
+    const float deviceY = (destination.y * transform._22 + transform._32) * dpiScaleY;
+    return {(std::round(deviceX) - deviceX) / pixelsPerDipX, (std::round(deviceY) - deviceY) / pixelsPerDipY};
 }
 } // namespace
 
@@ -131,10 +163,14 @@ void Image::Render(DeviceResources &deviceResources)
     }
 
     RectF destination = bounds_;
+    D2D1_RECT_F sourceRect = D2D1::RectF(0.0f, 0.0f, sourceSize.width, sourceSize.height);
     if (stretch_ == ImageStretch::None)
     {
         destination.width = std::min(sourceSize.width, bounds_.width);
         destination.height = std::min(sourceSize.height, bounds_.height);
+        // Crop rather than squeeze when the bounds are smaller than the image
+        sourceRect.right = destination.width;
+        sourceRect.bottom = destination.height;
     }
     else if (stretch_ == ImageStretch::Uniform || stretch_ == ImageStretch::UniformToFill)
     {
@@ -147,15 +183,24 @@ void Image::Render(DeviceResources &deviceResources)
         destination.y = bounds_.y + (bounds_.height - destination.height) * 0.5f;
     }
 
+    const D2D1_SIZE_U bitmapPixels = bitmap->GetPixelSize();
+    const D2D1_SIZE_F sourcePixels = {(sourceRect.right - sourceRect.left) * bitmapPixels.width / sourceSize.width,
+                                      (sourceRect.bottom - sourceRect.top) * bitmapPixels.height / sourceSize.height};
+    const D2D1_POINT_2F snap = NativeSizeSnapOffset(target, destination, sourcePixels);
+    destination.x += snap.x;
+    destination.y += snap.y;
+
     const auto destinationRect = D2D1::RectF(destination.x, destination.y, destination.x + destination.width,
                                              destination.y + destination.height);
     if (stretch_ == ImageStretch::UniformToFill || stretch_ == ImageStretch::None)
     {
-        target->PushAxisAlignedClip(
-            D2D1::RectF(bounds_.x, bounds_.y, bounds_.x + bounds_.width, bounds_.y + bounds_.height),
-            D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        // The clip moves with the snapped image so its edges are not shaved by half a pixel
+        target->PushAxisAlignedClip(D2D1::RectF(bounds_.x + snap.x, bounds_.y + snap.y,
+                                                bounds_.x + snap.x + bounds_.width,
+                                                bounds_.y + snap.y + bounds_.height),
+                                    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     }
-    target->DrawBitmap(bitmap, destinationRect, opacity_, interpolationMode_);
+    target->DrawBitmap(bitmap, destinationRect, opacity_, interpolationMode_, &sourceRect);
     if (stretch_ == ImageStretch::UniformToFill || stretch_ == ImageStretch::None)
     {
         target->PopAxisAlignedClip();

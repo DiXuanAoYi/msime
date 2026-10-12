@@ -17,6 +17,7 @@ KEYSTROKE_FUNCTION SegmentEditFunction(UINT code, UINT modifiers);
 UINT CaptureIpcModifiers();
 bool IsEnglishInputModeToggle(UINT code, UINT modifiers);
 bool IsTranslationCommitShortcut(UINT code, UINT modifiers);
+bool IsPinyinCommitShortcut(UINT code, UINT modifiers);
 bool IsCharacterSetInputModeToggle(UINT code, UINT modifiers);
 // Shared by immediate and deferred classification: English candidates use the
 // same edit-session dispatch and never replay letters into the application.

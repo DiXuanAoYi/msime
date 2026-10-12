@@ -256,7 +256,8 @@
               "translation.custom",
               "voice.asr",
               "voice.polish",
-              "ai.assistant"
+              "ai.assistant",
+              "translation.ai"
             ]
           },
           "config": {
@@ -1241,7 +1242,10 @@
               "putApplication",
               "exportApplication",
               "importApplication",
-              "removeLearning"
+              "removeLearning",
+              "domainCatalog",
+              "exportDomain",
+              "setApplicationDomains"
             ]
           },
           "enabled": {
@@ -1261,6 +1265,21 @@
           "payload": {
             "type": "string",
             "maxLength": 4194304
+          },
+          "domain_mode": {
+            "type": "string",
+            "enum": [
+              "inherit",
+              "replace"
+            ]
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "maxItems": 32
           }
         },
         "required": [
@@ -1374,13 +1393,168 @@
         ],
         "additionalProperties": false
       }
+    },
+    "apiModelList": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "service": {
+            "type": "string",
+            "enum": [
+              "ai.assistant",
+              "voice.polish",
+              "translation.ai"
+            ]
+          },
+          "config": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "requestId",
+          "service",
+          "config"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "aiTaskRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "run",
+              "cancel"
+            ]
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "pinyin",
+              "completion",
+              "question"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 12000
+          },
+          "context": {
+            "type": "string",
+            "maxLength": 24000
+          }
+        },
+        "required": [
+          "requestId",
+          "action",
+          "task"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "neuralModelsRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "download",
+              "import",
+              "cancel",
+              "delete",
+              "start",
+              "stop",
+              "activate"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "enum": [
+              "desktop",
+              "tongbian",
+              "zhiwei"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "defaultImeRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "setDefault",
+              "openSystemSettings"
+            ]
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "server": {
     "configSnapshot": {
       "data": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "environment": {
+            "type": "object",
+            "properties": {
+              "temporary_configuration": {
+                "type": "boolean"
+              }
+            },
+            "required": ["temporary_configuration"],
+            "additionalProperties": false
+          }
+        },
         "required": [],
         "additionalProperties": true
       }
@@ -2301,7 +2475,9 @@
           "type": "array",
           "items": {
             "type": "object",
-            "additionalProperties": true
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
           }
         }
       },
@@ -2362,7 +2538,9 @@
         },
         "state": {
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "properties": {},
+          "required": []
         }
       },
       "required": [
@@ -2384,9 +2562,17 @@
         "message": {
           "type": "string"
         },
+        "domainWarning": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        },
         "book": {
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "properties": {},
+          "required": []
         },
         "history": {
           "type": "array",
@@ -2395,6 +2581,43 @@
           }
         },
         "application": {
+          "type": "string"
+        },
+        "books": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "id": {"type": "string"},
+              "name": {"type": "string"},
+              "entries": {"type": "integer", "minimum": 1, "maximum": 1000000},
+              "bytes": {"type": "integer", "minimum": 1, "maximum": 4194304},
+              "license": {"type": "string"},
+              "source": {"type": "string"},
+              "version": {"type": "string"},
+              "sha256": {"type": "string"},
+              "exportable": {"type": "boolean"}
+            },
+            "required": ["id", "name", "entries", "bytes", "license", "source", "version", "sha256", "exportable"]
+          }
+        },
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          }
+        },
+        "enabled_domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exported": {
           "type": "string"
         }
       },
@@ -2484,7 +2707,9 @@
         },
         "raw": {
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "properties": {},
+          "required": []
         },
         "imageRevision": {
           "type": "number"
@@ -2496,7 +2721,9 @@
           "type": "array",
           "items": {
             "type": "object",
-            "additionalProperties": true
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
           }
         }
       },
@@ -2506,6 +2733,178 @@
         "message"
       ],
       "additionalProperties": true
+    },
+    "apiModelListResult": {
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "models"
+      ],
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "aiTaskResult": {
+      "required": [
+        "requestId",
+        "ok",
+        "task",
+        "message",
+        "completion",
+        "answers"
+      ],
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "task": {
+          "type": "string",
+          "enum": [
+            "pinyin",
+            "completion",
+            "question"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "completion": {
+          "type": "string",
+          "maxLength": 12000
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "pinyin": {
+                "type": "string",
+                "maxLength": 2048
+              },
+              "source": {
+                "type": "string",
+                "maxLength": 100
+              }
+            },
+            "required": [
+              "text",
+              "pinyin",
+              "source"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "neuralModelsResult": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          }
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {},
+          "required": []
+        }
+      },
+      "required": [
+        "requestId",
+        "ok",
+        "message",
+        "models",
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "defaultImeResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "isDefault": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requestId",
+        "action",
+        "ok",
+        "message",
+        "enabled",
+        "isDefault"
+      ],
+      "additionalProperties": false
+    },
+    "settingsOperationError": {
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "automatic": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "message",
+        "automatic"
+      ],
+      "additionalProperties": false
     }
   }
 }

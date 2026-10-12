@@ -19,8 +19,14 @@ Registrar::Registrar(const char *name, std::function<void()> fn)
 int RunVisionFixtureProbe(const char *path, bool code);
 int RunVisionCodeJsonFixtureProbe(const char *path, const char *expected);
 int RunVisionAudioFixtureProbe(const char *path, bool loopback);
+int RunAiTaskFixtureProbe(const char *endpoint, const char *reportPath);
+int RunCandidateTranslationFixtureProbe(const char *endpoint, const char *reportPath);
 int main(int argc, char **argv)
 {
+    if (argc == 4 && std::string(argv[1]) == "--candidate-translation-fixture")
+        return RunCandidateTranslationFixtureProbe(argv[2], argv[3]);
+    if (argc == 4 && std::string(argv[1]) == "--ai-task-fixture")
+        return RunAiTaskFixtureProbe(argv[2], argv[3]);
     if (argc == 3 && (std::string(argv[1]) == "--vision-fixture" || std::string(argv[1]) == "--vision-code-fixture"))
         return RunVisionFixtureProbe(argv[2], std::string(argv[1]) == "--vision-code-fixture");
     if ((argc == 3 || argc == 4) && std::string(argv[1]) == "--vision-code-json-fixture")

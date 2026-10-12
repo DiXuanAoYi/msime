@@ -1,11 +1,10 @@
 #include "cloud_translation.h"
-
 #include "config/ime_config.h"
 #include "custom_translation.h"
 #include "niutrans_translation.h"
 #include "tencent_tmt.h"
+#include "ai_translation.h"
 #include "translation_gloss.h"
-#include "engine/english/english_dictionary.h"
 #include <curl/curl.h>
 #include <atomic>
 #include <chrono>
@@ -16,12 +15,9 @@
 
 namespace
 {
-// Wait until the candidate window has been idle for 500ms before a TMT request.
 constexpr auto kIdleDelay = std::chrono::milliseconds(500);
 constexpr auto kNegativeTtl = std::chrono::minutes(8);
-constexpr size_t kMaxSourceChars = 40;
 constexpr size_t kMaxCacheEntries = 4096;
-
 std::mutex g_mutex;
 std::condition_variable g_cv;
 std::thread g_worker;
@@ -30,256 +26,142 @@ std::atomic<uint64_t> g_job{0};
 std::vector<EnglishIme::TranslationQuery> g_latest_queries;
 uint64_t g_latest_generation = 0;
 std::chrono::steady_clock::time_point g_last_request;
-std::string g_db_path;
 CloudTranslation::ApplyCallback g_callback;
-
 std::unordered_map<std::string, std::string> g_cache;
 std::unordered_map<std::string, std::chrono::steady_clock::time_point> g_negative;
-
-std::string TargetLanguage()
+std::string Scope(const CandidateTranslationConfig &config)
 {
-    const auto &language = GetConfiguredTencentTmt().target_language;
-    return language.empty() ? "en" : language;
+    // Never expose credentials in a key, message or log. Any provider/endpoint/model/key update changes revision.
+    return std::to_string(config.revision) + ":" + CloudTranslation::EffectiveProvider(config) + ":" +
+           config.tencent.target_language;
 }
-
-enum class Provider
+std::string Identity(const EnglishIme::TranslationQuery &query, const std::string &scope)
 {
-    Tencent,
-    Custom,
-    NiuTrans,
-};
-
-// Only one online provider is active at a time. NiuTrans and the custom DeepLX
-// endpoint override the Tencent default when enabled; NiuTrans wins if both are.
-Provider ActiveProvider()
-{
-    if (GetConfiguredNiuTrans().enabled)
-        return Provider::NiuTrans;
-    if (GetConfiguredCustomTranslation().enabled)
-        return Provider::Custom;
-    return Provider::Tencent;
+    return scope + (query.direction == EnglishIme::TranslationDirection::EnglishToChinese ? ":e:" : ":z:") + query.key;
 }
-
-std::string ProviderScope()
+bool Current(const CandidateTranslationConfig &config, uint64_t job, uint64_t generation)
 {
-    switch (ActiveProvider())
-    {
-    case Provider::NiuTrans:
-        return "niutrans:" + GetConfiguredNiuTrans().app_id;
-    case Provider::Custom:
-        return "custom:" + GetConfiguredCustomTranslation().endpoint;
-    case Provider::Tencent:
-    default:
-        return "tencent";
-    }
+    return g_running && GetConfiguredCandidateTranslationCloudEnabled() && g_job == job &&
+           EnglishIme::IsTranslationCurrent(generation) &&
+           Scope(GetConfiguredCandidateTranslationSnapshot()) == Scope(config);
 }
-
-std::string Identity(const EnglishIme::TranslationQuery &query, const std::string &target_language,
-                     const std::string &provider_scope)
+bool Usable(const CandidateTranslationConfig &config)
 {
-    return provider_scope + ":" + target_language + ":" +
-           (query.direction == EnglishIme::TranslationDirection::EnglishToChinese ? "e:" : "z:") + query.key;
+    const auto provider = CloudTranslation::EffectiveProvider(config);
+    if (provider == "ai")
+        return AiTranslation::IsUsableConfig(config);
+    if (provider == "niutrans")
+        return NiuTransTranslation::IsUsableConfig({CloudTranslation::TrimSecret(config.niutrans.app_id),
+                                                    CloudTranslation::TrimSecret(config.niutrans.apikey)});
+    if (provider == "custom")
+        return CustomTranslation::IsSupportedEndpoint(CloudTranslation::TrimSecret(config.custom.endpoint)) &&
+               (CloudTranslation::TrimSecret(config.custom.api_key).empty() ||
+                CloudTranslation::IsUsableSecret(config.custom.api_key));
+    return provider == "tencent" && CloudTranslation::IsUsableSecret(config.tencent.secret_id) &&
+           CloudTranslation::IsUsableSecret(config.tencent.secret_key);
 }
-
-bool TooLong(const std::string &key)
+std::vector<std::string> Translate(const CandidateTranslationConfig &config, const std::vector<std::string> &texts,
+                                   const std::string &source, const std::string &target,
+                                   const std::function<bool()> &cancelled)
 {
-    return CloudTranslation::Utf8Length(key) > kMaxSourceChars;
+    const auto provider = CloudTranslation::EffectiveProvider(config);
+    if (provider == "ai")
+        return AiTranslation::TextTranslateBatch(config, texts, source, target, cancelled);
+    if (provider == "custom")
+        return CustomTranslation::TextTranslateBatch(
+            {CloudTranslation::TrimSecret(config.custom.endpoint), CloudTranslation::TrimSecret(config.custom.api_key)},
+            texts, source, target);
+    if (provider == "niutrans")
+        return NiuTransTranslation::TextTranslateBatch({CloudTranslation::TrimSecret(config.niutrans.app_id),
+                                                        CloudTranslation::TrimSecret(config.niutrans.apikey)},
+                                                       texts, source, target);
+    if (provider == "tencent")
+        return TencentTmt::TextTranslateBatch({CloudTranslation::TrimSecret(config.tencent.secret_id),
+                                               CloudTranslation::TrimSecret(config.tencent.secret_key),
+                                               config.tencent.region},
+                                              texts, source, target);
+    return std::vector<std::string>(texts.size());
 }
-
-void RememberPositive(const std::string &identity, std::string gloss)
+void TranslateGroup(const CandidateTranslationConfig &config, const std::vector<EnglishIme::TranslationQuery> &group,
+                    const std::string &source, const std::string &target, uint64_t job, uint64_t generation,
+                    std::vector<EnglishIme::TranslationResult> &results)
 {
-    std::lock_guard lock(g_mutex);
-    if (g_cache.size() >= kMaxCacheEntries)
-        g_cache.clear();
-    g_cache[identity] = std::move(gloss);
-    g_negative.erase(identity);
-}
-
-bool IsNegative(const std::string &identity)
-{
-    const auto found = g_negative.find(identity);
-    if (found == g_negative.end())
-        return false;
-    if (found->second <= std::chrono::steady_clock::now())
-    {
-        g_negative.erase(found);
-        return false;
-    }
-    return true;
-}
-
-void RememberNegative(const std::string &identity)
-{
-    std::lock_guard lock(g_mutex);
-    if (g_negative.size() >= kMaxCacheEntries)
-        g_negative.clear();
-    g_negative[identity] = std::chrono::steady_clock::now() + kNegativeTtl;
-}
-
-TencentTmt::Credentials ResolveCredentials()
-{
-    TencentTmt::Credentials credentials;
-    const auto &config = GetConfiguredTencentTmt();
-    if (!config.enabled)
-        return credentials;
-    credentials.region = config.region.empty() ? "ap-guangzhou" : config.region;
-    credentials.secret_id = CloudTranslation::TrimSecret(config.secret_id);
-    credentials.secret_key = CloudTranslation::TrimSecret(config.secret_key);
-    if (!CloudTranslation::IsUsableSecret(credentials.secret_id) ||
-        !CloudTranslation::IsUsableSecret(credentials.secret_key))
-        return {};
-    return credentials;
-}
-
-CustomTranslation::Config ResolveCustomConfig()
-{
-    const auto &configured = GetConfiguredCustomTranslation();
-    if (!configured.enabled)
-        return {};
-    return {CloudTranslation::TrimSecret(configured.endpoint), CloudTranslation::TrimSecret(configured.api_key)};
-}
-
-NiuTransTranslation::Config ResolveNiuTransConfig()
-{
-    const auto &configured = GetConfiguredNiuTrans();
-    if (!configured.enabled)
-        return {};
-    return {CloudTranslation::TrimSecret(configured.app_id), CloudTranslation::TrimSecret(configured.apikey)};
-}
-
-void PersistGloss(const EnglishIme::TranslationQuery &query, const std::string &gloss,
-                  const std::string &target_language)
-{
-    // english.db is language-specific. Other target languages remain in the
-    // in-memory cloud cache only.
-    if (target_language != "en" || g_db_path.empty() || !CloudTranslation::ShouldPersistGloss(query.key, gloss))
+    if (group.empty() || !Current(config, job, generation))
         return;
-    const bool chinese_to_english = query.direction == EnglishIme::TranslationDirection::ChineseToEnglish;
-    EnglishDictionary::upsert_gloss(g_db_path, chinese_to_english, query.key, gloss);
-}
-
-void ApplyTranslatedGroup(const std::vector<EnglishIme::TranslationQuery> &group,
-                          const std::vector<std::string> &translated, const std::string &target_language,
-                          const std::string &provider_scope, std::vector<EnglishIme::TranslationResult> &out)
-{
-    for (size_t i = 0; i < group.size(); ++i)
-    {
-        const std::string identity = Identity(group[i], target_language, provider_scope);
-        const std::string raw = i < translated.size() ? translated[i] : std::string{};
-        const std::string gloss = CloudTranslation::FormatGloss(raw);
-        if (gloss.empty())
-        {
-            RememberNegative(identity);
-            continue;
-        }
-        RememberPositive(identity, gloss);
-        PersistGloss(group[i], gloss, target_language);
-        out.push_back({group[i].key, group[i].direction, gloss});
-    }
-}
-
-std::vector<std::string> TranslateWithProvider(Provider provider, const TencentTmt::Credentials &credentials,
-                                               const CustomTranslation::Config &custom,
-                                               const NiuTransTranslation::Config &niutrans,
-                                               const std::vector<std::string> &texts, const std::string &source,
-                                               const std::string &target)
-{
-    switch (provider)
-    {
-    case Provider::NiuTrans:
-        return NiuTransTranslation::TextTranslateBatch(niutrans, texts, source, target);
-    case Provider::Custom:
-        return CustomTranslation::TextTranslateBatch(custom, texts, source, target);
-    case Provider::Tencent:
-    default:
-        return TencentTmt::TextTranslateBatch(credentials, texts, source, target);
-    }
-}
-
-void TranslateGroup(Provider provider, const TencentTmt::Credentials &credentials,
-                    const CustomTranslation::Config &custom, const NiuTransTranslation::Config &niutrans,
-                    const std::vector<EnglishIme::TranslationQuery> &group, const std::string &source,
-                    const std::string &target, const std::string &target_language, const std::string &provider_scope,
-                    std::vector<EnglishIme::TranslationResult> &out)
-{
     std::vector<std::string> texts;
-    texts.reserve(group.size());
     for (const auto &query : group)
         texts.push_back(query.key);
-    if (!GetConfiguredCandidateTranslationCloudEnabled())
+    const auto translated = Translate(config, texts, source, target, [&] { return !Current(config, job, generation); });
+    if (!Current(config, job, generation))
         return;
-    const auto translated = TranslateWithProvider(provider, credentials, custom, niutrans, texts, source, target);
-    // Turning the switch off also prevents an in-flight result from being saved.
-    if (!GetConfiguredCandidateTranslationCloudEnabled())
+    std::lock_guard lock(g_mutex);
+    if (!Current(config, job, generation))
         return;
-    ApplyTranslatedGroup(group, translated, target_language, provider_scope, out);
+    for (size_t i = 0; i < group.size(); ++i)
+    {
+        const auto identity = Identity(group[i], Scope(config));
+        auto gloss = CloudTranslation::FormatGloss(i < translated.size() ? translated[i] : std::string());
+        if (gloss.empty())
+        {
+            if (g_negative.size() >= kMaxCacheEntries)
+                g_negative.clear();
+            g_negative[identity] = std::chrono::steady_clock::now() + kNegativeTtl;
+            continue;
+        }
+        if (g_cache.size() >= kMaxCacheEntries)
+            g_cache.clear();
+        g_cache[identity] = gloss;
+        g_negative.erase(identity);
+        // Keep machine results scoped. english.db has no provider metadata and must not be overwritten by AI output.
+        results.push_back({group[i].key, group[i].direction, std::move(gloss)});
+    }
 }
-
 void WorkerLoop()
 {
-    uint64_t observed_job = g_job.load();
+    uint64_t observed = UINT64_MAX;
     while (g_running)
     {
         std::unique_lock lock(g_mutex);
-        g_cv.wait(lock, [&] { return !g_running || g_job.load() != observed_job; });
+        g_cv.wait(lock, [&] { return !g_running || g_job != observed; });
         if (!g_running)
             break;
-        observed_job = g_job.load();
+        observed = g_job;
         auto queries = g_latest_queries;
         auto generation = g_latest_generation;
         auto target = g_last_request + kIdleDelay;
-        while (g_running)
+        while (g_running && g_cv.wait_until(lock, target, [&] { return !g_running || g_job != observed; }))
         {
-            if (g_cv.wait_until(lock, target, [&] { return !g_running || g_job.load() != observed_job; }))
-            {
-                if (!g_running)
-                    return;
-                observed_job = g_job.load();
-                queries = g_latest_queries;
-                generation = g_latest_generation;
-                target = g_last_request + kIdleDelay;
-                continue;
-            }
-            break;
+            if (!g_running)
+                return;
+            observed = g_job;
+            queries = g_latest_queries;
+            generation = g_latest_generation;
+            target = g_last_request + kIdleDelay;
         }
         lock.unlock();
-        if (!g_running || queries.empty() || !GetConfiguredCandidateTranslationCloudEnabled() ||
-            !EnglishIme::IsTranslationCurrent(generation))
+        const auto config = GetConfiguredCandidateTranslationSnapshot();
+        if (queries.empty() || !Current(config, observed, generation) || !Usable(config))
             continue;
-
-        const Provider provider = ActiveProvider();
-        const auto custom = ResolveCustomConfig();
-        const auto niutrans = ResolveNiuTransConfig();
-        const auto credentials = provider == Provider::Tencent ? ResolveCredentials() : TencentTmt::Credentials{};
-        if ((provider == Provider::Custom && !CustomTranslation::IsSupportedEndpoint(custom.endpoint)) ||
-            (provider == Provider::NiuTrans && !NiuTransTranslation::IsUsableConfig(niutrans)) ||
-            (provider == Provider::Tencent && !CloudTranslation::IsUsableSecret(credentials.secret_id)))
-            continue;
-
-        const std::string target_language = TargetLanguage();
-        const std::string provider_scope = ProviderScope();
-        std::vector<EnglishIme::TranslationQuery> en_zh;
-        std::vector<EnglishIme::TranslationQuery> zh_target;
+        std::vector<EnglishIme::TranslationQuery> en_zh, zh_target;
         std::vector<EnglishIme::TranslationResult> results;
         {
-            std::lock_guard cache_lock(g_mutex);
+            std::lock_guard cacheLock(g_mutex);
             for (const auto &query : queries)
             {
-                if (TooLong(query.key))
+                if (CloudTranslation::Utf8Length(query.key) > 40)
                     continue;
-                const std::string identity = Identity(query, target_language, provider_scope);
-                const auto cached = g_cache.find(identity);
-                if (cached != g_cache.end())
+                const auto identity = Identity(query, Scope(config));
+                if (const auto found = g_cache.find(identity); found != g_cache.end())
                 {
-                    // A previous request may have finished after its candidate
-                    // generation became stale. Its result is still valid for
-                    // this language, so publish it to the current generation
-                    // instead of silently skipping it.
-                    results.push_back({query.key, query.direction, cached->second});
+                    results.push_back({query.key, query.direction, found->second});
                     continue;
                 }
-                if (IsNegative(identity))
-                    continue;
+                if (const auto found = g_negative.find(identity); found != g_negative.end())
+                {
+                    if (found->second > std::chrono::steady_clock::now())
+                        continue;
+                    g_negative.erase(found);
+                }
                 if (query.direction == EnglishIme::TranslationDirection::EnglishToChinese &&
                     CloudTranslation::IsCloudTranslatableEnglish(query.key))
                     en_zh.push_back(query);
@@ -288,34 +170,39 @@ void WorkerLoop()
                     zh_target.push_back(query);
             }
         }
-
-        if (!en_zh.empty())
-            TranslateGroup(provider, credentials, custom, niutrans, en_zh, "en", "zh", target_language, provider_scope,
-                           results);
-        if (!zh_target.empty())
-            TranslateGroup(provider, credentials, custom, niutrans, zh_target, "zh", target_language, target_language,
-                           provider_scope, results);
-        if (results.empty() || !g_running || g_job.load() != observed_job ||
-            !EnglishIme::IsTranslationCurrent(generation) || !g_callback)
-            continue;
-        g_callback(std::move(results), generation);
+        // English candidates always receive Chinese explanations, independently of the Chinese candidate target.
+        TranslateGroup(config, en_zh, "en", "zh", observed, generation, results);
+        TranslateGroup(config, zh_target, "zh", config.tencent.target_language, observed, generation, results);
+        if (!results.empty() && Current(config, observed, generation) && g_callback)
+            g_callback(std::move(results), generation, Scope(config));
     }
 }
 } // namespace
-
 namespace CloudTranslation
 {
-void Start(const std::string &db_path, ApplyCallback apply_callback)
+std::string EffectiveProvider(const CandidateTranslationConfig &config)
+{
+    if (config.provider != "legacy")
+        return config.provider;
+    if (config.niutrans.enabled)
+        return "niutrans";
+    if (config.custom.enabled)
+        return "custom";
+    return config.tencent.enabled ? "tencent" : "dictionary";
+}
+std::string ConfigurationScope()
+{
+    return Scope(GetConfiguredCandidateTranslationSnapshot());
+}
+void Start(const std::string &, ApplyCallback callback)
 {
     if (g_running)
         return;
     curl_global_init(CURL_GLOBAL_DEFAULT);
-    g_db_path = db_path;
-    g_callback = std::move(apply_callback);
+    g_callback = std::move(callback);
     g_running = true;
     g_worker = std::thread(WorkerLoop);
 }
-
 void Stop()
 {
     if (!g_running)
@@ -326,7 +213,6 @@ void Stop()
         g_worker.join();
     g_callback = {};
 }
-
 void RequestMisses(std::vector<EnglishIme::TranslationQuery> queries, uint64_t generation)
 {
     if (!GetConfiguredCandidateTranslationCloudEnabled())
@@ -336,22 +222,23 @@ void RequestMisses(std::vector<EnglishIme::TranslationQuery> queries, uint64_t g
         g_latest_queries = std::move(queries);
         g_latest_generation = generation;
         g_last_request = std::chrono::steady_clock::now();
-        g_job.fetch_add(1);
+        ++g_job;
     }
     g_cv.notify_one();
 }
-
 void Clear()
 {
     RequestMisses({}, 0);
 }
-
 std::string LookupCache(const std::string &key, EnglishIme::TranslationDirection direction)
 {
     if (!GetConfiguredCandidateTranslationCloudEnabled())
         return {};
+    const auto config = GetConfiguredCandidateTranslationSnapshot();
+    if (!Usable(config))
+        return {};
     std::lock_guard lock(g_mutex);
-    const auto found = g_cache.find(Identity({key, direction}, TargetLanguage(), ProviderScope()));
-    return found == g_cache.end() ? std::string{} : found->second;
+    const auto found = g_cache.find(Identity({key, direction}, Scope(config)));
+    return found == g_cache.end() ? std::string() : found->second;
 }
 } // namespace CloudTranslation

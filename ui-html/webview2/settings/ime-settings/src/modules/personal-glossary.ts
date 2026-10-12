@@ -1,7 +1,7 @@
 // Personal translations are stored through the existing atomic config writer.
 // Validation here provides useful row errors; the native parser is authoritative.
 export const MAX_GLOSSARY_BYTES = 65536;
-const languages = new Set(['en', 'ja', 'es', 'fr', 'de', 'ru', 'ko']);
+const languages = new Set(['en', 'ja', 'es', 'fr', 'de', 'ru', 'ko', 'vi', 'th', 'it']);
 const bytes = (text: string) => new TextEncoder().encode(text).length;
 
 export function validatePersonalGlossary(text: string): string | null {
@@ -14,14 +14,15 @@ export function validatePersonalGlossary(text: string): string | null {
     const fields = line.split('\t').map(value => value.replace(/^[ \r]+|[ \r]+$/g, ''));
     if (fields.length < 3 || fields.length > 4 || !languages.has(fields[0]!) ||
         fields.some(value => !value || bytes(value) > 1024)) {
-      return `第 ${i + 1} 行格式有误：请用 Tab 分隔语言、中文词、译词（可加第二释义）。支持 en / ja / es / fr / de / ru / ko。`;
+      return `第 ${i + 1} 行格式有误：请用 Tab 分隔语言、中文词、译词（可加第二释义）。支持 en / ja / es / fr / de / ru / ko / vi / th / it。`;
     }
   }
   return null;
 }
 
-// Qingjian's per-language TSV contains word + at most two senses, with optional
-// part-of-speech and reading annotations. Only the translation itself commits.
+// Per-language TSV contains a word and one or more sense columns, optionally annotated
+// with POS/readings. Preserve every translation; fold extra senses into the legacy fourth
+// column so old three/four-column multilingual tables can still be imported and exported.
 export function importQingjianGlossary(text: string, language: string): string {
   if (!languages.has(language)) throw new Error('请选择有效的目标语种。');
   if (bytes(text) > MAX_GLOSSARY_BYTES) throw new Error('导入文件不能超过 64 KB。');
@@ -30,11 +31,11 @@ export function importQingjianGlossary(text: string, language: string): string {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const [word, ...rawSenses] = line.split('\t').map(value => value.trim());
-    const senses = rawSenses.filter(Boolean).slice(0, 2).map(value =>
+    const senses = rawSenses.filter(Boolean).map(value =>
       value.split('|')[0]!.replace(/^(?:n|noun|v|verb|adj|adv|pron|prep|conj|num|m|mw|part|int|interj|phr|phrase)\.\s+/iu, '').trim()
     );
     if (!word || !senses.length || senses.some(value => !value)) throw new Error(`第 ${index + 1} 行缺少词或译词。`);
-    result.push([language, word, ...senses].join('\t'));
+    result.push([language, word, senses[0]!, ...(senses.length>1?[senses.slice(1).join('; ')]:[])].join('\t'));
   }
   const converted = result.join('\n');
   const error = validatePersonalGlossary(converted);

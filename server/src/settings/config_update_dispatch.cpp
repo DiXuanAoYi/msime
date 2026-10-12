@@ -24,6 +24,24 @@ bool ApplyConfigUpdate(const json::object &data)
     if (const auto annotation = ApplyCandidateAnnotationUpdate(data); annotation.has_value())
         return *annotation;
     const std::string path = json::value_to<std::string>(data.at("path"));
+    if (path == "input.english_candidates")
+        return SetConfiguredEnglishCandidates(json::value_to<bool>(data.at("value")));
+    if (path == "input.english_candidate_app_rules")
+        return SetConfiguredEnglishCandidateAppRules(json::value_to<std::string>(data.at("value")));
+    if (path == "input.wubi_four_code_auto_commit")
+        return SetConfiguredWubiFourCodeAutoCommit(json::value_to<bool>(data.at("value")));
+    if (path == "input.wubi_fifth_code_top_commit")
+        return SetConfiguredWubiFifthCodeTopCommit(json::value_to<bool>(data.at("value")));
+    if (path == "input.vim_mode_apps")
+        return SetConfiguredVimModeApps(json::value_to<std::string>(data.at("value")));
+    if (path == "input.enabled_domain_dictionaries")
+        return SetConfiguredEnabledDomainDictionaries(json::value_to<std::string>(data.at("value")));
+    if (path == "keybindings.trilingual_cycle")
+        return SetConfiguredTrilingualCycleEnabled(json::value_to<bool>(data.at("value")));
+    if (path == "general.floating_toolbar_shadow")
+        return SetConfiguredFloatingToolbarShadow(json::value_to<bool>(data.at("value")));
+    if (path == "appearance.candidate_fit_content")
+        return SetConfiguredCandidateFitContentMode(json::value_to<std::string>(data.at("value")));
     if (path == "input.mode")
         return SetConfiguredInputMode(json::value_to<std::string>(data.at("value")));
     if (path == "input.schema")
@@ -291,6 +309,12 @@ bool ApplyConfigUpdate(const json::object &data)
         if (value.is_int64())
             return SetConfiguredAiAssistantInt(key, static_cast<int>(value.as_int64()));
         return false;
+    }
+    if (path.rfind("candidate_translation.", 0) == 0)
+    {
+        const auto &value = data.at("value");
+        return value.is_string() &&
+               SetConfiguredCandidateTranslationString(path.substr(22), json::value_to<std::string>(value));
     }
     if (path.rfind("tencent_tmt.", 0) == 0)
     {

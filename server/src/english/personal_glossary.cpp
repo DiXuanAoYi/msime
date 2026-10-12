@@ -19,7 +19,7 @@ std::string_view Trim(std::string_view text)
 bool PersonalGlossary::IsLanguage(std::string_view language)
 {
     return language == "en" || language == "ja" || language == "es" || language == "fr" || language == "de" ||
-           language == "ru" || language == "ko" || language == "vi";
+           language == "ru" || language == "ko" || language == "vi" || language == "th" || language == "it";
 }
 
 bool PersonalGlossary::Parse(std::string_view text)

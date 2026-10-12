@@ -12,7 +12,7 @@
   </div>
 
   <details class="section ai-section"><summary class="section-title">AI 联想 API · 连接设置</summary>
-    <div class="ai-description ai-api-description">DeepSeek、OpenAI、SiliconFlow、Groq 均使用 OpenAI 兼容的 Chat Completions 接口。每个提供商的 Token 分开保存。</div>
+    <div class="ai-description ai-api-description">每个提供商分别保存接口、Token 和模型。Custom 接入其他兼容服务，本地服务仅访问本机且可不填 Token。</div>
     <div class="ai-grid">
       <div class="ai-field">
         <span>服务提供商</span>
@@ -26,10 +26,12 @@
             <div class="dropdown-item" data-value="openai">OpenAI</div>
             <div class="dropdown-item" data-value="siliconflow">SiliconFlow</div>
             <div class="dropdown-item" data-value="groq">Groq</div>
+            <div class="dropdown-item" data-value="custom">Custom · 自定义兼容服务</div>
+            <div class="dropdown-item" data-value="local">本地文本模型 · 离线</div>
           </div>
         </div>
       </div>
-      <label><span>模型</span><input id="aiModel" type="text" autocomplete="off" spellcheck="false"></label>
+      <div class="ai-field"><label for="aiModel">模型 · 可直接输入名称</label><div class="model-combo"><input id="aiModel" type="text" autocomplete="off" spellcheck="false"><button id="aiModelArrow" type="button" aria-label="展开或查询模型">⌄</button><div id="aiModelMenu" class="model-menu"></div></div><button id="aiModelFetchButton" type="button">查询模型</button><span id="aiModelFetchStatus" role="status"></span></div>
       <div class="ai-field">
         <label for="aiToken">API Token</label>
         <span class="ai-secret-input">
@@ -49,10 +51,20 @@
       </div>
       <label><span>候选数量</span><input id="aiCandidateLimit" type="number" min="1" max="10" autocomplete="off"></label>
       <label class="ai-wide"><span>接口地址</span><input id="aiEndpoint" type="url" autocomplete="off" spellcheck="false"></label>
+      <div id="aiThinkingField" class="ai-field"><span>DeepSeek 思考强度</span><div class="dropdown"><button id="aiThinkingBtn" class="dropdown-toggle" type="button"><span>关闭 · 更快</span><img src="./assets/arrow.svg" alt=""></button><div id="aiThinkingMenu" class="dropdown-menu"><div class="dropdown-item" data-value="disabled">关闭 · 更快</div><div class="dropdown-item" data-value="low">低</div><div class="dropdown-item" data-value="high">高</div><div class="dropdown-item" data-value="max">最高</div></div></div></div>
     </div>
+    <p id="aiConnectionNote" class="ai-description"></p>
     <div class="credential-test-row">
       <button id="aiCredentialTestButton" class="credential-test-button" type="button">测试配置</button>
       <span id="aiCredentialTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
     </div>
   </details>
-</div>
+  <div class="section ai-section">
+    <h3 class="section-title">输入任务与预览</h3>
+    <p class="ai-description">拼音转换、文本续写和问字分别处理。问字不带应用前文；本地叠字部件表可离线查部分常见字，其他问题需要支持问答的文本模型。含章拼音模型不能充当聊天问答。启用相应入口后，在活动组词中按 Ctrl + Alt + Q 问字，按 Ctrl + Alt + Enter 续写；敏感字段禁用输入 AI。</p>
+    <div class="section-header"><span>启用文本续写补全</span><div id="aiCompletionEnabled" class="ftb-toggle-btn" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
+    <div class="section-header"><span>启用问字入口</span><div id="aiQuestionEnabled" class="ftb-toggle-btn" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
+    <div class="ai-grid"><label><span>任务</span><select id="aiTask"><option value="pinyin">拼音转换</option><option value="completion">文本续写</option><option value="question">问字 · 多答案</option></select></label><label class="ai-wide"><span>输入内容</span><textarea id="aiTaskInput" placeholder="例如：ni hao / ming tian kai hui" rows="3"></textarea></label><label class="ai-wide"><span>可选前文 · 问字不使用</span><textarea id="aiTaskContext" rows="2"></textarea></label></div>
+    <div class="ai-actions"><button id="aiTaskRun" type="button">预览结果</button><button id="aiTaskCancel" type="button">取消</button></div><p id="aiTaskStatus" role="status"></p><div id="aiTaskResults"></div>
+  </div>
+<details class="section ai-section"><summary class="section-title">本地整句模型 · 按需管理</summary><p class="ai-description">只在点击下载或导入时安装所选模型。旧配置、旧模型及替换前备份保留。含章模型不是通用问答模型；首次启动需准备额外 Python/Torch 运行依赖。</p><button id="neuralRefresh" type="button">刷新本地模型</button><p id="neuralModelStatus" role="status"></p><div id="neuralModelCards"></div></details></div>

@@ -83,6 +83,15 @@ class Database
 
 int run_test()
 {
+    for (const auto &test : std::vector<std::pair<std::string, std::string>>{{"rennai", "れんあい"},
+                                                                             {"ren'ai", "れんあい"},
+                                                                             {"nn", "ん"},
+                                                                             {"nna", "んあ"},
+                                                                             {"konnichiha", "こんにちは"},
+                                                                             {"konnichiwa", "こんにちわ"},
+                                                                             {"konni", "こんに"}})
+        if (japanese::ConvertRomaji(test.first).hiragana != test.second)
+            throw std::runtime_error("Japanese explicit nasal or conventional greeting compatibility failed.");
     if (japanese::HiraganaToKatakana("かな") != "カナ" || japanese::HiraganaToRomaji("カナ") != "kana")
     {
         throw std::runtime_error("Kana conversion changed during the platform port.");

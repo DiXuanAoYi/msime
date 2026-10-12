@@ -86,7 +86,8 @@ enum KEYSTROKE_FUNCTION
     // one input unit and answers with the authoritative caret. Append-only, like
     // every function above.
     FUNCTION_MOVE_LEFT_SEGMENT,
-    FUNCTION_MOVE_RIGHT_SEGMENT
+    FUNCTION_MOVE_RIGHT_SEGMENT,
+    FUNCTION_CYCLE_INPUT_MODE
 };
 
 //---------------------------------------------------------------------

@@ -58,3 +58,12 @@ Optional OCR environments: GLM-OCR (ZhipuAI), HunyuanOCR (Tencent-Hunyuan),
 PaddleOCR-VL and PP-OCRv6 (PaddlePaddle). See each catalog entry's official model
 card for its license and requirements. Source/model files are individually
 verified before local loading; all weights require an explicit download action.
+
+Optional Hanzhang Tongbian / Zhiwei QJM runtime adapter is derived from the
+qingjian-format and qingjian-neural architecture/container contract,
+qingjian-team/qingjian commit dd9c471766e117c1f8c557042560776179fe9bfe.
+Code and official Hanzhang weights are GPL-3.0-or-later.
+https://github.com/qingjian-team/qingjian
+The corresponding GPL text is licenses/qingjian-GPL-3.0.txt.
+Official weights remain user-requested downloads; none are distributed here.
+Model metadata and source are retained after verified import.

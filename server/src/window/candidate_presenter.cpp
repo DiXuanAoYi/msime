@@ -93,6 +93,7 @@ struct CandSkinTokens
     D2D1_COLOR_F accent = ColorFromRgb(0x6B69D6);
     // Alpha 0: follow the candidate text at the CSS opacity .62 (see CandidateList::Appearance).
     D2D1_COLOR_F translation = D2D1::ColorF(0, 0.0f);
+    D2D1_COLOR_F translationPos{}, translationSeparator{}, selectedTranslationPos{}, selectedTranslationSeparator{};
     float radius = 6.0f;
     float borderWidth = 1.5f;
     float containerPad = 5.0f;
@@ -162,6 +163,10 @@ void ApplyPackageColors(const CandidateSkinCatalog::CandidateColors &colors, Can
     apply(colors.selectedText, tokens.rowTextSelected);
     apply(colors.selectedNumber, tokens.rowLabelSelected);
     apply(colors.selectedTranslation, tokens.rowTranslationSelected);
+    apply(colors.translationPos, tokens.translationPos);
+    apply(colors.translationSeparator, tokens.translationSeparator);
+    apply(colors.selectedTranslationPos, tokens.selectedTranslationPos);
+    apply(colors.selectedTranslationSeparator, tokens.selectedTranslationSeparator);
     apply(colors.preeditBackground, tokens.preeditBackground);
     apply(colors.preeditDivider, tokens.preeditDivider);
     apply(colors.menuBackground, tokens.menuFill);
@@ -443,6 +448,7 @@ void CandidatePresenter::ApplySkin()
                 << GetConfiguredCandidateWindowPreeditFontSize() << '|' << GetConfiguredCandidateWindowLayout() << '|'
                 << GetConfiguredCandidateTextColor() << '|' << GetConfiguredCandidateWindowPreeditStyle();
     fingerprint << '|' << GetConfiguredCandidateEnglishFont();
+    fingerprint << '|' << GetConfiguredCandidateFitContentMode();
     // 同一个外部皮肤的 skin.toml 或图片改了，只有强制重载能看出来；带上重载代数让 D2D 也重读 manifest。
     fingerprint << '|' << GetCandidateSkinReloadRevision();
     for (const auto &font : GetConfiguredCandidateFallbackFonts())
@@ -453,6 +459,9 @@ void CandidatePresenter::ApplySkin()
         return;
     }
     lastSkinFingerprint_ = skinKey;
+    stickyCardKey_.clear();
+    stickyCardWidthDip_ = 0.0f;
+    stickyCardHeightDip_ = 0.0f;
     CandSkinTokens tokens;
     if (candLight)
     {
@@ -481,6 +490,11 @@ void CandidatePresenter::ApplySkin()
     // 再往下套用配色与尺寸。重建会清掉指纹，这里补回去。
     const bool pageArrows = CandidateSkinCatalog::ResolvePageArrows(std::filesystem::path(skinsRoot), skinId,
                                                                     package ? &*package : nullptr);
+    const auto &fitMode = GetConfiguredCandidateFitContentMode();
+    const bool fitContent =
+        fitMode == "enabled" ||
+        (fitMode == "follow" && CandidateSkinCatalog::ResolveFitContent(std::filesystem::path(skinsRoot), skinId,
+                                                                        package ? &*package : nullptr));
     if (pageArrows != impl_->scenePageArrows || horizontalLayout != impl_->sceneHorizontal)
     {
         impl_->scenePageArrows = pageArrows;
@@ -784,7 +798,8 @@ void CandidatePresenter::ApplySkin()
     appearance.contentPadBottom = tokens.itemExtraHeight * 0.5f;
     appearance.textPadLeft = 5.0f;
     appearance.labelGap = tokens.labelGap;
-    appearance.minItemWidth = tokens.minItemWidth;
+    appearance.minItemWidth = fitContent ? 0.0f : tokens.minItemWidth;
+    appearance.fitContent = fitContent;
     appearance.selectedBarWidth = tokens.selectedBarWidth;
     appearance.selectedBarHeight = fontSize * tokens.selectedBarHeightEm;
     appearance.selectedBarInside = tokens.selectedBarInside;
@@ -807,6 +822,10 @@ void CandidatePresenter::ApplySkin()
     appearance.labelColor = tokens.number;
     appearance.annotationColor = palette.candidateText;
     appearance.translationColor = tokens.translation;
+    translationPos_ = tokens.translationPos;
+    translationSeparator_ = tokens.translationSeparator;
+    selectedTranslationPos_ = tokens.selectedTranslationPos;
+    selectedTranslationSeparator_ = tokens.selectedTranslationSeparator;
     appearance.rowTranslationSelected = tokens.rowTranslationSelected;
     appearance.rowFillSelected = tokens.selected;
     appearance.rowFillHover = tokens.hover;
@@ -902,7 +921,7 @@ void CandidatePresenter::ApplySkin()
     // 底边贴着卡片顶边、不与卡片重叠，按 align 贴卡片左/中/右，图片在盒内等比居中（contain）。
     decorationTopDip_ = 0.0f;
     decorationWidthDip_ = 0.0f;
-    cardMinWidthDip_ = kCandidateMinWidthDip;
+    cardMinWidthDip_ = fitContent ? 0.0f : kCandidateMinWidthDip;
     std::wstring decorationPath;
     std::wstring backgroundPath;
     const std::wstring packageRoot = package ? skinsRoot + L"\\" + string_to_wstring(package->id) + L"\\" : L"";
@@ -914,8 +933,8 @@ void CandidatePresenter::ApplySkin()
             decorationPath = packageRoot + string_to_wstring(package->decorationImage);
         if (!package->backgroundImage.empty())
             backgroundPath = packageRoot + string_to_wstring(package->backgroundImage);
-        cardMinWidthDip_ =
-            (std::max)({cardMinWidthDip_, static_cast<float>(package->minWidthDip), decorationWidthDip_});
+        cardMinWidthDip_ = (std::max)(
+            {cardMinWidthDip_, fitContent ? 0.0f : static_cast<float>(package->minWidthDip), decorationWidthDip_});
     }
     // 卡片上方留给阴影的 kShadowPadTop 与装饰盒重叠，装饰盒高过它时不再额外留白。
     float framePadTop = kShadowPadTop;
@@ -981,6 +1000,18 @@ std::uint64_t CandidatePresenter::FillItemsFromUi()
                     span.start = static_cast<uint32_t>(item.translation.size());
                     span.length = static_cast<uint32_t>(text.size());
                     span.opacity = run.muted ? 0.65f : 1.0f;
+                    if (run.kind == TranslationDisplayRun::Kind::PartOfSpeech)
+                    {
+                        span.color = translationPos_;
+                        span.selectedColor = selectedTranslationPos_;
+                    }
+                    else if (run.kind == TranslationDisplayRun::Kind::Separator)
+                    {
+                        span.color = translationSeparator_;
+                        span.selectedColor = selectedTranslationSeparator_;
+                    }
+                    if (span.color.a > 0.001f || span.selectedColor.a > 0.001f)
+                        span.opacity = 1.0f;
                     if (run.fresh)
                         span.color = D2D1::ColorF(0xed9409);
                     item.translationSpans.push_back(span);

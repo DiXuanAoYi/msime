@@ -2,10 +2,12 @@
 #include "../contracts/dictionary/format.h"
 #include "quanpin_query.h"
 
+#include "fuzzy_pinyin.h"
 #include "quanpin_utils.h"
 #include "../shuangpin/shuangpin_utils.h"
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <map>
 #include <sqlite3.h>
 #include <stdexcept>
@@ -1280,9 +1282,9 @@ const std::string &canonical_syllable(const std::string &syllable)
 }
 
 WordLatticeLookup make_lattice_db_lookup(sqlite3 *db, std::unordered_map<std::string, sqlite3_stmt *> &statement_cache,
-                                         int span_limit)
+                                         int span_limit, metasequoia::FuzzyPinyinOptions fuzzy)
 {
-    return [db, &statement_cache, span_limit](const Segments &span) {
+    return [db, &statement_cache, span_limit, fuzzy](const Segments &span) {
         Segments normalized;
         normalized.reserve(span.size());
         for (const auto &syllable : span)
@@ -1293,11 +1295,47 @@ WordLatticeLookup make_lattice_db_lookup(sqlite3 *db, std::unordered_map<std::st
         // gun'qi 于是捞出 gun'qiu 的「滚球」——拿这种行去造句，联想出来的短语读音
         // 根本对不上用户敲的拼音。简拼那两级同理。走批量精确键查询既堵住这个口子，
         // 也省掉了白扫的前缀区间。
-        const auto rows = query_exact_segmentations_keyed_flat({normalized}, db, statement_cache, span_limit);
+        std::vector<Segments> keys{normalized};
+        for (auto &variant : fuzzy_segmentations(normalized, fuzzy, kFuzzyLatticeVariantLimit))
+        {
+            for (auto &syllable : variant)
+                syllable = canonical_syllable(syllable);
+            keys.push_back(std::move(variant));
+        }
+        // 模糊变体与敲出的读音同批查（同表一条 SQL）。LIMIT 按表计，放宽到每个键一份，
+        // 免得高频的模糊读音把敲出读音的行挤出去；折算之后再截回 span_limit。
+        const int limit = span_limit * static_cast<int>(keys.size());
+        const auto rows = query_exact_segmentations_keyed_flat(keys, db, statement_cache, limit);
         std::vector<LatticeLexeme> lexemes;
         lexemes.reserve(rows.size());
         for (const auto &row : rows)
-            lexemes.push_back({row.key, row.value, row.weight});
+        {
+            LatticeLexeme lexeme{row.key, row.value, row.weight};
+            if (keys.size() > 1)
+            {
+                // 每个与敲出读音不同的音节扣一份分：一个词里错两个音，比只错一个更不可能。
+                const auto syllables = split_segments(row.key);
+                for (size_t i = 0; i < syllables.size() && i < normalized.size(); ++i)
+                    lexeme.penalty += syllables[i] == normalized[i] ? 0.0 : kFuzzyLatticePenaltyLog;
+            }
+            lexemes.push_back(std::move(lexeme));
+        }
+        if (keys.size() > 1)
+        {
+            // 按折后权重排序再截断：与 build_graph 一样，参与解码的只是排在前面的 span_limit 行。
+            std::stable_sort(lexemes.begin(), lexemes.end(), [](const LatticeLexeme &a, const LatticeLexeme &b) {
+                return static_cast<double>(a.weight) * std::pow(10.0, -a.penalty) >
+                       static_cast<double>(b.weight) * std::pow(10.0, -b.penalty);
+            });
+            // 同一个字两种读音都收（多音字），只留排在前面的那行。
+            std::unordered_set<std::string> seen;
+            lexemes.erase(
+                std::remove_if(lexemes.begin(), lexemes.end(),
+                               [&](const LatticeLexeme &lexeme) { return !seen.insert(lexeme.value).second; }),
+                lexemes.end());
+            if (lexemes.size() > static_cast<size_t>(std::max(0, span_limit)))
+                lexemes.resize(static_cast<size_t>(std::max(0, span_limit)));
+        }
         return lexemes;
     };
 }

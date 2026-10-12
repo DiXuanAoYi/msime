@@ -24,8 +24,55 @@
 #include <chrono>
 #include "../../../engine/contracts/ipc_negotiation.h"
 #include "KeyEventSinkInternal.h"
+#include "InputFieldPrivacy.h"
+#include "VimMode.h"
+#include "../../../engine/contracts/input_runtime_settings.h"
+#include "../../../engine/contracts/trilingual_input.h"
+#include "../../../engine/contracts/ai_input_shortcuts.h"
 
 using namespace key_event_sink_detail;
+
+bool CMetasequoiaIME::_IsTrilingualCycleEnabled() const
+{
+    return (_runtimeSettingsFlags.load(std::memory_order_acquire) & FanyImeRuntimeSettings::TrilingualCycle) &&
+           !Global::CapsLockEnabled.load(std::memory_order_relaxed) && SupportsTrilingualCycle();
+}
+
+bool CMetasequoiaIME::_IsAiTaskShortcut(UINT code, UINT modifiers, bool composition) const
+{
+    if (_serverUnavailableFallbackActive || (GetAsyncKeyState(VK_LWIN) & 0x8000) ||
+        (GetAsyncKeyState(VK_RWIN) & 0x8000))
+        return false;
+    const auto flags = _runtimeSettingsFlags.load(std::memory_order_acquire);
+    return FanyImeAiInput::Shortcut(code, modifiers, composition, (flags & FanyImeRuntimeSettings::AiCompletion) != 0,
+                                    (flags & FanyImeRuntimeSettings::AiQuestion) != 0) != FanyImeAiInput::Task::None;
+}
+
+void CMetasequoiaIME::_ApplyVimModeEscape(WPARAM key, LPARAM flags, bool eaten)
+{
+    if ((_runtimeSettingsFlags.load(std::memory_order_acquire) & FanyImeRuntimeSettings::VimMode) &&
+        VimMode::ShouldSwitchToEnglish(static_cast<unsigned>(key), eaten, IsAutoRepeat(flags), CaptureIpcModifiers(),
+                                       (GetAsyncKeyState(VK_LWIN) & 0x8000) || (GetAsyncKeyState(VK_RWIN) & 0x8000),
+                                       _IsCompositionActiveForKeyGuard(), _HasDeferredKeyBarrier()) &&
+        _pCompositionProcessorEngine && _pCompositionProcessorEngine->GetIMEMode(_pThreadMgr, _tfClientId))
+        _pCompositionProcessorEngine->SetIMEMode(_pThreadMgr, _tfClientId, FALSE);
+}
+
+void CMetasequoiaIME::_RefreshInputFieldPrivacy(ITfContext *context)
+{
+    const auto state = ResolveInputFieldPrivacy(this, context, _tfClientId);
+    const bool boundary =
+        context != _fieldPrivacyContext || _fieldPrivacyFocusGeneration != _deferredKeyFocusGeneration;
+    if (boundary || state != _fieldPrivacy)
+        _fieldPrivacyAnnounced = false;
+    _fieldPrivacy = state;
+    if (state == FanyImeFieldPrivacy::State::Sensitive)
+        _ClearLastCommit();
+    _fieldPrivacyContext = context;
+    _fieldPrivacyFocusGeneration = _deferredKeyFocusGeneration;
+    if (!_fieldPrivacyAnnounced && SupportsFieldPrivacy())
+        _fieldPrivacyAnnounced = SendFieldPrivacyToUIProcessViaNamedPipe(FanyImeFieldPrivacy::Encode(state)) == 0;
+}
 
 namespace
 {
@@ -141,6 +188,12 @@ bool IsTranslationCommitShortcut(UINT code, UINT modifiers)
            (GetAsyncKeyState(VK_RWIN) & 0x8000) == 0;
 }
 
+bool IsPinyinCommitShortcut(UINT code, UINT modifiers)
+{
+    return code == VK_RETURN && (modifiers & 0b00000111u) == 0b00000001u && (GetAsyncKeyState(VK_LWIN) & 0x8000) == 0 &&
+           (GetAsyncKeyState(VK_RWIN) & 0x8000) == 0;
+}
+
 bool IsCharacterSetInputModeToggle(UINT code, UINT modifiers)
 {
     return FanyImeProtocol::IsCharacterSetShortcut(code, modifiers) && (GetAsyncKeyState(VK_LWIN) & 0x8000) == 0 &&
@@ -221,6 +274,7 @@ void CMetasequoiaIME::_ApplyCapsLockKeyDownSideEffects(bool capsLockEnabled)
     _RequestLanguageBarCapsIconRefresh();
     if (_pCompositionProcessorEngine)
     {
+        _pCompositionProcessorEngine->SyncPunctuationWithCapsLock(_GetThreadMgr(), _GetClientId(), capsLockEnabled);
         const bool imeOpen = _pCompositionProcessorEngine->GetIMEMode(_GetThreadMgr(), _GetClientId()) != FALSE;
         _pCompositionProcessorEngine->SendCaretStateSwitchEvent(
             FanyImePipeEventType::IMESwitch, imeOpen, FanyImeCaretStateTrigger::CapsLockEdge, capsLockEnabled);
@@ -292,6 +346,17 @@ BOOL CMetasequoiaIME::_IsKeyEaten(         //
         }
     }
 
+    if (_IsAiTaskShortcut(*pCodeOut, CaptureIpcModifiers(),
+                          !freshCompositionState && _IsCompositionActiveForKeyGuard()))
+    {
+        if (pKeyState)
+        {
+            pKeyState->Category = CATEGORY_CANDIDATE;
+            pKeyState->Function = FUNCTION_SERVER_CANDIDATE_KEY;
+        }
+        return TRUE;
+    }
+
     if (!isOpen && !_serverUnavailableFallbackActive)
     {
         const UINT modifiers = CaptureIpcModifiers();
@@ -308,7 +373,9 @@ BOOL CMetasequoiaIME::_IsKeyEaten(         //
         if ((modifiers & 0b00000110u) != 0 || (GetAsyncKeyState(VK_LWIN) & 0x8000) ||
             (GetAsyncKeyState(VK_RWIN) & 0x8000))
             return isTouchKeyboardSpecialKeys;
-        if (ClassifyEnglishCandidateKey(*pCodeOut, wch, active,
+        if (FanyImeRuntimeSettings::ShouldOfferEnglishCandidates(_runtimeSettingsFlags.load(std::memory_order_acquire),
+                                                                 active) &&
+            ClassifyEnglishCandidateKey(*pCodeOut, wch, active,
                                         !freshCompositionState && _candidateMode != CANDIDATE_NONE,
                                         (GetKeyState(VK_CAPITAL) & 1) != 0, pKeyState))
         {
@@ -359,9 +426,12 @@ BOOL CMetasequoiaIME::_IsKeyEaten(         //
             return TRUE;
         }
 
-        // 候选框开着的时候 Ctrl+Enter 上屏高亮候选的译文；没有候选框时它仍然属于应用。
-        if (!freshCompositionState && _candidateMode != CANDIDATE_NONE &&
-            IsTranslationCommitShortcut(*pCodeOut, shortcutModifiers))
+        // Ctrl+Enter commits a candidate translation. Shift+Enter commits the
+        // Server's converted spelling, including compositions without candidates.
+        if (!freshCompositionState &&
+            ((_candidateMode != CANDIDATE_NONE && IsTranslationCommitShortcut(*pCodeOut, shortcutModifiers)) ||
+             (!_serverUnavailableFallbackActive && pCompositionProcessorEngine->GetVirtualKeyLength() > 0 &&
+              IsPinyinCommitShortcut(*pCodeOut, shortcutModifiers))))
         {
             if (pKeyState)
             {
@@ -634,6 +704,8 @@ STDAPI CMetasequoiaIME::OnSetFocus(BOOL fForeground)
 
 void CMetasequoiaIME::_NotePassthroughStatistics(UINT virtualKey, WCHAR wch, bool keyboardKnownEnabled)
 {
+    if (!FanyImeFieldPrivacy::AllowsLocalHistory(_fieldPrivacy))
+        return;
     if (!Global::StatisticsEnabled.load(std::memory_order_relaxed))
     {
         // With the switch off nothing is classified and no frame is written;
@@ -702,6 +774,12 @@ STDAPI CMetasequoiaIME::OnTestKeyDown(ITfContext *pContext, WPARAM wParam, LPARA
     if (pContext == nullptr || pIsEaten == nullptr)
     {
         return E_INVALIDARG;
+    }
+    _RefreshInputFieldPrivacy(pContext);
+    if (_fieldPrivacy == FanyImeFieldPrivacy::State::Sensitive)
+    {
+        *pIsEaten = FALSE;
+        return S_OK;
     }
     if ((wParam == VK_BACK && _undoKeyHeld) || _IsUndoCommitKey(pContext, wParam))
     {
@@ -826,6 +904,7 @@ STDAPI CMetasequoiaIME::OnTestKeyDown(ITfContext *pContext, WPARAM wParam, LPARA
     WCHAR wch = '\0';
     UINT code = 0;
     *pIsEaten = _IsKeyEaten(pContext, (UINT)wParam, &code, &wch, &KeystrokeState);
+    _ApplyVimModeEscape(wParam, lParam, *pIsEaten != FALSE);
 
     // Every keydown reaches this sink, including the ones handed back to the
     // application (backspace with no composition), so the smart-punctuation
@@ -870,6 +949,12 @@ STDAPI CMetasequoiaIME::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM lP
     {
         return E_INVALIDARG;
     }
+    _RefreshInputFieldPrivacy(pContext);
+    if (_fieldPrivacy == FanyImeFieldPrivacy::State::Sensitive)
+    {
+        *pIsEaten = FALSE;
+        return S_OK;
+    }
     if ((wParam == VK_BACK && _undoKeyHeld) || _IsUndoCommitKey(pContext, wParam))
     {
         _undoKeyHeld = true;
@@ -896,6 +981,7 @@ STDAPI CMetasequoiaIME::OnKeyDown(ITfContext *pContext, WPARAM wParam, LPARAM lP
     PerfTimer onKeyDownTimer;
     const uint64_t focusGeneration = _deferredKeyFocusGeneration;
     (void)_DispatchKeyDown(pContext, wParam, lParam, pIsEaten, nullptr, nullptr, nullptr, true, focusGeneration);
+    _ApplyVimModeEscape(wParam, lParam, *pIsEaten != FALSE);
     DebugTsfKeyLatency(L"on-key-down", 0, onKeyDownTimer.ElapsedMs(), S_OK);
     return S_OK;
 }
@@ -1188,9 +1274,22 @@ CMetasequoiaIME::KeyDownDispatchResult CMetasequoiaIME::_DispatchKeyDown(
             return KeyDownDispatchResult::Complete;
         }
 
+        if (KeystrokeState.Function == FUNCTION_CYCLE_INPUT_MODE && !SupportsTrilingualCycle())
+        {
+            _ResetSessionAfterFailure(DeferredKeyFailureKind::Resync);
+            return KeyDownDispatchResult::Complete;
+        }
+
         Global::Keycode = code;
         Global::wch = wch;
         Global::ModifiersDown = capturedModifiers;
+        if (KeystrokeState.Function == FUNCTION_CYCLE_INPUT_MODE)
+            Global::ModifiersDown |= FanyImeTrilingualInput::EncodeCycleRequest(
+                _pCompositionProcessorEngine->GetIMEMode(_pThreadMgr, _tfClientId) != FALSE,
+                Global::JapaneseInputModeEnabled.load(std::memory_order_relaxed));
+        _RefreshInputFieldPrivacy(pContext);
+        if (SupportsFieldPrivacy())
+            Global::ModifiersDown |= FanyImeFieldPrivacy::Encode(_fieldPrivacy);
 
         // The character-set shortcut carries the caret anchor for its badge.
         // An unresolved anchor is sent explicitly as {0, INVALID_Y}; the packet
@@ -1233,6 +1332,13 @@ CMetasequoiaIME::KeyDownDispatchResult CMetasequoiaIME::_DispatchKeyDown(
             }
             _ResetSessionAfterFailure(DeferredKeyFailureKind::Transport);
             return KeyDownDispatchResult::Complete;
+        }
+
+        if (KeystrokeState.Function == FUNCTION_CYCLE_INPUT_MODE && _msgWndHandle)
+        {
+            _PostAsyncKeyRequest(WM_AsyncCycleInputMode, code, wch, requestId, {}, 0, 0, deferredReplayToken);
+            return deferredReplayToken != 0 ? KeyDownDispatchResult::AwaitingCompletion
+                                            : KeyDownDispatchResult::Complete;
         }
 
         if (KeystrokeState.Function == FUNCTION_SERVER_CANDIDATE_KEY && _msgWndHandle)

@@ -5,6 +5,7 @@
 #include "engine/quanpin/quanpin_query.h"
 #include "engine/shuangpin/shuangpin_dictionary.h"
 #include "src/ipc/candidate_selection_policy.h"
+#include "src/ipc/ai_candidate_rerank.h"
 #include <windows.h>
 #include <algorithm>
 #include <filesystem>
@@ -339,11 +340,41 @@ TEST_CASE(LearnedEnglishSlotMovesEnglishBehindItsDefaultPosition)
     placement.slot = 3;
     placement.input = "ni";
     FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
-    // 槽位是列表下标：英文挪到下标 3；emoji 留在默认的下一位。
+    // 无页容量信息时，学到的英文槽位仍是下标 3；emoji 位于普通候选之后。
     REQUIRE_EQ(items[0].word, std::string("你"));
-    REQUIRE_EQ(items[1].source, CandidateSource::Emoji);
+    REQUIRE_EQ(items[1].word, std::string("呢"));
+    REQUIRE_EQ(items[2].word, std::string("泥"));
     REQUIRE_EQ(items[3].word, std::string("nice"));
+    REQUIRE_EQ(items[4].word, std::string("尼"));
+    REQUIRE_EQ(items[5].source, CandidateSource::Emoji);
     REQUIRE_EQ(*FanyImeIpc::SlottedEnglishIndex(items), size_t{3});
+
+    // 有页容量信息时，首页末位留给首个 emoji；学到的英文位置最多退到倒数第二位。
+    placement.page_size = 5;
+    placement.slot = 20;
+    items = {local("你"), local("呢"), local("泥"), local("尼"), english(), emoji()};
+    FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
+    REQUIRE_EQ(items[0].word, std::string("你"));
+    REQUIRE_EQ(items[1].word, std::string("呢"));
+    REQUIRE_EQ(items[2].word, std::string("泥"));
+    REQUIRE_EQ(items[3].word, std::string("nice"));
+    REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
+    REQUIRE_EQ(items[5].word, std::string("尼"));
+    REQUIRE_EQ(*FanyImeIpc::SlottedEnglishIndex(items), size_t{3});
+
+    // 用户显式固定位置优先于自动学到的位置，元数据与其余词条均保留。
+    auto pinned = english();
+    pinned.fixed_position = 2;
+    items = {local("你"), local("呢"), local("泥"), local("尼"), pinned, emoji()};
+    FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
+    REQUIRE_EQ(items[0].word, std::string("你"));
+    REQUIRE_EQ(items[1].word, std::string("nice"));
+    REQUIRE_EQ(items[1].fixed_position, 2);
+    REQUIRE_EQ(items[2].word, std::string("呢"));
+    REQUIRE_EQ(items[3].word, std::string("泥"));
+    REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
+    REQUIRE_EQ(items[5].word, std::string("尼"));
+    REQUIRE(!FanyImeIpc::SlottedEnglishIndex(items));
 }
 
 TEST_CASE(PinyinInputPrefersExactEnglishAndParksCompletionsOnTheFirstPage)
@@ -434,11 +465,12 @@ TEST_CASE(EmojiMixedCandidateFollowsEnglishAndShiftsWithCloudAndAi)
     const auto cloud = [] { return WordItem("ni", "云候选", 1, CandidateSource::CloudSuggestion); };
     const auto ai = [] { return WordItem("ni", "AI联想", 1, CandidateSource::AiSuggestion); };
 
-    // Base case: English at slot 2, emoji at slot 3.
+    // Without page size metadata the emoji stays after ordinary candidates.
     std::vector<WordItem> items = {local("你"), emoji(), local("呢"), english()};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
     REQUIRE_EQ(items[1].source, CandidateSource::EnglishDictionary);
-    REQUIRE_EQ(items[2].source, CandidateSource::Emoji);
+    REQUIRE_EQ(items[2].word, std::string("呢"));
+    REQUIRE_EQ(items[3].source, CandidateSource::Emoji);
 
     // Cloud + AI occupy slots 2/3; English and emoji shift to slots 4/5.
     items = {local("你"), emoji(), english(), ai(), cloud()};
@@ -453,7 +485,8 @@ TEST_CASE(EmojiMixedCandidateFollowsEnglishAndShiftsWithCloudAndAi)
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
     REQUIRE_EQ(items[1].source, CandidateSource::CloudSuggestion);
     REQUIRE_EQ(items[2].source, CandidateSource::EnglishDictionary);
-    REQUIRE_EQ(items[3].source, CandidateSource::Emoji);
+    REQUIRE_EQ(items[3].word, std::string("呢"));
+    REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
 }
 
 TEST_CASE(KaomojiMixedCandidateSitsRightAfterEmoji)
@@ -469,8 +502,9 @@ TEST_CASE(KaomojiMixedCandidateSitsRightAfterEmoji)
     std::vector<WordItem> items = {local("你"), kaomoji(), emoji(), local("呢"), english()};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
     REQUIRE_EQ(items[1].source, CandidateSource::EnglishDictionary);
-    REQUIRE_EQ(items[2].source, CandidateSource::Emoji);
-    REQUIRE_EQ(items[3].source, CandidateSource::Kaomoji);
+    REQUIRE_EQ(items[2].word, std::string("呢"));
+    REQUIRE_EQ(items[3].source, CandidateSource::Emoji);
+    REQUIRE_EQ(items[4].source, CandidateSource::Kaomoji);
 
     // Cloud + AI occupy slots 2/3; emoji/kaomoji shift to slots 5/6.
     items = {local("你"), kaomoji(), emoji(), english(), ai(), cloud()};
@@ -498,8 +532,8 @@ TEST_CASE(DateTimeMixedCandidateLeadsAsyncCandidates)
     REQUIRE_EQ(items[1].word, std::string("2026年10月2日"));
     REQUIRE_EQ(items[2].source, CandidateSource::CloudSuggestion);
     REQUIRE_EQ(items[3].source, CandidateSource::EnglishDictionary);
-    REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
-    REQUIRE_EQ(items[5].word, std::string("日期"));
+    REQUIRE_EQ(items[4].word, std::string("日期"));
+    REQUIRE_EQ(items[5].source, CandidateSource::Emoji);
     REQUIRE_EQ(items.back().word, std::string("2026-10-02"));
 
     // 快捷短语组仍排在日期前面，不被拆开。
@@ -1743,4 +1777,59 @@ TEST_CASE(EngineShuangpinMidSentenceUppercaseTriggerActsAsBacktick)
     REQUIRE(SetConfiguredShuangpinDirectHelpcodeEnabled(true));
     REQUIRE(!IsConfiguredMidSentenceHelpcodeUppercaseTrigger());
     REQUIRE_EQ(FormatMidSentenceHelpcodeUppercaseWorkerPayload(), std::wstring(L"0"));
+}
+TEST_CASE(EmojiHomepageTailPreservesAiBatchAndEnglishCompletion)
+{
+    std::vector<WordItem> items;
+    for (int i = 0; i < 12; ++i)
+        items.emplace_back("ni", "local" + std::to_string(i), 100);
+    items.emplace_back("nice", "nice", 10, CandidateSource::EnglishDictionary);
+    items.emplace_back("ni", "best-emoji", 10, CandidateSource::Emoji);
+    items.emplace_back("ni", "second-emoji", 9, CandidateSource::Emoji);
+    items.emplace_back("ni", "first-ai", 10, CandidateSource::AiSuggestion);
+    items.emplace_back("ni", "second-ai", 9, CandidateSource::AiSuggestion);
+    FanyImeIpc::EnglishPlacement placement;
+    placement.page_size = 9;
+    placement.require_exact = true;
+    placement.input = "ni";
+    FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
+    REQUIRE_EQ(items[8].word, std::string("best-emoji"));
+    REQUIRE_EQ(items[7].word, std::string("nice"));
+    REQUIRE_EQ(items.back().word, std::string("second-emoji"));
+    REQUIRE_EQ(std::count_if(items.begin(), items.end(),
+                             [](const auto &item) { return item.source == CandidateSource::AiSuggestion; }),
+               2);
+    FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
+    REQUIRE_EQ(items[8].word, std::string("best-emoji"));
+    REQUIRE_EQ(items[7].word, std::string("nice"));
+}
+
+TEST_CASE(LocalAiRerankPreservesOriginalRowsPinsAndInterveningCandidates)
+{
+    WordItem first("shi'shi", "事实", 100, CandidateSource::Database);
+    WordItem second("shi'shi", "实施", 99, CandidateSource::AppDictionary);
+    second.input_domains = {"computing"};
+    second.canonical_pinyin = "shi'shi";
+    WordItem pinned("shi'shi", "时事", 98);
+    pinned.fixed_position = 5;
+    std::vector<WordItem> items = {first,
+                                   WordItem("ss", "快捷", 1, CandidateSource::QuickPhrase),
+                                   WordItem("ss", "云", 1, CandidateSource::CloudSuggestion),
+                                   second,
+                                   pinned,
+                                   WordItem("shi", "是", 97)};
+    const std::vector<std::string> originals = {"事实", "实施", "时事"};
+    REQUIRE(FanyImeIpc::ApplyStableAiRerank(items, originals, {"不存在", "实施", "实施", "是", "事实", "时事"}));
+    REQUIRE_EQ(items[0].word, std::string("实施"));
+    REQUIRE_EQ(items[0].source, CandidateSource::AppDictionary);
+    REQUIRE_EQ(items[0].input_domains, std::vector<std::string>{"computing"});
+    REQUIRE_EQ(items[0].canonical_pinyin, std::string("shi'shi"));
+    REQUIRE_EQ(items[1].source, CandidateSource::QuickPhrase);
+    REQUIRE_EQ(items[2].source, CandidateSource::CloudSuggestion);
+    REQUIRE_EQ(items[3].word, std::string("事实"));
+    REQUIRE_EQ(items[4].word, std::string("时事"));
+    REQUIRE_EQ(items[4].fixed_position, 5);
+    REQUIRE_EQ(items[5].word, std::string("是"));
+    REQUIRE(!FanyImeIpc::ApplyStableAiRerank(items, originals, {"实施", "事实"}));
+    REQUIRE_EQ(items.size(), 6U);
 }

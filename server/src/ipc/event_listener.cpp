@@ -33,6 +33,7 @@
 #include "conversion/chinese_converter.h"
 #include "log/candidate_diag_log.h"
 #include "ipc/event_listener_internal.h"
+#include "ipc/ai_context_policy.h"
 
 using namespace event_listener_detail;
 
@@ -47,6 +48,7 @@ bool g_jianpin_mode_triggered = false;
 bool g_y_mode_triggered = false;
 bool g_r_mode_triggered = false;
 std::shared_ptr<IInputSession> g_r_mode_original_session;
+std::shared_ptr<IInputSession> g_language_cycle_parked_session;
 bool g_english_input_mode = false;
 } // namespace event_listener_detail
 
@@ -67,6 +69,7 @@ std::string g_candidate_translation_signature;
 // 数字键像选普通候选一样选一条上屏。输入串一个字都没动，所以退出这个子模式时把原来的
 // items / 页码 / 高亮位原样放回去就行，不需要重新查词。
 bool g_translation_candidates_active = false;
+bool g_ai_task_candidates_active = false;
 bool g_date_time_page_active = false;
 std::string g_date_time_page_keyword;
 std::vector<WordItem> g_translation_saved_items;
@@ -81,7 +84,7 @@ std::string TranslationIdentity(const EnglishIme::TranslationQuery &query)
 
 bool IsCandidateSubPageActive()
 {
-    return g_translation_candidates_active || g_date_time_page_active;
+    return g_translation_candidates_active || g_date_time_page_active || g_ai_task_candidates_active;
 }
 
 bool IsUiLessMode()
@@ -455,7 +458,8 @@ void PostCaretStateBadge(FanyImeUi::CaretStateBadge badge, int x, int y)
 void UpdateCloudInput(const std::string &input, uint64_t client_id, uint64_t activation_epoch)
 {
     std::lock_guard lock(g_async_request_mutex);
-    const std::string effective_input = GetConfiguredCloudCandidatesEnabled() ? input : std::string{};
+    const std::string effective_input =
+        GetConfiguredCloudCandidatesEnabled() && FanyImeIpc::AutomaticInputNetworkAllowed() ? input : std::string{};
     const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
     CloudIme::OnInputChanged(effective_input, japanese);
     ++g_cloud_generation;
@@ -507,26 +511,102 @@ void UpdateAiInput(const std::string &identity, uint64_t client_id, uint64_t act
 {
     std::lock_guard lock(g_async_request_mutex);
     const AiAssistantConfig config = GetConfiguredAiAssistant();
-    const bool usable = config.enabled && g_inputSession &&
+    const bool local = config.provider == "local" && AiAssistant::IsLoopbackEndpoint(config.endpoint);
+    const bool usable = FanyImeIpc::AutomaticInputAiAllowed(local) && FanyImeIpc::input_privacy.client == client_id &&
+                        FanyImeIpc::input_privacy.epoch == activation_epoch && config.enabled && g_inputSession &&
                         (g_inputSession->current_scheme_type() == SchemeType::Quanpin ||
                          g_inputSession->current_scheme_type() == SchemeType::Shuangpin) &&
                         g_inputSession->is_all_complete_pure_pinyin() && !g_inputSession->has_active_helpcode() &&
                         !identity.empty();
     (void)0;
     AiAssistant::Request request;
+    ClearAiRerankForInput(usable ? client_id : 0, usable ? activation_epoch : 0,
+                          usable ? g_inputSession->get_pinyin_sequence_with_cases() : std::string{});
     if (usable)
     {
         request.pinyin_segments = SplitPinyin(g_inputSession->get_pinyin_segmentation());
-        request.context = g_ai_context;
+        request.context = FanyImeIpc::StripCredentialLikeText(g_ai_context);
         request.identity = identity;
         request.config = config;
+        if (local)
+        {
+            auto normalized = [](std::string text) {
+                text.erase(std::remove_if(text.begin(), text.end(), [](char ch) { return ch == '\'' || ch == ' '; }),
+                           text.end());
+                return text;
+            };
+            const auto entire_pinyin = normalized(g_inputSession->get_quanpin());
+            for (const auto &candidate : g_inputSession->get_candidates())
+            {
+                const auto &pinyin = candidate.canonical_pinyin.empty() ? candidate.pinyin : candidate.canonical_pinyin;
+                if (!entire_pinyin.empty() && normalized(pinyin) == entire_pinyin)
+                    request.source_candidates.push_back({candidate.word, pinyin, "local-dictionary"});
+                if (request.source_candidates.size() == 32)
+                    break;
+            }
+        }
     }
+    std::vector<std::string> original_candidates;
+    for (const auto &candidate : request.source_candidates)
+        original_candidates.push_back(candidate.text);
     AiAssistant::OnInputChanged(std::move(request));
     ++g_ai_generation;
     g_ai_request_origin =
         usable ? AsyncRequestOrigin{client_id, activation_epoch, g_ai_generation, identity} : AsyncRequestOrigin{};
     if (usable)
+    {
         g_ai_request_origin.engine_query = g_inputSession->online_query();
+        g_ai_request_origin.raw_input = g_inputSession->get_pinyin_sequence_with_cases();
+        g_ai_request_origin.local_only = local;
+        g_ai_request_origin.original_candidates = std::move(original_candidates);
+    }
+}
+
+void UpdateAiTaskInput(AiAssistant::Task task, uint64_t client_id, uint64_t activation_epoch)
+{
+    std::lock_guard lock(g_async_request_mutex);
+    const auto config = GetConfiguredAiAssistant();
+    const bool local = config.provider == "local" && AiAssistant::IsLoopbackEndpoint(config.endpoint);
+    if (!g_inputSession || FanyImeIpc::input_privacy.state == FanyImeFieldPrivacy::State::Sensitive ||
+        FanyImeIpc::input_privacy.client != client_id || FanyImeIpc::input_privacy.epoch != activation_epoch ||
+        (task == AiAssistant::Task::Question ? !config.question_enabled : !config.completion_enabled))
+        return;
+    AiAssistant::Request request;
+    request.task = task;
+    ClearAiRerankForInput(0, 0, "");
+    request.config = config;
+    request.config.enabled = true; // An explicit task has its own opt-in switch.
+    const auto raw = g_inputSession->get_pinyin_sequence_with_cases();
+    if (raw.empty())
+        return;
+    request.identity = AiAssistant::TaskName(task) + ":" + raw;
+    request.text = raw;
+    const auto &candidates = g_inputSession->get_candidates();
+    if (!candidates.empty())
+        request.text = CandidateTextForOutput(GlobalIme::composition.creating_word.word + candidates.front().word);
+    bool offline_question = false;
+    if (task == AiAssistant::Task::Question)
+    {
+        request.pinyin_segments = SplitPinyin(g_inputSession->get_quanpin());
+        std::string pinyin;
+        for (const auto &segment : request.pinyin_segments)
+            pinyin += segment;
+        offline_question = !AiAssistant::LookupOfflineQuestion(request.text).empty() ||
+                           !AiAssistant::LookupOfflineQuestion(pinyin).empty();
+    }
+    if (!FanyImeIpc::AutomaticInputAiAllowed(local || offline_question))
+        return;
+    if (task == AiAssistant::Task::Completion)
+        request.context = FanyImeIpc::StripCredentialLikeText(g_ai_context);
+    request.text = FanyImeIpc::StripCredentialLikeText(request.text);
+    const auto identity = request.identity;
+    const auto text = request.text;
+    AiAssistant::OnInputChanged(std::move(request));
+    ++g_ai_generation;
+    g_ai_request_origin = {client_id, activation_epoch, g_ai_generation, identity};
+    g_ai_request_origin.raw_input = raw;
+    g_ai_request_origin.task_text = text;
+    g_ai_request_origin.local_only = local || offline_question;
 }
 
 AsyncRequestOrigin FindCloudRequestOrigin(const std::string &input, uint64_t generation)
@@ -578,6 +658,8 @@ std::string CandidateTextForOutput(const std::string &text)
 // 造词过程中每选中一段都会各自调用一次，因此这里只追加本次提交的那一段。
 void AppendAiContext(const std::string &committed_word)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
     g_ai_context += CandidateTextForOutput(committed_word);
     if (g_ai_context.size() > 1024)
     {
@@ -590,6 +672,30 @@ void AppendAiContext(const std::string &committed_word)
     // QueryRequest 下发到词典层。词典层自己按 RerankOptions::context_chars 取末尾若干字。
     if (g_inputSession)
         g_inputSession->set_rescoring_context(g_ai_context);
+}
+
+void BindInputFieldPrivacy(uint64_t client, uint64_t epoch, FanyImeFieldPrivacy::State state, bool force_boundary)
+{
+    auto &binding = FanyImeIpc::input_privacy;
+    const bool changed = force_boundary || binding.client != client || binding.epoch != epoch || binding.state != state;
+    binding = {client, epoch, state};
+    if (!changed)
+        return;
+    // This is temporary input pretext, not the user's persistent chat library.
+    g_ai_context.clear();
+    if (g_inputSession)
+        g_inputSession->set_rescoring_context("");
+    if (g_r_mode_original_session)
+        g_r_mode_original_session->set_rescoring_context("");
+    if (g_language_cycle_parked_session)
+        g_language_cycle_parked_session->set_rescoring_context("");
+    UpdateAiInput("");
+    UpdateCloudInput("");
+    EnglishIme::ClearTranslations();
+    CloudTranslation::Clear();
+    g_candidate_translation_glosses.clear();
+    g_candidate_translation_signature.clear();
+    ResetVocabularySelections();
 }
 
 void SyncShuangpinPreeditForms()
@@ -706,6 +812,7 @@ void ClearState()
     // same common words, and its first frame should already carry them.
     g_candidate_translation_signature.clear();
     g_translation_candidates_active = false;
+    g_ai_task_candidates_active = false;
     g_date_time_page_active = false;
     g_date_time_page_keyword.clear();
     g_translation_saved_items.clear();

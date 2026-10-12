@@ -27,6 +27,51 @@ static const GUID SupportCategories[] = {
     GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
     GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
 };
+// Copy of the profile icon (msime.ico) that the installer keeps at a fixed path, one level above
+// the DLL's directory. The installer puts the DLL into a fresh msime_v* directory on every upgrade,
+// so an icon path pointing at the DLL itself changes with each install; if the taskbar re-reads the
+// icon while that path is in flux, it falls back to a text label for the language and keeps showing
+// that until explorer restarts.
+static const WCHAR TEXTSERVICE_STABLE_ICON_FILE[] = L"MetasequoiaImeTip.ico";
+
+//+---------------------------------------------------------------------------
+//
+//  GetStableIconFile
+//
+//  Builds <parent of the DLL's directory>\MetasequoiaImeTip.ico and reports whether that file
+//  exists. Development registrations from a build directory have no such file and keep using the
+//  icon resource embedded in the DLL.
+//
+//----------------------------------------------------------------------------
+
+static BOOL GetStableIconFile(_In_ LPCWSTR modulePath, _Out_writes_(cchIconFile) LPWSTR iconFile, size_t cchIconFile)
+{
+    if (StringCchCopy(iconFile, cchIconFile, modulePath) != S_OK)
+    {
+        return FALSE;
+    }
+
+    // Strip the file name, then the version directory.
+    for (int i = 0; i < 2; ++i)
+    {
+        WCHAR *separator = wcsrchr(iconFile, L'\\');
+        if (!separator)
+        {
+            return FALSE;
+        }
+        *separator = L'\0';
+    }
+
+    if (StringCchCat(iconFile, cchIconFile, L"\\") != S_OK ||
+        StringCchCat(iconFile, cchIconFile, TEXTSERVICE_STABLE_ICON_FILE) != S_OK)
+    {
+        return FALSE;
+    }
+
+    DWORD attributes = GetFileAttributes(iconFile);
+    return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+}
+
 //+---------------------------------------------------------------------------
 //
 //  RegisterProfiles
@@ -51,6 +96,22 @@ BOOL RegisterProfiles()
     cchA = cchA >= MAX_PATH ? (MAX_PATH - 1) : cchA;
     achIconFile[cchA] = '\0';
 
+    UINT iconIndex = (UINT)TEXTSERVICE_ICON_INDEX;
+
+    // A truncated module path would yield a wrong parent directory, so only look for the stable
+    // icon when GetModuleFileName returned the full path.
+    WCHAR stableIconFile[MAX_PATH] = {'\0'};
+    if (cchA > 0 && cchA < MAX_PATH - 1 && GetStableIconFile(achIconFile, stableIconFile, ARRAYSIZE(stableIconFile)))
+    {
+        size_t lenOfStableIconFile = 0;
+        if (StringCchLength(stableIconFile, ARRAYSIZE(stableIconFile), &lenOfStableIconFile) == S_OK &&
+            StringCchCopy(achIconFile, ARRAYSIZE(achIconFile), stableIconFile) == S_OK)
+        {
+            cchA = static_cast<DWORD>(lenOfStableIconFile);
+            iconIndex = 0; // a .ico file holds one icon (in several sizes)
+        }
+    }
+
     size_t lenOfDesc = 0;
     hr = StringCchLength(TEXTSERVICE_DESC, STRSAFE_MAX_CCH, &lenOfDesc);
     if (hr != S_OK)
@@ -59,7 +120,7 @@ BOOL RegisterProfiles()
     }
     hr = pITfInputProcessorProfileMgr->RegisterProfile(
         Global::MetasequoiaIMECLSID, TEXTSERVICE_LANGID, Global::MetasequoiaIMEGuidProfile, TEXTSERVICE_DESC,
-        static_cast<ULONG>(lenOfDesc), achIconFile, cchA, (UINT)TEXTSERVICE_ICON_INDEX, NULL, 0, TRUE, 0);
+        static_cast<ULONG>(lenOfDesc), achIconFile, cchA, iconIndex, NULL, 0, TRUE, 0);
 
     if (FAILED(hr))
     {

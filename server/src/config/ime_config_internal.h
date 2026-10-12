@@ -11,6 +11,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <string_view>
@@ -114,6 +115,19 @@ struct ConfigValueUpdate
 // 配置状态：定义与初始化顺序都在 ime_config.cpp。
 extern SchemeType g_input_scheme;
 extern std::string g_input_mode;
+enum class ActiveInputMode
+{
+    Configured,
+    Chinese,
+    Japanese
+};
+extern std::atomic<ActiveInputMode> g_active_input_mode;
+extern std::atomic_bool g_configured_input_mode_japanese;
+extern std::atomic_bool g_trilingual_cycle_enabled;
+extern std::atomic_bool g_wubi_four_code_auto_commit;
+extern std::atomic_bool g_wubi_fifth_code_top_commit;
+extern std::shared_ptr<const std::string> g_vim_mode_apps;
+void LoadConfiguredCollocationGrammar(const toml::table &table);
 extern std::string g_japanese_schema;
 extern std::string g_character_set;
 extern std::string g_default_ime_mode;
@@ -166,6 +180,8 @@ extern std::uint32_t g_fuzzy_pinyin_rules;
 extern bool g_fuzzy_pinyin_enabled;
 extern bool g_fuzzy_seeded;
 extern bool g_floating_toolbar_enabled;
+extern std::atomic_bool g_floating_toolbar_shadow;
+extern std::atomic_int g_candidate_fit_content_mode;
 extern bool g_caret_state_indicator_enabled;
 extern bool g_caret_state_indicator_on_focus;
 extern std::string g_caret_state_indicator_position;
@@ -246,6 +262,10 @@ extern std::string g_theme_voice;
 extern std::shared_mutex g_voice_input_mutex;
 extern VoiceInputConfig g_voice_input;
 extern AiAssistantConfig g_ai_assistant;
+extern std::shared_mutex g_ai_assistant_mutex;
+extern std::atomic_bool g_english_runtime_candidates;
+extern std::shared_ptr<const std::string> g_english_candidate_app_rules;
+extern std::shared_ptr<const std::string> g_enabled_domain_dictionaries;
 extern TencentTmtConfig g_tencent_tmt;
 extern CustomTranslationConfig g_custom_translation;
 extern NiuTransConfig g_niutrans;
@@ -267,6 +287,12 @@ bool IsValidCandidateSkinId(const std::string &skin);
 bool IsValidCandidateFixedBadgeStyle(const std::string &style);
 bool IsValidSettingsWindowLinger(const std::string &linger);
 std::string AiAssistantTokenSlotKey(std::string_view provider);
+bool IsCredentialKey(const std::string &key);
+std::optional<std::string> ProtectCredentialLiteral(const std::string &key, const std::string &literal);
+void RevealStoredCredentials(toml::table &table);
+void ProtectPlaintextCredentials();
+bool IsValidAiThinking(const std::string &value);
+bool IsValidAiTask(const std::string &value);
 void RememberConfigWriteTime();
 
 // ime_config_toml.cpp

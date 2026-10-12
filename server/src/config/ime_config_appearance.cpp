@@ -227,8 +227,22 @@ bool SetConfiguredUiBackend(const std::string &backend)
 
 bool UseD2dSmallWindowUi()
 {
-    return UiBackendPolicy::Resolve(UiBackendPolicy::Surface::Candidate, g_ui_backend_active) ==
-           UiBackendPolicy::Backend::Native;
+    return IsNativeSmallWindowFallbackActive() ||
+           UiBackendPolicy::Resolve(UiBackendPolicy::Surface::Candidate, g_ui_backend_active) ==
+               UiBackendPolicy::Backend::Native;
+}
+
+namespace
+{
+std::atomic_bool native_small_window_fallback{false};
+}
+void ActivateNativeSmallWindowFallback()
+{
+    native_small_window_fallback.store(true);
+}
+bool IsNativeSmallWindowFallbackActive()
+{
+    return native_small_window_fallback.load();
 }
 
 const std::string &GetConfiguredCandidateSkin()

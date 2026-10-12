@@ -181,6 +181,9 @@ void RenderFloatingToolbarState(ICoreWebView2 *webview)
                               : L"window.setToolbarItem('reply-studio',false);");
     script.append(items.settings ? L"window.setToolbarItem('settings',true);"
                                  : L"window.setToolbarItem('settings',false);");
+    script.append(GetConfiguredFloatingToolbarShadow()
+                      ? L"if(window.setToolbarShadowEnabled)window.setToolbarShadowEnabled(true);"
+                      : L"if(window.setToolbarShadowEnabled)window.setToolbarShadowEnabled(false);");
     script.append(L"if(window.CheckContentTruncation)window.CheckContentTruncation();");
 
     webview->ExecuteScript(script.c_str(), nullptr);
@@ -207,6 +210,12 @@ HRESULT OnControllerCreatedFtbWnd(      //
     ICoreWebView2Controller *controller //
 )
 {
+    if (UseD2dSmallWindowUi())
+    {
+        if (controller)
+            controller->Close();
+        return S_OK;
+    }
     if (!controller || FAILED(result))
     {
         OnSmallWindowControllerSettled(FAILED(result) ? result : E_FAIL);
@@ -311,7 +320,7 @@ HRESULT OnControllerCreatedFtbWnd(      //
                 {
                     NotifySmallWindowNavigationReady(floatingToolbarNavigationReady, L"floating-toolbar");
                     ApplyConfiguredFloatingToolbarAppearance();
-                    floatingToolbarState.japanese_input_mode = GetConfiguredInputMode() == "japanese" ? 1 : 0;
+                    floatingToolbarState.japanese_input_mode = GetActiveInputMode() == "japanese" ? 1 : 0;
                     RenderFloatingToolbarState(sender);
                     ApplyConfiguredFloatingToolbarSize();
                     InjectSurfaceViewportLimits(sender, ::global_hwnd_ftb);
@@ -394,21 +403,12 @@ HRESULT OnControllerCreatedFtbWnd(      //
                     {
                         std::string mode = json::value_to<std::string>(val.at("data"));
 
-                        if (mode == "cn") // Change to CN
+                        // "en" is sent from the 中/日 icon, "cn" from the English one.
+                        // The Server picks the destination, so the trilingual cycle
+                        // applies to clicks as it does to the hotkey.
+                        if (mode == "cn" || mode == "en")
                         {
-#ifdef FANY_DEBUG
-                            (void)0;
-#endif
-                            SendToTsfWorkerThreadViaNamedpipe(
-                                Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToCn, L"");
-                        }
-                        else if (mode == "en") // Change to EN
-                        {
-#ifdef FANY_DEBUG
-                            (void)0;
-#endif
-                            SendToTsfWorkerThreadViaNamedpipe(
-                                Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToEn, L"");
+                            FanyNamedPipe::EnqueueToolbarLanguageToggleTask(mode == "en");
                         }
                     }
                     else if (type == "exitEnglishInputMode")
@@ -459,10 +459,7 @@ HRESULT OnControllerCreatedFtbWnd(      //
                     {
                         const std::string next =
                             GetConfiguredCharacterSet() == "traditional" ? "simplified" : "traditional";
-                        if (SetConfiguredCharacterSet(next))
-                        {
-                            PostSettingsConfig();
-                        }
+                        SetConfiguredCharacterSet(next);
                     }
                     else if (type == "openSettings")
                     {

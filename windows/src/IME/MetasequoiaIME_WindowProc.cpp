@@ -4,6 +4,7 @@
 #include "Private.h"
 #include "Globals.h"
 #include "MetasequoiaIME.h"
+#include "../../../engine/contracts/input_runtime_settings.h"
 #include "CandidateListUIPresenter.h"
 #include "CompositionProcessorEngine.h"
 #include "Compartment.h"
@@ -235,6 +236,11 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
 
     switch (message)
     {
+    case WM_ApplyRuntimeSettings:
+        // The atomic flag prevents new words immediately. An existing raw
+        // English word finishes at the next user commit boundary, so an async
+        // forced finalize cannot overtake queued letters.
+        break;
     case NativeCommitUndo::CaptureMessage:
         pIME->_CaptureNativeLastCommit(static_cast<uint64_t>(static_cast<uint32_t>(wParam)) |
                                        (static_cast<uint64_t>(static_cast<uint32_t>(lParam)) << 32));
@@ -713,6 +719,61 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
         }
         break;
     }
+    case WM_AsyncCycleInputMode: {
+        CMetasequoiaIME::AsyncKeyRequest request;
+        if (!pIME->_TakeAsyncKeyRequest(WM_AsyncCycleInputMode, static_cast<UINT>(wParam), request))
+        {
+            break;
+        }
+        if (!pIME->_IsFocusSessionCurrent(request.focusToken) ||
+            !pIME->_IsCompositionEpochCurrent(request.compositionEpoch))
+        {
+            pIME->_FailDeferredKey(request.deferredReplayToken, DeferredKeyFailureReason::Superseded);
+            break;
+        }
+        FanyImeNamedpipeDataToTsf *receivedData = TryReadCommitReplyFromServerPipe(request.requestId);
+        // The edit handler parses the payload once and rejects malformed text
+        // through the same deferred-cycle failure policy.
+        if (receivedData->msg_type != Global::DataFromServerMsgType::TrilingualCycle)
+        {
+            const DeferredKeyFailureReason reason = IsDeliveredServerRequestId(request.requestId)
+                                                        ? DeferredKeyFailureReason::DeliveryAmbiguous
+                                                        : DeferredKeyFailureReason::TransportBroken;
+            if (request.deferredReplayToken != 0)
+            {
+                pIME->_FailDeferredKey(request.deferredReplayToken, reason);
+            }
+            else
+            {
+                pIME->_ResetSessionAfterFailure(DeferredKeyFailureKind::Transport);
+            }
+            break;
+        }
+
+        ITfDocumentMgr *documentMgr = nullptr;
+        ITfContext *context = nullptr;
+        bool handedOffReplay = false;
+        if (SUCCEEDED(pIME->_GetThreadMgr()->GetFocus(&documentMgr)) && documentMgr)
+        {
+            if (SUCCEEDED(documentMgr->GetTop(&context)) && context)
+            {
+                _KEYSTROKE_STATE keyState = {};
+                keyState.Category = CATEGORY_COMPOSING;
+                keyState.Function = FUNCTION_CYCLE_INPUT_MODE;
+                pIME->_InvokeKeyHandler(context, request.code, request.wch, 0, keyState, request.requestId,
+                                        receivedData->candidate_string, 0, request.compositionEpoch, request.focusToken,
+                                        request.deferredReplayToken);
+                handedOffReplay = true;
+                context->Release();
+            }
+            documentMgr->Release();
+        }
+        if (!handedOffReplay)
+        {
+            pIME->_FailDeferredKey(request.deferredReplayToken, DeferredKeyFailureReason::AsyncPostFailed);
+        }
+        break;
+    }
     case WM_AsyncServerCandidateKey: {
         CMetasequoiaIME::AsyncKeyRequest request;
         if (!pIME->_TakeAsyncKeyRequest(WM_AsyncServerCandidateKey, static_cast<UINT>(wParam), request))
@@ -841,6 +902,9 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
     case WM_RefreshLanguageBarTheme: {
         if (wParam != 0)
         {
+            if (auto *engine = pIME->GetCompositionProcessorEngine())
+                engine->SyncPunctuationWithCapsLock(pIME->_GetThreadMgr(), pIME->_GetClientId(),
+                                                    Global::CapsLockEnabled.load(std::memory_order_relaxed));
             pIME->_RefreshLanguageBarThemeIcons();
             break;
         }

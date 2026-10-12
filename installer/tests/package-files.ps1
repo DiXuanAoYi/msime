@@ -37,6 +37,7 @@ try {
         'LICENSE',
         'server/assets/config/config.toml',
         'server/src/resource/MetasequoiaIME.ico',
+        'windows/image/msime.ico',
         'engine/helpcode/helpcodes/helpcode.txt',
         'engine/googlepinyinime-rev/data/dict_pinyin.dat',
         'MetasequoiaImeDict/out/msime.db',
@@ -65,13 +66,16 @@ try {
     Copy-Item (Join-Path $PSScriptRoot '../../assets/qingjian-glossary') (Join-Path $fixture 'assets') -Recurse
     Copy-Item (Join-Path $PSScriptRoot '../../scripts/build_translation_library.py') (Join-Path $fixture 'scripts')
     Copy-Item (Join-Path $PSScriptRoot '../../assets/translation-library') (Join-Path $fixture 'assets') -Recurse
+    Copy-Item (Join-Path $PSScriptRoot '../../scripts/build_domain_input.py') (Join-Path $fixture 'scripts')
+    Copy-Item (Join-Path $PSScriptRoot '../../assets/domain-input') (Join-Path $fixture 'assets') -Recurse
     $english = Join-Path $fixture 'MetasequoiaImeDict/out/english.db'
     python -c "import sqlite3,sys; sqlite3.connect(sys.argv[1]).executescript('CREATE TABLE english_words(word TEXT,display TEXT,weight INTEGER,PRIMARY KEY(word,display)); CREATE TABLE zh_en_glosses(word TEXT,gloss TEXT); CREATE TABLE en_zh_glosses(word TEXT,gloss TEXT);')" $english
     if ($LASTEXITCODE -ne 0) { throw 'Failed to create packaging fixture' }
     & (Join-Path $installer 'Prepare-PackageFiles.ps1') -RepoRoot $fixture -TargetVersion '2026.9.1' -IncludeSymbols
     foreach ($file in @('app_data/html/webview2/shared/runtime.js', 'app_data/dictionary-manifest.json',
                          'app_data/sc.lm', 'app_data/libime-lm-NOTICE.md', 'app_data/dict_pinyin.dat',
-                         'app_data/sentence-model-desktop.safetensors', 'app_data/sentence-model.safetensors',
+                         'app_data/sentence-model.safetensors', 'app_data/domain-input.db',
+                         'app_data/domain-input-sources/catalog.json', 'MetasequoiaImeTip.ico',
                          'app_data/industry-learning.db', 'app_data/translation-library/catalog.json', 'app_data/translation-library/study-cet4.tsv', 'app_data/translation-library/ECDICT-LICENSE.txt', 'app_data/chinese-ime-lm-NOTICE.md', 'app_data/qingjian-glossary.db', 'app_data/qingjian-glossary-sources/LICENSE',
                          'tsf_dll/32/MetasequoiaImeTsf.dll', 'tsf_dll/32/MetasequoiaImeTsf.pdb',
                          'tsf_dll/64/MetasequoiaImeTsf.dll', 'tsf_dll/64/MetasequoiaImeTsf.pdb',
@@ -114,6 +118,11 @@ try {
     $shipped = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($literal in [regex]::Matches($shippedBody, "CompareText\(\s*FileName\s*,\s*'([^']+)'")) {
         [void]$shipped.Add($literal.Groups[1].Value)
+    }
+    # Keyboard weights are shipped only when absent and deliberately become preserved user data.
+    [void]$shipped.Add('sentence-model.safetensors')
+    if (Test-Path (Join-Path $installer 'app_data/sentence-model-desktop.safetensors')) {
+        throw 'Desktop weights must remain on demand rather than silently bundled'
     }
     foreach ($entry in Get-ChildItem -LiteralPath (Join-Path $installer 'app_data') -Force) {
         if (-not $shipped.Contains($entry.Name)) {
@@ -187,8 +196,8 @@ try {
     try { & (Join-Path $installer 'Prepare-PackageFiles.ps1') -RepoRoot $fixture } catch { $rejected = $_.Exception.Message -match 'dict_pinyin\.dat' }
     if (-not $rejected) { throw 'Missing pinyin decoder model was accepted' }
     [IO.File]::WriteAllText($pinyinModelFixture, 'fixture')
-    # 神经整句模型同理：缺文件时 shared_sentence_model 返回 nullptr，设置页开关能开但不出候选。
-    $neuralModelFixture = Join-Path $fixture 'neural-model/sentence-model-desktop.safetensors'
+    # 随包速度档缺失必须拒绝；效果档缺失正常，后续由用户按需下载。
+    $neuralModelFixture = Join-Path $fixture 'neural-model/sentence-model.safetensors'
     Remove-Item $neuralModelFixture -Force
     $rejected = $false
     try { & (Join-Path $installer 'Prepare-PackageFiles.ps1') -RepoRoot $fixture } catch { $rejected = $_.Exception.Message -match 'safetensors' }

@@ -1,4 +1,5 @@
 #include "ime_session.h"
+#include "../domain_dictionary/domain_dictionary.h"
 #include "../schemes/quanpin_scheme.h"
 #include "../schemes/shuangpin_scheme.h"
 #include "../schemes/wubi_scheme.h"
@@ -368,7 +369,17 @@ void ImeSession::apply_request_options(QueryRequest &request) const
     request.enable_quanpin_autocorrect_neighbor = (quanpin_autocorrect_types_ & quanpin::kAutocorrectNeighbor) != 0;
     request.fuzzy_pinyin = fuzzy_pinyin_;
     request.sentence_association = sentence_association_;
+    request.enabled_domain_dictionaries = enabled_domain_dictionaries_;
     request.rescoring_context = rescoring_context_;
+}
+
+void ImeSession::set_enabled_domain_dictionaries(const std::string &csv)
+{
+    const auto normalized = domain_dictionary::normalize_enabled(csv);
+    if (enabled_domain_dictionaries_ == normalized)
+        return;
+    enabled_domain_dictionaries_ = normalized;
+    reset_cache();
 }
 
 void ImeSession::refresh_candidates()

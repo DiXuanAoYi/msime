@@ -283,10 +283,10 @@ bool WriteFileTextAtomically(const std::filesystem::path &path, const std::strin
     {
         return true;
     }
-    const bool replaced = WriteFileBytes(path, text);
+    // A failed rename must leave the previous file intact. Never truncate it as a fallback.
     std::error_code error;
     std::filesystem::remove(temp_path, error);
-    return replaced;
+    return false;
 }
 
 bool TomlTextIsParseable(const std::string &text)

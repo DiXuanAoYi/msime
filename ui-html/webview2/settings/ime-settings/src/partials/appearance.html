@@ -1,6 +1,155 @@
 <div class="content" id="appearence-settings">
   <div class="content-header"><span>外观</span></div>
 
+  <!-- 主题模式（全局） -->
+  <div class="section sec-theme">
+    <div class="section-header theme-toggle-header">
+      <div>
+        <div class="section-title">主主题（全局）</div>
+        <div class="appearance-description">采用“跟随主主题”的界面随这里切换；独立选择浅色或深色的界面保持自己的设置。</div>
+      </div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="themeBtn">
+          <span>深色</span>
+          <div class="arrow">
+            <img src="./assets/arrow.svg" alt="arrow">
+          </div>
+        </button>
+        <div class="dropdown-menu" id="themeMenu">
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+          <div class="dropdown-item" data-value="system">跟随系统</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">设置页主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="settingsThemeBtn">
+          <span>跟随主主题</span>
+          <div class="arrow">
+            <img src="./assets/arrow.svg" alt="arrow">
+          </div>
+        </button>
+        <div class="dropdown-menu" id="settingsThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+    <div class="theme-resolution-box">
+      <p id="settingsThemeStatus" role="status">正在读取设置页主题…</p>
+      <button type="button" class="theme-follow-button" id="settingsThemeFollowBtn" disabled>已跟随主主题</button>
+    </div>
+    <div class="divider"></div>
+    <button class="theme-surface-expand" id="themeSurfaceExpand" type="button" aria-expanded="false" aria-controls="themeSurfaceDetails">
+      <span class="section-title">其他界面独立主题</span><span class="theme-surface-chevron" aria-hidden="true"></span>
+    </button>
+    <div class="theme-surface-details" id="themeSurfaceDetails">
+    <div class="section-header">
+      <div class="section-title">候选窗口主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="candThemeBtn">
+          <span>跟随主主题</span>
+          <div class="arrow">
+            <img src="./assets/arrow.svg" alt="arrow">
+          </div>
+        </button>
+        <div class="dropdown-menu" id="candThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">悬浮工具栏主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="ftbThemeBtn">
+          <span>跟随主主题</span>
+          <div class="arrow">
+            <img src="./assets/arrow.svg" alt="arrow">
+          </div>
+        </button>
+        <div class="dropdown-menu" id="ftbThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">菜单主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="menuThemeBtn">
+          <span>跟随主主题</span>
+          <div class="arrow">
+            <img src="./assets/arrow.svg" alt="arrow">
+          </div>
+        </button>
+        <div class="dropdown-menu" id="menuThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">表情面板主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="emojiThemeBtn"><span>跟随主主题</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
+        <div class="dropdown-menu" id="emojiThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">屏幕键盘主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="screenKeyboardThemeBtn"><span>跟随主主题</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
+        <div class="dropdown-menu" id="screenKeyboardThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">手写识别板主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="handwritingThemeBtn"><span>跟随主主题</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
+        <div class="dropdown-menu" id="handwritingThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-header">
+      <div class="section-title">语音输入弹出条主题</div>
+      <div class="dropdown">
+        <button class="dropdown-toggle" id="voiceThemeBtn"><span>跟随主主题</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
+        <div class="dropdown-menu" id="voiceThemeMenu">
+          <div class="dropdown-item" data-value="follow">跟随主主题</div>
+          <div class="dropdown-item" data-value="dark">深色</div>
+          <div class="dropdown-item" data-value="light">浅色</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+
   <!-- 候选窗口预览 -->
   <div class="section sec-candidate-preview">
     <div class="section-header s-h-cand-preview">
@@ -17,7 +166,7 @@
     <div class="section-header">
       <div>
         <div class="section-title">界面渲染</div>
-        <div class="floating-toolbar-description">用于候选窗、悬浮工具栏和托盘菜单。更改后需重启输入法进程才会生效。</div>
+        <div class="floating-toolbar-description">用于候选窗、悬浮工具栏和托盘菜单。更改后需重启输入法进程。启动失败时小窗口临时使用 D2D，原渲染器配置保留，重启后再尝试 WebView2。</div>
       </div>
       <div class="dropdown">
         <button class="dropdown-toggle" id="uiBackendBtn">
@@ -64,6 +213,7 @@
         </div>
       </div>
     </div>
+    <p class="appearance-description">小窗口若因 WebView2 启动失败，会临时使用 D2D；已保存的渲染器配置保留，重启服务后会重新尝试。</p>
   </div>
 
   <!-- 候选窗样式 -->
@@ -232,146 +382,6 @@
     </div>
   </div>
 
-  <!-- 主题模式（全局） -->
-  <div class="section sec-theme">
-    <div class="section-header theme-toggle-header">
-      <button class="theme-surface-expand" id="themeSurfaceExpand" type="button" aria-expanded="false" aria-controls="themeSurfaceDetails">
-        <span class="section-title">主题模式</span><span class="theme-surface-chevron" aria-hidden="true"></span>
-      </button>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="themeBtn">
-          <span>深色</span>
-          <div class="arrow">
-            <img src="./assets/arrow.svg" alt="arrow">
-          </div>
-        </button>
-        <div class="dropdown-menu" id="themeMenu">
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-          <div class="dropdown-item" data-value="system">跟随系统</div>
-        </div>
-      </div>
-    </div>
-    <!-- 分表面主题 -->
-    <div class="theme-surface-details" id="themeSurfaceDetails">
-    <div class="section-header">
-      <div class="section-title">设置界面主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="settingsThemeBtn">
-          <span>跟随全局</span>
-          <div class="arrow">
-            <img src="./assets/arrow.svg" alt="arrow">
-          </div>
-        </button>
-        <div class="dropdown-menu" id="settingsThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="section-header">
-      <div class="section-title">候选窗口主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="candThemeBtn">
-          <span>跟随全局</span>
-          <div class="arrow">
-            <img src="./assets/arrow.svg" alt="arrow">
-          </div>
-        </button>
-        <div class="dropdown-menu" id="candThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="section-header">
-      <div class="section-title">悬浮工具栏主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="ftbThemeBtn">
-          <span>跟随全局</span>
-          <div class="arrow">
-            <img src="./assets/arrow.svg" alt="arrow">
-          </div>
-        </button>
-        <div class="dropdown-menu" id="ftbThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="section-header">
-      <div class="section-title">菜单主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="menuThemeBtn">
-          <span>跟随全局</span>
-          <div class="arrow">
-            <img src="./assets/arrow.svg" alt="arrow">
-          </div>
-        </button>
-        <div class="dropdown-menu" id="menuThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="section-header">
-      <div class="section-title">表情面板主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="emojiThemeBtn"><span>跟随全局</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
-        <div class="dropdown-menu" id="emojiThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="section-header">
-      <div class="section-title">屏幕键盘主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="screenKeyboardThemeBtn"><span>跟随全局</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
-        <div class="dropdown-menu" id="screenKeyboardThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="section-header">
-      <div class="section-title">手写识别板主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="handwritingThemeBtn"><span>跟随全局</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
-        <div class="dropdown-menu" id="handwritingThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="section-header">
-      <div class="section-title">语音输入弹出条主题</div>
-      <div class="dropdown">
-        <button class="dropdown-toggle" id="voiceThemeBtn"><span>跟随全局</span><div class="arrow"><img src="./assets/arrow.svg" alt="arrow"></div></button>
-        <div class="dropdown-menu" id="voiceThemeMenu">
-          <div class="dropdown-item" data-value="follow">跟随全局</div>
-          <div class="dropdown-item" data-value="dark">深色</div>
-          <div class="dropdown-item" data-value="light">浅色</div>
-        </div>
-      </div>
-    </div>
-  </div>
-  </div>
-
   <!-- 候选项排列方式 -->
   <div class="section sec-arrange">
     <div class="section-header">
@@ -448,4 +458,4 @@
     </div>
   </div>
 
-</div>
+<div class="section"><div class="section-header"><div><div class="section-title">候选窗口宽度贴合内容</div><p class="floating-toolbar-description">跟随皮肤，或为所有皮肤指定开关；保留候选上方拼音和装饰的必要宽度。</p></div><div class="dropdown"><button id="candidateFitContentBtn" class="dropdown-toggle" type="button"><span>跟随皮肤</span><img src="./assets/arrow.svg" alt=""></button><div id="candidateFitContentMenu" class="dropdown-menu"><div class="dropdown-item" data-value="follow">跟随皮肤</div><div class="dropdown-item" data-value="enabled">启用</div><div class="dropdown-item" data-value="disabled">关闭</div></div></div></div></div></div>

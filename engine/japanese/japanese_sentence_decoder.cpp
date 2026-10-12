@@ -343,6 +343,24 @@ std::vector<JapaneseLemma> JapaneseSentenceDecoder::PrefixLemmas(const std::stri
     return BestLemmas(matches, limit);
 }
 
+std::vector<JapaneseLemma> JapaneseSentenceDecoder::LongerPrefixLemmas(const std::string &reading_prefix,
+                                                                       size_t limit) const
+{
+    if (!ready_ || reading_prefix.empty() || limit == 0)
+        return {};
+    std::vector<std::uint32_t> matches;
+    for (size_t index = LowerBoundReading(reading_prefix); index < token_count_; ++index)
+    {
+        const auto token_reading = Reading(TokenAt(index));
+        if (token_reading.size() < reading_prefix.size() ||
+            token_reading.compare(0, reading_prefix.size(), reading_prefix) != 0)
+            break;
+        if (token_reading.size() > reading_prefix.size())
+            matches.push_back(static_cast<std::uint32_t>(index));
+    }
+    return BestLemmas(matches, limit);
+}
+
 std::vector<JapaneseLemma> JapaneseSentenceDecoder::PrefixLemmasContinuing(const std::string &reading_prefix,
                                                                            const std::vector<std::string> &next_kana,
                                                                            size_t limit) const

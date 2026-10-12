@@ -362,6 +362,9 @@ if __name__ == "__main__":
     if '--image-job' in sys.argv:
         from image_ops import run_job
         run_job(sys.argv[sys.argv.index('--image-job')+1])
+    elif '--neural' in sys.argv:
+        import neural_manager
+        neural_manager.main()
     elif '--ocr' in sys.argv:
         import ocr_manager
         ocr_manager.main()

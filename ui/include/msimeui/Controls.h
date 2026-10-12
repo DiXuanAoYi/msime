@@ -503,7 +503,8 @@ class CandidateList : public Visual
     {
         uint32_t start = 0, length = 0;
         float opacity = 1.0f;
-        D2D1_COLOR_F color = {}; // alpha zero inherits the surrounding text color
+        D2D1_COLOR_F color = {};         // alpha zero inherits the surrounding text color
+        D2D1_COLOR_F selectedColor = {}; // alpha zero follows the normal span color
     };
     struct Item
     {
@@ -545,6 +546,7 @@ class CandidateList : public Visual
         // Horizontal only: items narrower than this are widened to it, content
         // stays leading. 0 keeps every item at its natural width.
         float minItemWidth = 0.0f;
+        bool fitContent = false;
         float contentPadLeft = 5.0f;
         float contentPadRight = 5.0f;
         // Part of itemHeight that is the row's bottom padding. Lines stacked

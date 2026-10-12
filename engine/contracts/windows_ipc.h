@@ -111,7 +111,9 @@ constexpr std::uint32_t ClientSuspended = 14;   // temporary focus route reset; 
 // ownership claim the Server would discard it as an inactive-client event.
 constexpr std::uint32_t FocusRestored = 15;
 constexpr std::uint32_t VocabularyCommitConfirmed = 17; // request_id only; no text
-constexpr std::uint32_t HideCaretState = 16;            // focus-context boundary; never clears candidate state
+constexpr std::uint32_t RuntimeSettingsRequest = 18;
+constexpr std::uint32_t FieldPrivacyChanged = 19; // flags only; never document text
+constexpr std::uint32_t HideCaretState = 16;      // focus-context boundary; never clears candidate state
 // Caret-badge notifications (FanyImeProtocol::CaretStateIndicator). keycode is
 // the resulting mode (1 = Chinese / Chinese punctuation / fullwidth); point[]
 // is the physical caret anchor or {0, INVALID_Y} when none was resolved.
@@ -336,7 +338,8 @@ constexpr std::uint32_t ProtocolMismatch = 13;
 constexpr std::uint32_t CompositionRestored = 14;
 // Highest opcode a live Server may send. Local-only sentinels are larger and
 // must never be accepted as a Server frame.
-constexpr std::uint32_t MaxKnown = CompositionRestored;
+constexpr std::uint32_t TrilingualCycle = 15;
+constexpr std::uint32_t MaxKnown = TrilingualCycle;
 // Local-only result. It is never sent over the pipe and must never be
 // interpreted as candidate text to commit.
 constexpr std::uint32_t TransportUnavailable = static_cast<std::uint32_t>(-1);
@@ -433,7 +436,9 @@ constexpr std::uint32_t MidSentenceHelpcodeUppercaseChanged = 31;
 constexpr std::uint32_t VModeChanged = 32;
 // Optional VocabularyCommit capability: decimal request id, tab, committed text.
 constexpr std::uint32_t VocabularyCommitCandidate = 33;
-constexpr std::uint32_t MaxKnown = VocabularyCommitCandidate;
+constexpr std::uint32_t RuntimeSettingsSnapshot = 34;
+constexpr std::uint32_t TrilingualCycleChanged = 35;
+constexpr std::uint32_t MaxKnown = TrilingualCycleChanged;
 // Source compatibility for the Server's historical spellings.
 constexpr std::uint32_t SwitchToEn = SwitchToEnglish;
 constexpr std::uint32_t SwitchToCn = SwitchToChinese;

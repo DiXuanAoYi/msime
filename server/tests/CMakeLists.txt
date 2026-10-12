@@ -28,6 +28,10 @@ target_compile_features(test_voice_control_dispatch PRIVATE cxx_std_17)
 add_test(NAME voice_control_dispatch COMMAND test_voice_control_dispatch)
 
 set(TEST_SOURCE_FILES
+    src/test_ai_tasks.cpp
+    src/test_settings_task_diagnostics.cpp
+    src/ai_task_fixture_probe.cpp
+    src/candidate_translation_fixture_probe.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_app_dictionary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vision.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vision_workbench.cpp"
@@ -50,8 +54,11 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_caret_prefix_input_session.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_english_dictionary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_translation_gloss.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_translation.cpp"
+    "${CMAKE_SOURCE_DIR}/src/cloud/cloud_translation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_default_config_credentials.cpp"
     "${CMAKE_SOURCE_DIR}/src/cloud/translation_gloss.cpp"
+    "${CMAKE_SOURCE_DIR}/src/cloud/ai_translation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_custom_translation.cpp"
     "${CMAKE_SOURCE_DIR}/src/cloud/custom_translation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_niutrans_translation.cpp"
@@ -64,6 +71,13 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_async_request_origin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_assistant_cache_key.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_cache_key.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/ai_task.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_request.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/api_credential_test.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/ai_workbench.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/neural_models.cpp"
+    "${CMAKE_SOURCE_DIR}/src/voice-input/doubao_asr_client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_assistant_cache.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_cache.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_ui_action_policy.cpp"
@@ -124,6 +138,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/skin/candidate_skin_catalog.cpp"
     "${CMAKE_SOURCE_DIR}/src/window/candidate_skin_palette.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_floating_toolbar_skin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_toolbar_placement.cpp"
     "${CMAKE_SOURCE_DIR}/src/window/floating_toolbar_skin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_system_font_family.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_dictionary_validation.cpp"
@@ -157,12 +172,16 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_input.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_keys.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_services.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/ime_config_candidate_translation.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_shuangpin.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_template.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_theme.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_toml.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_toolbar.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_write.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/credential_protection.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/ime_config_credentials.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/ime_config_runtime.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/engine_input_session.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/common_utils.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/ime_paths.cpp"
@@ -212,6 +231,8 @@ target_link_libraries(${TEST_EXECUTABLE_NAME}
     Boost::locale
     Boost::json
     CURL::libcurl
+    ZLIB::ZLIB
+    winhttp
     unofficial::sqlite3::sqlite3
     # dictionary_manager.cpp annotates pure-Chinese imports with cpp-pinyin and clears the
     # candidate cache through user32 window messages.

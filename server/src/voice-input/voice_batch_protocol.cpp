@@ -130,7 +130,16 @@ std::string BuildBatchPolish(const std::string &text, const VoiceInputConfig &co
     if (config.polish_provider == "siliconflow")
         body["enable_thinking"] = false;
     else if (config.polish_provider == "deepseek")
-        body["thinking"] = {{"type", "disabled"}};
+    {
+        const bool thinking =
+            config.polish_thinking == "low" || config.polish_thinking == "high" || config.polish_thinking == "max";
+        body["thinking"] = {{"type", thinking ? "enabled" : "disabled"}};
+        if (thinking)
+        {
+            body["reasoning_effort"] = config.polish_thinking;
+            body["max_tokens"] = 8192;
+        }
+    }
     return body.dump();
 }
 } // namespace VoiceInput

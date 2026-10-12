@@ -371,11 +371,11 @@ std::string BuildQuanpinAutocorrectDisplay(const QueryRequest &request)
     }
 
     // Jianpin guard, mirroring resolve_series_query in the dictionary layer: a
-    // legal syllable plus at most one trailing letter is user intent, never a
-    // typo. The deletion table explains shapes like "zheg" -> zheng, so without
-    // this guard the preedit would lose the scheme separators once the deletion
-    // bit rides along with the legacy switches.
-    if (quanpin::looks_like_syllable_with_jianpin_tail(request.raw_input))
+    // leading initial plus complete syllables, or legal syllables plus at most
+    // one trailing initial, expresses user intent rather than a typo
+    // Corrections like "ywen" -> wen and "zheg" -> zheng would otherwise erase
+    // the original syllable boundaries from the preedit
+    if (quanpin::looks_like_jianpin_spelling(request.raw_input))
     {
         // The typed spelling is legal, but the scheme alias table may still
         // have re-segmented it into a reading with copied letters (dongan ->
@@ -410,6 +410,46 @@ std::string BuildQuanpinAutocorrectDisplay(const QueryRequest &request)
     // were rewritten, otherwise keep the scheme segmentation untouched. Manual
     // delimiters are part of what was typed, so they stay ("mihng'").
     return letters_rewritten ? cased : base;
+}
+
+// 首选是同一串字母的另一种字面切分时（yibananzhao 由 yi'ban'an'zhao 的「一般按照」领衔，
+// fangan 由 fang'an 的「方案」领衔），预编辑跟着首选分，而不是停在方案层的最少音节切分上，
+// 否则用户看着 yi'ba'nan'zhao 选「一般按照」。只认读音字母与敲的字母逐个相同、盖住整串、
+// 不带纠错标记的首选（辅助码、手动分隔符都不满足），而且音节数与方案层切分相同：那正是
+// 只差一处 n/ng 边界的等长歧义；音节数不同的读法（nue 的字面整词「怒鹅」nu'e）不在此列，
+// 预编辑照旧。否则返回空串。
+std::string BuildQuanpinDisplayFromLiteralHead(const QueryRequest &request, const WordItem &head)
+{
+    const std::string &cased = request.raw_input_with_cases.empty() ? request.raw_input : request.raw_input_with_cases;
+    if (!head.corrected_from.empty() || request.raw_input.find('\'') != std::string::npos ||
+        cased.size() != request.raw_input.size())
+    {
+        return {};
+    }
+    const auto syllables = quanpin::split_segments(head.pinyin);
+    const std::string &scheme_segmentation =
+        request.normalized_segmentation.empty() ? request.segmentation : request.normalized_segmentation;
+    if (syllables.size() < 2 || syllables.size() != quanpin::split_segments(scheme_segmentation).size())
+    {
+        return {};
+    }
+    std::vector<size_t> boundaries;
+    size_t end = 0;
+    for (const auto &syllable : syllables)
+    {
+        if (request.raw_input.compare(end, syllable.size(), syllable) != 0)
+        {
+            return {};
+        }
+        end += syllable.size();
+        boundaries.push_back(end);
+    }
+    if (end != request.raw_input.size())
+    {
+        return {};
+    }
+    boundaries.pop_back();
+    return RebuildQuanpinDisplayAtBoundaries(cased, boundaries);
 }
 
 // 合法输入上的纠错领衔时（ziazheliya 出「在这里呀」、jiuzheeyang 出「就这样」），预编辑
@@ -603,7 +643,28 @@ std::string InputSession::build_pinyin_segmentation_with_cases(bool shuangpin_ra
     {
         if (!candidates().empty())
         {
-            std::string display = BuildQuanpinDisplayFromLeadingCorrection(request(), candidates().front());
+            const auto &head = candidates().front();
+            if (quanpin::literal_mixed_pinyin_match(request().raw_input, head.pinyin, head.canonical_pinyin))
+            {
+                std::vector<size_t> boundaries;
+                size_t consumed = 0;
+                for (const auto &segment : quanpin::split_segments(head.pinyin))
+                {
+                    consumed += segment.size();
+                    boundaries.push_back(consumed);
+                }
+                if (consumed == request().raw_input.size())
+                    boundaries.pop_back();
+                return RebuildQuanpinDisplayAtBoundaries(typed, boundaries);
+            }
+        }
+        if (!candidates().empty())
+        {
+            std::string display = BuildQuanpinDisplayFromLiteralHead(request(), candidates().front());
+            if (display.empty())
+            {
+                display = BuildQuanpinDisplayFromLeadingCorrection(request(), candidates().front());
+            }
             if (!display.empty())
             {
                 return display;
@@ -933,7 +994,12 @@ InputSession::SelectionTransition InputSession::advance_composition_after_select
     // 长度消耗会剩下或多吞字母（buuhui 选「不会」剩个 i）。
     size_t consumed_letters = selected_pure_pinyin.size();
     const unsigned autocorrect_types = QuanpinAutocorrectTypes(request());
-    if (autocorrect_types != 0 && raw_input_without_helpcodes.find('\'') == std::string::npos)
+    const bool literal_mixed_prefix =
+        current_scheme_type() == SchemeType::Quanpin && !candidates().empty() &&
+        quanpin::literal_mixed_pinyin_match(raw_input_without_helpcodes, candidates().front().pinyin,
+                                            candidates().front().canonical_pinyin) &&
+        raw_input_without_helpcodes.compare(0, consumed_letters, selected_pure_pinyin) == 0;
+    if (autocorrect_types != 0 && !literal_mixed_prefix && raw_input_without_helpcodes.find('\'') == std::string::npos)
     {
         if (const auto aligned = quanpin::corrected_reading_raw_length(
                 raw_input_without_helpcodes, quanpin::split_segments(selected_pinyin), autocorrect_types))

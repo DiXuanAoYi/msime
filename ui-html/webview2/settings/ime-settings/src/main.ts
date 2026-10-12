@@ -5,6 +5,7 @@ import './styles/critical.css';
 import { loadHTML, showOnlyCurrentModule } from './utils/common-utils';
 import { loadContent, scheduleBackgroundModuleLoad, setupSidebar } from './modules/sidebar';
 import { setupConfigSync } from './modules/config-sync';
+import {setupSettingsErrors} from './modules/settings-errors';
 
 const RESIZE_BORDER = 4;
 const WINDOW_CONTROLS_RESIZE_BORDER = 2;
@@ -100,6 +101,7 @@ async function initializeApp() {
   }
 
   setupConfigSync();
+  setupSettingsErrors();
   await loadContent('appearance');
   showOnlyCurrentModule('appearance');
   setupSidebar();

@@ -136,6 +136,20 @@ int run_test()
     }
     set_data_directory(english_mode_directory);
 
+    {
+        Database database(english_mode_directory / "english.db");
+        database.execute("INSERT INTO zh_en_glosses VALUES('完整义项','n. alpha; v. beta; adj. gamma; adv. delta; "
+                         "prep. epsilon; pron. zeta; int. eta; phr. theta')");
+        Database glossary(english_mode_directory / "qingjian-glossary.db");
+        glossary.execute("CREATE TABLE glosses(word TEXT,language TEXT,gloss TEXT)");
+        glossary.execute("INSERT INTO glosses VALUES('完整义项','en','n. alpha; int. iota')");
+        EnglishDictionary dictionary(metasequoia::path_to_utf8(english_mode_directory / "english.db"));
+        const auto gloss = dictionary.query_english_gloss("完整义项");
+        require(gloss.find("theta") != std::string::npos && gloss.find("iota") != std::string::npos &&
+                    std::count(gloss.begin(), gloss.end(), ';') == 8,
+                "Cross-source gloss merging lost senses after the sixth or duplicated an existing sense.");
+    }
+
     metasequoia::EnglishInputOptions mixed_options;
     mixed_options.mixed_candidates = true;
     mixed_options.minimum_prefix = 2;
@@ -218,6 +232,12 @@ int run_test()
         require(journal.query_integer("SELECT COUNT(*) FROM user_dictionary_operations WHERE dictionary='english' "
                                       "AND key='scopeguardfixture'") == 0,
                 "Raw English commit was journaled even though shared learning was disabled.");
+        isolated.set_candidate_learning_enabled(true);
+        type(isolated, "RestoredLearningFixture");
+        require(isolated.handle_command(metasequoia::Command::CommitRaw).commit == "RestoredLearningFixture",
+                "Restoring the live learning gate blocked English commit.");
+        require(english.query_integer("SELECT COUNT(*) FROM english_words WHERE word='restoredlearningfixture'") == 1,
+                "The live learning gate did not resume learning after returning to a regular field.");
     }
     {
         // A busy user dictionary must not leave english.db carrying a weight that no journal row can replay: the boost

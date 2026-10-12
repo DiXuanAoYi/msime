@@ -40,6 +40,7 @@ std::vector<WordItem> QuanpinEngine::query(const QueryRequest &request)
 
     // 整句联想开关随请求下发到词典层，四条整句来源据此各自门控（见 query_series）。
     dictionary_.set_sentence_association(request.sentence_association);
+    dictionary_.set_enabled_domain_dictionaries(request.enabled_domain_dictionaries);
     // 前文同理随请求下发；换了前文，按旧前文重排出来的缓存顺序作废。
     dictionary_.set_rescoring_context(request.rescoring_context);
 

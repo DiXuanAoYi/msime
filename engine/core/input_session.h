@@ -262,6 +262,13 @@ class InputSession
     {
         engine_.set_sentence_association(options);
     }
+    void set_enabled_domain_dictionaries(const std::string &csv)
+    {
+        engine_.set_enabled_domain_dictionaries(csv);
+        prefix_query_input_.clear();
+        prefix_candidates_.clear();
+        refresh_prefix_candidates();
+    }
     void set_rescoring_context(std::string context)
     {
         engine_.set_rescoring_context(std::move(context));

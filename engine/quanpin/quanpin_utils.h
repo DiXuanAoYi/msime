@@ -26,10 +26,19 @@ const std::vector<std::string> &intact_pinyin_list();
 const std::unordered_set<std::string> &intact_pinyin_set();
 const std::unordered_set<std::string> &prefix_pinyin_set();
 bool has_only_complete_pinyin_segments(const Segments &segments);
+// 0: no literal mixed match; 1: whole input; 2: one unfinished 1-2-letter syllable remains.
+// Both full syllables and single-letter initials must match the candidate's canonical key.
+unsigned literal_mixed_pinyin_match(const std::string &raw, const std::string &code, const std::string &canonical);
+// 纯简拼字面整词：两个及以上单字母声母（a/e/o 是完整音节，不算）盖住整串输入，且逐个是
+// 候选正读音节的首字母（nbn = n'b'n -> neng'bu'neng）。前缀单字和带完整音节的混合简拼不算。
+bool literal_jianpin_pinyin_match(const std::string &raw, const std::string &code, const std::string &canonical);
 SyllableGraph build_syllable_graph(const std::string &pinyin);
 std::vector<Segments> enumerate_complete_segmentations(const SyllableGraph &graph, size_t path_limit = 32);
 std::vector<std::string> cut_one_piece_greedy(const std::string &pinyin, bool intact_only);
 std::vector<std::string> cut_one_piece_min_segments(const std::string &pinyin, bool intact_only);
+// 音节数与 cut_one_piece_min_segments 相同的全部合法切分（最多 path_limit 条），即只在
+// ban'an / ba'nan 这类等长歧义边界上分叉。cut_one_piece_min_segments 的结果总在其中。
+std::vector<Segments> enumerate_min_segmentations(const std::string &pinyin, size_t path_limit);
 bool is_complete_pinyin_input(const std::string &pinyin);
 // 把切好的全拼串换成 Google 两个解码器（本地 googlepinyinime-rev 与 inputtools
 // 云输入）认的 ü 写法：nve→nue、lve→lue、jv→ju……只在送进这两个解码器前用，
@@ -213,9 +222,11 @@ std::optional<AutocorrectCut> correction_cut_for_reading(const std::string &raw_
 std::optional<size_t> corrected_reading_raw_length(const std::string &raw_letters, const Segments &reading,
                                                    unsigned autocorrect_types);
 
-// True when the input reads as one or more legal syllables plus at most one trailing
-// letter ("zheg" = zhe + g): a jianpin-intent shape, which is user intent and never
-// a typo. Deliberately NOT true for all-consonant strings of 3+ letters: the engine
+// True for a leading initial followed by complete syllables ("ywen" = y + wen),
+// or one or more legal syllables plus at most one trailing letter ("zheg" = zhe + g)
+// These jianpin-intent shapes are not typos
+// Repeated leading initials are included ("sshang" = s + shang)
+// Deliberately NOT true for all-consonant strings of 3+ letters: the engine
 // has no multi-letter jianpin, so correction is the only useful reading of e.g.
 // "bqng" -> bang. Inputs with manual delimiters return false; the correction path
 // excludes them on its own.
@@ -229,6 +240,11 @@ std::optional<size_t> corrected_reading_raw_length(const std::string &raw_letter
 // input_session_composition.cpp (preedit layer). A new caller has to do the same;
 // none of these signatures carries the constraint, so omitting it fails silently
 // rather than at compile time.
-bool looks_like_syllable_with_jianpin_tail(const std::string &pinyin);
+bool looks_like_jianpin_spelling(const std::string &pinyin);
+// Compatibility for existing consumers/tests; the new guard also protects leading initials.
+inline bool looks_like_syllable_with_jianpin_tail(const std::string &pinyin)
+{
+    return looks_like_jianpin_spelling(pinyin);
+}
 
 } // namespace quanpin

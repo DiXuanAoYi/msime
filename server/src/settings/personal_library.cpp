@@ -1,9 +1,11 @@
 #include "settings/personal_library.h"
+#include "config/ime_config.h"
 #include "clipboard/clipboard_history.h"
 #include "english/vocabulary_service.h"
 #include "english/voice_studio.h"
 #include "engine/core/data_path.h"
 #include "engine/english/english_dictionary.h"
+#include "engine/domain_dictionary/domain_dictionary.h"
 #include "utils/common_utils.h"
 #include <algorithm>
 #include <atomic>
@@ -17,6 +19,7 @@
 #include <iterator>
 #include <set>
 #include <stdexcept>
+#include <sstream>
 
 namespace PersonalLibrary
 {
@@ -170,6 +173,72 @@ std::string NormalizeApp(std::string s)
         throw std::runtime_error("请填写程序文件名，例如 WeChat.exe、Code.exe");
     return s;
 }
+
+json ValidateDomains(const json &domains)
+{
+    if (!domains.is_array() || domains.size() > domain_dictionary::ids().size())
+        throw std::runtime_error("领域词库集合无效");
+    std::string csv;
+    for (const auto &value : domains)
+    {
+        if (!value.is_string())
+            throw std::runtime_error("领域词库编号无效");
+        const auto id = value.get<std::string>();
+        if (std::find(domain_dictionary::ids().begin(), domain_dictionary::ids().end(), id) ==
+            domain_dictionary::ids().end())
+            throw std::runtime_error("未知领域词库编号");
+        if (!csv.empty())
+            csv += ',';
+        csv += id;
+    }
+    json result = json::array();
+    std::istringstream input(domain_dictionary::normalize_enabled(csv));
+    std::string id;
+    while (std::getline(input, id, ','))
+        result.push_back(id);
+    return result;
+}
+
+json DomainBooks()
+{
+    const auto path = metasequoia::data_directory() / "domain-input-sources" / "catalog.json";
+    if (!std::filesystem::exists(path))
+        return json::array();
+    if (std::filesystem::file_size(path) > 64 * 1024)
+        throw std::runtime_error("领域词库清单过大");
+    std::ifstream file(path);
+    if (!file)
+        throw std::runtime_error("领域词库清单读取失败");
+    auto catalog = json::parse(file);
+    if (catalog.at("version") != 1 || catalog.at("kind") != "msime-domain-input" || !catalog.at("books").is_array())
+        throw std::runtime_error("领域词库清单无效");
+    const auto &books = catalog.at("books");
+    if (books.size() > domain_dictionary::ids().size())
+        throw std::runtime_error("领域词库清单条目过多");
+    std::set<std::string> seen;
+    for (const auto &book : books)
+    {
+        if (!book.is_object())
+            throw std::runtime_error("领域词库清单条目无效");
+        const auto id = Text(book, "id", 40);
+        if (std::find(domain_dictionary::ids().begin(), domain_dictionary::ids().end(), id) ==
+                domain_dictionary::ids().end() ||
+            !seen.insert(id).second)
+            throw std::runtime_error("领域词库清单编号无效或重复");
+        Text(book, "name", 240);
+        Text(book, "license", 240);
+        Text(book, "source", 2048);
+        Text(book, "version", 100);
+        const auto hash = Text(book, "sha256", 64);
+        if (hash.size() != 64 || hash.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos ||
+            !book.at("exportable").is_boolean() || !book.at("entries").is_number_integer() ||
+            !book.at("bytes").is_number_integer() || book.at("entries").get<int64_t>() <= 0 ||
+            book.at("entries").get<int64_t>() > 1000000 || book.at("bytes").get<int64_t>() <= 0 ||
+            book.at("bytes").get<int64_t>() > 4 * 1024 * 1024)
+            throw std::runtime_error("领域词库清单统计或校验信息无效");
+    }
+    return books;
+}
 } // namespace
 
 namespace
@@ -277,6 +346,37 @@ ApplicationPolicy Policy(const std::string &application)
     catch (...)
     {
         return {true, false, false};
+    }
+}
+
+std::string EffectiveDomainDictionaries(const std::string &application, const std::string &global_csv)
+{
+    const auto global = domain_dictionary::normalize_enabled(global_csv);
+    if (application.empty())
+        return global;
+    try
+    {
+        const auto book = CachedBook();
+        const auto app = NormalizeApp(application);
+        for (const auto &profile : book->at("applications"))
+            if (profile.value("application", "") == app && profile.value("domain_mode", "inherit") == "replace")
+            {
+                const auto selected = ValidateDomains(profile.value("domains", json::array()));
+                std::string csv;
+                for (const auto &id : selected)
+                {
+                    if (!csv.empty())
+                        csv += ',';
+                    csv += id.get<std::string>();
+                }
+                return csv;
+            }
+        return global;
+    }
+    catch (...)
+    {
+        // A corrupt explicit profile must not enable unintended input packs.
+        return {};
     }
 }
 void RecordSelection(const std::string &application, const std::string &code, const std::string &word,
@@ -466,18 +566,83 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
     {
         const auto action = r.at("action").get<std::string>();
         Lock lock;
+        json books = json::array();
+        try
+        {
+            books = DomainBooks();
+        }
+        catch (const std::exception &)
+        {
+            // Optional pack metadata must not turn an already-saved phrase, voice favorite or review into failure.
+            // Domain operations still fail before any personal-library mutation or export.
+            if (action == "domainCatalog" || action == "exportDomain" || action == "setApplicationDomains")
+                throw std::runtime_error("领域输入词库清单无效，请修复安装包");
+            response["domainWarning"] = "领域输入词库清单无法加载，请修复安装包；常用语、语音收藏及复习资料仍可使用。";
+        }
         auto book = Read();
         bool changed = false;
-        if (action == "putApplication")
+        if (action == "setApplicationDomains")
+        {
+            const auto app = NormalizeApp(Text(r, "application", 260));
+            const auto mode = r.value("domain_mode", "inherit");
+            if (mode != "inherit" && mode != "replace")
+                throw std::runtime_error("软件领域模式无效");
+            const auto domains = ValidateDomains(r.value("domains", json::array()));
+            auto &profiles = book["applications"];
+            auto it = std::find_if(profiles.begin(), profiles.end(),
+                                   [&](const json &x) { return x.at("application") == app; });
+            if (it == profiles.end())
+            {
+                if (profiles.size() >= 200)
+                    throw std::runtime_error("独立软件词库最多 200 个");
+                profiles.push_back({{"application", app}, {"enabled", false}, {"learn", true}, {"frequency", true}});
+                it = profiles.end() - 1;
+            }
+            (*it)["domain_mode"] = mode;
+            (*it)["domains"] = domains;
+            changed = true;
+            response["message"] = "已自动保存此软件的领域输入词库集合";
+        }
+        else if (action == "domainCatalog")
+        {
+            // Read-only action; status is refreshed below through the same response contract.
+        }
+        else if (action == "exportDomain")
+        {
+            const auto id = Text(r, "id", 40);
+            if (std::find(domain_dictionary::ids().begin(), domain_dictionary::ids().end(), id) ==
+                domain_dictionary::ids().end())
+                throw std::runtime_error("未知领域词库编号");
+            const auto item = std::find_if(books.begin(), books.end(), [&](const json &x) { return x.at("id") == id; });
+            if (item == books.end())
+                throw std::runtime_error("领域输入词库未安装，请修复安装包");
+            if (!item->at("exportable").get<bool>())
+                throw std::runtime_error("此领域词库不支持导出");
+            const auto path = metasequoia::data_directory() / "domain-input-sources" / (id + ".tsv");
+            if (!std::filesystem::is_regular_file(path) || std::filesystem::file_size(path) > 4 * 1024 * 1024)
+                throw std::runtime_error("领域输入词库源文件缺失或过大");
+            std::ifstream file(path, std::ios::binary);
+            std::string body((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            if (!file || body.find('\0') != std::string::npos)
+                throw std::runtime_error("领域输入词库读取失败");
+            response["exported"] = "# 水杉领域输入词库：" + item->at("name").get<std::string>() +
+                                   "\n# 字段：词条<TAB>空格分隔拼音<TAB>词频\n# 来源：" +
+                                   item->at("source").get<std::string>() + "\n# 许可：" +
+                                   item->at("license").get<std::string>() + "；请随再分发保留许可与来源\n" + body;
+            response["filename"] = "msime-domain-" + id + ".tsv";
+            response["message"] = "已导出完整输入词条与拼音，原词库保持不变";
+        }
+        else if (action == "putApplication")
         {
             const auto app = NormalizeApp(Text(r, "application", 260));
             auto &profiles = book["applications"];
             auto it = std::find_if(profiles.begin(), profiles.end(),
                                    [&](const json &x) { return x.at("application") == app; });
-            json profile = {{"application", app},
-                            {"enabled", r.value("enabled", true)},
-                            {"learn", r.value("learn", true)},
-                            {"frequency", r.value("frequency", true)}};
+            json profile = it == profiles.end() ? json::object() : *it;
+            profile["application"] = app;
+            profile["enabled"] = r.value("enabled", true);
+            profile["learn"] = r.value("learn", true);
+            profile["frequency"] = r.value("frequency", true);
             if (it != profiles.end())
                 *it = profile;
             else
@@ -558,8 +723,16 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
             {
                 if (book["applications"].size() >= 200)
                     throw std::runtime_error("独立软件词库最多 200 个");
-                book["applications"].push_back(
-                    {{"application", app}, {"enabled", true}, {"learn", true}, {"frequency", true}});
+                json profile = {{"application", app}, {"enabled", true}, {"learn", true}, {"frequency", true}};
+                if (source.contains("profile") && source.at("profile").is_object())
+                {
+                    const auto mode = source.at("profile").value("domain_mode", "inherit");
+                    if (mode != "inherit" && mode != "replace")
+                        throw std::runtime_error("导入软件领域模式无效");
+                    profile["domain_mode"] = mode;
+                    profile["domains"] = ValidateDomains(source.at("profile").value("domains", json::array()));
+                }
+                book["applications"].push_back(std::move(profile));
             }
             changed = true;
             response["message"] = "已合并 " + std::to_string(added) + " 条应用记录，原有内容保留";
@@ -734,13 +907,60 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
         }
         else if (action != "status")
             throw std::runtime_error("未知资料操作");
-        if (changed)
-            Save(book);
-        response["book"] = std::move(book);
+        response["books"] = std::move(books);
+        response["enabled_domains"] = json::array();
+        std::istringstream domains(*GetConfiguredEnabledDomainDictionaries());
+        std::string domain;
+        while (std::getline(domains, domain, ','))
+            response["enabled_domains"].push_back(domain);
+        auto displayBook = book;
+        auto &displayProfiles = displayBook["applications"];
+        const auto originalProfiles = displayProfiles.size();
+        displayProfiles.erase(std::remove_if(displayProfiles.begin(), displayProfiles.end(),
+                                             [](const json &profile) {
+                                                 try
+                                                 {
+                                                     if (!profile.is_object())
+                                                         return true;
+                                                     NormalizeApp(Text(profile, "application", 260));
+                                                     for (const auto *key : {"enabled", "learn", "frequency"})
+                                                         if (profile.contains(key) && !profile.at(key).is_boolean())
+                                                             return true;
+                                                     const auto mode = profile.value("domain_mode", "inherit");
+                                                     if (mode != "inherit" && mode != "replace")
+                                                         return true;
+                                                     ValidateDomains(profile.value("domains", json::array()));
+                                                     return false;
+                                                 }
+                                                 catch (const std::exception &)
+                                                 {
+                                                     return true;
+                                                 }
+                                             }),
+                              displayProfiles.end());
+        if (displayProfiles.size() != originalProfiles)
+        {
+            const auto message = response["message"].get<std::string>();
+            response["message"] =
+                message + (message.empty() ? "" : "；") + "部分软件词库配置格式无效，已从本次展示略过；原记录仍保留。";
+        }
+        response["applications"] = displayProfiles;
+        for (auto &profile : response["applications"])
+        {
+            if (!profile.contains("domain_mode"))
+                profile["domain_mode"] = "inherit";
+            if (!profile.contains("domains"))
+                profile["domains"] = json::array();
+        }
+        response["book"] = std::move(displayBook);
         response["history"] = json::array();
         for (const auto &s : ClipboardHistory::Load())
             response["history"].push_back(wstring_to_string(s));
         response["application"] = ForegroundApplication();
+        // Prepare every response field before persistence. Optional display metadata must not make a completed save
+        // appear to fail, and filtered display profiles must never erase their original records from disk.
+        if (changed)
+            Save(book);
     }
     catch (const std::exception &e)
     {

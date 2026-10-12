@@ -1,6 +1,7 @@
 // 在线服务配置：语音输入（识别与润色的提供商、凭证槽位、热键）、AI 助手、翻译服务（腾讯 TMT、自定义翻译、小牛翻译）
 // 和这些服务共用的网络代理。
 #include "config/ime_config_internal.h"
+#include "config/ime_config_candidate_translation.h"
 #include <algorithm>
 #include <cctype>
 #include <mutex>
@@ -8,6 +9,7 @@
 #include <string>
 #include "voice-input/voice_providers.h"
 #include "config/prompt_library.h"
+#include "ai/ai_task.h"
 
 using namespace ime_config_detail;
 
@@ -24,6 +26,8 @@ bool SetConfiguredVoiceInputString(const std::string &key, const std::string &va
         return false;
     if (key == "commit_mode" && value != "tsf" && value != "sendinput" && value != "ctrl_v")
         return false;
+    if (key == "polish_thinking" && !IsValidAiThinking(value))
+        return false;
     if (key == "polish_prompt_id" && !VoiceInput::IsPolishPromptId(value))
         return false;
 
@@ -39,43 +43,33 @@ bool SetConfiguredVoiceInputString(const std::string &key, const std::string &va
         return true;
     };
 
-    if (key.rfind("asr_token_", 0) == 0)
+    if (key == "asr_token" || key == "polish_token")
     {
-        const std::string provider = key.substr(std::string("asr_token_").size());
-        if (VoiceInput::AsrTokenSlotKey(provider) != key)
+        const auto current = SnapshotVoiceInput();
+        const auto slot = key == "asr_token" ? VoiceInput::AsrTokenSlotKey(current.asr_provider)
+                                             : VoiceInput::PolishTokenSlotKey(current.polish_provider);
+        return !slot.empty() && SetConfiguredVoiceInputString(slot, value);
+    }
+    if (key.rfind("asr_token_", 0) == 0 || key.rfind("polish_token_", 0) == 0)
+    {
+        const bool asr = key.rfind("asr_token_", 0) == 0;
+        const auto provider = key.substr(asr ? std::string("asr_token_").size() : std::string("polish_token_").size());
+        if ((asr ? VoiceInput::AsrTokenSlotKey(provider) : VoiceInput::PolishTokenSlotKey(provider)) != key)
             return false;
-        const std::string id = VoiceInput::NormalizeProviderId(provider);
-        if (!WriteConfiguredValue("voice_input", key, EscapeTomlBasicString(value)))
+        const auto id = VoiceInput::NormalizeProviderId(provider);
+        const auto current = SnapshotVoiceInput();
+        const bool active = VoiceInput::NormalizeProviderId(asr ? current.asr_provider : current.polish_provider) == id;
+        std::vector<ConfigValueUpdate> updates{{"voice_input", key, EscapeTomlBasicString(value)}};
+        if (active)
+            updates.push_back({"voice_input", asr ? "asr_token" : "polish_token", EscapeTomlBasicString(value)});
+        if (!WriteConfiguredValues(updates))
             return false;
-        std::string asr_provider;
-        {
-            std::unique_lock<std::shared_mutex> lock(g_voice_input_mutex);
-            g_voice_input.asr_tokens[id] = value;
-            asr_provider = g_voice_input.asr_provider;
-        }
-        if (VoiceInput::NormalizeProviderId(asr_provider) == id)
-            persist("asr_token", value, &VoiceInputConfig::asr_token);
+        std::unique_lock<std::shared_mutex> lock(g_voice_input_mutex);
+        (asr ? g_voice_input.asr_tokens : g_voice_input.polish_tokens)[id] = value;
+        if (active)
+            (asr ? g_voice_input.asr_token : g_voice_input.polish_token) = value;
         return true;
     }
-    if (key.rfind("polish_token_", 0) == 0)
-    {
-        const std::string provider = key.substr(std::string("polish_token_").size());
-        if (VoiceInput::PolishTokenSlotKey(provider) != key)
-            return false;
-        const std::string id = VoiceInput::NormalizeProviderId(provider);
-        if (!WriteConfiguredValue("voice_input", key, EscapeTomlBasicString(value)))
-            return false;
-        std::string polish_provider;
-        {
-            std::unique_lock<std::shared_mutex> lock(g_voice_input_mutex);
-            g_voice_input.polish_tokens[id] = value;
-            polish_provider = g_voice_input.polish_provider;
-        }
-        if (VoiceInput::NormalizeProviderId(polish_provider) == id)
-            persist("polish_token", value, &VoiceInputConfig::polish_token);
-        return true;
-    }
-
     std::string VoiceInputConfig::*target = nullptr;
     if (key == "asr_provider")
         target = &VoiceInputConfig::asr_provider;
@@ -103,6 +97,8 @@ bool SetConfiguredVoiceInputString(const std::string &key, const std::string &va
         target = &VoiceInputConfig::polish_endpoint;
     else if (key == "polish_model")
         target = &VoiceInputConfig::polish_model;
+    else if (key == "polish_thinking")
+        target = &VoiceInputConfig::polish_thinking;
     else if (key == "prompt_library")
         target = &VoiceInputConfig::prompt_library;
     else if (key == "polish_prompt_id")
@@ -218,18 +214,41 @@ bool SetConfiguredVoiceInputBool(const std::string &key, bool value)
     return true;
 }
 
-const AiAssistantConfig &GetConfiguredAiAssistant()
+AiAssistantConfig GetConfiguredAiAssistantSnapshot()
 {
+    std::shared_lock<std::shared_mutex> lock(g_ai_assistant_mutex);
     return g_ai_assistant;
 }
 
+const AiAssistantConfig &GetConfiguredAiAssistant()
+{
+    thread_local AiAssistantConfig snapshot;
+    snapshot = GetConfiguredAiAssistantSnapshot();
+    return snapshot;
+}
+
+namespace ime_config_detail
+{
+bool IsValidAiThinking(const std::string &value)
+{
+    return value == "disabled" || value == "low" || value == "high" || value == "max";
+}
+bool IsValidAiTask(const std::string &value)
+{
+    return value == "pinyin" || value == "completion" || value == "question";
+}
+} // namespace ime_config_detail
+
 const TencentTmtConfig &GetConfiguredTencentTmt()
 {
-    return g_tencent_tmt;
+    thread_local TencentTmtConfig snapshot;
+    snapshot = GetConfiguredCandidateTranslationSnapshot().tencent;
+    return snapshot;
 }
 
 bool SetConfiguredTencentTmtString(const std::string &key, const std::string &value)
 {
+    std::unique_lock lock(g_candidate_translation_mutex);
     std::string *target = nullptr;
     if (key == "secret_id")
         target = &g_tencent_tmt.secret_id;
@@ -237,30 +256,37 @@ bool SetConfiguredTencentTmtString(const std::string &key, const std::string &va
         target = &g_tencent_tmt.secret_key;
     else if (key == "region")
         target = &g_tencent_tmt.region;
-    else if (key == "target_language" && (value == "en" || value == "fr" || value == "ja" || value == "es" ||
-                                          value == "ru" || value == "de" || value == "ko" || value == "vi"))
+    else if (key == "target_language" &&
+             (value == "en" || value == "fr" || value == "ja" || value == "es" || value == "ru" || value == "de" ||
+              value == "ko" || value == "vi" || value == "th" || value == "it"))
         target = &g_tencent_tmt.target_language;
     if (!target || !WriteConfiguredValue("tencent_tmt", key, EscapeTomlBasicString(value)))
         return false;
     *target = value;
+    TouchCandidateTranslationRevision();
     return true;
 }
 
 const CustomTranslationConfig &GetConfiguredCustomTranslation()
 {
-    return g_custom_translation;
+    thread_local CustomTranslationConfig snapshot;
+    snapshot = GetConfiguredCandidateTranslationSnapshot().custom;
+    return snapshot;
 }
 
 bool SetConfiguredCustomTranslationBool(const std::string &key, bool value)
 {
+    std::unique_lock lock(g_candidate_translation_mutex);
     if (key != "enabled" || !WriteConfiguredValue("custom_translation", key, value ? "true" : "false"))
         return false;
     g_custom_translation.enabled = value;
+    TouchCandidateTranslationRevision();
     return true;
 }
 
 bool SetConfiguredCustomTranslationString(const std::string &key, const std::string &value)
 {
+    std::unique_lock lock(g_candidate_translation_mutex);
     std::string *target = nullptr;
     if (key == "endpoint")
         target = &g_custom_translation.endpoint;
@@ -269,24 +295,30 @@ bool SetConfiguredCustomTranslationString(const std::string &key, const std::str
     if (!target || !WriteConfiguredValue("custom_translation", key, EscapeTomlBasicString(value)))
         return false;
     *target = value;
+    TouchCandidateTranslationRevision();
     return true;
 }
 
 const NiuTransConfig &GetConfiguredNiuTrans()
 {
-    return g_niutrans;
+    thread_local NiuTransConfig snapshot;
+    snapshot = GetConfiguredCandidateTranslationSnapshot().niutrans;
+    return snapshot;
 }
 
 bool SetConfiguredNiuTransBool(const std::string &key, bool value)
 {
+    std::unique_lock lock(g_candidate_translation_mutex);
     if (key != "enabled" || !WriteConfiguredValue("niutrans", key, value ? "true" : "false"))
         return false;
     g_niutrans.enabled = value;
+    TouchCandidateTranslationRevision();
     return true;
 }
 
 bool SetConfiguredNiuTransString(const std::string &key, const std::string &value)
 {
+    std::unique_lock lock(g_candidate_translation_mutex);
     std::string *target = nullptr;
     if (key == "app_id")
         target = &g_niutrans.app_id;
@@ -295,6 +327,7 @@ bool SetConfiguredNiuTransString(const std::string &key, const std::string &valu
     if (!target || !WriteConfiguredValue("niutrans", key, EscapeTomlBasicString(value)))
         return false;
     *target = value;
+    TouchCandidateTranslationRevision();
     return true;
 }
 
@@ -393,6 +426,9 @@ static std::string AiAssistantEffectiveValue(const std::string &key, const std::
 
 bool SetConfiguredAiAssistantString(const std::string &key, const std::string &value)
 {
+    if ((key == "thinking" && !IsValidAiThinking(value)) || (key == "task" && !IsValidAiTask(value)))
+        return false;
+    std::unique_lock<std::shared_mutex> lock(g_ai_assistant_mutex);
     if (key == "prompt_library" && !PromptLibrary::Validate(value))
         return false;
     if (key == "prompt_id" && value != "custom_1" && value != "custom_2" && value != "custom_3")
@@ -449,18 +485,36 @@ bool SetConfiguredAiAssistantString(const std::string &key, const std::string &v
         const std::string provider = key.substr(std::string("token_").size());
         if (AiAssistantTokenSlotKey(provider) != key)
             return false;
-        if (!WriteConfiguredValue("ai_assistant", key, EscapeTomlBasicString(value)))
-            return false;
         const std::string id = VoiceInput::NormalizeProviderId(provider);
+        std::vector<ConfigValueUpdate> changes{{"ai_assistant", key, EscapeTomlBasicString(value)}};
+        if (g_ai_assistant.provider == id)
+            changes.push_back({"ai_assistant", "token", EscapeTomlBasicString(value)});
+        if (!WriteConfiguredValues(changes))
+            return false;
         g_ai_assistant.tokens[id] = value;
         if (g_ai_assistant.provider == id)
-            persist("token", value, g_ai_assistant.token);
+            g_ai_assistant.token = value;
+        return true;
+    }
+
+    if (key == "token")
+    {
+        const std::string slot = AiAssistantTokenSlotKey(g_ai_assistant.provider);
+        if (slot.empty() || !WriteConfiguredValues({{"ai_assistant", "token", EscapeTomlBasicString(value)},
+                                                    {"ai_assistant", slot, EscapeTomlBasicString(value)}}))
+            return false;
+        g_ai_assistant.token = value;
+        g_ai_assistant.tokens[g_ai_assistant.provider] = value;
         return true;
     }
 
     std::string *target = nullptr;
     if (key == "token")
         target = &g_ai_assistant.token;
+    else if (key == "thinking")
+        target = &g_ai_assistant.thinking;
+    else if (key == "task")
+        target = &g_ai_assistant.task;
     else if (key == "prompt_library")
         target = &g_ai_assistant.prompt_library;
     else if (key == "prompt_id")
@@ -497,16 +551,59 @@ bool SetConfiguredAiAssistantString(const std::string &key, const std::string &v
     return true;
 }
 
+bool SetConfiguredLocalAiConnection(const std::string &endpoint, const std::string &model, const std::string &token,
+                                    bool enabled)
+{
+    if (!AiAssistant::IsLoopbackEndpoint(endpoint) || model.empty() || model.size() > 256 || token.size() > 4096 ||
+        model.find_first_of("\r\n\0", 0, 3) != std::string::npos)
+        return false;
+    std::unique_lock<std::shared_mutex> lock(g_ai_assistant_mutex);
+    const std::string previous = g_ai_assistant.provider;
+    if (!WriteConfiguredValues(
+            {{"ai_assistant", "endpoint_" + previous,
+              EscapeTomlBasicString(AiAssistantStoredValue("endpoint", previous, g_ai_assistant.endpoint))},
+             {"ai_assistant", "model_" + previous,
+              EscapeTomlBasicString(AiAssistantStoredValue("model", previous, g_ai_assistant.model))},
+             {"ai_assistant", "provider", EscapeTomlBasicString("local")},
+             {"ai_assistant", "endpoint", EscapeTomlBasicString(endpoint)},
+             {"ai_assistant", "endpoint_local", EscapeTomlBasicString(endpoint)},
+             {"ai_assistant", "model", EscapeTomlBasicString(model)},
+             {"ai_assistant", "model_local", EscapeTomlBasicString(model)},
+             {"ai_assistant", "token", EscapeTomlBasicString(token)},
+             {"ai_assistant", "token_local", EscapeTomlBasicString(token)},
+             {"ai_assistant", "enabled", enabled ? "true" : "false"}}))
+        return false;
+    auto next = g_ai_assistant;
+    next.endpoints[previous] = next.endpoint;
+    next.models[previous] = next.model;
+    next.provider = "local";
+    next.endpoint = endpoint;
+    next.model = model;
+    next.token = token;
+    next.enabled = enabled;
+    next.endpoints["local"] = endpoint;
+    next.models["local"] = model;
+    next.tokens["local"] = token;
+    g_ai_assistant = std::move(next);
+    return true;
+}
+
 bool SetConfiguredAiAssistantBool(const std::string &key, bool value)
 {
-    if (key != "enabled" || !WriteConfiguredValue("ai_assistant", key, value ? "true" : "false"))
+    if (key != "enabled" && key != "completion_enabled" && key != "question_enabled")
         return false;
-    g_ai_assistant.enabled = value;
+    std::unique_lock<std::shared_mutex> lock(g_ai_assistant_mutex);
+    if (!WriteConfiguredValue("ai_assistant", key, value ? "true" : "false"))
+        return false;
+    (key == "enabled"              ? g_ai_assistant.enabled
+     : key == "completion_enabled" ? g_ai_assistant.completion_enabled
+                                   : g_ai_assistant.question_enabled) = value;
     return true;
 }
 
 bool SetConfiguredAiAssistantInt(const std::string &key, int value)
 {
+    std::unique_lock<std::shared_mutex> lock(g_ai_assistant_mutex);
     if (key != "candidate_limit" || value < 1 || value > 10 ||
         !WriteConfiguredValue("ai_assistant", key, std::to_string(value)))
         return false;

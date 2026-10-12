@@ -71,9 +71,13 @@ void linear_int8_avx2(const float *x, const std::int8_t *weights, const float *s
     {
         linear_block<2>(x, weights, scales, bias, rows, inputs, outputs, out);
     }
-    else
+    else if (rows <= 4)
     {
         linear_block<4>(x, weights, scales, bias, rows, inputs, outputs, out);
+    }
+    else
+    {
+        linear_block<8>(x, weights, scales, bias, rows, inputs, outputs, out);
     }
 }
 

@@ -27,7 +27,7 @@ const THEME_MODE_LABELS: Record<ThemeMode, string> = {
 };
 
 const SURFACE_THEME_LABELS: Record<SurfaceTheme, string> = {
-  follow: '跟随全局',
+  follow: '跟随主主题',
   dark: '深色',
   light: '浅色'
 };
@@ -86,7 +86,13 @@ export function applyCandidatePreviewTheme(theme: ResolvedTheme): void {
     element.classList.toggle('theme-light', theme === 'light');
     element.classList.toggle('theme-dark', theme === 'dark');
   });
-  candidateSurfaceThemeListener?.(theme);
+  try {
+    candidateSurfaceThemeListener?.(theme);
+  } catch {
+    // A broken optional preview cannot stop the shell or the remaining modules
+    // from receiving their snapshot. Never expose an exception/configuration.
+    window.dispatchEvent?.(new CustomEvent('settings-handler-error', {detail: {type: 'configSnapshot'}}));
+  }
 }
 
 function ensureSystemThemeListener(onChange: () => void): void {
@@ -100,7 +106,7 @@ function ensureSystemThemeListener(onChange: () => void): void {
 }
 
 export function applyThemeConfig(config: ThemeConfig | undefined): void {
-  lastThemeConfig = config ?? null;
+  lastThemeConfig = config ? {...config} : null;
   const mode = normalizeThemeMode(config?.theme_mode);
   const settingsTheme = normalizeSurfaceTheme(config?.theme_settings);
   const candTheme = normalizeSurfaceTheme(config?.theme_cand);
@@ -124,15 +130,15 @@ export function applyThemeConfig(config: ThemeConfig | undefined): void {
     });
   }
 
-  applyDropdownLabel('themeBtn', THEME_MODE_LABELS[mode]);
-  applyDropdownLabel('settingsThemeBtn', SURFACE_THEME_LABELS[settingsTheme]);
-  applyDropdownLabel('candThemeBtn', SURFACE_THEME_LABELS[candTheme]);
-  applyDropdownLabel('ftbThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_ftb)]);
-  applyDropdownLabel('menuThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_menu)]);
-  applyDropdownLabel('emojiThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_emoji)]);
-  applyDropdownLabel('screenKeyboardThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_screen_keyboard)]);
-  applyDropdownLabel('handwritingThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_handwriting)]);
-  applyDropdownLabel('voiceThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_voice)]);
+  applyDropdownLabel('themeBtn', THEME_MODE_LABELS[mode], mode);
+  applyDropdownLabel('settingsThemeBtn', SURFACE_THEME_LABELS[settingsTheme], settingsTheme);
+  applyDropdownLabel('candThemeBtn', SURFACE_THEME_LABELS[candTheme], candTheme);
+  applyDropdownLabel('ftbThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_ftb)], normalizeSurfaceTheme(config?.theme_ftb));
+  applyDropdownLabel('menuThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_menu)], normalizeSurfaceTheme(config?.theme_menu));
+  applyDropdownLabel('emojiThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_emoji)], normalizeSurfaceTheme(config?.theme_emoji));
+  applyDropdownLabel('screenKeyboardThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_screen_keyboard)], normalizeSurfaceTheme(config?.theme_screen_keyboard));
+  applyDropdownLabel('handwritingThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_handwriting)], normalizeSurfaceTheme(config?.theme_handwriting));
+  applyDropdownLabel('voiceThemeBtn', SURFACE_THEME_LABELS[normalizeSurfaceTheme(config?.theme_voice)], normalizeSurfaceTheme(config?.theme_voice));
 
   ensureSystemThemeListener(() => {
     const modeNow = normalizeThemeMode(config?.theme_mode);
@@ -158,6 +164,7 @@ export function applyThemeConfig(config: ThemeConfig | undefined): void {
     applyThemeConfig(config);
   });
 
+  updateSettingsThemeState(mode, settingsTheme, settingsResolved);
   updateSkinThemeCard(mode, settingsResolved, candResolved);
 }
 
@@ -175,8 +182,14 @@ export function applyFtbPreviewTheme(theme: ResolvedTheme): void {
   });
 }
 
-function applyDropdownLabel(btnId: string, label: string): void {
+function applyDropdownLabel(btnId: string, label: string, value: string): void {
   const span = document.querySelector<HTMLElement>(`#${btnId} span`);
+  const menuId = btnId.replace(/Btn$/, 'Menu');
+  document.querySelectorAll<HTMLElement>(`#${menuId} .dropdown-item`).forEach(item => {
+    const active = item.dataset.value === value;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-selected', String(active));
+  });
   if (span) {
     span.textContent = label;
   }
@@ -204,60 +217,36 @@ function updateSkinThemeCard(
 }
 
 export function setThemeMode(value: string | undefined): void {
-  const mode = normalizeThemeMode(value);
-  const current: ThemeConfig = {
-    theme_mode: mode,
-    theme_settings: readSurfaceFromUi('settingsThemeMenu', 'settingsThemeBtn'),
-    theme_cand: readSurfaceFromUi('candThemeMenu', 'candThemeBtn'),
-    theme_ftb: readSurfaceFromUi('ftbThemeMenu', 'ftbThemeBtn'),
-    theme_menu: readSurfaceFromUi('menuThemeMenu', 'menuThemeBtn'),
-    theme_emoji: readSurfaceFromUi('emojiThemeMenu', 'emojiThemeBtn'),
-    theme_screen_keyboard: readSurfaceFromUi('screenKeyboardThemeMenu', 'screenKeyboardThemeBtn'),
-    theme_handwriting: readSurfaceFromUi('handwritingThemeMenu', 'handwritingThemeBtn'),
-    theme_voice: readSurfaceFromUi('voiceThemeMenu', 'voiceThemeBtn')
-  };
-  applyThemeConfig(current);
+  // Native snapshots own all independent overrides, including controls on pages
+  // that have not loaded yet. A global change must never infer them from labels.
+  applyThemeConfig({...lastThemeConfig, theme_mode: normalizeThemeMode(value)});
 }
 
 export function setSurfaceTheme(
   surface: 'settings' | 'cand' | 'ftb' | 'menu' | 'emoji' | 'screenKeyboard' | 'handwriting' | 'voice',
   value: string | undefined
 ): void {
-  const current: ThemeConfig = {
-    theme_mode: readModeFromUi(),
-    theme_settings: readSurfaceFromUi('settingsThemeMenu', 'settingsThemeBtn'),
-    theme_cand: readSurfaceFromUi('candThemeMenu', 'candThemeBtn'),
-    theme_ftb: readSurfaceFromUi('ftbThemeMenu', 'ftbThemeBtn'),
-    theme_menu: readSurfaceFromUi('menuThemeMenu', 'menuThemeBtn'),
-    theme_emoji: readSurfaceFromUi('emojiThemeMenu', 'emojiThemeBtn'),
-    theme_screen_keyboard: readSurfaceFromUi('screenKeyboardThemeMenu', 'screenKeyboardThemeBtn'),
-    theme_handwriting: readSurfaceFromUi('handwritingThemeMenu', 'handwritingThemeBtn'),
-    theme_voice: readSurfaceFromUi('voiceThemeMenu', 'voiceThemeBtn')
-  };
-
-  if (surface === 'settings') current.theme_settings = normalizeSurfaceTheme(value);
-  if (surface === 'cand') current.theme_cand = normalizeSurfaceTheme(value);
-  if (surface === 'ftb') current.theme_ftb = normalizeSurfaceTheme(value);
-  if (surface === 'menu') current.theme_menu = normalizeSurfaceTheme(value);
-  if (surface === 'emoji') current.theme_emoji = normalizeSurfaceTheme(value);
-  if (surface === 'screenKeyboard') current.theme_screen_keyboard = normalizeSurfaceTheme(value);
-  if (surface === 'handwriting') current.theme_handwriting = normalizeSurfaceTheme(value);
-  if (surface === 'voice') current.theme_voice = normalizeSurfaceTheme(value);
-
-  applyThemeConfig(current);
+  const keys = {
+    settings: 'theme_settings', cand: 'theme_cand', ftb: 'theme_ftb', menu: 'theme_menu',
+    emoji: 'theme_emoji', screenKeyboard: 'theme_screen_keyboard', handwriting: 'theme_handwriting', voice: 'theme_voice'
+  } as const;
+  applyThemeConfig({...lastThemeConfig, [keys[surface]]: normalizeSurfaceTheme(value)});
 }
 
-function readModeFromUi(): ThemeMode {
-  const label = document.querySelector('#themeBtn span')?.textContent?.trim();
-  if (label === '浅色') return 'light';
-  if (label === '跟随系统') return 'system';
-  return 'dark';
-}
-
-function readSurfaceFromUi(menuId: string, btnId: string): SurfaceTheme {
-  const label = document.querySelector(`#${btnId} span`)?.textContent?.trim();
-  if (label === '浅色') return 'light';
-  if (label === '深色') return 'dark';
-  const selected = document.querySelector<HTMLElement>(`#${menuId} .dropdown-item.active`);
-  return normalizeSurfaceTheme(selected?.dataset.value);
+function updateSettingsThemeState(mode: ThemeMode, surface: SurfaceTheme, resolved: ResolvedTheme): void {
+  const status = document.getElementById('settingsThemeStatus');
+  const independent = surface !== 'follow';
+  if (status) {
+    const global = THEME_MODE_LABELS[mode];
+    const shown = resolved === 'light' ? '浅色' : '深色';
+    status.textContent = independent
+      ? `设置页独立使用${shown}，修改主主题不会改变本页。可以一键改为跟随主主题；其他界面的独立设置会保留。`
+      : `设置页跟随主主题（${global}），当前显示${shown}。更改主主题会立即更新本页。`;
+    status.dataset.independent = String(independent);
+  }
+  const follow = document.getElementById('settingsThemeFollowBtn') as HTMLButtonElement | null;
+  if (follow) {
+    follow.disabled = !independent;
+    follow.textContent = independent ? '设置页跟随主主题' : '已跟随主主题';
+  }
 }

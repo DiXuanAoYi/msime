@@ -4,6 +4,7 @@ import { importQingjianGlossary, validatePersonalGlossary } from './personal-glo
 it('accepts language-scoped unicode rows, BOM, comments and empty tables', () => {
   expect(validatePersonalGlossary('\uFEFF# personal\r\nen\t开发\tdevelopment\tdevelop\r\nja\t开发\t開発')).toBeNull();
   expect(validatePersonalGlossary('')).toBeNull();
+  expect(validatePersonalGlossary('th\t你好\tสวัสดี\nit\t你好\tciao\nvi\t你好\txin chào')).toBeNull();
 });
 
 it('reports the offending row without accepting malformed or oversized data', () => {
@@ -17,9 +18,17 @@ it('reports the offending row without accepting malformed or oversized data', ()
 
 it('imports Qingjian senses without committing part-of-speech or reading annotations', () => {
   expect(importQingjianGlossary('# sample\n开发\tv. 開発する|かいはつする\tn. 開発|かいはつ\tthird\n', 'ja'))
-    .toBe('ja\t开发\t開発する\t開発');
+    .toBe('ja\t开发\t開発する\t開発; third');
   expect(importQingjianGlossary('架构\tn. architecture', 'en')).toBe('en\t架构\tarchitecture');
   expect(importQingjianGlossary('你好\tphr. hello\tint. hi', 'en')).toBe('en\t你好\thello\thi');
   expect(() => importQingjianGlossary('坏行', 'en')).toThrow('第 1 行');
   expect(() => importQingjianGlossary('猫\tcat', '../en')).toThrow();
+});
+it('preserves all senses in an exportable legacy table and rejects oversized joined fields',()=>{
+  const input='你好\tint. hello\tint. hi\tphr. how do you do\twelcome\tgreetings\tsalutations\tgood day';
+  const imported=importQingjianGlossary(input,'en');
+  expect(imported).toBe('en\t你好\thello\thi; how do you do; welcome; greetings; salutations; good day');
+  expect(validatePersonalGlossary(imported)).toBeNull();
+  expect(imported.split('\t')).toHaveLength(4);
+  expect(()=>importQingjianGlossary('词\tone\t'+('x'.repeat(600))+'\t'+('y'.repeat(600)),'en')).toThrow();
 });

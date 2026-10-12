@@ -20,6 +20,8 @@ struct ApplicationPolicy
     bool frequency = true;
 };
 ApplicationPolicy Policy(const std::string &application);
+// Missing/old profiles inherit. An explicit empty replacement disables every domain input pack.
+std::string EffectiveDomainDictionaries(const std::string &application, const std::string &global_csv);
 // Isolation stays fail-closed on a read/write error: callers must not then learn globally.
 void RecordSelection(const std::string &application, const std::string &code, const std::string &word,
                      const std::string &language, bool insert = false);

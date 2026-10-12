@@ -12,7 +12,7 @@ vi.mock('./shared', () => ({
 }));
 vi.mock('./theme', () => ({ applyThemeConfig: vi.fn(), setCandidateSurfaceThemeListener: vi.fn() }));
 vi.mock('../utils/common-utils', () => ({ loadHTML: async () => '' }));
-vi.mock('./skin', () => ({ applyBuiltinSkinPageArrows: vi.fn(), applyCandidateSkin: vi.fn(), applyCandidateSkinCatalog: vi.fn() }));
+vi.mock('./skin', () => ({ applyCandidateFitContentMode:vi.fn(),applyBuiltinSkinFitContent:vi.fn(),applyBuiltinSkinPageArrows: vi.fn(), applyCandidateSkin: vi.fn(), applyCandidateSkinCatalog: vi.fn() }));
 
 class Element extends EventTarget {
   children: Element[] = [];

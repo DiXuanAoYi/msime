@@ -10,6 +10,7 @@ theme = "dark"
 # 通用
 #
 [general]
+floating_toolbar_shadow = true
 disabled_translation_dictionaries = "" # 关闭的离线翻译词典 ID，逗号分隔
 # Server 端诊断日志（默认关闭；不记录输入内容或候选文本）
 diagnostic_log = false
@@ -79,6 +80,12 @@ clean_mode = false
 # chinese-ime-lm 的 Transformer，还需模型文件在数据目录里，desktop 更准也更慢。
 #
 [association]
+collocation_max_length = 6
+collocation_min_length = 2
+collocation_penalty = -14.0
+non_collocation_penalty = -6.0
+weak_collocation_penalty = -100.0
+rear_penalty = -18.0
 # 词格整句联想（kenlm 三元模型打分）
 sentence_wordlattice = true
 # Google 解码器整句联想
@@ -102,7 +109,7 @@ sentence_collocation_enabled = false
 # 模型后直接填 id。
 sentence_collocation_model = ""
 # 搭配项的线性权重（log10 域），越大越信任搭配表。不进设置页，供配置文件高级调参
-sentence_collocation_weight = 0.1
+sentence_collocation_weight = 1.0
 sentence_collocation_rerank_weight = 0.05
 
 #
@@ -155,6 +162,7 @@ linear_step = 1
 # 外观
 #
 [appearance]
+candidate_fit_content = "follow"
 # 主题模式，可选："dark", "light", "system"
 theme_mode = "system"
 # 候选窗 / 悬浮工具栏 / 托盘菜单渲染，可选："d2d", "webview2"
@@ -221,6 +229,14 @@ tsf_preedit_shuangpin_quanpin = false
 # 输入
 #
 [input]
+wubi_four_code_auto_commit = true
+wubi_fifth_code_top_commit = true
+vim_mode_apps = "[]"
+# English candidate settings apply to already running compatible TSF hosts.
+english_candidates = true
+english_candidate_app_rules = "[]"
+# Additional input packs remain optional, with idioms enabled on a fresh install.
+enabled_domain_dictionaries = "idioms"
 character_set = "simplified" # 候选输出字形，可选："simplified", "traditional"
 # 启动/从其他输入法切换到本输入法时的默认中英文，可选："chinese", "english"
 default_ime_mode = "chinese"
@@ -359,6 +375,7 @@ autocorrect_marker = true
 # 快捷键
 #
 [keybindings]
+trilingual_cycle = false
 # 中英文切换快捷键（Ctrl+Space 由 Windows 系统管理，此处不控制）
 switch_language_shift = true
 switch_language_ctrl = false
@@ -387,6 +404,7 @@ skin_name = "default"
 # 语音输入
 #
 [voice_input]
+polish_thinking = "disabled"
 # 语音输入
 voice_input = true
 # 全局语音快捷键（可分别启用或关闭）
@@ -502,6 +520,16 @@ v_mode = true # V 模式：V 后接数字转中文（V123 → 一百二十三，
 # AI 辅助
 #
 [ai_assistant]
+thinking = "disabled"
+task = "pinyin"
+completion_enabled = false
+question_enabled = false
+token_custom = ""
+token_local = ""
+endpoint_custom = ""
+model_custom = ""
+endpoint_local = "http://127.0.0.1:11434/v1/chat/completions"
+model_local = ""
 enabled = true
 provider = "deepseek"
 token = "<YOUR_OWN_DEEPSEEK_TOKEN>"
@@ -618,3 +646,30 @@ target_language = "en"
 capture_x = "false"
 capture_y = "true"
 screen_interval_ms = "2000"
+
+
+# Independent candidate translation; legacy preserves previous provider flags and the existing cloud master switch.
+[candidate_translation]
+provider = "legacy"
+ai_provider = "deepseek"
+endpoint = "https://api.deepseek.com/chat/completions"
+model = "deepseek-v4-flash"
+token = ""
+token_deepseek = ""
+endpoint_deepseek = "https://api.deepseek.com/chat/completions"
+model_deepseek = "deepseek-v4-flash"
+token_openai = ""
+endpoint_openai = "https://api.openai.com/v1/chat/completions"
+model_openai = "gpt-4o-mini"
+token_siliconflow = ""
+endpoint_siliconflow = "https://api.siliconflow.cn/v1/chat/completions"
+model_siliconflow = "Qwen/Qwen3-8B"
+token_groq = ""
+endpoint_groq = "https://api.groq.com/openai/v1/chat/completions"
+model_groq = "llama-3.3-70b-versatile"
+token_custom = ""
+endpoint_custom = ""
+model_custom = ""
+token_local = ""
+endpoint_local = "http://127.0.0.1:11434/v1/chat/completions"
+model_local = ""

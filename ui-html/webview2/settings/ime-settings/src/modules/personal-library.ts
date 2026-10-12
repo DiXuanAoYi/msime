@@ -1,3 +1,4 @@
+import {setupDomainSettings} from './domain-settings';
 import { serializeHostMessage } from "../../../../shared/messages";
 import { onHostMessage } from "../utils/host-messages";
 import "../styles/modules/prompt-library.css";
@@ -70,6 +71,7 @@ export function setupPersonalLibrary(): void {
   const root = document.getElementById("personalLibraryPanel");
   if (!root || root.dataset.ready) return;
   root.dataset.ready = "1";
+  setupDomainSettings();
   let book: Book = { groups: [], clips: [], rules: [], favorites: [], applications:[],appLearning:[] },
     history: string[] = [],
     editing = "", page = 0;

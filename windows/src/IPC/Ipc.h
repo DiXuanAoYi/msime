@@ -47,6 +47,9 @@ bool EnsureNamedpipeFocusSessionActivated();
 bool SupportsCharacterSetShortcut();
 bool SupportsCompositionRestore();
 bool SupportsCaretStateIndicator();
+bool SupportsFieldPrivacy();
+bool SupportsTrilingualCycle();
+int SendFieldPrivacyToUIProcessViaNamedPipe(uint32_t flags);
 bool FlushNamedpipeFocusSessionReset();
 bool FlushNamedpipeImeDeactivation(uint64_t focusToken = 0);
 
@@ -132,6 +135,7 @@ inline bool IsDeliveredServerRequestId(uint64_t requestId)
 // Edit-session result for a commit whose reply never arrived although the
 // request was delivered. The key is dropped with the composition and never
 // sent again (DeferredKeyFailureReason::DeliveryAmbiguous).
+constexpr HRESULT FANY_S_PROJECTION_INVALIDATED = MAKE_HRESULT(SEVERITY_SUCCESS, FACILITY_ITF, 0x201);
 constexpr HRESULT FANY_E_COMMIT_REPLY_AMBIGUOUS = __HRESULT_FROM_WIN32(ERROR_TIMEOUT);
 
 //

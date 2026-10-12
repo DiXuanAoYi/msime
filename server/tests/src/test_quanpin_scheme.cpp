@@ -992,7 +992,7 @@ std::filesystem::path CreateAutocorrectDatabase()
 }
 } // namespace
 
-TEST_CASE(QuanpinDictionaryAutocorrectPutsCorrectedCandidateFirst)
+TEST_CASE(QuanpinDictionaryAutocorrectPreservesLiteralMixedWordAndOffersCorrection)
 {
     const auto db_path = CreateAutocorrectDatabase();
     QuanpinDictionary dictionary(test::Utf8(db_path));
@@ -1000,15 +1000,15 @@ TEST_CASE(QuanpinDictionaryAutocorrectPutsCorrectedCandidateFirst)
 
     const auto candidates = dictionary.query("sahng", "sa'h'n'g", both);
     REQUIRE(!candidates.empty());
-    // The corrected candidate leads, and its pinyin is the corrected key so
-    // that selection/weight updates land on the right dictionary entry.
-    REQUIRE_EQ(candidates.front().word, std::string("上"));
-    REQUIRE_EQ(candidates.front().pinyin, std::string("shang"));
-    REQUIRE_EQ(candidates.front().canonical_pinyin, std::string("shang"));
-    // The original greedy candidates stay behind as a fallback tail.
-    REQUIRE(std::any_of(candidates.begin(), candidates.end(),
-                        [](const WordItem &item) { return item.word == "撒谎那个"; }));
-    REQUIRE(candidates.front().word != "撒谎那个");
+    // This fixture has a real mixed abbreviation sa'h'n'g: v0.10.1 protects that intent.
+    REQUIRE_EQ(candidates.front().word, std::string("撒谎那个"));
+    REQUIRE_EQ(candidates.front().pinyin, std::string("sa'h'n'g"));
+    REQUIRE_EQ(candidates.front().canonical_pinyin, std::string("sa'huang'na'ge"));
+    REQUIRE(candidates.front().corrected_from.empty());
+    const auto correction = std::find_if(candidates.begin(), candidates.end(), [](const WordItem &item) {
+        return item.word == "上" && item.canonical_pinyin == "shang" && item.corrected_from == "sahng";
+    });
+    REQUIRE(correction != candidates.end());
 }
 
 TEST_CASE(QuanpinDictionaryAutocorrectNeighborKeySubstitution)

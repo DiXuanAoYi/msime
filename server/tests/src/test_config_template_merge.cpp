@@ -77,9 +77,9 @@ TEST_CASE(shipped_caret_indicator_defaults_and_upgrade_behavior)
     const auto preserved = toml::parse(MergeConfigIntoTemplate(installed, enabled, old_template));
     REQUIRE(preserved["general"]["caret_state_indicator"].value_or(false));
 
-    // A value identical to the previous baseline is indistinguishable from an untouched default.
+    // A persisted old default is still a user choice; upgrading must not disable it.
     const auto changed = toml::parse(MergeConfigIntoTemplate(installed, enabled, enabled));
-    REQUIRE(!changed["general"]["caret_state_indicator"].value_or(true));
+    REQUIRE(changed["general"]["caret_state_indicator"].value_or(false));
     const std::string previous_off = "[general]\nfloating_toolbar = true\ncaret_state_indicator = false\n";
     const auto opted_in = toml::parse(MergeConfigIntoTemplate(installed, enabled, previous_off));
     REQUIRE(opted_in["general"]["caret_state_indicator"].value_or(false));
@@ -144,23 +144,26 @@ TEST_CASE(config_merge_keeps_customized_values_and_adds_new_keys)
     REQUIRE_EQ(MergeConfigIntoTemplate(template_text, user_text, baseline_text), expected);
 }
 
-TEST_CASE(config_merge_lets_new_defaults_win_for_untouched_keys)
+TEST_CASE(config_merge_preserves_old_defaults_as_user_choices)
 {
     const std::string template_text = "[appearance]\npage_size = 9\nfont_size = 18\n";
     const std::string user_text = "[appearance]\npage_size = 8\nfont_size = 20\n";
     const std::string baseline_text = "[appearance]\npage_size = 8\nfont_size = 16\n";
 
-    // page_size 仍是旧默认值 -> 跟随新默认值；font_size 被用户改过 -> 保留。
+    // Both the old default and the customized size survive the upgrade.
     REQUIRE_EQ(MergeConfigIntoTemplate(template_text, user_text, baseline_text),
-               "[appearance]\npage_size = 9\nfont_size = 20\n");
+               "[appearance]\npage_size = 8\nfont_size = 20\n");
 }
 
-TEST_CASE(config_merge_drops_keys_and_sections_absent_from_template)
+TEST_CASE(config_merge_retains_extension_keys_and_sections)
 {
     const std::string template_text = "[general]\nkept = true\n";
     const std::string user_text = "[general]\nkept = false\nretired = 1\n\n[gone]\nvalue = \"x\"\n";
 
-    REQUIRE_EQ(MergeConfigIntoTemplate(template_text, user_text, std::string()), "[general]\nkept = false\n");
+    const auto merged = toml::parse(MergeConfigIntoTemplate(template_text, user_text, std::string()));
+    REQUIRE(!merged["general"]["kept"].value_or(true));
+    REQUIRE_EQ(merged["general"]["retired"].value_or(0), 1);
+    REQUIRE_EQ(merged["gone"]["value"].value_or(std::string()), std::string("x"));
 }
 
 TEST_CASE(config_merge_keeps_all_user_values_without_a_baseline)
@@ -187,7 +190,7 @@ TEST_CASE(config_merge_handles_multiline_string_values)
 
     const std::string expected = "[ai_assistant]\n"
                                  "prompt = \"\"\"my\nown prompt\"\"\"\n"
-                                 "model = \"v2\"\n";
+                                 "model = \"v1\"\n";
     REQUIRE_EQ(MergeConfigIntoTemplate(template_text, user_text, baseline_text), expected);
 }
 
@@ -265,13 +268,13 @@ TEST_CASE(config_merge_reappends_real_credentials_absent_from_template)
 }
 
 // 用户从没填过这个 token（还是占位符）：升级不该把旧占位符粘住，让新模板的默认占位符生效即可。
-TEST_CASE(config_merge_keeps_new_placeholder_for_untouched_credential)
+TEST_CASE(config_merge_keeps_existing_placeholder_as_inert_value)
 {
     const std::string template_text = "[ai_assistant]\ntoken = \"<YOUR_AI_TOKEN_DEEPSEEK>\"\n";
     const std::string user_text = "[ai_assistant]\ntoken = \"<YOUR_OLD_TOKEN>\"\n";
     const std::string baseline_text = "[ai_assistant]\ntoken = \"<YOUR_OLD_TOKEN>\"\n";
     REQUIRE_EQ(MergeConfigIntoTemplate(template_text, user_text, baseline_text),
-               "[ai_assistant]\ntoken = \"<YOUR_AI_TOKEN_DEEPSEEK>\"\n");
+               "[ai_assistant]\ntoken = \"<YOUR_OLD_TOKEN>\"\n");
 }
 
 // 抢救路径的核心：一份解析不过的 config.toml（这里结尾留了半行）仍能逐行捞回前面的真 token，

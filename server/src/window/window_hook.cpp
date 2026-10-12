@@ -17,7 +17,14 @@ void OnWinEvent(HWND hwnd);
 namespace
 {
 std::atomic<int> g_caps_lock{0};
+bool g_caps_key_held = false;
+
+void PublishServerCapsLockState(int enabled)
+{
+    if (::global_hwnd_ftb && IsWindow(::global_hwnd_ftb))
+        PostMessage(::global_hwnd_ftb, UPDATE_FTB_CAPS_LOCK, static_cast<WPARAM>(enabled), 0);
 }
+} // namespace
 
 void InitServerCapsLockState()
 {
@@ -27,6 +34,13 @@ void InitServerCapsLockState()
 int GetServerCapsLockState()
 {
     return g_caps_lock.load(std::memory_order_relaxed);
+}
+
+void SyncServerCapsLockState(bool enabled)
+{
+    const int next = enabled ? 1 : 0;
+    if (g_caps_lock.exchange(next, std::memory_order_relaxed) != next)
+        PublishServerCapsLockState(next);
 }
 
 bool IsKeyPressed(int vk)
@@ -43,6 +57,10 @@ void RestartServerProcess()
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
+    if (nCode == HC_ACTION && (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) &&
+        reinterpret_cast<KBDLLHOOKSTRUCT *>(lParam)->vkCode == VK_CAPITAL)
+        g_caps_key_held = false;
+
     // When Alt is held, Windows normally reports the following non-system key
     // as WM_SYSKEYDOWN rather than WM_KEYDOWN.  Handle both; otherwise all of
     // the Ctrl+Shift+Alt shortcuts depend on modifier press order.
@@ -50,14 +68,12 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
     {
         KBDLLHOOKSTRUCT *p = (KBDLLHOOKSTRUCT *)lParam;
 
-        if (p->vkCode == VK_CAPITAL && (p->flags & LLKHF_UP) == 0)
+        if (p->vkCode == VK_CAPITAL && (p->flags & LLKHF_UP) == 0 && !g_caps_key_held)
         {
+            g_caps_key_held = true;
             const int next = g_caps_lock.load(std::memory_order_relaxed) ? 0 : 1;
             g_caps_lock.store(next, std::memory_order_relaxed);
-            if (::global_hwnd_ftb && IsWindow(::global_hwnd_ftb))
-            {
-                PostMessage(::global_hwnd_ftb, UPDATE_FTB_CAPS_LOCK, static_cast<WPARAM>(next), 0);
-            }
+            PublishServerCapsLockState(next);
         }
 
         bool ctrl = IsKeyPressed(VK_CONTROL);

@@ -4,6 +4,7 @@
 #include "engine/local_modes/date_time_query.h"
 
 #include <algorithm>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -134,11 +135,14 @@ inline std::optional<size_t> SlottedEnglishIndex(const std::vector<WordItem> &it
 // Keep asynchronous mixed-input candidates in stable priority slots regardless
 // of the order in which their workers finish. English keeps its legacy slotting
 // (promoted ahead of AI unless a cloud result forces it behind cloud+AI), and
-// emoji/kaomoji are placed one slot after the last of cloud/AI/English:
-//   no cloud:         Chinese, English, AI, emoji, kaomoji
-//   cloud:            Chinese, cloud, AI, English, emoji, kaomoji
-//   cloud only:       Chinese, cloud, English, emoji, kaomoji
-//   base:             Chinese, English, emoji, kaomoji
+// emoji/kaomoji are placed at the end of the candidate list so they do not
+// displace normal Chinese candidates:
+//   no cloud:         Chinese..., English, AI, ..., emoji, kaomoji
+//   cloud:            Chinese..., cloud, AI, English, ..., emoji, kaomoji
+//   cloud only:       Chinese..., cloud, English, ..., emoji, kaomoji
+//   base:             Chinese..., English, ..., emoji, kaomoji
+// 知道每页候选数（page_size）时，最匹配的那个 emoji 单独放在首页末位，其余 emoji 仍在末尾；
+// 补全词的默认位置和学到的英文槽位相应让到首页倒数第二位，两者都留在首页。
 // 日期时间只在 rq / sj / xq 这类唤醒词上出现，用户打它就是要日期，所以它排在所有异步候选前面，
 // 紧跟首个中文候选，展开全部格式的入口紧跟在它后面：Chinese, date/time, 📅日期, cloud, ...
 // The learned English slot (EnglishPlacement) moves the English candidate away
@@ -155,6 +159,7 @@ inline void NormalizeMixedCandidateOrder(std::vector<WordItem> &items, size_t lo
     std::optional<WordItem> date_time_menu;
     std::optional<WordItem> cloud_candidate;
     std::optional<WordItem> ai_candidate;
+    std::vector<WordItem> additional_ai_candidates;
     local_candidates.reserve(items.size());
 
     for (auto &item : items)
@@ -168,6 +173,8 @@ inline void NormalizeMixedCandidateOrder(std::vector<WordItem> &items, size_t lo
         case CandidateSource::AiSuggestion:
             if (!ai_candidate)
                 ai_candidate = std::move(item);
+            else
+                additional_ai_candidates.push_back(std::move(item));
             break;
         case CandidateSource::EnglishDictionary:
             english_candidates.push_back(std::move(item));
@@ -232,18 +239,19 @@ inline void NormalizeMixedCandidateOrder(std::vector<WordItem> &items, size_t lo
     }
     if (!cloud_candidate && ai_candidate)
         insert_at(slot++, std::move(*ai_candidate));
-    if (!emoji_candidates.empty())
+    std::optional<WordItem> first_page_emoji;
+    if (english_placement.page_size >= 2 && !emoji_candidates.empty())
     {
-        insert_at(slot++, std::move(emoji_candidates.front()));
+        first_page_emoji = std::move(emoji_candidates.front());
         emoji_candidates.erase(emoji_candidates.begin());
     }
-    if (!kaomoji_candidates.empty())
-    {
-        insert_at(slot++, std::move(kaomoji_candidates.front()));
-        kaomoji_candidates.erase(kaomoji_candidates.begin());
-    }
+    const size_t english_slot_maximum = english_placement.page_size > 0
+                                            ? english_placement.page_size - (first_page_emoji ? 2 : 1)
+                                            : (std::numeric_limits<size_t>::max)();
 
     for (auto &candidate : english_candidates)
+        items.push_back(std::move(candidate));
+    for (auto &candidate : additional_ai_candidates)
         items.push_back(std::move(candidate));
     for (auto &candidate : emoji_candidates)
         items.push_back(std::move(candidate));
@@ -252,19 +260,21 @@ inline void NormalizeMixedCandidateOrder(std::vector<WordItem> &items, size_t lo
     for (auto &candidate : date_time_candidates)
         items.push_back(std::move(candidate));
 
-    // 把英文从默认位置挪到学到的槽位；没学过的补全词挪到首页末位。槽位 0 排在最前，但仍在首位
-    // 的快捷短语组后面。后面插入的 AI/emoji/颜文字都在 english_index 之后，下标仍然有效。
+    // First-page emoji reserves the last slot; an English completion uses the
+    // preceding slot. Explicitly fixed English rows keep their final priority.
     std::optional<size_t> target = english_placement.slot;
     if (!target && completion_takes_slot)
-        target = english_placement.page_size > 0 ? english_placement.page_size - 1 : items.size();
+        target = english_placement.page_size > 0 ? english_slot_maximum : items.size();
     if (english_index && target && items[*english_index].fixed_position == 0)
     {
-        if (english_placement.page_size > 0)
-            target = (std::min)(*target, english_placement.page_size - 1);
+        target = (std::min)(*target, english_slot_maximum);
         WordItem candidate = std::move(items[*english_index]);
         items.erase(items.begin() + static_cast<std::ptrdiff_t>(*english_index));
         insert_at(*target == 0 ? IndexAfterLocalCandidates(items, 0) : *target, std::move(candidate));
     }
+
+    if (first_page_emoji)
+        insert_at(english_placement.page_size - 1, std::move(*first_page_emoji));
 
     std::vector<WordItem> fixed_english_candidates;
     for (auto candidate = items.begin(); candidate != items.end();)

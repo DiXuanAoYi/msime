@@ -291,6 +291,7 @@ std::string BuildCurrentCandidatePage()
 
         CandidateViewItem view;
         view.text = word;
+        view.input_domains = item.input_domains;
         if (GetConfiguredCandidateShowPinyin())
             view.reading = SettingsDictionary::CandidateReading(word);
         if (show_autocorrect_marker && !item.corrected_from.empty())
@@ -321,6 +322,14 @@ std::string BuildCurrentCandidatePage()
             view.badge = " ☁️";
         else if (item.source == CandidateSource::AiSuggestion)
             view.badge = " 🤖";
+        else if (item.source == CandidateSource::AiCompletion)
+            view.badge = " 〔续写〕";
+        else if (item.source == CandidateSource::AiQuestion)
+        {
+            view.badge = " 〔问字〕";
+            if (GetConfiguredCandidateShowPinyin() && !item.canonical_pinyin.empty())
+                view.reading = item.canonical_pinyin;
+        }
         // 整句来源标签与设置页名称保持一致，方便同时比较四个来源。两家选中同一句时只剩一行，
         // 标签归先保留下来的来源；开启去重补位后，其余来源会改为显示自己的下一条不同结果。
         // Generated/Fallback 也被原样上屏、英文、日期等合成候选借用，只有引擎标了整句联想的才挂标签。
@@ -339,6 +348,7 @@ std::string BuildCurrentCandidatePage()
                 view.badge = collocation_badge;
         }
         view.fixed_position = item.fixed_position > 0;
+        ApplyInputDomainBadge(view);
         ApplyFixedPositionBadge(view, show_fixed_badge, fixed_badge_style);
         EnglishIme::TranslationQuery translation_query;
         if (!translation_page && BuildTranslationQuery(item, translation_query))
@@ -381,7 +391,8 @@ std::string BuildCurrentCandidatePage()
 void PrepareCandidateTranslationRequest()
 {
     const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
-    const bool enabled = GetConfiguredCandidateTranslationsEnabled() && !IsUiLessMode() && !japanese;
+    const bool enabled = GetConfiguredCandidateTranslationsEnabled() && !IsUiLessMode() && !japanese &&
+                         FanyImeIpc::InputLearningAllowed();
     auto &ui = Global::candidate_ui;
     if (IsCandidateSubPageActive())
     {
@@ -405,10 +416,11 @@ void PrepareCandidateTranslationRequest()
         }
         return;
     }
-    const std::string scope = fmt::format(
-        "{}|{}|{}|{}|{}|{}", GetConfiguredTencentTmt().enabled, GetConfiguredCustomTranslation().enabled,
-        GetConfiguredNiuTrans().enabled, GetConfiguredTencentTmt().target_language,
-        GetConfiguredCandidateTranslationCloudEnabled(), GetConfiguredPersonalTranslationGlossaryRevision());
+    const std::string scope =
+        fmt::format("{}|{}|{}|{}|{}|{}|{}", GetConfiguredTencentTmt().enabled, GetConfiguredCustomTranslation().enabled,
+                    GetConfiguredNiuTrans().enabled, GetConfiguredTencentTmt().target_language,
+                    GetConfiguredCandidateTranslationCloudEnabled() && FanyImeIpc::AutomaticInputNetworkAllowed(),
+                    GetConfiguredPersonalTranslationGlossaryRevision(), CloudTranslation::ConfigurationScope());
     if (scope != g_candidate_translation_scope)
     {
         g_candidate_translation_scope = scope;
@@ -453,6 +465,16 @@ void PublishBuiltCandidatePage(const std::wstring &candidate_string)
     snapshot->page_views = ui.page_views;
     snapshot->page_words = ui.page_words;
     snapshot->candidate_string = candidate_string;
+    snapshot->page_index = ui.page_index;
+    snapshot->html_items.reserve(ui.page_views.size());
+    for (const auto &view : ui.page_views)
+    {
+        auto html = string_to_wstring(CandidateViewHtml(view));
+        // Only legacy transport commas remain literal PUA here; real user PUA
+        // text was escaped to an HTML entity by EscapeCandidateViewHtml.
+        std::replace(html.begin(), html.end(), static_cast<wchar_t>(0xF000), L',');
+        snapshot->html_items.push_back(std::move(html));
+    }
     snapshot->selected_index_in_page = ui.selected_index_in_page;
     snapshot->page_count = ui.current_page_count();
     snapshot->page_item_count = ui.cur_page_item_cnt;
@@ -569,6 +591,7 @@ bool ExpandCandidatesKeepingPagePosition()
         g_inputSession->has_active_helpcode());
     PlaceQuickPhrases(expanded, g_inputSession->get_pinyin_sequence_with_cases());
     PlaceApplicationWords(expanded, g_inputSession->get_pinyin_sequence_with_cases());
+    ApplyActiveAiRerank(expanded);
     ui.set_items(std::move(expanded));
     ui.page_index = current_page;
     ui.selected_index_in_page = current_selection;
@@ -753,6 +776,7 @@ void PrepareCandidateList(uint64_t client_id, uint64_t activation_epoch)
             g_inputSession->has_active_helpcode());
         PlaceQuickPhrases(items, current_input);
         PlaceApplicationWords(items, current_input);
+        ApplyActiveAiRerank(items);
         fixedPosMs = segment.Split();
         if (g_inputSession->get_pinyin_sequence().size() == 1 && items.size() > 24)
             items.resize(24);

@@ -130,6 +130,10 @@ bool ClientNegotiatedCompositionRestore(uint64_t client_id);
 // its character-set shortcut KeyEvent carries a caret anchor in point[].
 bool ClientNegotiatedVocabularyCommit(uint64_t client_id);
 bool ClientNegotiatedCaretStateIndicator(uint64_t client_id);
+bool ClientNegotiatedFieldPrivacy(uint64_t client_id);
+bool ClientNegotiatedTrilingualCycle(uint64_t client_id);
+bool ClientNegotiatedRuntimeSettings(uint64_t client_id);
+std::vector<uint64_t> SnapshotRuntimeSettingsClients();
 uint64_t RegisterToTsfWorkerThreadPipeClient(uint64_t client_id, HANDLE pipe);
 uint64_t BeginPipeClientHandler(HANDLE pipe);
 void EndPipeClientHandler(uint64_t handler_id);

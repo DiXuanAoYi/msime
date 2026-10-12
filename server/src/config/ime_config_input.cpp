@@ -20,7 +20,7 @@ SchemeType GetConfiguredInputScheme()
 
 SchemeType GetConfiguredActiveInputScheme()
 {
-    return g_input_mode == "japanese" ? SchemeType::JapaneseRomaji : g_input_scheme;
+    return GetActiveInputMode() == "japanese" ? SchemeType::JapaneseRomaji : g_input_scheme;
 }
 
 std::string GetConfiguredInputSchemeName()
@@ -762,6 +762,8 @@ bool SetConfiguredInputMode(const std::string &mode)
         return false;
     }
     g_input_mode = mode;
+    g_configured_input_mode_japanese.store(mode == "japanese");
+    g_active_input_mode.store(ActiveInputMode::Configured);
     RefreshEffectiveTsfPreeditStyle();
     NotifyImeServerInputSchemeChanged();
     return true;

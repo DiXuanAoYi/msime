@@ -10,6 +10,13 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     endif()
 endif()
 
+# These executables use assert to enforce their policies in Release too.
+if(MSVC)
+    add_compile_options(/UNDEBUG)
+else()
+    add_compile_options(-UNDEBUG)
+endif()
+
 add_executable(test_client_fallback client_fallback.cpp)
 target_include_directories(test_client_fallback PRIVATE ../src)
 target_compile_features(test_client_fallback PRIVATE cxx_std_17)
@@ -64,3 +71,28 @@ if(WIN32 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     target_compile_features(test_english_candidate_keys PRIVATE cxx_std_17)
     add_test(NAME english_candidate_keys COMMAND test_english_candidate_keys)
 endif()
+
+add_executable(test_punctuation_commit_text punctuation_commit_text.cpp)
+target_include_directories(test_punctuation_commit_text PRIVATE ../src)
+target_compile_features(test_punctuation_commit_text PRIVATE cxx_std_17)
+add_test(NAME punctuation_commit_text COMMAND test_punctuation_commit_text)
+
+add_executable(test_caps_lock_punctuation_policy caps_lock_punctuation_policy.cpp)
+target_include_directories(test_caps_lock_punctuation_policy PRIVATE ../src)
+target_compile_features(test_caps_lock_punctuation_policy PRIVATE cxx_std_17)
+add_test(NAME caps_lock_punctuation_policy COMMAND test_caps_lock_punctuation_policy)
+
+add_executable(test_field_privacy field_privacy.cpp)
+target_include_directories(test_field_privacy PRIVATE ../..)
+target_compile_features(test_field_privacy PRIVATE cxx_std_17)
+add_test(NAME field_privacy COMMAND test_field_privacy)
+
+add_executable(test_input_runtime_settings input_runtime_settings.cpp)
+target_include_directories(test_input_runtime_settings PRIVATE ../..)
+target_compile_features(test_input_runtime_settings PRIVATE cxx_std_17)
+add_test(NAME input_runtime_settings COMMAND test_input_runtime_settings)
+
+add_executable(test_feature_input_policies feature_input_policies.cpp)
+target_include_directories(test_feature_input_policies PRIVATE ../..)
+target_compile_features(test_feature_input_policies PRIVATE cxx_std_17)
+add_test(NAME feature_input_policies COMMAND test_feature_input_policies)

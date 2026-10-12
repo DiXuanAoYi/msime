@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <stdexcept>
@@ -672,7 +673,14 @@ std::unique_ptr<SentenceModel> SentenceModel::load(const std::vector<std::uint8_
 
 std::unique_ptr<SentenceModel> SentenceModel::load_file(const std::string &path)
 {
-    std::ifstream file(path, std::ios::binary);
+    // path is UTF-8. A narrow std::string opens through the ANSI code page on Windows, which
+    // cannot name a data directory under a non-ASCII user profile.
+#if defined(__cpp_lib_char8_t)
+    const std::filesystem::path file_path(std::u8string(path.begin(), path.end()));
+#else
+    const std::filesystem::path file_path = std::filesystem::u8path(path);
+#endif
+    std::ifstream file(file_path, std::ios::binary);
     if (!file)
     {
         return nullptr;

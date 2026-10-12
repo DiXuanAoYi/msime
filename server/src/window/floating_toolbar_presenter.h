@@ -13,7 +13,8 @@ class FloatingToolbarPresenter
     void Present();
     void ApplyTheme();
     void ApplyAppearance();
-    void RelayoutHost(FLOAT scaleOverride = 0.0f);
+    void RelayoutHost(FLOAT scaleOverride = 0.0f, const RECT *suggestedRect = nullptr);
+    RECT ShadowInsetsPx(int hostWidthPx, int hostHeightPx, FLOAT scale) const;
     void SyncUi(int cnEn, int doubleSingleByte, int punctuation, int englishInputMode, int capsLock,
                 int japaneseInputMode);
     bool HitCaptionDrag(POINT clientPoint) const;

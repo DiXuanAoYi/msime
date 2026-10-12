@@ -6,6 +6,7 @@
 
 #include "engine/core/fuzzy_pinyin_options.h"
 #include "engine/core/scheme_type.h"
+#include "engine/ngram/octagram/octagram_gram.h"
 #include "engine/shuangpin/shuangpin_profile.h"
 #include <toml++/toml.h>
 #include <filesystem>
@@ -45,6 +46,7 @@ struct VoiceInputConfig
     std::map<std::string, std::string> polish_tokens;
     std::string polish_endpoint = "https://api.siliconflow.cn/v1/chat/completions";
     std::string polish_model;
+    std::string polish_thinking = "disabled";
     // cleanup | faithful | zh2en | casual | custom_1 | custom_2 | custom_3
     std::string polish_prompt_id = "cleanup";
     // Legacy single custom prompt. Retained for config compatibility.
@@ -74,14 +76,22 @@ struct AiAssistantConfig
     std::map<std::string, std::string> tokens;
     std::string endpoint = "https://api.deepseek.com/chat/completions";
     std::string model = "deepseek-v4-flash";
+    std::string thinking = "disabled";
+    std::string task = "pinyin";
+    bool completion_enabled = false;
+    bool question_enabled = false;
     std::map<std::string, std::string> endpoints{{"deepseek", "https://api.deepseek.com/chat/completions"},
                                                  {"openai", "https://api.openai.com/v1/chat/completions"},
                                                  {"siliconflow", "https://api.siliconflow.cn/v1/chat/completions"},
-                                                 {"groq", "https://api.groq.com/openai/v1/chat/completions"}};
+                                                 {"groq", "https://api.groq.com/openai/v1/chat/completions"},
+                                                 {"custom", ""},
+                                                 {"local", "http://127.0.0.1:11434/v1/chat/completions"}};
     std::map<std::string, std::string> models{{"deepseek", "deepseek-v4-flash"},
                                               {"openai", "gpt-4o-mini"},
                                               {"siliconflow", "Qwen/Qwen3-8B"},
-                                              {"groq", "llama-3.3-70b-versatile"}};
+                                              {"groq", "llama-3.3-70b-versatile"},
+                                              {"custom", ""},
+                                              {"local", ""}};
     int candidate_limit = 3;
     // custom_1 | custom_2 | custom_3
     std::string prompt_id = "custom_1";
@@ -140,6 +150,26 @@ struct NiuTransConfig
     std::string apikey;
 };
 
+// Candidate translation is independent of input assistance, voice polish and Vision translation.
+// The default preserves the previous NiuTrans > Custom > Tencent legacy selection without enabling cloud lookup.
+struct CandidateTranslationConfig
+{
+    std::string provider = "legacy"; // legacy | dictionary | tencent | custom | niutrans | ai
+    std::string ai_provider = "deepseek";
+    std::string token;
+    std::string endpoint = "https://api.deepseek.com/chat/completions";
+    std::string model = "deepseek-v4-flash";
+    std::map<std::string, std::string> tokens;
+    std::map<std::string, std::string> endpoints = AiAssistantConfig{}.endpoints;
+    std::map<std::string, std::string> models = AiAssistantConfig{}.models;
+    TencentTmtConfig tencent;
+    CustomTranslationConfig custom;
+    NiuTransConfig niutrans;
+    uint64_t revision = 1;
+};
+CandidateTranslationConfig GetConfiguredCandidateTranslationSnapshot();
+bool SetConfiguredCandidateTranslationString(const std::string &key, const std::string &value);
+
 // [network] 段：云输入、模型下载、AI、翻译、语音等所有出站请求共用的代理设置。
 struct NetworkProxyConfig
 {
@@ -161,8 +191,8 @@ void NotifyImeServerCandidateSkinRefresh();
 void NotifyImeServerInputSchemeChanged();
 // 请求输入法后台进程重启（由 Watchdog 拉起）。返回是否成功送达。
 bool NotifyImeServerRestart();
-// 升级用：以新版模板为骨架重建配置。用户改过的值（与 baseline 中的旧默认值不同）保留，
-// 其余跟随新默认值；模板里没有的旧键被丢弃。baseline 为空时一律保留用户值。
+// Upgrade adds missing defaults, retaining all existing values and extension slots, including old defaults.
+// baseline_text remains accepted for older callers but never authorizes overwriting a persisted value.
 std::string MergeConfigIntoTemplate(const std::string &template_text, const std::string &user_text,
                                     const std::string &baseline_text);
 bool ReloadImeConfigIfChanged();
@@ -212,6 +242,19 @@ std::string GetConfiguredInputSchemeName();
 bool SetConfiguredInputScheme(const std::string &scheme);
 const std::string &GetConfiguredInputMode();
 bool SetConfiguredInputMode(const std::string &mode);
+const std::string &GetActiveInputMode();
+bool SetActiveInputMode(const std::string &mode);
+bool GetConfiguredTrilingualCycleEnabled();
+bool SetConfiguredTrilingualCycleEnabled(bool enabled);
+bool GetConfiguredWubiFourCodeAutoCommit();
+bool SetConfiguredWubiFourCodeAutoCommit(bool enabled);
+bool GetConfiguredWubiFifthCodeTopCommit();
+bool SetConfiguredWubiFifthCodeTopCommit(bool enabled);
+bool GetConfiguredVimModeForApplication(const std::string &application);
+std::shared_ptr<const std::string> GetConfiguredVimModeApps();
+bool SetConfiguredVimModeApps(const std::string &apps);
+gram::GrammarConfig GetConfiguredCollocationGrammar();
+bool SetConfiguredCollocationGrammar(const gram::GrammarConfig &config);
 const std::string &GetConfiguredJapaneseSchema();
 bool SetConfiguredJapaneseSchema(const std::string &schema);
 const std::string &GetConfiguredCharacterSet();
@@ -363,6 +406,10 @@ bool GetConfiguredShowQuanpinHelpcodeInCandidateWindow();
 bool SetConfiguredShowQuanpinHelpcodeInCandidateWindow(bool enabled);
 bool GetConfiguredFloatingToolbarEnabled();
 bool SetConfiguredFloatingToolbarEnabled(bool enabled);
+bool GetConfiguredFloatingToolbarShadow();
+bool SetConfiguredFloatingToolbarShadow(bool enabled);
+const std::string &GetConfiguredCandidateFitContentMode();
+bool SetConfiguredCandidateFitContentMode(const std::string &mode);
 bool GetConfiguredCaretStateIndicatorEnabled();
 bool SetConfiguredCaretStateIndicatorEnabled(bool enabled);
 // Also announce the current mode when focus moves into another text field,
@@ -539,6 +586,9 @@ const std::string &GetConfiguredUiBackend();
 bool SetConfiguredUiBackend(const std::string &backend);
 // Process-lifetime renderer chosen at InitImeConfig. Independent of later reloads.
 bool UseD2dSmallWindowUi();
+// Process-only recovery; never changes the user's requested backend in config.toml.
+void ActivateNativeSmallWindowFallback();
+bool IsNativeSmallWindowFallbackActive();
 // "fluent" | "wechat" | "graphite" | "willow_green" | "autumn_osmanthus" | "microsoft"
 // — candidate-window and floating-toolbar skin.
 const std::string &GetConfiguredCandidateSkin();
@@ -575,6 +625,16 @@ VoiceInputConfig GetConfiguredVoiceInput();
 bool SetConfiguredVoiceInputString(const std::string &key, const std::string &value);
 bool SetConfiguredVoiceInputBool(const std::string &key, bool value);
 const AiAssistantConfig &GetConfiguredAiAssistant();
+AiAssistantConfig GetConfiguredAiAssistantSnapshot();
+bool SetConfiguredLocalAiConnection(const std::string &endpoint, const std::string &model, const std::string &token,
+                                    bool enabled = true);
+bool GetConfiguredEnglishCandidates();
+bool SetConfiguredEnglishCandidates(bool enabled);
+std::shared_ptr<const std::string> GetConfiguredEnglishCandidateAppRules();
+bool SetConfiguredEnglishCandidateAppRules(const std::string &rules);
+bool GetConfiguredEnglishCandidatesForApplication(const std::string &application);
+std::shared_ptr<const std::string> GetConfiguredEnabledDomainDictionaries();
+bool SetConfiguredEnabledDomainDictionaries(const std::string &ids);
 const TencentTmtConfig &GetConfiguredTencentTmt();
 bool SetConfiguredTencentTmtString(const std::string &key, const std::string &value);
 const CustomTranslationConfig &GetConfiguredCustomTranslation();

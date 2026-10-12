@@ -110,6 +110,7 @@
           </div>
         </div>
       </div>
+      <label id="voiceAsrResourceIdField"><span>Resource ID · 火山引擎资源</span><input id="voiceAsrResourceId" type="text" autocomplete="off" placeholder="volc.seedasr.sauc.duration"><small>填写控制台中已授权的资源 ID；留空使用默认资源。</small></label>
       <label id="voiceAsrAppKeyField"><span>App ID / App Key</span><input id="voiceAsrAppKey" type="text" autocomplete="off"></label>
       <label id="voiceAsrModelField"><span>模型</span><input id="voiceAsrModel" type="text" autocomplete="off" spellcheck="false" placeholder="whisper-1"></label>
       <div class="voice-field voice-wide" id="voiceAsrTokenField">
@@ -228,7 +229,8 @@
           </div>
         </div>
       </div>
-      <label><span>模型</span><input id="voicePolishModel" type="text" autocomplete="off" spellcheck="false" placeholder="Qwen/Qwen3-8B"></label>
+      <div class="ai-field"><label for="voicePolishModel">模型 · 可直接输入名称</label><div class="model-combo"><input id="voicePolishModel" type="text" autocomplete="off" spellcheck="false" placeholder="Qwen/Qwen3-8B"><button id="voicePolishModelArrow" type="button" aria-label="展开或查询模型">⌄</button><div id="voicePolishModelMenu" class="model-menu"></div></div><button id="voicePolishModelFetch" type="button">查询模型</button><span id="voicePolishModelStatus" role="status"></span></div>
+      <div id="voiceThinkingField" class="ai-field is-hidden"><span>DeepSeek 思考强度</span><div class="dropdown"><button id="voiceThinkingBtn" class="dropdown-toggle" type="button"><span>关闭 · 更快</span><img src="./assets/arrow.svg" alt=""></button><div id="voiceThinkingMenu" class="dropdown-menu"><div class="dropdown-item" data-value="disabled">关闭 · 更快</div><div class="dropdown-item" data-value="low">低</div><div class="dropdown-item" data-value="high">高</div><div class="dropdown-item" data-value="max">最高</div></div></div><small>开启会延长等待，失败时保留原识别文字。</small></div>
       <div class="voice-field voice-wide">
         <label for="voicePolishToken">API Token</label>
         <span class="voice-secret-input">

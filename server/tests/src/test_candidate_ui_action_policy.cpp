@@ -11,3 +11,11 @@ TEST_CASE(candidate_ui_action_accepts_exact_one_based_page_range)
     REQUIRE(!FanyImeIpc::IsValidCandidateUiOneBasedIndex(-1));
     REQUIRE(!FanyImeIpc::IsValidCandidateUiOneBasedIndex(11));
 }
+
+TEST_CASE(ai_task_results_cannot_change_the_dictionary_under_the_question_input)
+{
+    REQUIRE(!FanyImeIpc::SupportsCandidateDictionaryMutation(CandidateSource::AiQuestion));
+    REQUIRE(!FanyImeIpc::SupportsCandidateDictionaryMutation(CandidateSource::AiCompletion));
+    REQUIRE(FanyImeIpc::SupportsCandidateDictionaryMutation(CandidateSource::AiSuggestion));
+    REQUIRE(FanyImeIpc::SupportsCandidateDictionaryMutation(CandidateSource::AppDictionary));
+}

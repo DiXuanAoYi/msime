@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { applyBuiltinSkinPageArrows, applyCandidateSkin, applyCandidateSkinCatalog, skinShowsPageArrows } from './skin';
+import { applyCandidateFitContentMode,applyBuiltinSkinFitContent,skinFitsContent,applyBuiltinSkinPageArrows, applyCandidateSkin, applyCandidateSkinCatalog, skinShowsPageArrows } from './skin';
 
 const readStyle = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 
@@ -338,3 +338,7 @@ it('shows page arrows in the appearance preview only for skins that turn them on
   applyBuiltinSkinPageArrows(undefined);
   expect(skinShowsPageArrows('graphite')).toBe(false);
 });
+
+it('follows skin content width unless explicitly overridden',()=>{applyBuiltinSkinFitContent({fluent:true,wechat:false});applyCandidateFitContentMode('follow');expect(skinFitsContent('fluent')).toBe(true);expect(skinFitsContent('wechat')).toBe(false);applyCandidateFitContentMode('disabled');expect(skinFitsContent('fluent')).toBe(false);applyCandidateFitContentMode('enabled');expect(skinFitsContent('wechat')).toBe(true);applyCandidateFitContentMode('follow');});
+
+it('uses separate word class and separator colors for normal and selected candidate translations',()=>{applyCandidateSkinCatalog([{id:'custom-parts',name:'Parts',version:'1',base:'fluent',layouts:['horizontal'],themes:['dark'],compatible:true,candidate:{dark:{translationPos:'#123456',translationSeparator:'#234567',selectedTranslationPos:'#345678',selectedTranslationSeparator:'#456789'}}}],[],'',true,9);applyCandidateSkin('custom-parts');expect(generatedCss).toContain('.cand-translation .cand-pos {color:#123456;opacity:1;}');expect(generatedCss).toContain('.cand-translation .cand-sep {color:#234567;opacity:1;}');expect(generatedCss).toContain('.cand.first .cand-translation .cand-pos {color:#345678;opacity:1;}');expect(generatedCss).toContain('.cand.first .cand-translation .cand-sep {color:#456789;opacity:1;}');});

@@ -79,6 +79,32 @@ def build(output: Path, english_db: Path):
         add('industry-cloud','en',zh,en)
         add('industry-cloud','zh',en.lower(),zh)
 
+    # The tagged Windows source builder reads this source after ECDICT, retaining every sense.
+    # Keep it separately switchable/exportable instead of changing the old locked base or user overrides.
+    origin = manifest['upstream-cn-en']
+    translated = gzip.decompress((source / origin['filename']).read_bytes())
+    assert len(translated) == origin['bytes'] and hashlib.sha256(translated).hexdigest() == origin['sha256']
+    custom = (source / 'upstream-custom-translations.txt').read_bytes()
+    assert hashlib.sha256(custom).hexdigest() == origin['custom_sha256']
+    book('upstream-cn-en', '水杉 · 全义项中译英', '通用', 'upstream-cn-en')
+    meta['upstream-cn-en']['language'] = '中译英'
+    entries = {}
+    for line in translated.decode('utf-8-sig').splitlines():
+        if not line.strip() or line.startswith('#'): continue
+        fields = line.split('\t')
+        if len(fields) != 2 or not all(fields) or fields[0].isascii() or fields[0] in entries:
+            raise ValueError('Invalid/duplicate pinned Chinese translation record')
+        entries[fields[0]] = fields[1]
+    assert len(entries) == origin['entries']
+    # Upstream hand-edited translations override generated records, as in the official build order.
+    for line in custom.decode('utf-8-sig').splitlines():
+        if not line.strip() or line.startswith('#'): continue
+        fields = line.split('\t')
+        if len(fields) != 2 or not all(fields): raise ValueError('Invalid upstream manual translation')
+        if not fields[0].isascii(): entries[fields[0]] = fields[1]
+    for word, gloss in entries.items(): add('upstream-cn-en', 'en', word, gloss)
+    meta['upstream-cn-en']['note'] = '912,640 条原始词条，保留全部义项并叠加上游人工修正；机器生成部分未逐条审校。个人释义仍优先。'
+
     output.mkdir(parents=True, exist_ok=True)
     destination = output / 'translation-library'
     destination.mkdir(exist_ok=True)

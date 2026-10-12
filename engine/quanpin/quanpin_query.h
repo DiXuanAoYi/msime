@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/fuzzy_pinyin_options.h"
 #include "word_lattice.h"
 
 #include <sqlite3.h>
@@ -80,7 +81,10 @@ std::vector<KeyedQueryItem> query_exact_segmentations_keyed_flat(
 // 词格的跨度查询：只返回键与跨度完全相等的行，没有前缀区间与简拼降级——整句
 // 联想出来的每个词，读音都必须精确对上用户敲的那段拼音。因此也不需要 QuerySource：
 // 区分全拼/双拼的只有简拼那几级。
+// 开着模糊音时同时收跨度的模糊变体：行的 key 是词库里的真实读音，每个与敲出读音不同的音节
+// 在 penalty 上记一份 kFuzzyLatticePenaltyLog。整句的 canonical_pinyin 因此落在真实读音上，
+// 选中后造词不会把错音写进词库。
 WordLatticeLookup make_lattice_db_lookup(sqlite3 *db, std::unordered_map<std::string, sqlite3_stmt *> &statement_cache,
-                                         int span_limit);
+                                         int span_limit, metasequoia::FuzzyPinyinOptions fuzzy = {});
 
 } // namespace quanpin

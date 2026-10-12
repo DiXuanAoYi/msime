@@ -62,7 +62,7 @@ void CMetasequoiaIME::_ClearLastCommit()
 void CMetasequoiaIME::_RememberLastCommit(TfEditCookie ec, ITfComposition *composition)
 {
     _ClearLastCommit();
-    if (!composition)
+    if (!composition || !FanyImeFieldPrivacy::AllowsLocalHistory(_fieldPrivacy))
         return;
     ComPtr<ITfRange> original, range;
     ComPtr<ITfContext> context;

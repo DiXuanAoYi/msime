@@ -71,14 +71,18 @@ RomajiConversion ConvertRomaji(std::string_view input)
                 continue;
             }
             const char next = normalized[index + 1];
-            if (next == '\'')
+            // Explicit nn completes a nasal before vowels (rennai -> れんあい).
+            // Retain the conventional greeting spelling konnichiha/konnichiwa:
+            // its second n begins ni. Re-evaluation from raw input keeps incremental typing stable.
+            const bool conventional_konni = next == 'n' && index == 2 && normalized.compare(0, 5, "konni") == 0;
+            if (next == '\'' || (next == 'n' && !conventional_konni))
             {
                 result.hiragana += "ん";
                 index += 2;
                 continue;
             }
             // 长音符 '-' 不是元音，和辅音一样让前面的 n 收成 ん。
-            if (next == 'n' || next == '-' || (IsConsonant(next) && next != 'y'))
+            if (conventional_konni || next == '-' || (IsConsonant(next) && next != 'y'))
             {
                 result.hiragana += "ん";
                 ++index;

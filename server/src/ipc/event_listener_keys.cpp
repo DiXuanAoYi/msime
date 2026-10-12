@@ -12,6 +12,8 @@
 #include "engine/contracts/date_time_input.h"
 #include "engine/contracts/direct_helpcode.h"
 #include "engine/contracts/ipc_negotiation.h"
+#include "engine/contracts/trilingual_input.h"
+#include "engine/contracts/ai_input_shortcuts.h"
 #include "engine/contracts/mid_sentence_helpcode.h"
 #include "defines/defines.h"
 #include "defines/globals.h"
@@ -20,6 +22,7 @@
 #include "window/caret_state_indicator_policy.h"
 #include "utils/ime_utils.h"
 #include "config/ime_config.h"
+#include "settings/personal_library.h"
 #include "session/session_factory.h"
 #include "mixed/date_time_candidates.h"
 #include "log/candidate_diag_log.h"
@@ -516,6 +519,62 @@ bool ApplyCompositionEditKey(UINT keycode, WCHAR wch, UINT modifiers_down, bool 
     composition.raw_input_with_cases = raw;
     return true;
 }
+struct ScopedKeyStage
+{
+    ScopedKeyStage(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id, const wchar_t *stage)
+        : client_id_(client_id), activation_epoch_(activation_epoch), request_id_(request_id), stage_(stage)
+    {
+    }
+
+    ~ScopedKeyStage()
+    {
+        Stop();
+    }
+
+    ScopedKeyStage(const ScopedKeyStage &) = delete;
+    ScopedKeyStage &operator=(const ScopedKeyStage &) = delete;
+
+    void Stop()
+    {
+        if (!stopped_)
+        {
+            stopped_ = true;
+            const ULONGLONG elapsed_ms = GetTickCount64() - started_at_ms_;
+            if (elapsed_ms >= 8)
+            {
+                DIAG_LOGF(L"[key-latency] side=server stage={} request={} client={} epoch={} elapsed_ms={}", stage_,
+                          request_id_, client_id_, activation_epoch_, elapsed_ms);
+            }
+        }
+    }
+
+    uint64_t client_id_;
+    uint64_t activation_epoch_;
+    uint64_t request_id_;
+    const wchar_t *stage_;
+    ULONGLONG started_at_ms_ = GetTickCount64();
+    bool stopped_ = false;
+};
+void SendTimedKeyReply(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id)
+{
+    ScopedKeyStage worker_reply{client_id, activation_epoch, request_id, L"handle-worker-push"};
+    FanyNamedPipe::SendCurrentDataToClient(client_id, activation_epoch, request_id);
+}
+
+void EnsureTimedCandidatePageReady(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id)
+{
+    ScopedKeyStage candidates{client_id, activation_epoch, request_id, L"handle-candidates"};
+    event_listener_detail::EnsureCandidatePageReady();
+}
+
+bool SendTimedWubiCommit(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id,
+                         const std::wstring &payload)
+{
+    ScopedKeyStage worker_push{client_id, activation_epoch, request_id, L"handle-worker-push"};
+    return SendToTsfWorkerThreadClientViaNamedpipe(
+        client_id, activation_epoch, Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidateAndContinue,
+        payload);
+}
 } // namespace
 
 namespace FanyNamedPipe
@@ -548,6 +607,7 @@ void ExitCandidateSubPage()
         return;
     }
     g_translation_candidates_active = false;
+    g_ai_task_candidates_active = false;
     g_date_time_page_active = false;
     g_date_time_page_keyword.clear();
     auto &ui = Global::candidate_ui;
@@ -613,25 +673,25 @@ void HandleTranslationCommitKey(uint64_t client_id, uint64_t activation_epoch, u
     if (IsCandidateSubPageActive() || IsUiLessMode() || japanese || !GetConfiguredCandidateTranslationsEnabled() ||
         Global::candidate_ui.items.empty())
     {
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
         return;
     }
 
     // 和数字/空格选词一样，先等画面追上已发布的那一页，否则取到的是用户没看见的那条译文。
     WaitForCandidateRenderSync(VK_RETURN);
-    EnsureCandidatePageReady();
+    EnsureTimedCandidatePageReady(client_id, activation_epoch, request_id);
 
     auto &ui = Global::candidate_ui;
     const size_t index = static_cast<size_t>((std::max)(0, ui.selected_index_in_page));
     if (index >= ui.page_glosses.size())
     {
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
         return;
     }
     const auto senses = FanyImeIpc::SplitTranslationGloss(wstring_to_string(ui.page_glosses[index]));
     if (senses.empty())
     {
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
         return;
     }
 
@@ -641,7 +701,7 @@ void HandleTranslationCommitKey(uint64_t client_id, uint64_t activation_epoch, u
         Global::MsgTypeToTsf = Global::DataFromServerMsgType::CommitExactText;
         ui.selected_text = string_to_wstring(CandidateTextForOutput(senses.front()));
         // Normal/CommitExactText 的回复由 SendCurrentDataToClient 负责收尾（ClearState）。
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
         return;
     }
 
@@ -658,7 +718,7 @@ void HandleTranslationCommitKey(uint64_t client_id, uint64_t activation_epoch, u
     ui.set_items(std::move(translation_items));
     g_translation_candidates_active = true;
     RefreshCandidatePageUi(true);
-    SendCurrentDataToClient(client_id, activation_epoch, request_id);
+    SendTimedKeyReply(client_id, activation_epoch, request_id);
 }
 
 // 真顶字与自动上屏的推送负载："<消费字符数>\t<上屏文本>"。TSF 拿这个数字裁自己的
@@ -705,7 +765,12 @@ void PublishRestoredCompositionCandidates(uint64_t client_id, uint64_t activatio
         return;
     }
 
-    PrepareCandidateList(client_id, activation_epoch);
+    {
+
+        ScopedKeyStage stage_1{client_id, activation_epoch, 0, L"handle-candidates"};
+        PrepareCandidateList(client_id, activation_epoch);
+        stage_1.Stop();
+    }
     if (restored_highlight.absolute_index >= 0)
     {
         // A retraction re-highlights the item the user had picked on the rebuilt
@@ -760,7 +825,7 @@ void HandleCreatingWordEscape(uint64_t client_id, uint64_t activation_epoch, uin
         Global::MsgTypeToTsf = Global::DataFromServerMsgType::CompositionRestored;
         Global::candidate_ui.selected_text =
             BuildCreateWordPipePayload(std::string{}, composition.creating_word.word) + L"\t0";
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
         if (GetConfiguredCandidateWindowPreeditStyle() == "empty")
         {
             // The window draws no preedit, so an empty page would be a blank card.
@@ -779,7 +844,115 @@ void HandleCreatingWordEscape(uint64_t client_id, uint64_t activation_epoch, uin
     ClearState();
     Global::MsgTypeToTsf = Global::DataFromServerMsgType::CompositionRestored;
     Global::candidate_ui.selected_text = L"\t\t\t0";
-    SendCurrentDataToClient(client_id, activation_epoch, request_id);
+    SendTimedKeyReply(client_id, activation_epoch, request_id);
+}
+
+void BroadcastActiveInputMode(uint64_t excluded_client = 0)
+{
+    for (const auto client : SnapshotRuntimeSettingsClients())
+        if (client != excluded_client)
+            SendToTsfWorkerThreadClientViaNamedpipe(client, FanyImeWorkerReplyType::InputModeChanged,
+                                                    GetActiveInputMode() == "japanese" ? L"1" : L"0");
+}
+
+void SwitchSessionForLanguageCycle()
+{
+    const SchemeType wanted = GetConfiguredActiveInputScheme();
+    if (g_inputSession && g_inputSession->current_scheme_type() == wanted)
+        return;
+    std::shared_ptr<IInputSession> next;
+    if (g_language_cycle_parked_session && g_language_cycle_parked_session->current_scheme_type() == wanted)
+        next = std::move(g_language_cycle_parked_session);
+    else
+        next = CreateInputSessionFromConfig();
+    g_language_cycle_parked_session = std::move(g_inputSession);
+    g_inputSession = std::move(next);
+}
+
+void HandleTrilingualCycleKey(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id,
+                              bool requester_ime_enabled, bool requester_japanese)
+{
+    using FanyImeTrilingualInput::Mode;
+    // Cycle from the requester's own state. With ime_mode_scope=app the Server's
+    // global CN/EN mode can describe another host. When the switch was turned
+    // off while this request was queued, the active language is the configured
+    // one again and the request is answered as the binary toggle.
+    Mode destination =
+        FanyImeTrilingualInput::Destination(requester_ime_enabled, requester_japanese,
+                                            GetConfiguredTrilingualCycleEnabled(), GetActiveInputMode() == "japanese");
+
+    // Match the existing language toggle: retain an already selected word
+    // prefix, then commit the remaining raw spelling without choosing or
+    // learning a candidate.
+    const std::string raw = g_inputSession ? g_inputSession->get_pinyin_sequence_with_cases() : std::string{};
+    const std::wstring commit_text = string_to_wstring(
+        CandidateTextForOutput(GlobalIme::composition.creating_word.word) + (g_r_mode_triggered ? "R" + raw : raw));
+
+    bool native_mode_changed = false;
+    if (destination != Mode::English)
+    {
+        const std::string wanted_mode = destination == Mode::Japanese ? "japanese" : "chinese";
+        if (wanted_mode != GetActiveInputMode())
+        {
+            native_mode_changed = SetActiveInputMode(wanted_mode);
+            if (!native_mode_changed)
+            {
+                // The switch was turned off after Destination() read it. Never
+                // claim a language the Server is not in.
+                destination = GetActiveInputMode() == "japanese" ? Mode::Japanese : Mode::Chinese;
+            }
+        }
+    }
+    SetEnglishInputMode(false);
+    ClearState();
+    SwitchSessionForLanguageCycle();
+
+    const bool next_ime_enabled = destination != Mode::English;
+    g_authoritative_cn_mode = next_ime_enabled ? 1 : 0;
+    const int remembered = RecallClientStatusSnapshot(client_id);
+    const int packed_state = ((remembered >= 0 ? remembered : 0) & ~0x4) | (g_authoritative_cn_mode << 2);
+    RememberClientStatusSnapshot(client_id, packed_state);
+    PublishStatusSnapshotValue(packed_state);
+    PostMessage(::global_hwnd_ftb, UPDATE_FTB_INPUT_MODE, GetActiveInputMode() == "japanese" ? 1 : 0, 0);
+    // The originating client takes its native-language state from the main
+    // reply, after committing. Other hosts still receive the global language.
+    if (native_mode_changed)
+        BroadcastActiveInputMode(client_id);
+
+    // The exact commit and destination share one correlated reply. TSF applies
+    // them in one edit session before it drains the next key, so a fast Shift then
+    // letter cannot be classified using the old language/compartment.
+    Global::MsgTypeToTsf = Global::DataFromServerMsgType::TrilingualCycle;
+    Global::candidate_ui.selected_text = FanyImeTrilingualInput::BuildPayload(destination, commit_text);
+    SendTimedKeyReply(client_id, activation_epoch, request_id);
+}
+
+void HandleToolbarLanguageToggle(bool from_ime_enabled)
+{
+    using FanyImeTrilingualInput::Mode;
+    const bool japanese = GetActiveInputMode() == "japanese";
+    const Mode destination = FanyImeTrilingualInput::Destination(from_ime_enabled, japanese,
+                                                                 GetConfiguredTrilingualCycleEnabled(), japanese);
+    if (destination == Mode::English)
+    {
+        SendToTsfWorkerThreadViaNamedpipe(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToEn, L"");
+        return;
+    }
+
+    const std::string wanted_mode = destination == Mode::Japanese ? "japanese" : "chinese";
+    if (wanted_mode != GetActiveInputMode() && SetActiveInputMode(wanted_mode))
+    {
+        SetEnglishInputMode(false);
+        PostMessage(::global_hwnd, WM_HIDE_MAIN_WINDOW, 0, 0);
+        ClearState();
+        SwitchSessionForLanguageCycle();
+        PostMessage(::global_hwnd_ftb, UPDATE_FTB_INPUT_MODE, wanted_mode == "japanese" ? 1 : 0, 0);
+        // Every client, the focused one included: no key reply carries this change.
+        BroadcastToTsfWorkerThreadViaNamedpipe(FanyImeWorkerReplyType::InputModeChanged,
+                                               wanted_mode == "japanese" ? L"1" : L"0");
+    }
+    if (!from_ime_enabled)
+        SendToTsfWorkerThreadViaNamedpipe(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToCn, L"");
 }
 
 /**
@@ -793,7 +966,63 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
     const ScopedServerKeyLatency latency{client_id, activation_epoch, request_id};
     /* 先清理一下状态 */
     Global::MsgTypeToTsf = Global::DataFromServerMsgType::Normal;
+    ScopedKeyStage read_packet{client_id, activation_epoch, request_id, L"handle-read-packet"};
     ::ReadDataFromNamedPipe(0b000111);
+    Global::ModifiersDown &= ~FanyImeFieldPrivacy::Mask;
+    read_packet.Stop();
+    const UINT cycle_request = Global::ModifiersDown & FanyImeTrilingualInput::CycleRequestMask;
+    Global::ModifiersDown &= ~FanyImeTrilingualInput::CycleRequestMask;
+    if (FanyImeTrilingualInput::IsCycleRequest(Global::Keycode, Global::ModifiersDown | cycle_request) &&
+        ClientNegotiatedTrilingualCycle(client_id))
+    {
+        HandleTrilingualCycleKey(client_id, activation_epoch, request_id,
+                                 FanyImeTrilingualInput::CycleRequestImeEnabled(cycle_request),
+                                 FanyImeTrilingualInput::CycleRequestJapanese(cycle_request));
+        return;
+    }
+
+    const auto remembered = RecallClientStatusSnapshot(client_id);
+    if (g_english_input_mode && remembered >= 0 && (remembered & 4) == 0 &&
+        !GetConfiguredEnglishCandidatesForApplication(PersonalLibrary::InputApplication()))
+    {
+        const bool simple = (Global::ModifiersDown & 6u) == 0;
+        const bool letter =
+            (Global::Wch >= L'a' && Global::Wch <= L'z') || (Global::Wch >= L'A' && Global::Wch <= L'Z');
+        const bool boundary = simple && (Global::Keycode == VK_SPACE || Global::Keycode == VK_RETURN ||
+                                         (!letter && Global::Wch >= 0x20 && Global::Wch < 0x7f));
+        if (boundary && g_inputSession)
+        {
+            auto raw = string_to_wstring(g_inputSession->get_pinyin_sequence_with_cases());
+            if (Global::Keycode != VK_SPACE && Global::Keycode != VK_RETURN)
+                raw.push_back(Global::Wch);
+            ClearState();
+            Global::MsgTypeToTsf = Global::Keycode == VK_SPACE || (Global::Keycode >= '1' && Global::Keycode <= '9')
+                                       ? Global::DataFromServerMsgType::Normal
+                                       : Global::DataFromServerMsgType::CommitExactText;
+            Global::candidate_ui.selected_text = std::move(raw);
+            if (Global::Keycode != VK_RETURN) // Enter's existing TSF handler commits the raw buffer locally.
+                SendTimedKeyReply(client_id, activation_epoch, request_id);
+            return;
+        }
+    }
+
+    const auto ai_config = GetConfiguredAiAssistant();
+    const auto ai_shortcut =
+        FanyImeAiInput::Shortcut(Global::Keycode, Global::ModifiersDown,
+                                 g_inputSession && !g_inputSession->get_pinyin_sequence_with_cases().empty(),
+                                 ai_config.completion_enabled, ai_config.question_enabled);
+    if (ai_shortcut != FanyImeAiInput::Task::None)
+    {
+        if (g_ai_task_candidates_active)
+            ExitCandidateSubPage();
+        UpdateAiTaskInput(ai_shortcut == FanyImeAiInput::Task::Question ? AiAssistant::Task::Question
+                                                                        : AiAssistant::Task::Completion,
+                          client_id, activation_epoch);
+        Global::MsgTypeToTsf = Global::DataFromServerMsgType::NavigationIgnored;
+        Global::candidate_ui.selected_text.clear();
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
+        return;
+    }
 
     // TSF classifies VK_NUMPAD0..9 as candidate digit keys. Keep the IPC
     // contract symmetric before any selection/composition predicates run.
@@ -863,7 +1092,13 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
     const bool shift_only = (Global::ModifiersDown & 0b00000111u) == 0b00000001u;
     const bool chinese_scheme = g_inputSession && (g_inputSession->current_scheme_type() == SchemeType::Quanpin ||
                                                    g_inputSession->current_scheme_type() == SchemeType::Shuangpin);
-    if (Global::Keycode == VK_RETURN && !input_before_key.empty() && GetConfiguredEnterLearnsEnglishWord())
+    const bool pinyin_commit =
+        FanyImeIpc::IsPinyinCommitKey(Global::Keycode, Global::ModifiersDown) && !input_before_key.empty();
+    const bool convert_shuangpin = pinyin_commit && g_inputSession->current_scheme_type() == SchemeType::Shuangpin &&
+                                   !g_english_input_mode && !g_r_mode_triggered &&
+                                   !IsSpecialModeCompositionActive(input_before_key);
+    if (Global::Keycode == VK_RETURN && !input_before_key.empty() && !convert_shuangpin &&
+        GetConfiguredEnterLearnsEnglishWord())
     {
         std::string english_word;
         // V 模式没有触发标记，按输入串认：回车上屏的 V123 不是要学的英文词。
@@ -873,6 +1108,16 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                                                       g_inputSession->is_all_complete_pure_pinyin()))
             english_word = g_r_mode_triggered ? "R" + input_before_key : input_before_key;
         EnqueueLearnEnteredEnglishWordTask(english_word);
+    }
+    if (pinyin_commit)
+    {
+        const std::string raw = g_r_mode_triggered ? "R" + input_before_key : input_before_key;
+        const std::string text = FanyImeIpc::EnteredPinyinText(
+            raw, convert_shuangpin ? g_inputSession->get_quanpin() : std::string{}, convert_shuangpin);
+        Global::candidate_ui.selected_text = string_to_wstring(GlobalIme::composition.creating_word.word + text);
+        Global::MsgTypeToTsf = Global::DataFromServerMsgType::CommitExactText;
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
+        return;
     }
     if (chinese_scheme && !g_english_input_mode && GetConfiguredQuickPhraseEnabled() && input_before_key.empty() &&
         Global::Keycode == 'K' && Global::Wch == L'K' && shift_only)
@@ -973,7 +1218,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         const bool has_active_composition = g_inputSession != nullptr && !g_inputSession->get_pinyin_sequence().empty();
         if (has_active_composition)
         {
-            EnsureCandidatePageReady();
+            EnsureTimedCandidatePageReady(client_id, activation_epoch, request_id);
             auto &ui = Global::candidate_ui;
             ui.selected_text = FanyImeIpc::HighlightedCandidateText(ui.page_words, ui.selected_index_in_page);
 
@@ -996,7 +1241,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                     ui.selected_text = string_to_wstring(*character);
                 }
             }
-            SendCurrentDataToClient(client_id, activation_epoch, request_id);
+            SendTimedKeyReply(client_id, activation_epoch, request_id);
         }
         else
         {
@@ -1028,11 +1273,13 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             Global::Keycode == VK_BACK &&
             FanyImeIpc::HasRetreatBackspaceShape(GlobalIme::composition.creating_word.active, IsUiLessMode(),
                                                  client_supports_restore);
+        ScopedKeyStage engine_edit{client_id, activation_epoch, request_id, L"handle-engine"};
         ApplyCompositionEditKey(Global::Keycode, Global::Wch, Global::ModifiersDown, client_supports_restore,
                                 composition_restored);
     }
     else if (should_forward_key_to_session)
     {
+        ScopedKeyStage engine_forward{client_id, activation_epoch, request_id, L"handle-engine"};
         g_inputSession->handle_key(Global::Keycode, Global::ModifiersDown, Global::Wch);
     }
     GlobalIme::composition.segmented_pinyin = g_inputSession->get_pinyin_segmentation_with_cases();
@@ -1100,29 +1347,36 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
     // 五笔四码唯一自动上屏：敲满四码且码表只给一个候选时，直接走与空格完全相同的提交路径，
     // 用户不必再按一次空格。判定只发生在字母键插入之后（上面的 ApplyCompositionEditKey）：
     // 退格、方向键、composition_restored 等路径都不会到这里，所以「打满第四键就上屏」只有
-    // 这一个入口。这是无条件行为，不读配置。
+    // 这一个入口；四码自动上屏与五码顶屏由各自开关控制。
     const bool letter_key = Global::Keycode >= 'A' && Global::Keycode <= 'Z';
     if (!g_english_input_mode && letter_key &&
-        FanyImeIpc::ShouldAutoCommitCompleteWubiCode(g_inputSession->wubi_unique_four_code(),
+        FanyImeIpc::ShouldAutoCommitCompleteWubiCode(GetConfiguredWubiFourCodeAutoCommit(),
+                                                     g_inputSession->wubi_unique_four_code(),
                                                      GlobalIme::composition.creating_word.active))
     {
         // 候选页是异步发布的：此刻 ui.items / ui.page_words 可能还停在第 3 码那一拍，而提交
         // 路径读的正是这两份数据。先按当前组合同步重建一次，否则会把上一拍的候选上屏。
         // forced_index_in_page = 0 让结算不进入渲染等待（与鼠标点击同类），自动上屏的语义
         // 是「这个码只有一个候选」，必须显式取 0 而不是跟随页内选择。
-        PrepareCandidateList(client_id, activation_epoch);
+        {
+            ScopedKeyStage stage_2{client_id, activation_epoch, request_id, L"handle-candidates"};
+            PrepareCandidateList(client_id, activation_epoch);
+            stage_2.Stop();
+        }
         Global::candidate_ui.select_first_on_page();
-        ProcessSelectionKey(VK_SPACE, client_id, activation_epoch, /*forced_index_in_page=*/0);
+        {
+            ScopedKeyStage stage_3{client_id, activation_epoch, request_id, L"handle-selection"};
+            ProcessSelectionKey(VK_SPACE, client_id, activation_epoch, /*forced_index_in_page=*/0);
+            stage_3.Stop();
+        }
         if (Global::MsgTypeToTsf == Global::DataFromServerMsgType::Normal)
         {
             // 真上屏只能靠 worker 管道推送：字母键在默认 raw 预编辑样式下不读请求-回复管道，
             // 回一帧 Normal 既不会上屏，还会被 TSF 当成「不属于本次请求」的帧缓存起来，
             // 而本函数返回前 Server 已经清掉组合，两边就此分叉。推送携带消费的 4 个字符，
             // TSF 裁自己的缓冲；快打时用户已多敲的字母因此不会被旧快照覆盖。
-            if (SendToTsfWorkerThreadClientViaNamedpipe(
-                    client_id, activation_epoch,
-                    Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidateAndContinue,
-                    BuildWubiCommitAndContinuePayload(Global::candidate_ui.selected_text)))
+            if (SendTimedWubiCommit(client_id, activation_epoch, request_id,
+                                    BuildWubiCommitAndContinuePayload(Global::candidate_ui.selected_text)))
             {
                 ClearState();
                 // 推送同样会引来 HideCandidateWnd；用户若已抢敲下一个字母，那时服务端组合
@@ -1134,24 +1388,34 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         // raw 样式不读回复，塞一帧反而变成死帧。
         if (IsUiLessMode() || GlobalSettings::getTsfPreeditStyle() == GlobalSettings::TsfPreeditStyle::Pinyin)
         {
-            SendCurrentDataToClient(client_id, activation_epoch, request_id);
+            SendTimedKeyReply(client_id, activation_epoch, request_id);
         }
         return;
     }
 
     // 真顶字：完整四码（不论是否唯一）之后再敲一个字母时，先上屏该码的首选候选，再把这个字母
-    // 留作下一次组合的开头——用户已经在打下一个字，字母绝不能丢。它不看自动上屏开关：开关
-    // 只决定「唯一码要不要多敲一键才上屏」，不决定丢不丢输入。判定复用同一份引擎事实，
+    // 留作下一次组合的开头——用户已经在打下一个字，字母绝不能丢。关闭第五码顶字且开启混拼时
+    // 保留第五码发展混拼；混拼关闭时引擎会裁回四码，所以仍安全顶字，防止 Server 与 TSF 分叉。
+    // 四码自动上屏开关不影响本分支。判定复用同一份引擎事实，
     // 但不要求唯一；上屏取候选 0（首选），不进入 30ms 渲染等待。
     if (!g_english_input_mode && letter_key && raw_length_before_key == kWubiCompleteCodeLength &&
         caret_before_key == raw_length_before_key &&
-        FanyImeIpc::ShouldCommitCompleteWubiCodeOnNextKey(g_inputSession->wubi_four_code_is_complete(),
-                                                          /*key_is_letter=*/true, /*caret_at_end=*/true,
-                                                          GlobalIme::composition.creating_word.active))
+        FanyImeIpc::ShouldCommitCompleteWubiCodeOnNextKey(
+            GetConfiguredWubiFifthCodeTopCommit(), GetConfiguredWubiMixedPinyin(),
+            g_inputSession->wubi_four_code_is_complete(),
+            /*key_is_letter=*/true, /*caret_at_end=*/true, GlobalIme::composition.creating_word.active))
     {
-        PrepareCandidateList(client_id, activation_epoch);
+        {
+            ScopedKeyStage stage_4{client_id, activation_epoch, request_id, L"handle-candidates"};
+            PrepareCandidateList(client_id, activation_epoch);
+            stage_4.Stop();
+        }
         Global::candidate_ui.select_first_on_page();
-        ProcessSelectionKey(VK_SPACE, client_id, activation_epoch, /*forced_index_in_page=*/0);
+        {
+            ScopedKeyStage stage_5{client_id, activation_epoch, request_id, L"handle-selection"};
+            ProcessSelectionKey(VK_SPACE, client_id, activation_epoch, /*forced_index_in_page=*/0);
+            stage_5.Stop();
+        }
         const std::wstring committed_text = Global::candidate_ui.selected_text;
 
         // 用刚敲下的这个字母重建服务端组合。ProcessSelectionKey 已经把引擎与组合清空，这里
@@ -1176,7 +1440,11 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         GlobalIme::composition.segmented_pinyin = g_inputSession->get_pinyin_segmentation_with_cases();
         SyncShuangpinPreeditForms();
         GlobalIme::composition.caret_position = GlobalIme::composition.raw_input_with_cases.size();
-        PrepareCandidateList(client_id, activation_epoch);
+        {
+            ScopedKeyStage stage_6{client_id, activation_epoch, request_id, L"handle-candidates"};
+            PrepareCandidateList(client_id, activation_epoch);
+            stage_6.Stop();
+        }
         // 组合被提交时 TSF 会送 HideCandidateWnd 把候选窗藏起来；顶字重建的新组合必须
         // 显式把窗口再请出来，否则后续整词的候选（xyyf 的统计）用户永远看不到。
         RequestShowCandidateWindow();
@@ -1190,10 +1458,8 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             // 推送会让 DLL 结束旧组合，TSF 随之发来 HideCandidateWnd；标记本客户端的余码
             // 组合仍然存活，HideCandidate 处理器据此跳过 ClearState。推送失败就不会有这次 Hide，
             // 也就不记账。
-            if (SendToTsfWorkerThreadClientViaNamedpipe(
-                    client_id, activation_epoch,
-                    Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidateAndContinue,
-                    BuildWubiCommitAndContinuePayload(committed_text)))
+            if (SendTimedWubiCommit(client_id, activation_epoch, request_id,
+                                    BuildWubiCommitAndContinuePayload(committed_text)))
             {
                 NoteTopCommitPushed(client_id, activation_epoch);
             }
@@ -1208,7 +1474,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         {
             Global::MsgTypeToTsf = Global::DataFromServerMsgType::Preedit;
             Global::candidate_ui.selected_text = GetTsfPreedit();
-            SendCurrentDataToClient(client_id, activation_epoch, request_id);
+            SendTimedKeyReply(client_id, activation_epoch, request_id);
         }
         return;
     }
@@ -1228,6 +1494,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         !IsSpecialModeCompositionActive(g_inputSession->get_pinyin_sequence_with_cases()) &&
         cloud_query_state.should_query)
     {
+        ScopedKeyStage cloud_query{client_id, activation_epoch, request_id, L"handle-async-query"};
         UpdateCloudInput(cloud_query_state.query_text, client_id, activation_epoch);
     }
 
@@ -1239,6 +1506,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                              !GlobalIme::composition.creating_word.active;
     if (!suppress_async_lookup)
     {
+        ScopedKeyStage ai_query{client_id, activation_epoch, request_id, L"handle-async-query"};
         UpdateAiInput(ai_eligible ? g_inputSession->get_pinyin_segmentation() : std::string{}, client_id,
                       activation_epoch);
     }
@@ -1260,7 +1528,11 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
     {
         if (IsUiLessMode())
         {
-            PrepareCandidateList(client_id, activation_epoch);
+            {
+                ScopedKeyStage stage_7{client_id, activation_epoch, request_id, L"handle-candidates"};
+                PrepareCandidateList(client_id, activation_epoch);
+                stage_7.Stop();
+            }
             SendUiLessCompositionToClient(client_id, activation_epoch, request_id);
         }
         else
@@ -1270,7 +1542,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                 std::wstring preedit = GetTsfPreedit();
                 Global::MsgTypeToTsf = Global::DataFromServerMsgType::Preedit;
                 Global::candidate_ui.selected_text = preedit;
-                SendCurrentDataToClient(client_id, activation_epoch, request_id);
+                SendTimedKeyReply(client_id, activation_epoch, request_id);
             }
         }
     }
@@ -1283,11 +1555,15 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                 ClearState();
                 Global::MsgTypeToTsf = Global::DataFromServerMsgType::UiLessComposition;
                 Global::candidate_ui.selected_text = L"\t";
-                SendCurrentDataToClient(client_id, activation_epoch, request_id);
+                SendTimedKeyReply(client_id, activation_epoch, request_id);
             }
             else
             {
-                PrepareCandidateList(client_id, activation_epoch);
+                {
+                    ScopedKeyStage stage_8{client_id, activation_epoch, request_id, L"handle-candidates"};
+                    PrepareCandidateList(client_id, activation_epoch);
+                    stage_8.Stop();
+                }
                 SendUiLessCompositionToClient(client_id, activation_epoch, request_id);
             }
         }
@@ -1318,7 +1594,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             Global::candidate_ui.selected_text = BuildCreateWordPipePayload(GlobalIme::composition.raw_input_with_cases,
                                                                             GlobalIme::composition.creating_word.word) +
                                                  L'\t' + std::to_wstring(GlobalIme::composition.caret_position);
-            SendCurrentDataToClient(client_id, activation_epoch, request_id);
+            SendTimedKeyReply(client_id, activation_epoch, request_id);
             PublishRestoredCompositionCandidates(client_id, activation_epoch);
         }
         else if (GlobalSettings::getTsfPreeditStyle() == GlobalSettings::TsfPreeditStyle::Pinyin)
@@ -1328,14 +1604,18 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
                 std::wstring preedit = GetTsfPreedit();
                 Global::MsgTypeToTsf = Global::DataFromServerMsgType::Preedit;
                 Global::candidate_ui.selected_text = preedit;
-                SendCurrentDataToClient(client_id, activation_epoch, request_id);
+                SendTimedKeyReply(client_id, activation_epoch, request_id);
             }
         }
     }
     else if (IsUiLessMode() && is_composition_edit_key && Global::Keycode != VK_LEFT && Global::Keycode != VK_RIGHT &&
              Global::Keycode != VK_BACK)
     {
-        PrepareCandidateList(client_id, activation_epoch);
+        {
+            ScopedKeyStage stage_9{client_id, activation_epoch, request_id, L"handle-candidates"};
+            PrepareCandidateList(client_id, activation_epoch);
+            stage_9.Stop();
+        }
         SendUiLessCompositionToClient(client_id, activation_epoch, request_id);
     }
 
@@ -1352,14 +1632,22 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         (!IsUnicodeCompositionActive(GlobalIme::composition.raw_input_with_cases) && !is_date_time_input_key &&
          !is_v_mode_input_key && Global::Keycode > '0' && Global::Keycode <= '9'))
     {
-        ProcessSelectionKey(Global::Keycode, client_id, activation_epoch);
-        SendCurrentDataToClient(client_id, activation_epoch, request_id);
+        {
+            ScopedKeyStage stage_10{client_id, activation_epoch, request_id, L"handle-selection"};
+            ProcessSelectionKey(Global::Keycode, client_id, activation_epoch);
+            stage_10.Stop();
+        }
+        SendTimedKeyReply(client_id, activation_epoch, request_id);
     }
     else if (Global::Keycode == VK_LEFT || Global::Keycode == VK_RIGHT)
     {
         if (IsUiLessMode())
         {
-            PrepareCandidateList(client_id, activation_epoch);
+            {
+                ScopedKeyStage stage_11{client_id, activation_epoch, request_id, L"handle-candidates"};
+                PrepareCandidateList(client_id, activation_epoch);
+                stage_11.Stop();
+            }
             SendUiLessCompositionToClient(client_id, activation_epoch, request_id);
         }
         else
@@ -1382,7 +1670,11 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             case FanyImeIpc::CaretArrowCandidatePublish::RebuildFromEngine:
                 // 窗口可能因之前的前缀为空状态被收起（单音节后缀从 caret=0 右移两次），
                 // 必须显式请求显示；PrepareCandidateList 末尾自带 RefreshCandidatePageUi(false)。
-                PrepareCandidateList(client_id, activation_epoch);
+                {
+                    ScopedKeyStage stage_12{client_id, activation_epoch, request_id, L"handle-candidates"};
+                    PrepareCandidateList(client_id, activation_epoch);
+                    stage_12.Stop();
+                }
                 RequestShowCandidateWindow();
                 break;
             case FanyImeIpc::CaretArrowCandidatePublish::RefreshPageOnly:
@@ -1398,6 +1690,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         bool refresh = false;
 
         const auto move_page = [&](int offset, UINT response_type) {
+            ScopedKeyStage navigation{client_id, activation_epoch, request_id, L"handle-candidates"};
             result = response_type;
             // Keyboard paging keeps the in-page selection where it is; the wheel
             // path in WorkerThread is the one that restarts it at the top.
@@ -1478,7 +1771,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
             }
             else
             {
-                EnsureCandidatePageReady();
+                EnsureTimedCandidatePageReady(client_id, activation_epoch, request_id);
             }
             // Prefer selection index in page for host-drawn lists.
             if (!ui.page_words.empty())
@@ -1491,7 +1784,7 @@ void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t reques
         else
         {
             Global::MsgTypeToTsf = result;
-            SendCurrentDataToClient(client_id, activation_epoch, request_id);
+            SendTimedKeyReply(client_id, activation_epoch, request_id);
             if (refresh)
             {
                 RefreshCandidatePageUi(true);

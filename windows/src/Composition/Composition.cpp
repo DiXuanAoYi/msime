@@ -1269,6 +1269,8 @@ void CMetasequoiaIME::_SetComposition(_In_ ITfComposition *pComposition)
 
 void CMetasequoiaIME::_CaptureCompositionStats(TfEditCookie ec, _In_ ITfComposition *pComposition)
 {
+    if (!FanyImeFieldPrivacy::AllowsLocalHistory(_fieldPrivacy))
+        return;
     if (!Global::StatisticsEnabled.load(std::memory_order_relaxed))
     {
         // Nothing to capture while the switch is off: no range read, no
@@ -1457,7 +1459,7 @@ HRESULT CMetasequoiaIME::_AddCharAndFinalize(TfEditCookie ec, _In_ ITfContext *p
         // Direct write with no composition: this text never passes through
         // _TerminateComposition / OnCompositionTerminated, so it is the third
         // and last commit exit and must be counted here.
-        if (_pComposition == nullptr)
+        if (_pComposition == nullptr && FanyImeFieldPrivacy::AllowsLocalHistory(_fieldPrivacy))
         {
             MsimeStats::QueueStatisticsEvent(
                 MsimeStats::ClassifyText(pstrAddString->Get(), static_cast<size_t>(pstrAddString->GetLength())));

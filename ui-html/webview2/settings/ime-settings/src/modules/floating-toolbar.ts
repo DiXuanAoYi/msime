@@ -46,6 +46,7 @@ export function setupFloatingToolbar(): void {
   syncCaretStateIndicatorPreview();
   syncAppearancePreviews();
 
+  setupToggleButton('ftbShadowToggleBtn',active=>{updateConfig('general.floating_toolbar_shadow',active);applyFloatingToolbarShadow(active);});
   setupToggleButton('ftbToggleBtn', (active) => {
     updateConfig('general.floating_toolbar', active);
     document.getElementById('ftbToggleBtn')?.setAttribute('aria-checked', String(active));
@@ -248,3 +249,5 @@ function applyPreviewAppearance(): void {
   host.style.setProperty('--ftb-scale', String(toolbarScale));
   host.style.setProperty('--ftb-icon-size', `${toolbarFontSize}px`);
 }
+
+export function applyFloatingToolbarShadow(enabled?:boolean):void {if(typeof enabled!=='boolean')return;applyToggleState('ftbShadowToggleBtn',enabled);document.querySelectorAll<HTMLElement>('.ftb-preview-host').forEach(host=>host.style.setProperty('--msime-ftb-shadow',enabled?'4px 4px 4px rgba(0,0,0,.4)':'none'));}

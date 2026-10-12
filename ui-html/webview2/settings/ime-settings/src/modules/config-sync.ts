@@ -1,3 +1,5 @@
+import {applyThemeConfig} from './theme';
+import {applySettingsEnvironment} from './settings-environment';
 import { onHostMessage } from '../utils/host-messages';
 import { serializeHostMessage } from '../../../../shared/messages';
 import { applyCollocationModelStatus, applyCandidateArrange, applyDropdownValue as applyDropdown, applyToggleState as applyToggle, setFuzzyRuleOptionsDisabled, setMixedCandidateOptionsDisabled, setSmartPunctuationOptionsDisabled } from './shared';
@@ -21,6 +23,9 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
     if (findElement(id)) applyDropdown(id, menu, value);
   };
   lastSnapshot = data;
+  if (!target) applySettingsEnvironment(data?.environment);
+  // Apply the shell theme immediately; lazy-loaded appearance controls are not a prerequisite.
+  if (!target && data?.appearance && typeof data.appearance === 'object') applyThemeConfig(data.appearance);
 
   if (!target || target === 'appearance' || target === 'skin') applyCandidateArrange(data?.appearance?.candidate_window_layout);
 
@@ -57,6 +62,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
     void import('./skin').then((module) => {
       if (data !== lastSnapshot) return;
       module.applyBuiltinSkinPageArrows(data?.appearance?.builtin_skin_page_arrows);
+      module.applyBuiltinSkinFitContent(data?.appearance?.builtin_skin_fit_content);
       module.applyCandidateSkinCatalog(
         data?.appearance?.external_candidate_skins,
         data?.appearance?.candidate_skin_scan_issues,
@@ -401,6 +407,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
         data?.input?.ime_mode_scope,
         data?.input?.japanese_schema
       );
+      void import('./input-advanced').then(m=>{if(data===lastSnapshot)m.applyInputAdvanced(data?.input??{});});
       module.applyFrequencyConfig(data?.frequency_adjustment);
       module.applyTencentTmtConfig(data?.tencent_tmt);
       module.applyTranslationCloudEnabled(data?.general?.candidate_translation_cloud === true);
@@ -408,6 +415,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
       module.applyPersonalGlossaryConfig(data?.general?.personal_translation_glossary, data?.tencent_tmt?.target_language);
       module.applyNiuTransConfig(data?.niutrans);
       module.applyCustomTranslationConfig(data?.custom_translation);
+      module.applyCandidateTranslationConfig(data?.candidate_translation);
     });
   }
   if (applies('tools-settings')) {
@@ -444,6 +452,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
         settings: data?.general?.floating_toolbar_settings
       });
       module.applyCaretStateIndicatorPosition(data?.general?.caret_state_indicator_position);
+      module.applyFloatingToolbarShadow(data?.general?.floating_toolbar_shadow);
       module.applyFloatingToolbarAppearanceConfig(
         data?.general?.floating_toolbar_scale,
         data?.general?.floating_toolbar_font_size

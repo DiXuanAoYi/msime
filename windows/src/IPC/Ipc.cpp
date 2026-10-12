@@ -489,7 +489,8 @@ bool WritePipeHello(HANDLE hPipeHandle, UINT pipeRole)
             FanyImeProtocol::Hello(GetPipeClientId(), NextProtocolId(nextRequestId),
                                    FanyImeProtocol::Capabilities | FanyImeProtocol::CharacterSetShortcut |
                                        FanyImeProtocol::CompositionRestore | FanyImeProtocol::CaretStateIndicator |
-                                       FanyImeProtocol::VocabularyCommit);
+                                       FanyImeProtocol::VocabularyCommit | FanyImeProtocol::RuntimeSettings |
+                                       FanyImeProtocol::FieldPrivacy | FanyImeProtocol::TrilingualCycle);
         BOOL ret = WriteFile(hPipeHandle, &hello, sizeof(hello), &bytesWritten, NULL);
         // Never authorize keys from merely writing a hello. An old Server
         // without negotiation times out into the existing raw-input fallback.
@@ -959,6 +960,29 @@ bool SupportsCaretStateIndicator()
            (negotiatedServerCapabilities & FanyImeProtocol::CaretStateIndicator) != 0;
 }
 
+bool SupportsTrilingualCycle()
+{
+    return Global::g_connected && (negotiatedServerCapabilities & FanyImeProtocol::TrilingualCycle) != 0;
+}
+
+bool SupportsFieldPrivacy()
+{
+    return hPipe && hPipe != INVALID_HANDLE_VALUE &&
+           (negotiatedServerCapabilities & FanyImeProtocol::FieldPrivacy) != 0;
+}
+
+bool SendToNamedpipe(bool *deliveryAmbiguous);
+
+int SendFieldPrivacyToUIProcessViaNamedPipe(uint32_t flags)
+{
+    if (!Global::g_connected || !SupportsFieldPrivacy())
+        return -1;
+    namedpipeData = {};
+    namedpipeData.event_type = FanyImePipeEventType::FieldPrivacyChanged;
+    namedpipeData.modifiers_down = flags;
+    return SendToNamedpipe(nullptr) ? 0 : -1;
+}
+
 HANDLE GetToTsfWorkerThreadNamedpipe()
 {
     return hToTsfWorkerThreadPipe;
@@ -1071,10 +1095,8 @@ void DebugTsfIssue47(const wchar_t *stage, uint64_t requestId, UINT code, WCHAR 
         return;
     }
 
-    // This is an explicitly enabled, short-lived diagnostic trace. Keep both
-    // the VK and translated code point so a TestKeyDown can be matched to the
-    // exact OnKeyDown/edit-session path. Composition/candidate/document text
-    // is deliberately still excluded.
+    // Request and correlation IDs match the test/actual/edit-session path.
+    // Never persist the virtual key, translated character or document text.
     const wchar_t *keyClass = L"other";
     if (wch != L'\0' && std::iswprint(static_cast<wint_t>(wch)) != 0)
     {
@@ -1101,16 +1123,14 @@ void DebugTsfIssue47(const wchar_t *stage, uint64_t requestId, UINT code, WCHAR 
     {
         keyClass = L"control";
     }
-    const wchar_t keyText[2] = {wch != L'\0' && std::iswprint(static_cast<wint_t>(wch)) != 0 ? wch : L'-', L'\0'};
-
     const uint64_t sequence = issue47Sequence.fetch_add(1, std::memory_order_relaxed) + 1;
     const std::wstring message =
-        fmt::format(L"[msime][issue47] seq={} stage={} request={} vk=0x{:02X} wch=U+{:04X} key={} "
+        fmt::format(L"[msime][issue47] seq={} stage={} request={} "
                     L"key_class={} category={} function={} eaten={} composing={} buffer_len={} "
                     L"result=0x{:08X} correlation={} process={}\n",
-                    sequence, stage, requestId, code, static_cast<unsigned int>(wch), keyText, keyClass, category,
-                    function, eaten, composing ? 1 : 0, virtualKeyLength, static_cast<unsigned long>(result),
-                    correlationToken, Global::current_process_name.empty() ? L"unknown" : Global::current_process_name);
+                    sequence, stage, requestId, keyClass, category, function, eaten, composing ? 1 : 0,
+                    virtualKeyLength, static_cast<unsigned long>(result), correlationToken,
+                    Global::current_process_name.empty() ? L"unknown" : Global::current_process_name);
     QueueTsfDiagnosticLog(message);
 }
 

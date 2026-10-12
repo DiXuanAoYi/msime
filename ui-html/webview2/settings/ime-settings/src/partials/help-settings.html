@@ -2,7 +2,7 @@
   <div class="content-header"><span>帮助</span></div>
 
   <div class="section help-document help-simple-document">
-    <p>水杉输入法是一款 Windows 平台的中文输入法。目前支持 Windows11/Windows10 平台。</p>
+    <p>水杉输入法支持 Windows 10 / 11。</p><p><a href="https://github.com/DiXuanAoYi/msime" target="_blank" rel="noopener noreferrer">本项目源码与使用说明</a> · <a href="https://github.com/metasequoiaime/msime-windows/wiki" target="_blank" rel="noopener noreferrer">上游基础输入 Wiki</a> · <a href="https://github.com/metasequoiaime/msime-windows/wiki/FAQ" target="_blank" rel="noopener noreferrer">基础输入常见问题（FAQ）</a>。新增语音、OCR、聊天和模型管理请以本项目设置页说明为准。</p>
 
     <div class="help-simple-section">
       <div class="section-title">快速上手</div>
@@ -12,11 +12,12 @@
     <div class="help-simple-section">
       <div class="section-title">基本功能</div>
       <p>支持全拼、双拼和五笔。可以在设置窗口下的输入功能分区进行切换。全拼和双拼均支持辅助码。辅助码方案目前支持自然码辅助码、蓝天小雨点、首右2.0、首右plus、小鹤和拼音加加，也可以把自己的辅助码文件放进数据目录下的 helpcodes\custom 文件夹导入。可以在设置的辅助码分区进行辅助码的开关和切换。打字过程中，全拼使用辅助码需要用大写的字母唤起单码和双码辅助。双拼在开启辅助码的状态下默认使用单码辅助，第二个码是大写字母的情况下，则会使用完整双码进行筛选。</p>
-      <p>语音识别和 AI 联想需要自行填入 API 和 token。内测期间，将默认使用开发者个人的 api 和 token，仅供测试使用。云联想目前支持谷歌的云接口，请用户注意网络问题，需要时可在下方设置网络代理。</p>
+      <p>本地语音识别、发音和 OCR 模型按需下载；云端语音、AI 联想和文本润色可填入服务接口与凭据。默认保持离线；云端功能需你自行配置凭据，程序不提供开发者密钥。云联想目前支持谷歌的云接口，请用户注意网络问题，需要时可在下方设置网络代理。</p>
       <p>更多功能欢迎自由探索~</p>
     </div>
   </div>
 
+<div class="section"><h3 class="section-title">默认输入法 · 中文（简体）</h3><p class="input-setting-description">点击后只把水杉移到中文键盘列表首位，保留其他语言顺序与界面语言。启动或升级不会自动修改。</p><p id="defaultImeStatus" role="status">正在检查…</p><div class="ai-actions"><button id="defaultImeSetButton" type="button" disabled>设为中文默认</button><button id="defaultImeSystemButton" type="button">打开系统设置</button></div></div>
   <div class="section network-proxy-section">
     <div class="section-title">网络代理</div>
     <div class="input-setting-description">云输入、语法模型下载、AI 联想、翻译和语音识别等联网功能共用这里的设置，修改后立即生效</div>

@@ -748,6 +748,12 @@ HRESULT OnControllerCreatedCandWnd(     //
     ICoreWebView2Controller *controller //
 )
 {
+    if (UseD2dSmallWindowUi())
+    {
+        if (controller)
+            controller->Close();
+        return S_OK;
+    }
     CAND_DIAG_LOGF(L"webview controller callback hr={:#x} controller_present={} hwnd_valid={}",
                    static_cast<unsigned>(result), controller != nullptr, IsWindow(hwnd) != FALSE);
     if (!controller || FAILED(result))

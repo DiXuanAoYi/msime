@@ -25,6 +25,7 @@ enum class DeferredKeyFailureReason
     // The request was written but its reply never arrived: the Server may
     // already have acted on it (committed a candidate). Never resend.
     DeliveryAmbiguous,
+    ProjectionInvalidated,
 };
 
 // How much state the failure discards.
@@ -44,8 +45,13 @@ enum class DeferredKeyFailureKind
     Transport,
 };
 
-inline DeferredKeyFailureKind ResolveDeferredKeyFailure(DeferredKeyFailureReason reason, bool offlineLaneActive)
+inline DeferredKeyFailureKind ResolveDeferredKeyFailure(DeferredKeyFailureReason reason, bool offlineLaneActive,
+                                                        bool serverModeMayHaveChanged = false)
 {
+    if (reason == DeferredKeyFailureReason::ProjectionInvalidated)
+        return offlineLaneActive ? DeferredKeyFailureKind::Offline : DeferredKeyFailureKind::Resync;
+    if (serverModeMayHaveChanged && !offlineLaneActive)
+        return DeferredKeyFailureKind::Transport;
     switch (reason)
     {
     case DeferredKeyFailureReason::Superseded:
@@ -64,7 +70,7 @@ inline DeferredKeyFailureKind ResolveDeferredKeyFailure(DeferredKeyFailureReason
 // Reason for an edit session that ran but did not apply its key. The caller
 // derives the flags from the session's own validation and HRESULT.
 inline DeferredKeyFailureReason ClassifyEditSessionFailure(bool superseded, bool deliveryAmbiguous,
-                                                           bool transportBroken)
+                                                           bool transportBroken, bool projectionInvalidated = false)
 {
     if (superseded)
     {
@@ -78,6 +84,8 @@ inline DeferredKeyFailureReason ClassifyEditSessionFailure(bool superseded, bool
     {
         return DeferredKeyFailureReason::TransportBroken;
     }
+    if (projectionInvalidated)
+        return DeferredKeyFailureReason::ProjectionInvalidated;
     return DeferredKeyFailureReason::HostEditRejected;
 }
 

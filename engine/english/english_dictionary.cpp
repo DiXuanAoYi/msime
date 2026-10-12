@@ -120,7 +120,7 @@ std::string MergeGlosses(const std::string &primary, const std::string &fallback
     for (const auto *source : {&primary, &fallback})
     {
         size_t start = 0;
-        while (start < source->size() && seen.size() < 6)
+        while (start < source->size())
         {
             auto end = source->find(';', start);
             auto sense = source->substr(start, end == std::string::npos ? end : end - start);

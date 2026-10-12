@@ -1,4 +1,5 @@
 #pragma once
+#include "../domain_dictionary/domain_dictionary.h"
 #include "../common/helpcode_utils.h"
 #include "../core/runtime_paths.h"
 #include "../core/pinyin_decoder.h"
@@ -95,6 +96,13 @@ class ShuangpinDictionary
     {
         direct_span_cache_enabled_ = enabled;
     }
+    // 词格跨度查询带的模糊音规则，见 QuanpinDictionary::set_fuzzy_pinyin。变化时清缓存。
+    void set_fuzzy_pinyin(metasequoia::FuzzyPinyinOptions options);
+    void set_enabled_domain_dictionaries(const std::string &csv);
+    const std::string &enabled_domain_dictionaries() const
+    {
+        return domain_.enabled();
+    }
 
     explicit ShuangpinDictionary(const ShuangpinProfile &profile = GetXiaoheShuangpinProfile(),
                                  metasequoia::RuntimePaths paths = metasequoia::RuntimePaths::legacy());
@@ -111,6 +119,7 @@ class ShuangpinDictionary
     sqlite3 *quanpin_db_ = nullptr;
     sqlite3_int64 data_version_ = -1;
     metasequoia::RuntimePaths paths_;
+    domain_dictionary::Dictionary domain_;
     metasequoia::PinyinDecoder decoder_;
     // 与全拼共用的词格打分模型，见 QuanpinDictionary::language_model_。
     const ngram::LanguageModel *language_model_ = nullptr;
@@ -139,6 +148,7 @@ class ShuangpinDictionary
     // （reset_cache）缓存随之清空。
     quanpin::WordLatticeLookup lattice_lookup(int limit);
     bool direct_span_cache_enabled_ = false;
+    metasequoia::FuzzyPinyinOptions fuzzy_pinyin_;
     std::unordered_map<std::string, std::vector<quanpin::LatticeLexeme>> direct_span_cache_;
     void reset_cache_if_database_changed();
     // 这个字能不能落在 helpcode 约束的音节上。

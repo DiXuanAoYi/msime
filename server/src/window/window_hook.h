@@ -5,6 +5,7 @@ inline HHOOK g_mouseHook = NULL;
 
 void InitServerCapsLockState();
 int GetServerCapsLockState();
+void SyncServerCapsLockState(bool enabled);
 
 // Exits with the Watchdog's restart code so the Server comes back immediately.
 [[noreturn]] void RestartServerProcess();

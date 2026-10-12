@@ -3,7 +3,8 @@ param(
     [string]$Python = 'python',
     [string]$VenvDirectory = '',
     [string]$WorkDirectory = "$PSScriptRoot/../../work/local-asr-build",
-    [string]$OutputDirectory = "$PSScriptRoot/../../server/build-release/bin/Release/local-asr"
+    [string]$OutputDirectory = "$PSScriptRoot/../../server/build-release/bin/Release/local-asr",
+    [string]$VulkanLoader = ''
 )
 $ErrorActionPreference = 'Stop'
 $WorkDirectory = [IO.Path]::GetFullPath($WorkDirectory)
@@ -15,6 +16,11 @@ if (!(Test-Path "$venv/Scripts/python.exe")) {
     if ($LASTEXITCODE) { throw 'Could not create local ASR build environment' }
 }
 $py = "$venv/Scripts/python.exe"
+if (!$VulkanLoader) { $VulkanLoader = $env:MSIME_VULKAN_LOADER }
+if ($VulkanLoader) {
+    if (!(Test-Path -LiteralPath $VulkanLoader -PathType Leaf)) { throw 'Configured Vulkan loader is missing.' }
+    Copy-Item -LiteralPath $VulkanLoader -Destination "$PSScriptRoot/native-voxtral/vulkan-1.dll" -Force
+}
 foreach ($native in @('audiocpp.dll','audiocpp_gguf.exe','vcomp140.dll','vulkan-1.dll')) {
     if (!(Test-Path -LiteralPath "$PSScriptRoot/native-voxtral/$native")) {
         throw 'Run Build-Voxtral.ps1 before packaging the local runtime.'
@@ -52,6 +58,8 @@ if ($LASTEXITCODE) { throw 'Local ASR tests failed' }
     --add-data "$PSScriptRoot/tts_stream.py;worker" --add-data "$PSScriptRoot/vendor;worker/vendor" `
     --add-data "$PSScriptRoot/../../engine/contracts/tts_stream.json;." --add-data "$PSScriptRoot/../../engine/contracts/tts_stream.json;worker" `
     --add-data "$PSScriptRoot/worker_dependencies.py;worker" `
+    --add-data "$PSScriptRoot/neural_qjm.py;worker" --add-data "$PSScriptRoot/neural_manager.py;worker" `
+    --add-data "$PSScriptRoot/neural_worker.py;worker" `
     --add-data "$PSScriptRoot/THIRD-PARTY-NOTICES.txt;." `
     --add-data "$PSScriptRoot/licenses;licenses" `
     --add-binary "$venv/Scripts/uv.exe;." "$PSScriptRoot/manager.py"
