@@ -184,7 +184,7 @@ E04混合场景settle P50/P95（ms）：keyboard冷103.110/140.566、暖104.882/
 | 桌面布局 | 深浅/系统主题、独立覆盖、统计实际图表/明细/日期选择、AI/润色菜单、领域卡片 | 物理双屏混合DPI未测；不是全部页面/故障路径操作重放 |
 | 模型/云/签名服务 | tiny QJM、原有keyboard/desktop实际推理；模型按需管理保留 | 正式QJM/GPU质量、真实云及hosted SignPath未测 |
 | 最终安装资产 | Inno完整包252359122B，SHA256 `ca44c2109c7c25b7e08123782309efdc2af1b3705eba483d1a9ce78ea9855b2d`，NotSigned，Server uiAccess=false | 不声称高完整性应用支持或正式可信签名；摘要见Release |
-| Release | 授权推送DiXuanAoYi/msime并发布v0.10.2-chat.1 | 上线后核对tag/资产GitHub摘要及个人频道 |
+| Release | [v0.10.2-chat.1 已公开](https://github.com/DiXuanAoYi/msime/releases/tag/v0.10.2-chat.1)，对应产品源码9eaffd65f34094b2190011e8b73e6f7fbe72468e | 5个资产的GitHub大小/SHA256逐项匹配本地，tag commit一致；生产更新选择器识别个人版并拒绝draft，新装0.10.2不产生更新循环 |
 
 ## 文档核对
 
