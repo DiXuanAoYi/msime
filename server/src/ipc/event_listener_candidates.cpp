@@ -462,6 +462,7 @@ void PublishBuiltCandidatePage(const std::wstring &candidate_string)
 {
     const auto &ui = Global::candidate_ui;
     auto snapshot = std::make_shared<Global::CandidatePageSnapshot>();
+    snapshot->task_status = Global::candidate_task_status;
     snapshot->page_views = ui.page_views;
     snapshot->page_words = ui.page_words;
     snapshot->candidate_string = candidate_string;

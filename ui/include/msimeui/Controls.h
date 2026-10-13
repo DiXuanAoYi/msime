@@ -29,6 +29,8 @@ class Image : public Visual
     void SetStretch(ImageStretch stretch);
     void SetOpacity(float opacity);
     void SetInterpolationMode(D2D1_BITMAP_INTERPOLATION_MODE interpolationMode);
+    // A drawing-only pose: layout and hit bounds remain unchanged.
+    void SetRenderPose(float angleDegrees, float offsetY, float scale);
 
     SizeF Measure(const SizeF &availableSize) override;
     void Arrange(const RectF &finalRect) override;
@@ -42,6 +44,9 @@ class Image : public Visual
     bool naturalSizeLoaded_ = false;
     ImageStretch stretch_ = ImageStretch::Uniform;
     float opacity_ = 1.0f;
+    float angleDegrees_ = 0.0f;
+    float offsetY_ = 0.0f;
+    float scale_ = 1.0f;
     D2D1_BITMAP_INTERPOLATION_MODE interpolationMode_ = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 };
 

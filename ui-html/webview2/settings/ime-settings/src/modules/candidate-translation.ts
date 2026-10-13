@@ -7,7 +7,7 @@ let aiProvider='deepseek';
 let tokens:Record<string,string>={},endpoints:Record<string,string>={},models:Record<string,string>={};
 let resetModels=()=>{};
 const defaults:Record<string,[string,string]>={
-  deepseek:['https://api.deepseek.com/chat/completions','deepseek-v4-flash'],
+  deepseek:['https://api.deepseek.com/chat/completions','deepseek-flash'],
   openai:['https://api.openai.com/v1/chat/completions','gpt-4o-mini'],
   siliconflow:['https://api.siliconflow.cn/v1/chat/completions','Qwen/Qwen3-8B'],
   groq:['https://api.groq.com/openai/v1/chat/completions','llama-3.3-70b-versatile'],

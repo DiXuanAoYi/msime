@@ -1,0 +1,4 @@
+.translation-provider-links { display:flex; flex-direction:column; gap:7px; padding:12px; margin:8px 0 16px; border:1px solid var(--control-border); border-radius:7px; background:var(--surface-subtle); }
+.translation-provider-links[hidden] { display:none; }
+.translation-provider-links a { color:var(--accent-color); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.personal-glossary-editor > summary { cursor:pointer; padding:8px 0; }

@@ -10,7 +10,7 @@ export function setupAiWorkbench():void {
   setupToggleButton('aiQuestionEnabled',v=>updateConfig('ai_assistant.question_enabled',v));
   const task=document.getElementById('aiTask') as HTMLSelectElement|null;
   task?.addEventListener('change',()=>{selected=task.value as Task;updateConfig('ai_assistant.task',selected);
-    const text=document.getElementById('aiTaskInput') as HTMLTextAreaElement|null;if(text)text.placeholder=selected==='question'?'例如：三个木是什么字 / 三个直怎么读':selected==='completion'?'请输入已写好的文字，将生成后续新增文字':'例如：ni hao / ming tian kai hui';});
+    const text=document.getElementById('aiTaskInput') as HTMLTextAreaElement|null;if(text)text.placeholder=selected==='question'?'例如：草字头＋日＋十 / 上下结构木＋口 / 四个月是什么字':selected==='completion'?'请输入已写好的文字，将生成后续新增文字':'例如：ni hao / ming tian kai hui';});
   document.getElementById('aiTaskRun')?.addEventListener('click',()=>{
     if(!window.chrome?.webview)return;pending=`task-${Date.now()}-${++seq}`;
     const text=(document.getElementById('aiTaskInput') as HTMLTextAreaElement|null)?.value??'';
@@ -32,7 +32,9 @@ export function setupAiWorkbench():void {
       const draft=document.createElement('textarea');draft.value=row.text;draft.dataset.original=row.text;draft.setAttribute('aria-label','可编辑结果');
       const copy=document.createElement('button');copy.type='button';copy.textContent='复制';copy.addEventListener('click',()=>{
         window.chrome?.webview?.postMessage(serializeHostMessage({type:'copyText',data:draft.value}));if(status)status.textContent='已复制，请手动粘贴；不会发送消息';});
-      card.append(reading,draft,copy);output.append(card);});
+      card.append(reading);
+      if('explanation' in row&&typeof row.explanation==='string'&&row.explanation){const note=document.createElement('p');note.className='ai-answer-explanation';note.textContent=row.explanation;card.append(note);}
+      card.append(draft,copy);output.append(card);});
   });
 }
 export function applyAiTaskConfig(config:Record<string,unknown>):void {

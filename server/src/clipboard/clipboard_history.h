@@ -14,6 +14,7 @@ std::vector<std::wstring> Load();
 bool AddText(std::wstring text);
 bool RemoveText(const std::wstring &text);
 void Clear();
+bool TryClear();
 bool IsEnabled();
 bool SetEnabled(bool enabled);
 std::filesystem::file_time_type StoreWriteTime();

@@ -24,6 +24,6 @@ using ApplyCallback = std::function<void(const std::string &, const std::string 
 void Start(ApplyCallback callback, TaskCallback taskCallback = {});
 Result RunTask(const Request &request, const std::function<bool()> &cancelled = {});
 void Stop();
-void OnInputChanged(Request request);
+uint64_t OnInputChanged(Request request);
 void Clear();
 } // namespace AiAssistant

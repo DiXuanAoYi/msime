@@ -24,11 +24,15 @@ ApiCredentialTest::Request ReadConnection(const nlohmann::json &input)
 nlohmann::json HandleModelList(const nlohmann::json &input)
 {
     const auto result = ApiCredentialTest::FetchModels(ReadConnection(input));
+    auto details = nlohmann::json::array();
+    for (const auto &detail : result.details)
+        details.push_back({{"id", detail.id}, {"name", detail.name}});
     return {{"type", "apiModelListResult"},
             {"requestId", input.value("requestId", std::string())},
             {"ok", result.ok},
             {"message", result.message},
-            {"models", result.models}};
+            {"models", result.models},
+            {"modelDetails", details}};
 }
 nlohmann::json HandleCredentialTest(const nlohmann::json &input)
 {
@@ -85,8 +89,10 @@ nlohmann::json Handle(const nlohmann::json &input)
         }
         response["completion"] = result.completion;
         for (const auto &answer : result.candidates)
-            response["answers"].push_back(
-                {{"text", answer.text}, {"pinyin", answer.pinyin}, {"source", answer.source}});
+            response["answers"].push_back({{"text", answer.text},
+                                           {"pinyin", answer.pinyin},
+                                           {"source", answer.source},
+                                           {"explanation", answer.explanation}});
         response["ok"] = result.error.empty();
         response["message"] = result.error.empty() ? "已生成，可编辑、复制或手动上屏；不会发送消息" : result.error;
     }

@@ -1,3 +1,4 @@
+import {setupDomainSettings} from './domain-settings';
 import { setupTranslationLibrary } from './translation-library';
 import { createDictionaryPager, DICTIONARY_PAGE_SIZE } from '../utils/dictionary-pagination';
 import { readDictionaryFile } from '../utils/dictionary-file';
@@ -168,6 +169,7 @@ function downloadExport(content: string, filename: string): void {
 }
 
 export function setupDictionary(): void {
+  setupDomainSettings();
   setupTranslationLibrary();
   hoistOverlay(document.getElementById('dictToast'));
   hoistOverlay(document.getElementById('dictModal'));

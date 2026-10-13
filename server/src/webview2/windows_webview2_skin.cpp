@@ -365,8 +365,11 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
         css.append(L" width: var(--msime-skin-decoration-width, 0px); "
                    L"height: var(--msime-skin-decoration-top, 0px); background: ");
         css.append(ManifestImageCssUrl(skinsRoot, skin.id, skin.decorationImage));
-        css.append(L" center / contain no-repeat; pointer-events: none; }\n"
-                   L".container { position: relative; z-index: 1; }\n");
+        css.append(
+            L" center / contain no-repeat; pointer-events: none; "
+            L"transform: translateY(var(--msime-decoration-lift,0px)) rotate(var(--msime-decoration-angle,0deg)) "
+            L"scale(var(--msime-decoration-scale,1)); transform-origin: center; }\n"
+            L".container { position: relative; z-index: 1; }\n");
     }
     AppendExternalCandidateCornerCss(css, skin);
     const bool light = ResolveConfiguredTheme(GetConfiguredThemeCand()) == "light";
@@ -407,8 +410,12 @@ bool InjectExternalCandidateSkin(std::wstring &html, const CandidateSkinCatalog:
     }
     const std::wstring vars =
         fmt::format(L"<style id=\"external-candidate-skin-vars\">:root{{--msime-skin-min-width:{}px;"
-                    L"--msime-skin-decoration-top:{}px;--msime-skin-decoration-width:{}px;}}</style>",
-                    skin.minWidthDip, skin.decorationTopDip, skin.decorationWidthDip);
+                    L"--msime-skin-decoration-top:{}px;--msime-skin-decoration-width:{}px;"
+                    L"--msime-skin-decoration-align:{};}}</style>",
+                    skin.minWidthDip, skin.decorationTopDip, skin.decorationWidthDip,
+                    skin.decorationAlign == "left"     ? 0
+                    : skin.decorationAlign == "center" ? 1
+                                                       : 2);
     std::wstring css = BuildExternalCandidateSkinCss(skin, skinsRoot);
     NeutralizeEmbeddedStyleClosers(css);
     std::wstring generated;

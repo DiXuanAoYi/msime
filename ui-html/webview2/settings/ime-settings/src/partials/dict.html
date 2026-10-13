@@ -72,4 +72,5 @@
     <div id="dictToastMessage" class="dict-toast-message"></div>
     <button id="dictToastClose" class="dict-toast-close" type="button" aria-label="关闭通知">×</button>
   </div>
+<details class="section domain-input-section"><summary class="section-title">领域输入词库 · 独立开关与导出</summary><p>参与中文输入候选，与用于显示释义的翻译词典分别管理。每个领域可独立开关、导出，也可按软件限定范围；关闭只停用，不删除文件。</p><button id="domainRefresh" type="button">刷新领域词库</button><p id="domainStatus" role="status"></p><div id="domainCatalog" class="domain-catalog"></div><h3>按软件选择领域</h3><label>软件进程名<input id="domainApplication" placeholder="例如 Code.exe"></label><label>使用范围<select id="domainApplicationMode"><option value="inherit">跟随全局开关</option><option value="replace">仅使用下面所选包</option></select></label><p>独立范围未选任何包时，该软件关闭全部领域输入包。选项默认自动保存。</p><div id="domainApplicationPacks" class="domain-checks"></div></details>
 </div>

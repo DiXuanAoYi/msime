@@ -333,18 +333,32 @@ ModelListResult FetchModels(const Request &request)
     const auto response = PerformJsonRequest(ModelListEndpoint(endpoint), token, nullptr, kMaxModelListBytes);
     if (response.code != CURLE_OK || response.status < 200 || response.status >= 300)
         return {false, "模型查询失败（HTTP " + std::to_string(response.status) + "）；请检查接口、凭据和网络", {}};
+    return ParseModelList(response.body);
+}
+ModelListResult ParseModelList(const std::string &body)
+{
     try
     {
-        const auto root = nlohmann::json::parse(response.body);
+        const auto root = nlohmann::json::parse(body);
         const auto &rows = root.is_array() ? root : root.at("data");
         if (!rows.is_array())
             throw std::runtime_error("models");
         std::vector<std::string> models;
+        std::vector<ModelListResult::Detail> details;
         for (const auto &row : rows)
         {
-            const auto id = row.is_string() ? row.get<std::string>() : row.value("id", std::string());
-            if (!id.empty() && id.size() <= 200 && id.find_first_of("\r\n\0", 0, 3) == std::string::npos)
-                models.push_back(id);
+            if (!row.is_string() && (!row.is_object() || !row.contains("id") || !row["id"].is_string()))
+                continue;
+            const auto id = row.is_string() ? row.get<std::string>() : row["id"].get<std::string>();
+            if (id.empty() || id.size() > 200 || id.find_first_of("\r\n\0", 0, 3) != std::string::npos)
+                continue;
+            models.push_back(id);
+            if (row.is_object() && row.contains("name") && row["name"].is_string())
+            {
+                const auto name = row["name"].get<std::string>();
+                if (!name.empty() && name.size() <= 200 && name.find_first_of("\r\n\0", 0, 3) == std::string::npos)
+                    details.push_back({id, name});
+            }
             if (models.size() >= 5000)
                 break;
         }
@@ -352,7 +366,7 @@ ModelListResult FetchModels(const Request &request)
         models.erase(std::unique(models.begin(), models.end()), models.end());
         if (models.empty())
             return {false, "服务没有返回可用模型名，仍可手动填写", {}};
-        return {true, "已读取模型名；没有下载任何模型权重", std::move(models)};
+        return {true, "已读取服务返回的模型；选择时保存 API 名称，不下载权重", std::move(models), std::move(details)};
     }
     catch (...)
     {

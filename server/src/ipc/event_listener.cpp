@@ -510,6 +510,7 @@ namespace event_listener_detail
 void UpdateAiInput(const std::string &identity, uint64_t client_id, uint64_t activation_epoch)
 {
     std::lock_guard lock(g_async_request_mutex);
+    Global::candidate_task_status.clear();
     const AiAssistantConfig config = GetConfiguredAiAssistant();
     const bool local = config.provider == "local" && AiAssistant::IsLoopbackEndpoint(config.endpoint);
     const bool usable = FanyImeIpc::AutomaticInputAiAllowed(local) && FanyImeIpc::input_privacy.client == client_id &&
@@ -549,8 +550,7 @@ void UpdateAiInput(const std::string &identity, uint64_t client_id, uint64_t act
     std::vector<std::string> original_candidates;
     for (const auto &candidate : request.source_candidates)
         original_candidates.push_back(candidate.text);
-    AiAssistant::OnInputChanged(std::move(request));
-    ++g_ai_generation;
+    g_ai_generation = AiAssistant::OnInputChanged(std::move(request));
     g_ai_request_origin =
         usable ? AsyncRequestOrigin{client_id, activation_epoch, g_ai_generation, identity} : AsyncRequestOrigin{};
     if (usable)
@@ -564,7 +564,7 @@ void UpdateAiInput(const std::string &identity, uint64_t client_id, uint64_t act
 
 void UpdateAiTaskInput(AiAssistant::Task task, uint64_t client_id, uint64_t activation_epoch)
 {
-    std::lock_guard lock(g_async_request_mutex);
+    std::unique_lock lock(g_async_request_mutex);
     const auto config = GetConfiguredAiAssistant();
     const bool local = config.provider == "local" && AiAssistant::IsLoopbackEndpoint(config.endpoint);
     if (!g_inputSession || FanyImeIpc::input_privacy.state == FanyImeFieldPrivacy::State::Sensitive ||
@@ -584,29 +584,51 @@ void UpdateAiTaskInput(AiAssistant::Task task, uint64_t client_id, uint64_t acti
     const auto &candidates = g_inputSession->get_candidates();
     if (!candidates.empty())
         request.text = CandidateTextForOutput(GlobalIme::composition.creating_word.word + candidates.front().word);
-    bool offline_question = false;
+    std::vector<AiAssistant::Answer> offline_answers;
     if (task == AiAssistant::Task::Question)
     {
         request.pinyin_segments = SplitPinyin(g_inputSession->get_quanpin());
         std::string pinyin;
         for (const auto &segment : request.pinyin_segments)
             pinyin += segment;
-        offline_question = !AiAssistant::LookupOfflineQuestion(request.text).empty() ||
-                           !AiAssistant::LookupOfflineQuestion(pinyin).empty();
+        offline_answers = AiAssistant::LookupOfflineQuestion(request.text);
+        if (offline_answers.empty())
+            offline_answers = AiAssistant::LookupOfflineQuestion(pinyin);
     }
+    const bool offline_question = !offline_answers.empty();
     if (!FanyImeIpc::AutomaticInputAiAllowed(local || offline_question))
+    {
+        Global::candidate_task_status = L"此输入框只允许离线查询；其他问字请在 AI 辅助中手动预览";
+        RefreshCandidatePageUi(true);
         return;
+    }
     if (task == AiAssistant::Task::Completion)
         request.context = FanyImeIpc::StripCredentialLikeText(g_ai_context);
     request.text = FanyImeIpc::StripCredentialLikeText(request.text);
     const auto identity = request.identity;
     const auto text = request.text;
-    AiAssistant::OnInputChanged(std::move(request));
-    ++g_ai_generation;
+    // Local dictionary answers are immediate. Cancel any in-flight automatic
+    // pinyin lookup so it cannot replace the explicit question result later.
+    g_ai_generation = AiAssistant::OnInputChanged(offline_question ? AiAssistant::Request{} : std::move(request));
     g_ai_request_origin = {client_id, activation_epoch, g_ai_generation, identity};
     g_ai_request_origin.raw_input = raw;
     g_ai_request_origin.task_text = text;
     g_ai_request_origin.local_only = local || offline_question;
+    const auto origin = g_ai_request_origin;
+    Global::candidate_task_status =
+        task == AiAssistant::Task::Question ? L"问字：正在查找，可按 Esc 取消" : L"补全：正在生成，可按 Esc 取消";
+    lock.unlock();
+    if (offline_question)
+    {
+        AiAssistant::Result result;
+        result.task = task;
+        result.identity = identity;
+        result.generation = origin.generation;
+        result.candidates = std::move(offline_answers);
+        FanyNamedPipe::ApplyAiTaskResult(result, origin);
+    }
+    else
+        RefreshCandidatePageUi(true);
 }
 
 AsyncRequestOrigin FindCloudRequestOrigin(const std::string &input, uint64_t generation)
@@ -802,6 +824,7 @@ bool SendUiLessCompositionToClient(uint64_t client_id, uint64_t activation_epoch
 
 void ClearState()
 {
+    Global::candidate_task_status.clear();
     const auto r_mode_original_session = g_r_mode_original_session;
     ClearSpecialModeTriggers();
     ClearCandidateUiOwner();

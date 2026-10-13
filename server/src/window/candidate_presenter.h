@@ -41,6 +41,8 @@ class CandidatePresenter
     // briefly showing the previous card.
     void PresentEmptyFrame();
     void ArmHoverIfPointerMoved();
+    bool HandleDecorationMessage(UINT message, WPARAM wParam, LPARAM lParam);
+    void ResetDecorationMotion();
     void CommitItem(size_t pageIndex);
     void ShowItemContextMenu(size_t pageIndex, POINT clientPoint);
     void CloseContextMenu(bool restoreHost);

@@ -1245,7 +1245,9 @@
               "removeLearning",
               "domainCatalog",
               "exportDomain",
-              "setApplicationDomains"
+              "setApplicationDomains",
+              "removeHistory",
+              "clearHistory"
             ]
           },
           "enabled": {
@@ -1551,7 +1553,9 @@
                 "type": "boolean"
               }
             },
-            "required": ["temporary_configuration"],
+            "required": [
+              "temporary_configuration"
+            ],
             "additionalProperties": false
           }
         },
@@ -2589,17 +2593,49 @@
             "type": "object",
             "additionalProperties": true,
             "properties": {
-              "id": {"type": "string"},
-              "name": {"type": "string"},
-              "entries": {"type": "integer", "minimum": 1, "maximum": 1000000},
-              "bytes": {"type": "integer", "minimum": 1, "maximum": 4194304},
-              "license": {"type": "string"},
-              "source": {"type": "string"},
-              "version": {"type": "string"},
-              "sha256": {"type": "string"},
-              "exportable": {"type": "boolean"}
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "entries": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000000
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4194304
+              },
+              "license": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "exportable": {
+                "type": "boolean"
+              }
             },
-            "required": ["id", "name", "entries", "bytes", "license", "source", "version", "sha256", "exportable"]
+            "required": [
+              "id",
+              "name",
+              "entries",
+              "bytes",
+              "license",
+              "source",
+              "version",
+              "sha256",
+              "exportable"
+            ]
           }
         },
         "applications": {
@@ -2758,6 +2794,27 @@
           "items": {
             "type": "string"
           }
+        },
+        "modelDetails": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
@@ -2811,6 +2868,10 @@
               "source": {
                 "type": "string",
                 "maxLength": 100
+              },
+              "explanation": {
+                "type": "string",
+                "maxLength": 1500
               }
             },
             "required": [

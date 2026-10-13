@@ -16,6 +16,15 @@ std::wstring GetPreedit()
     return preedit_pinyin;
 }
 
+std::wstring GetCandidatePreeditWithTaskStatus()
+{
+    auto text = GetConfiguredCandidateWindowPreeditStyle() == "empty" ? std::wstring{} : GetPreeditWithCaretMarker();
+    const auto page = Global::LoadCandidatePageSnapshot();
+    if (!page->task_status.empty())
+        text += (text.empty() ? L"" : L" · ") + page->task_status;
+    return text;
+}
+
 std::wstring GetPreeditWithCaretMarker()
 {
     const auto &composition = GlobalIme::composition;

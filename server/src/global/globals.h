@@ -416,8 +416,11 @@ inline CandidateUiState candidate_ui;
 // the handoff is an asynchronous PostMessage, so nothing serialises the two. The worker therefore copies each finished
 // page into one of these immutable snapshots and publishes it atomically, and every UI-thread reader (candidate
 // presenter, its mouse callbacks, the WebView2 payload) loads a snapshot once and reads only from that copy.
+// Written only by the IPC worker; renderers read the immutable page copy.
+inline std::wstring candidate_task_status;
 struct CandidatePageSnapshot
 {
+    std::wstring task_status;
     std::vector<CandidateViewItem> page_views;
     std::vector<std::wstring> page_words;
     std::wstring candidate_string;

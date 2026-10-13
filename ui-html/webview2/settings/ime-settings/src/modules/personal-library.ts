@@ -1,8 +1,10 @@
-import {setupDomainSettings} from './domain-settings';
 import { serializeHostMessage } from "../../../../shared/messages";
 import { onHostMessage } from "../utils/host-messages";
 import "../styles/modules/prompt-library.css";
 import "../styles/modules/workbench-layout.css";
+import "../styles/modules/clipboard.css";
+import {confirmDialog} from '../utils/confirm-dialog';
+import {updateConfig} from './config-sync';
 type Action =
   | "status"
   | "putGroup"
@@ -19,7 +21,9 @@ type Action =
   | "putApplication"
   | "exportApplication"
   | "importApplication"
-  | "removeLearning";
+  | "removeLearning"
+  | "removeHistory"
+  | "clearHistory";
 const el = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const value = (id: string) => el<HTMLInputElement>(id)?.value ?? "";
@@ -71,10 +75,9 @@ export function setupPersonalLibrary(): void {
   const root = document.getElementById("personalLibraryPanel");
   if (!root || root.dataset.ready) return;
   root.dataset.ready = "1";
-  setupDomainSettings();
   let book: Book = { groups: [], clips: [], rules: [], favorites: [], applications:[],appLearning:[] },
     history: string[] = [],
-    editing = "", page = 0;
+    editing = "", page = 0, selectedKey = "";
   let study: { word: string; language: string; gloss: string }[] = [],
     reviewed = 0;
   const status = (s: string) => {
@@ -93,15 +96,15 @@ export function setupPersonalLibrary(): void {
       el<HTMLInputElement>(id).value = "";
     el<HTMLInputElement>("libraryEnabled").checked = true;
   };
-  const card = () => {
-    const c = document.createElement("div");
-    c.className = "library-card";
-    return c;
-  };
   const render = () => {
     const view = value("libraryView"),
       isClip = view === "clips",
       isRule = view === "rules";
+    root.querySelectorAll<HTMLButtonElement>('[data-library-view]').forEach(tab=>tab.setAttribute('aria-pressed',String(tab.dataset.libraryView===view)));
+    el('libraryBrowse').hidden=view==='study';
+    el('libraryCaptureEnabled').parentElement!.hidden=view!=='history';
+    el('libraryClearHistory').hidden=view!=='history';
+    el<HTMLButtonElement>('libraryClearHistory').disabled=!history.length;
     el("libraryGroups").hidden = !isClip;
     el("libraryApplicationManager").hidden = !isRule && view !== "learning";
     const appSelect=el<HTMLSelectElement>("libraryApplicationSelect");
@@ -116,6 +119,7 @@ export function setupPersonalLibrary(): void {
     el("librarySearchArea").hidden = view === "study";
     el("libraryPager").hidden = view === "study";
     el("libraryNew").hidden = !isClip && !isRule;
+    el("libraryNew").textContent=isRule?'新建软件词条':'新建常用语';
     const group = el<HTMLSelectElement>("libraryGroup");
     const old = group.value;
     group.replaceChildren(...book.groups.map((g) => new Option(g.name, g.id)));
@@ -148,19 +152,15 @@ export function setupPersonalLibrary(): void {
           : "暂无内容。";
       rows.append(p);
     }
-    for (const x of visible.items) {
-      const c = card(),
-        title = document.createElement("strong"),
-        text = document.createElement("pre"),
-        actions = document.createElement("div");
-      title.textContent =
-        x.name +
-        ((view === "rules" || view === "learning")
-          ? ` · ${x.application} / ${x.code}${x.enabled === false ? " · 已停用" : ""}`
-          : "");
-      text.textContent = x.text ?? "";
-      text.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere";
-      actions.className = "local-asr-actions";
+    const entryKey=(x:Entry)=>`${view}:${view==='history'?x.text:x.id}`;
+    if(!visible.items.some(x=>entryKey(x)===selectedKey))selectedKey=visible.items[0]?entryKey(visible.items[0]):'';
+    const renderPreview=(x:Entry|undefined)=>{
+      const title=el('libraryPreviewTitle'),text=el<HTMLTextAreaElement>('libraryPreviewText'),actions=el('libraryPreviewActions');
+      actions.replaceChildren();
+      if(!x){title.textContent='暂无可预览的内容';text.value='';el('libraryPreviewMeta').textContent='';return;}
+      title.textContent=view==='history'?'复制记录':x.name;
+      text.value=x.text??'';
+      el('libraryPreviewMeta').textContent=[x.application,x.code,`${Array.from(x.text??'').length} 字符`,x.enabled===false?'已停用':''].filter(Boolean).join(' · ');
       if (view === "favorites") {
         actions.append(
           button("播放", () => personalAction("playFavorite", { id: x.id })),
@@ -209,9 +209,24 @@ export function setupPersonalLibrary(): void {
               : personalAction("remove", { section: view, id: x.id }),
           ),
         );
-      c.append(title, text, actions);
-      rows.append(c);
+      if(view==='history')actions.append(button('删除此记录',async()=>{
+        if(await confirmDialog('删除这条复制记录？保存的常用语和其他资料不会删除。'))personalAction('removeHistory',{text:x.text});
+      }));
+    };
+    for(const x of visible.items){
+      const row=document.createElement('button');row.type='button';row.className='clipboard-item';row.setAttribute('role','option');
+      const key=entryKey(x),selected=key===selectedKey;row.setAttribute('aria-selected',String(selected));
+      const title=document.createElement('strong'),snippet=document.createElement('span'),meta=document.createElement('small');
+      title.textContent=view==='history'?(x.text??'').split(/\r?\n/)[0].slice(0,72)||'空白文本':x.name;
+      snippet.textContent=(x.text??'').replace(/\s+/g,' ').slice(0,150);
+      meta.textContent=[x.application,x.code,`${Array.from(x.text??'').length} 字符`].filter(Boolean).join(' · ');
+      row.append(title,snippet,meta);
+      row.onclick=()=>{selectedKey=key;rows.querySelectorAll<HTMLButtonElement>('.clipboard-item').forEach(b=>b.setAttribute('aria-selected',String(b===row)));renderPreview(x);};
+      row.ondblclick=()=>{if(x.text)personalAction('copy',{text:x.text});};
+      row.onkeydown=e=>{if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;e.preventDefault();const buttons=Array.from(rows.querySelectorAll<HTMLButtonElement>('.clipboard-item'));const index=buttons.indexOf(row)+(e.key==='ArrowDown'?1:-1);const next=buttons[index];if(next){next.click();next.focus();}};
+      rows.append(row);
     }
+    renderPreview(visible.items.find(x=>entryKey(x)===selectedKey));
   };
   const renderStudy = () => {
     const x = study[0];
@@ -246,6 +261,15 @@ export function setupPersonalLibrary(): void {
       personalAction("importApplication",{application:value("libraryScope").trim(),payload:(await file.text()).replace(/^\uFEFF/,"")});
     }catch(error){status(String(error));}finally{importFile.value="";}
   };
+  root.querySelectorAll<HTMLButtonElement>('[data-library-view]').forEach(tab=>tab.onclick=()=>{
+    el<HTMLSelectElement>('libraryView').value=tab.dataset.libraryView??'history';el('libraryView').dispatchEvent(new Event('change'));
+  });
+  el('libraryClearHistory').onclick=async()=>{
+    if(await confirmDialog('清空全部复制记录？常用语、分组、语音收藏和词库不受影响。',{title:'清空复制记录',confirmText:'清空'}))personalAction('clearHistory');
+  };
+  el<HTMLInputElement>('libraryCaptureEnabled').onchange=()=>updateConfig('utility.clipboard_history',el<HTMLInputElement>('libraryCaptureEnabled').checked);
+  onHostMessage('configSnapshot',r=>{const utility=r.data.utility as Record<string,unknown>|undefined;const enabled=utility?.clipboard_history;if(typeof enabled==='boolean')el<HTMLInputElement>('libraryCaptureEnabled').checked=enabled;});
+  window.chrome?.webview?.postMessage(serializeHostMessage({type:'configRequest'}));
   el("libraryRefresh").onclick = () => personalAction("status");
   el("libraryView").onchange = () => {
     page=0;el<HTMLInputElement>("librarySearch").value="";
@@ -331,7 +355,7 @@ export function setupPersonalLibrary(): void {
       study = message.study as typeof study;
       renderStudy();
     }
-    status(message.message || "已保存到本机");
+    status(message.message || (message.requestId.startsWith("library-status-")?"已读取本机记录":"已保存到本机"));
     render();
   });
   personalAction("status");

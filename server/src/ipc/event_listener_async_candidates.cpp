@@ -2,6 +2,7 @@
 // （英文、emoji、颜文字、日期时间）。
 #include "ipc/event_listener_internal.h"
 #include "settings/personal_library.h"
+#include "utils/common_utils.h"
 #include <Windows.h>
 #include <string>
 #include <algorithm>
@@ -234,11 +235,21 @@ void ApplyAiTaskResult(const AiAssistant::Result &result, const AsyncRequestOrig
 {
     const auto config = GetConfiguredAiAssistant();
     const auto current_origin = FindAiRequestOrigin(result.identity, result.generation);
-    if ((result.task == AiAssistant::Task::Pinyin && !config.enabled) || !result.error.empty() || !g_inputSession ||
-        !current_origin.client_id || !IsPipeActivationCurrent(origin.client_id, origin.activation_epoch) ||
+    if ((result.task == AiAssistant::Task::Pinyin && !config.enabled) || !g_inputSession || !current_origin.client_id ||
+        !IsPipeActivationCurrent(origin.client_id, origin.activation_epoch) ||
         origin.raw_input != g_inputSession->get_pinyin_sequence_with_cases() ||
         !FanyImeIpc::AutomaticInputAiAllowed(origin.local_only))
         return;
+    if (!result.error.empty())
+    {
+        if (result.task != AiAssistant::Task::Pinyin)
+        {
+            Global::candidate_task_status = string_to_wstring(
+                (result.task == AiAssistant::Task::Question ? "问字失败：" : "补全失败：") + result.error);
+            RefreshCandidatePageUi(true);
+        }
+        return;
+    }
     auto &ui = Global::candidate_ui;
     if (result.task == AiAssistant::Task::Pinyin)
     {
@@ -308,6 +319,21 @@ void ApplyAiTaskResult(const AiAssistant::Result &result, const AsyncRequestOrig
         g_translation_saved_page_index = ui.page_index;
         g_translation_saved_selected_index = ui.selected_index_in_page;
         g_ai_task_candidates_active = true;
+        Global::candidate_task_status =
+            result.task == AiAssistant::Task::Question ? L"问字结果 · 按数字或空格上屏" : L"补全结果 · 手动选择上屏";
+        if (result.task == AiAssistant::Task::Question && result.candidates.size() == 1 &&
+            !result.candidates[0].explanation.empty())
+        {
+            auto explanation = string_to_wstring(result.candidates[0].explanation);
+            if (explanation.size() > 48)
+            {
+                explanation.resize(48);
+                if (explanation.back() >= 0xd800 && explanation.back() <= 0xdbff)
+                    explanation.pop_back();
+                explanation += L"…";
+            }
+            Global::candidate_task_status += L" · " + explanation;
+        }
         ui.set_items(std::move(answers));
     }
     ui.item_total_count = static_cast<int>(ui.items.size());

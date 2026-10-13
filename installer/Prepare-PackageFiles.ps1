@@ -210,6 +210,8 @@ else {
     & python (Join-Path $RepoRoot 'scripts/build_domain_input.py') --output (Join-Path $targetAppData 'domain-input.db')
     if ($LASTEXITCODE -ne 0) { throw 'Failed to build the pinned Qingjian input domain packs.' }
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'assets/domain-input') -Destination (Join-Path $targetAppData 'domain-input-sources') -Recurse -Force
+    # Verified, prebuilt character facts; no network or model download during packaging.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'assets/hanzi-question') -Destination (Join-Path $targetAppData 'hanzi-question') -Recurse -Force
     Copy-Item -LiteralPath $othersDb -Destination (Join-Path $targetAppData 'others.db') -Force
     # sc.lm 落在资源目录根下，与 msime.db 同级：engine/contracts/assets 的清单就是这么
     # 声明这个资源的路径的，引擎按该清单里的文件名去找。

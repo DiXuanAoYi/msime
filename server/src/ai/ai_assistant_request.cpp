@@ -11,9 +11,15 @@ nlohmann::json BuildRequestBody(const Request &request)
     if (request.task == Task::Question)
     {
         input["question"] = request.text;
-        prompt += "\n本任务是查字/问字，不是拼音转换。不要带入应用前文，不复述问题。只返回 JSON："
-                  "{\"answers\":[{\"text\":\"森\",\"pinyin\":\"sēn\"}]}。可有多个答案；"
-                  "text 仅放答案，读音放 pinyin，无法确定不要编造。";
+        input["pinyin_hint"] = request.pinyin_segments;
+        prompt +=
+            "\n本任务是查字/问字，不是拼音转换。不要带入应用前文，不复述问题。只返回 JSON："
+            "{\"answers\":[{\"text\":\"草\",\"pinyin\":\"cǎo\",\"explanation\":\"艹在上，早在下；早由日和十组成\"}]}。"
+            "识别偏旁名称（草字头、三点水、提手旁等）、加号/加/和连接的 2 至 8 个部件，以及上下、左右、包围、嵌套结构。"
+            "把部件组合与真实字形核对，不要只拼接字符，不把部件误转成近音字。参考 pinyin_hint 校正临时首候选。"
+            "例如草字头+日+十为草；四个月为朤；木+口可能是杏或束，需区分上下和重叠。"
+            "有歧义列出候选及各自结构；text 只放单个目标字，读音用声调拼音，explanation 简短解释拆法与不确定处。"
+            "未收录字、部件不全或未知读音明确说明，不编造生僻字或读音。返回真实可复制字形，不把解释混进 text。";
     }
     else if (request.task == Task::Completion)
     {

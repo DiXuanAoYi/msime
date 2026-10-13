@@ -98,8 +98,9 @@ void WorkerLoop()
         }
         lock.unlock();
         auto result = AiAssistant::RunTask(request, [observed] { return !g_running || g_generation != observed; });
-        if (result.error.empty() && g_running && g_generation == observed)
+        if (g_running && g_generation == observed)
         {
+            if (result.error.empty())
             {
                 std::lock_guard cacheLock(g_mutex);
                 if (g_cache.size() >= 128)
@@ -278,15 +279,17 @@ void Stop()
     g_cache.clear();
     g_latest = {};
 }
-void OnInputChanged(Request request)
+uint64_t OnInputChanged(Request request)
 {
+    uint64_t generation;
     {
         std::lock_guard lock(g_mutex);
         g_latest = std::move(request);
         g_last_input = std::chrono::steady_clock::now();
-        ++g_generation;
+        generation = ++g_generation;
     }
     g_cv.notify_one();
+    return generation;
 }
 void Clear()
 {

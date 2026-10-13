@@ -1,0 +1,26 @@
+#personalLibraryPanel .clipboard-heading { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+#personalLibraryPanel .clipboard-heading h2 { margin:0 0 7px; font-size:22px; }
+#personalLibraryPanel .clipboard-heading p { color:var(--text-secondary); font-size:13px; margin:0; line-height:1.6; }
+#personalLibraryPanel .clipboard-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; padding:5px; background:var(--surface-subtle); border:1px solid var(--control-border); border-radius:8px; }
+#personalLibraryPanel .clipboard-tabs button { padding:8px 6px; font-size:13px; border-color:transparent; background:transparent; color:var(--text-secondary); }
+#personalLibraryPanel .clipboard-tabs button[aria-pressed=true] { background:var(--surface-raised); color:var(--text-color); border-color:var(--accent-color); font-weight:600; }
+#personalLibraryPanel .clipboard-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:14px 0; font-size:13px; }
+#personalLibraryPanel .clipboard-capture { display:flex; align-items:center; gap:7px; flex:1; color:var(--text-secondary); }
+#personalLibraryPanel .clipboard-browser { display:grid; grid-template-columns:minmax(190px,.9fr) minmax(0,1.1fr); min-height:340px; border:1px solid var(--control-border); border-radius:8px; overflow:hidden; background:var(--surface-raised); }
+#personalLibraryPanel #libraryRows { display:flex; flex-direction:column; gap:0; max-height:430px; overflow:auto; border-right:1px solid var(--control-border); background:var(--surface-subtle); }
+#personalLibraryPanel .clipboard-item { display:grid; gap:6px; width:100%; text-align:left; padding:13px 12px; border:0; border-bottom:1px solid var(--control-border); border-radius:0; background:transparent; font-size:13px; }
+#personalLibraryPanel .clipboard-item[aria-selected=true] { background:color-mix(in srgb,var(--accent-color) 14%,var(--surface-raised)); box-shadow:inset 3px 0 var(--accent-color); }
+#personalLibraryPanel .clipboard-item :is(strong,span,small) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#personalLibraryPanel .clipboard-item span { color:var(--text-secondary); font-size:12px; }
+#personalLibraryPanel .clipboard-item small { color:var(--text-secondary); font-size:11px; }
+#personalLibraryPanel .clipboard-preview { display:flex; flex-direction:column; min-width:0; padding:16px; }
+#personalLibraryPanel .clipboard-preview h3 { margin:0 0 8px; font-size:15px; overflow-wrap:anywhere; }
+#personalLibraryPanel #libraryPreviewMeta { font-size:12px; color:var(--text-secondary); margin:0 0 12px; }
+#personalLibraryPanel #libraryPreviewText { flex:1; width:100%; min-width:0; min-height:210px; max-height:400px; resize:vertical; padding:10px; border:1px solid var(--control-border); border-radius:5px; background:var(--control-bg); color:var(--text-color); font:13px/1.65 Consolas,'Microsoft YaHei',monospace; }
+#personalLibraryPanel .clipboard-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+#personalLibraryPanel .clipboard-actions button { font-size:12px; }
+#personalLibraryPanel #libraryGroups { margin-top:14px; }
+#personalLibraryPanel #libraryStatus { font-size:12px; }
+#personalLibraryPanel #libraryRows > p { padding:20px; font-size:13px; color:var(--text-secondary); }
+@media(min-width:1000px) { #personalLibraryPanel .clipboard-tabs { grid-template-columns:repeat(6,minmax(0,1fr)); } }
+@media(max-width:650px) { #personalLibraryPanel .clipboard-browser { grid-template-columns:minmax(0,1fr); } #personalLibraryPanel #libraryRows { border-right:0; border-bottom:1px solid var(--control-border); max-height:250px; } }

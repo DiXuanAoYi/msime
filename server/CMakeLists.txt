@@ -147,6 +147,7 @@ endif()
 set(SRC_FILES
     "./src/ai/ai_assistant.cpp"
     "./src/ai/ai_task.cpp"
+    "./src/ai/character_question.cpp"
     "./src/ai/ai_assistant_request.cpp"
     "./src/ai/ai_assistant.h"
     "./src/ai/ai_assistant_cache.cpp"
@@ -474,6 +475,7 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/settings/settings_app.cpp"
     "./src/ai/ai_assistant.cpp"
     "./src/ai/ai_task.cpp"
+    "./src/ai/character_question.cpp"
     "./src/ai/ai_assistant_request.cpp"
     "./src/ai/ai_assistant_cache_key.cpp"
     "./src/settings/api_credential_test.cpp"

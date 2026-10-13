@@ -113,8 +113,7 @@ LRESULT CALLBACK WndProcCandWindow(HWND hwnd, UINT message, WPARAM wParam, LPARA
             (void)0;
         }
         const POINT layoutCaret = GetCandidateLayoutCaret();
-        const std::wstring preedit =
-            GetConfiguredCandidateWindowPreeditStyle() == "empty" ? std::wstring{} : GetPreeditWithCaretMarker();
+        const std::wstring preedit = GetCandidatePreeditWithTaskStatus();
         // Suppress a repaint that would reproduce the frame already on screen.
         // g_candidate_force_layout marks the cases (DPI / display change) where
         // the same content must still be re-laid out, so never dedup through it.

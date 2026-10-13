@@ -284,12 +284,19 @@ bool WriteStoreUnlocked(const std::vector<std::wstring> &items)
         return false;
     std::error_code error;
     std::filesystem::create_directories(path.parent_path(), error);
-    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    auto temporary = path;
+    temporary += L"." + std::to_wstring(GetCurrentProcessId()) + L".tmp";
+    std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
     if (!output)
         return false;
     const std::string payload = SerializeJsonArray(items);
     output.write(payload.data(), static_cast<std::streamsize>(payload.size()));
-    return static_cast<bool>(output);
+    output.close();
+    const bool written = !output.fail() && MoveFileExW(temporary.c_str(), path.c_str(),
+                                                       MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    if (!written)
+        std::filesystem::remove(temporary, error);
+    return written;
 }
 
 std::wstring NormalizeClipboardText(std::wstring text)
@@ -603,16 +610,20 @@ bool ClipboardHistory::RemoveText(const std::wstring &text)
 
 void ClipboardHistory::Clear()
 {
+    (void)TryClear();
+}
+bool ClipboardHistory::TryClear()
+{
     NamedMutex lock(kStoreMutexName);
     if (!lock)
-        return;
+        return false;
     const auto path = StorePath();
     if (path.empty())
-        return;
+        return false;
     std::error_code error;
     if (!std::filesystem::exists(path, error))
-        return;
-    WriteStoreUnlocked({});
+        return !error;
+    return WriteStoreUnlocked({});
 }
 
 bool ClipboardHistory::IsEnabled()

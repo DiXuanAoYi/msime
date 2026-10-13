@@ -1,4 +1,5 @@
 #include "settings/personal_library.h"
+#include "clipboard/clipboard_history.h"
 #include "engine/core/data_path.h"
 #include "tests/includes/test_framework.h"
 #include <filesystem>
@@ -11,7 +12,10 @@ namespace
 struct IsolatedLibraryProfile
 {
     std::optional<std::wstring> original = metasequoia::detail::wide_environment_variable(L"METASEQUOIA_IME_DATA_DIR");
-    std::filesystem::path parent = std::filesystem::temp_directory_path();
+    std::filesystem::path parent = [] {
+        auto path = std::filesystem::temp_directory_path();
+        return path.filename().empty() ? path.parent_path() : path;
+    }();
     std::filesystem::path root = parent / (L"msime-domain-catalog-fixture-" + std::to_wstring(GetCurrentProcessId()) +
                                            L"-" + std::to_wstring(GetTickCount64()));
     IsolatedLibraryProfile()
@@ -233,6 +237,40 @@ TEST_CASE(domain_input_sets_inherit_replace_preserve_and_export_with_application
     request["domain_mode"] = "inherit";
     REQUIRE(PersonalLibrary::Handle(request, nullptr).at("ok") == true);
     REQUIRE_EQ(PersonalLibrary::EffectiveDomainDictionaries(app, "idioms,it"), std::string("idioms,it"));
+}
+
+TEST_CASE(clipboard_history_delete_and_clear_preserve_saved_groups_and_phrases)
+{
+    IsolatedLibraryProfile profile;
+    REQUIRE(PersonalLibrary::Handle({{"action", "putClip"},
+                                     {"id", "saved"},
+                                     {"name", "保留短语"},
+                                     {"group", "phrases"},
+                                     {"text", "保留常用语"}},
+                                    nullptr)
+                .at("ok") == true);
+    const auto saved = profile.StoredLibrary();
+    {
+        std::ofstream config(profile.root / "config.toml");
+        config << "[utility]\nclipboard_history = true\n";
+    }
+    REQUIRE(ClipboardHistory::AddText(L"第一条测试复制"));
+    REQUIRE(ClipboardHistory::AddText(L"第二条测试复制"));
+    auto result = PersonalLibrary::Handle({{"action", "removeHistory"}, {"text", "第一条测试复制"}}, nullptr);
+    REQUIRE(result.at("ok") == true);
+    REQUIRE(result.at("history").size() == 1);
+    REQUIRE_EQ(ClipboardHistory::Load(), std::vector<std::wstring>{L"第二条测试复制"});
+    result = PersonalLibrary::Handle({{"action", "clearHistory"}}, nullptr);
+    REQUIRE(result.at("ok") == true);
+    REQUIRE(result.at("history").empty());
+    REQUIRE(ClipboardHistory::Load().empty());
+    REQUIRE_EQ(profile.StoredLibrary(), saved);
+    // A failed write must be reported as a failure, not a projected successful empty history.
+    const auto path = ClipboardHistory::StorePath();
+    REQUIRE(std::filesystem::remove(path));
+    REQUIRE(std::filesystem::create_directory(path));
+    REQUIRE(PersonalLibrary::Handle({{"action", "clearHistory"}}, nullptr).at("ok") == false);
+    REQUIRE_EQ(profile.StoredLibrary(), saved);
 }
 
 TEST_CASE(optional_domain_catalog_failure_preserves_real_library_saves_and_reads)

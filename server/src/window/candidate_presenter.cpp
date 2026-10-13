@@ -319,6 +319,10 @@ struct CandidatePresenter::Impl
     bool contextSubmenuOpen = false;
     bool hostExpandedForMenu = false;
     size_t contextMenuPageIndex = 0;
+    bool decorationPressed = false;
+    bool decorationHovered = false;
+    float decorationTilt = 0.0f;
+    ULONGLONG decorationPulseStart = 0;
 };
 
 CandidatePresenter::CandidatePresenter() = default;
@@ -1465,9 +1469,10 @@ void CandidatePresenter::ShowFromGlobalState(POINT caret)
     ApplySkin();
     std::wstring preedit;
     size_t caretIndex = 0;
-    if (GetConfiguredCandidateWindowPreeditStyle() != "empty")
+    if (GetConfiguredCandidateWindowPreeditStyle() != "empty" ||
+        !Global::LoadCandidatePageSnapshot()->task_status.empty())
     {
-        preedit = GetPreeditWithCaretMarker();
+        preedit = GetCandidatePreeditWithTaskStatus();
         const size_t marker = preedit.find(L'\uE000');
         if (marker != std::wstring::npos)
         {
@@ -1578,6 +1583,7 @@ void CandidatePresenter::Hide()
         return;
     }
     CloseContextMenu(false);
+    ResetDecorationMotion();
     ::is_global_wnd_cand_shown = false;
     Global::SetCandidateWindowRenderedVisible(false);
     hoverArmed_ = false;
@@ -1699,11 +1705,94 @@ void CandidatePresenter::ArmHoverIfPointerMoved()
     }
 }
 
+namespace
+{
+constexpr UINT_PTR kDecorationTimer = 0x4D534441;
+constexpr ULONGLONG kDecorationPulseMs = 320;
+} // namespace
+
+void CandidatePresenter::ResetDecorationMotion()
+{
+    if (hwnd_)
+        KillTimer(hwnd_, kDecorationTimer);
+    if (!impl_)
+        return;
+    impl_->decorationPressed = false;
+    impl_->decorationHovered = false;
+    impl_->decorationTilt = 0;
+    impl_->decorationPulseStart = 0;
+    if (impl_->decoration)
+        impl_->decoration->SetRenderPose(0, 0, 1);
+}
+
+bool CandidatePresenter::HandleDecorationMessage(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message == WM_TIMER && wParam == kDecorationTimer)
+    {
+        const ULONGLONG elapsed = GetTickCount64() - impl_->decorationPulseStart;
+        if (!::is_global_wnd_cand_shown || elapsed >= kDecorationPulseMs)
+        {
+            KillTimer(hwnd_, kDecorationTimer);
+            impl_->decorationPulseStart = 0;
+            impl_->decoration->SetRenderPose(impl_->decorationTilt, impl_->decorationHovered ? -1.0f : 0.0f, 1);
+        }
+        else
+        {
+            const float phase = static_cast<float>(elapsed) / kDecorationPulseMs;
+            const float pulse = std::sin(phase * 3.14159265f);
+            impl_->decoration->SetRenderPose(impl_->decorationTilt + 2 * std::sin(phase * 6.2831853f) * (1 - phase),
+                                             -3 * pulse, 1 + 0.025f * pulse);
+        }
+        Present();
+        return true;
+    }
+    if (message != WM_MOUSEMOVE && message != WM_MOUSELEAVE && message != WM_LBUTTONDOWN && message != WM_LBUTTONUP)
+        return false;
+    BOOL animate = TRUE;
+    SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animate, 0);
+    if (!animate || !::is_global_wnd_cand_shown || !impl_->decoration || impl_->decoration->GetSource().empty())
+    {
+        ResetDecorationMotion();
+        return false;
+    }
+    const auto bounds = impl_->decoration->GetBounds();
+    const POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    const auto point = impl_->window->ClientPixelsToDips(clientPoint);
+    const bool hit = message != WM_MOUSELEAVE && point.x >= bounds.x && point.x <= bounds.x + bounds.width &&
+                     point.y >= bounds.y && point.y <= bounds.y + bounds.height && !impl_->contextMenuOpen;
+    if (message == WM_MOUSEMOVE || message == WM_MOUSELEAVE)
+    {
+        impl_->decorationHovered = hit;
+        impl_->decorationTilt = hit && bounds.width > 0 ? 2 * (2 * (point.x - bounds.x) / bounds.width - 1) : 0;
+        if (!impl_->decorationPulseStart)
+            impl_->decoration->SetRenderPose(impl_->decorationTilt, hit ? -1.0f : 0.0f, 1);
+        // Still dispatch movement/leave to clear candidate hover and arm TRACKMOUSEEVENT.
+        return false;
+    }
+    if (message == WM_LBUTTONDOWN)
+    {
+        impl_->decorationPressed = hit;
+        return hit;
+    }
+    const bool pressed = impl_->decorationPressed;
+    impl_->decorationPressed = false;
+    if (pressed && hit)
+    {
+        impl_->decorationPulseStart = GetTickCount64();
+        SetTimer(hwnd_, kDecorationTimer, 16, nullptr);
+    }
+    return pressed || hit;
+}
+
 bool CandidatePresenter::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam)
 {
     if (!bound_ || !impl_ || !impl_->window)
     {
         return false;
+    }
+    if (HandleDecorationMessage(message, wParam, lParam))
+    {
+        return true;
     }
     switch (message)
     {

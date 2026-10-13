@@ -565,6 +565,8 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
     try
     {
         const auto action = r.at("action").get<std::string>();
+        std::optional<std::wstring> pending_history_remove;
+        bool pending_history_clear = false;
         Lock lock;
         json books = json::array();
         try
@@ -860,6 +862,16 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
                 throw std::runtime_error(result.value("message", "音频操作失败"));
             response["message"] = action == "playFavorite" ? "正在播放收藏语音" : "已复制音频文件，请手动发送";
         }
+        else if (action == "removeHistory")
+        {
+            pending_history_remove = string_to_wstring(Text(r, "text", 512 * 1024));
+            response["message"] = "已删除所选复制记录；常用语和其他资料保留";
+        }
+        else if (action == "clearHistory")
+        {
+            pending_history_clear = true;
+            response["message"] = "已清空复制记录；常用语、分组和其他资料保留";
+        }
         else if (action == "copy")
         {
             CopyText(owner, Text(r, "text", 512 * 1024));
@@ -955,12 +967,17 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
         response["book"] = std::move(displayBook);
         response["history"] = json::array();
         for (const auto &s : ClipboardHistory::Load())
-            response["history"].push_back(wstring_to_string(s));
+            if (!pending_history_clear && (!pending_history_remove || s != *pending_history_remove))
+                response["history"].push_back(wstring_to_string(s));
         response["application"] = ForegroundApplication();
         // Prepare every response field before persistence. Optional display metadata must not make a completed save
         // appear to fail, and filtered display profiles must never erase their original records from disk.
         if (changed)
             Save(book);
+        if (pending_history_remove && !ClipboardHistory::RemoveText(*pending_history_remove))
+            throw std::runtime_error("删除复制记录失败，或该记录已经不存在；请刷新后重试");
+        if (pending_history_clear && !ClipboardHistory::TryClear())
+            throw std::runtime_error("清空复制记录失败；未报告为成功，请刷新检查");
     }
     catch (const std::exception &e)
     {

@@ -60,7 +60,7 @@ const POLISH_DEFAULTS: Record<string, ProviderDefaults> = {
   },
   deepseek: {
     endpoint: 'https://api.deepseek.com/chat/completions',
-    model: 'deepseek-v4-flash'
+    model: 'deepseek-flash'
   },
   groq: {
     endpoint: 'https://api.groq.com/openai/v1/chat/completions',

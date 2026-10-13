@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 const handlers=vi.hoisted(()=>new Map<string,(value:any)=>void>());
 vi.mock('../utils/host-messages',()=>({onHostMessage:(type:string,cb:(value:any)=>void)=>handlers.set(type,cb)}));
-import {setupModelFetch} from './model-fetch';
+import {setupModelFetch,modelDisplayName} from './model-fetch';
 class Element extends EventTarget {
  value='';textContent='';id='';hidden=false;disabled=false;type='';title='';children:Element[]=[];parentElement?:Element;
  attributes=new Map<string,string>();classes=new Set<string>();classList={add:(x:string)=>this.classes.add(x),remove:(x:string)=>this.classes.delete(x),contains:(x:string)=>this.classes.has(x),toggle:(x:string,on:boolean)=>on?this.classes.add(x):this.classes.delete(x)};
@@ -16,3 +16,13 @@ it('does not query models or download on setup and keeps arbitrary input on fail
 it('uses escaped text, ArrowUp chooses last option and selection remains editable',()=>{setup();nodes.get('fetch')!.click();const req=JSON.parse(post.mock.calls[0][0]);handlers.get('apiModelListResult')!({requestId:req.data.requestId,ok:true,message:'ok',models:['model-a','<img onerror=bad>','model-z']});expect(nodes.get('menu')!.children[1].textContent).toBe('<img onerror=bad>');const event=new Event('keydown',{cancelable:true});Object.defineProperty(event,'key',{value:'ArrowUp'});nodes.get('input')!.dispatchEvent(event);const enter=new Event('keydown',{cancelable:true});Object.defineProperty(enter,'key',{value:'Enter'});nodes.get('input')!.dispatchEvent(enter);expect(nodes.get('input')!.value).toBe('model-z');nodes.get('input')!.value='custom-text';expect(nodes.get('input')!.value).toBe('custom-text');});
 it('provider reset rejects the earlier provider response',()=>{const reset=setup();nodes.get('fetch')!.click();const req=JSON.parse(post.mock.calls[0][0]);reset();handlers.get('apiModelListResult')!({requestId:req.data.requestId,ok:true,message:'old provider',models:['old-model']});expect(nodes.get('menu')!.children).toHaveLength(0);expect(nodes.get('status')!.textContent).toBe('');});
 it('timeout restores the manual model field',()=>{setup();nodes.get('input')!.value='offline-local';nodes.get('fetch')!.click();vi.advanceTimersByTime(20000);expect(nodes.get('fetch')!.disabled).toBe(false);expect(nodes.get('input')!.value).toBe('offline-local');expect(nodes.get('status')!.textContent).toContain('超时');});
+it('shows the current service display name while selecting the actual API ID',()=>{
+ setup();nodes.get('fetch')!.click();const req=JSON.parse(post.mock.calls[0][0]);
+ handlers.get('apiModelListResult')!({requestId:req.data.requestId,ok:true,message:'ok',models:['deepseek-flash'],modelDetails:[{id:'deepseek-flash',name:'DeepSeek-V4.1-Flash'}]});
+ expect(nodes.get('menu')!.children[0].textContent).toBe('DeepSeek-V4.1-Flash · deepseek-flash');
+ nodes.get('menu')!.children[0].click();expect(nodes.get('input')!.value).toBe('deepseek-flash');
+});
+it('does not invent an official model version for third-party endpoints',()=>{
+ expect(modelDisplayName('deepseek-flash',[],{provider:'deepseek',endpoint:'https://api.deepseek.com/chat/completions'})).toContain('V4.1');
+ expect(modelDisplayName('deepseek-flash',[],{provider:'custom',endpoint:'https://example.test/v1/chat/completions'})).toBe('deepseek-flash');
+});

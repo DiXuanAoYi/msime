@@ -72,6 +72,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_assistant_cache_key.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_cache_key.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_task.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/character_question.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_request.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/api_credential_test.cpp"

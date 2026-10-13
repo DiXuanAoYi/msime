@@ -15,7 +15,7 @@ const fields: Record<string, string> = {
 const PROVIDER_DEFAULTS: Record<string, ProviderDefaults> = {
   deepseek: {
     endpoint: 'https://api.deepseek.com/chat/completions',
-    model: 'deepseek-v4-flash'
+    model: 'deepseek-flash'
   },
   openai: {
     endpoint: 'https://api.openai.com/v1/chat/completions',

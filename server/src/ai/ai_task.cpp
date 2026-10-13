@@ -1,4 +1,5 @@
 #include "ai_task.h"
+#include "character_question.h"
 #include <algorithm>
 #include <cctype>
 #include <set>
@@ -82,16 +83,24 @@ std::vector<Answer> LookupOfflineQuestion(const std::string &text)
         if (c >= 'a' && c <= 'z')
             ascii += char(c);
     std::vector<Answer> answers;
+    const auto suffixAllowed = [](std::string tail) {
+        for (const std::string punctuation : {" ", "?", "？", "。", "!", "！", "'"})
+            for (size_t pos; (pos = tail.find(punctuation)) != std::string::npos;)
+                tail.erase(pos, punctuation.size());
+        return tail.empty() || tail == "是什么字" || tail == "是什么" || tail == "怎么读" || tail == "读什么" ||
+               tail == "shishenmezi" || tail == "shishenme" || tail == "zenmedu";
+    };
     for (const auto &entry : entries)
     {
-        const bool chinese =
-            text.find(std::string(entry.count == 3 ? "三" : "两") + "个" + entry.component) != std::string::npos ||
-            text.find(std::string(entry.count == 3 ? "三" : "二") + entry.component) != std::string::npos;
+        const auto first = std::string(entry.count == 3 ? "三" : "两") + "个" + entry.component;
+        const auto second = std::string(entry.count == 3 ? "三" : "二") + entry.component;
+        const bool chinese = (text.rfind(first, 0) == 0 && suffixAllowed(text.substr(first.size()))) ||
+                             (text.rfind(second, 0) == 0 && suffixAllowed(text.substr(second.size())));
         const std::string prefix = std::string(entry.count == 3 ? "sange" : "liangge") + entry.pinyin;
-        if (chinese || ascii.rfind(prefix, 0) == 0)
+        if (chinese || (ascii.rfind(prefix, 0) == 0 && suffixAllowed(ascii.substr(prefix.size()))))
             answers.push_back({entry.answer, entry.reading, "本地叠字部件表"});
     }
-    return answers;
+    return answers.empty() ? LookupComponentQuestion(text) : answers;
 }
 Result ParseTaskContent(Task task, const std::string &content, const std::string &precedingText, int limit)
 {
@@ -122,6 +131,17 @@ Result ParseTaskContent(Task task, const std::string &content, const std::string
         if (!row.is_object() || !row.contains("text") || !row["text"].is_string())
             continue;
         Answer answer{row["text"].get<std::string>(), row.value("pinyin", std::string()), "AI 模型"};
+        if (task == Task::Question && row.contains("explanation") && row["explanation"].is_string())
+        {
+            answer.explanation = row["explanation"].get<std::string>();
+            if (answer.explanation.size() > 1500)
+            {
+                size_t end = 1500;
+                while (end && (static_cast<unsigned char>(answer.explanation[end]) & 0xc0) == 0x80)
+                    --end;
+                answer.explanation.resize(end);
+            }
+        }
         const auto key = task == Task::Question ? answer.text + "\x1f" + answer.pinyin : answer.text;
         if (answer.text.empty() || answer.text.size() > 2048 || answer.pinyin.size() > 2048 || !seen.insert(key).second)
             continue;
@@ -129,6 +149,15 @@ Result ParseTaskContent(Task task, const std::string &content, const std::string
             (answer.text == precedingText || answer.text.find("是什么字") != std::string::npos ||
              answer.text.find("怎么读") != std::string::npos))
             continue;
+        if (task == Task::Question)
+        {
+            auto position = answer.text.begin();
+            const auto character = utf8::next(position, answer.text.end());
+            if (position != answer.text.end() ||
+                !((character >= 0x3400 && character <= 0x9fff) || (character >= 0x20000 && character <= 0x323af) ||
+                  (character >= 0xf900 && character <= 0xfaff) || character == 0x3007))
+                continue;
+        }
         result.candidates.push_back(std::move(answer));
         if (result.candidates.size() >= size_t(limit))
             break;

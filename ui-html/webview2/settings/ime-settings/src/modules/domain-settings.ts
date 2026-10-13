@@ -1,9 +1,11 @@
+import '../styles/modules/domain-settings.css';
 import {serializeHostMessage} from '../../../../shared/messages';
 import {onHostMessage} from '../utils/host-messages';
 import {updateConfig} from './config-sync';
 type Pack={id:string;name:string;entries:number;bytes:number;license:string;source:string;version:string;sha256:string;exportable:boolean};
 type Profile={application:string;domain_mode?:string;domains?:string[]};
 let packs:Pack[]=[],globalDomains:string[]=[],profiles:Profile[]=[];
+const initializedCatalogs=new WeakSet<HTMLElement>();
 const el=(id:string)=>document.getElementById(id);
 const send=(action:'domainCatalog'|'exportDomain'|'setApplicationDomains',extra:Record<string,unknown>={})=>window.chrome?.webview?.postMessage(serializeHostMessage({type:'personalLibraryRequest',data:{requestId:`domains-${action}-${Date.now()}`,action,...extra}}));
 function renderApplication():void {
@@ -95,7 +97,7 @@ function render(): void {
  renderApplication();
 }
 export function setupDomainSettings():void {
- if(!el('domainCatalog'))return;
+ const catalog=el('domainCatalog');if(!catalog||initializedCatalogs.has(catalog))return;initializedCatalogs.add(catalog);
  el('domainRefresh')?.addEventListener('click',()=>send('domainCatalog'));
  el('domainApplication')?.addEventListener('change',renderApplication);
  el('domainApplicationMode')?.addEventListener('change',()=>{const mode=(el('domainApplicationMode') as HTMLSelectElement).value;el('domainApplicationPacks')?.querySelectorAll<HTMLInputElement>('input').forEach(x=>x.disabled=mode!=='replace');saveApplication();});

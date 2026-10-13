@@ -1,6 +1,7 @@
 import {setupCandidateTranslation, candidateTranslationSelection, selectCandidateTranslation, candidateTranslationAiConfig} from "./candidate-translation";
 export {applyCandidateTranslationConfig} from "./candidate-translation";
 import {setupInputAdvanced} from './input-advanced';
+import {renderTranslationServiceLinks} from './translation-service-links';
 import { setupVocabulary } from './vocabulary';
 export { applyVocabularyConfig } from './vocabulary';
 import { applyPersonalGlossaryConfig, setupPersonalGlossaryEditor } from './personal-glossary-editor';
@@ -170,10 +171,9 @@ export function applyFrequencyConfig(config: any): void {
 
 export function applyTranslationCloudEnabled(enabled: boolean): void {
   applyToggleState('candidateTranslationCloudToggleBtn', enabled);
-  for (const id of ['translationOnlineProvider', 'translationOnlineCredentials']) {
-    const element = document.getElementById(id);
-    if (element) element.hidden = !enabled;
-  }
+  // Provider discovery and registration must be available before opting in to network lookup.
+  const provider=document.getElementById('translationOnlineProvider');if(provider)provider.hidden=false;
+  const credentials=document.getElementById('translationOnlineCredentials');if(credentials)credentials.hidden=!enabled;
 }
 
 function syncCandidateTranslationOptions(enabled: boolean): void {
@@ -231,6 +231,7 @@ function syncCandidateTranslationWarning(): void {
 }
 
 function syncTranslationProviderView(provider: TranslationProvider): void {
+  renderTranslationServiceLinks('candidateTranslationProviderLinks',provider);
   const tencentFields = document.getElementById('tencentTranslationFields');
   const niutransFields = document.getElementById('niutransTranslationFields');
   const customFields = document.getElementById('customTranslationFields');

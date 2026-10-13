@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <wincodec.h>
@@ -386,4 +387,33 @@ TEST_CASE(unstretched_image_crops_instead_of_squeezing_into_smaller_bounds)
     const int worst = CheckImagePixels(scenario);
     std::printf("cropped image worst channel difference %d/255\n", worst);
     REQUIRE(worst <= 1);
+}
+
+TEST_CASE(animated_image_preserves_layout_and_the_following_controls_transform)
+{
+    ImageFixture fixture;
+    msimeui::DeviceResources resources;
+    REQUIRE(resources.EnsureForComposition(fixture.window.hwnd));
+    auto *dc = resources.GetDeviceContext();
+    Canvas canvas(dc, 144.0f);
+    msimeui::Image image(fixture.file.path);
+    const msimeui::RectF bounds{20, 24, 100, 80};
+    image.Arrange(bounds);
+    image.SetRenderPose(3, -2, 1.02f);
+    const auto original = D2D1::Matrix3x2F::Translation(0.3f, 0.6f);
+    canvas.Render([&]() {
+        dc->SetTransform(original);
+        image.Render(resources);
+        D2D1_MATRIX_3X2_F after;
+        dc->GetTransform(&after);
+        REQUIRE(std::memcmp(&after, &original, sizeof(after)) == 0);
+    });
+    REQUIRE(image.GetBounds().x == bounds.x);
+    REQUIRE(image.GetBounds().height == bounds.height);
+    image.SetRenderPose(0, 0, 1);
+    const auto restored = canvas.Render([&]() { image.Render(resources); });
+    msimeui::Image unchanged(fixture.file.path);
+    unchanged.Arrange(bounds);
+    const auto baseline = canvas.Render([&]() { unchanged.Render(resources); });
+    REQUIRE(restored == baseline);
 }

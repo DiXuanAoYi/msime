@@ -255,7 +255,7 @@
     <div class="section-header">
       <div>
         <div class="section-title">候选词翻译</div>
-        <div class="input-setting-description">中文候选显示所选语言的译词；英文候选显示中文释义</div>
+        <div class="input-setting-description">仅控制输入候选旁的译义：中文显示目标语言译词，英文显示中文释义。完整词典及开关在“词库”，整段、对话和屏幕翻译在“截图 · OCR · 翻译”。</div>
       </div>
       <div class="ftb-toggle-btn active" id="candidateTranslationsToggleBtn" role="switch" aria-checked="true" tabindex="0">
         <div class="ftb-toggle-knob"></div>
@@ -271,7 +271,7 @@
         <div class="ftb-toggle-btn" id="candidateTranslationCloudToggleBtn" role="switch" aria-label="允许在线补全译文" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div>
       </div>
       <div class="input-option-divider"></div>
-      <div class="personal-glossary-editor">
+      <details class="personal-glossary-editor"><summary class="section-title">个人译词 · 编辑、导入与导出</summary>
         <label class="section-title" for="personalGlossaryText">个人译词表</label>
         <div class="input-setting-description" id="personalGlossaryHelp">每行用 Tab 分隔：语言代码、中文词、译词，可加第四列。译词列可用分号保存全部义项。支持 en / ja / es / fr / de / ru / ko / vi / th / it。青简单语种多列文件导入时保留所有译义，第三条以后的译义并入第四列；相同语言和中文词以最后一行为准。</div>
         <textarea id="personalGlossaryText" rows="6" spellcheck="false" aria-describedby="personalGlossaryHelp" placeholder="en&#9;开发&#9;development&#10;ja&#9;开发&#9;開発&#10;es&#9;开发&#9;desarrollo"></textarea>
@@ -283,7 +283,7 @@
         </div>
         <div class="input-setting-description">仅保存在本机。青简单语词表按下方目标语种导入，去除词性与读音，保留全部译义。导入后需点击保存。</div>
         <div id="personalGlossaryStatus" class="input-setting-description" role="status" aria-live="polite"></div>
-      </div>
+      </details>
       <div class="input-option-divider"></div>
         <details id="vocabularyPanel" class="personal-glossary-editor">
           <summary class="section-title">生词熟悉度</summary>
@@ -304,10 +304,10 @@
           <p id="vocabularyStatus" class="input-setting-description" role="status" aria-live="polite"></p>
         </details>
         <div class="input-option-divider"></div>
-      <div class="section-header translation-language-row" id="translationOnlineProvider" hidden>
+      <div class="section-header translation-language-row" id="translationOnlineProvider">
         <div>
-          <div class="section-title">在线翻译服务</div>
-          <div class="input-setting-description">每次仅使用所选的一种服务：腾讯云、小牛、DeepLX 或 AI。升级先沿用原选择；本地词典始终优先。</div>
+          <div class="section-title">候选译文补全服务</div>
+          <div class="input-setting-description">可以先选择服务、查看注册网址；选择本身不会开启在线翻译。允许在线补全后只用所选一种服务，本地词典始终优先。</div>
         </div>
         <div class="dropdown">
           <button class="dropdown-toggle translation-language-toggle" id="translationProviderBtn">
@@ -323,6 +323,7 @@
           </div>
         </div>
       </div>
+      <div id="candidateTranslationProviderLinks" class="translation-provider-links" aria-label="当前翻译服务网址"></div>
       <div class="input-option-divider"></div>
       <div class="section-header translation-language-row">
         <div>
@@ -359,7 +360,7 @@
           <div class="ai-field"><label for="candidateAiModel">模型 · 可直接输入</label><div class="model-combo"><input id="candidateAiModel" type="text" autocomplete="off" spellcheck="false"><button id="candidateAiModelArrow" type="button" aria-label="展开或查询模型">⌄</button><div id="candidateAiModelMenu" class="model-menu"></div></div><button id="candidateAiModelFetch" type="button">查询模型</button><span id="candidateAiModelStatus" role="status"></span></div>
         </div>
       </div>
-      <div id="tencentTranslationFields">
+<div id="tencentTranslationFields">
         <div class="translation-api-heading">
           <div class="section-title">腾讯云 API 凭据</div>
           <div class="input-setting-description">用于在线机器翻译，凭据仅保存在本机配置文件中</div>

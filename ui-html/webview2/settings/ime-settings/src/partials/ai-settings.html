@@ -61,7 +61,7 @@
   </details>
   <div class="section ai-section">
     <h3 class="section-title">输入任务与预览</h3>
-    <p class="ai-description">拼音转换、文本续写和问字分别处理。问字不带应用前文；本地叠字部件表可离线查部分常见字，其他问题需要支持问答的文本模型。含章拼音模型不能充当聊天问答。启用相应入口后，在活动组词中按 Ctrl + Alt + Q 问字，按 Ctrl + Alt + Enter 续写；敏感字段禁用输入 AI。</p>
+    <p class="ai-description">拼音转换、文本续写和问字分别处理。问字支持偏旁名称、2～8 个部件和多层拆解，例如“草字头＋日＋十”“上下结构木＋口”；本地字形词典先离线匹配，显示读音和拆解，有歧义列多条。复杂自然描述可交给已配置的文本模型，不带应用前文。含章拼音模型不能充当聊天问答。启用后，在活动组词中按 Ctrl + Alt + Q 问字，按 Ctrl + Alt + Enter 续写；敏感字段禁用。</p>
     <div class="section-header"><span>启用文本续写补全</span><div id="aiCompletionEnabled" class="ftb-toggle-btn" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
     <div class="section-header"><span>启用问字入口</span><div id="aiQuestionEnabled" class="ftb-toggle-btn" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
     <div class="ai-grid"><label><span>任务</span><select id="aiTask"><option value="pinyin">拼音转换</option><option value="completion">文本续写</option><option value="question">问字 · 多答案</option></select></label><label class="ai-wide"><span>输入内容</span><textarea id="aiTaskInput" placeholder="例如：ni hao / ming tian kai hui" rows="3"></textarea></label><label class="ai-wide"><span>可选前文 · 问字不使用</span><textarea id="aiTaskContext" rows="2"></textarea></label></div>

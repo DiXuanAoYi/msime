@@ -18,6 +18,7 @@ struct Answer
     std::string text;
     std::string pinyin;
     std::string source;
+    std::string explanation;
 };
 struct Result
 {

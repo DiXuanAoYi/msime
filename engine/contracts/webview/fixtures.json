@@ -1396,42 +1396,186 @@
   },
   {
     "name": "temporary configuration boolean only snapshot",
-    "message": {"type": "configSnapshot", "data": {"environment": {"temporary_configuration": true}}},
-    "valid": true, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "configSnapshot",
+      "data": {
+        "environment": {
+          "temporary_configuration": true
+        }
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
   },
   {
     "name": "legacy snapshot has no environment metadata",
-    "message": {"type": "configSnapshot", "data": {}},
-    "valid": true, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "configSnapshot",
+      "data": {}
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
   },
   {
     "name": "temporary configuration rejects string boolean",
-    "message": {"type": "configSnapshot", "data": {"environment": {"temporary_configuration": "true"}}},
-    "valid": false, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "configSnapshot",
+      "data": {
+        "environment": {
+          "temporary_configuration": "true"
+        }
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
   },
   {
     "name": "temporary configuration does not disclose profile paths",
-    "message": {"type": "configSnapshot", "data": {"environment": {"temporary_configuration": true, "path": "private"}}},
-    "valid": false, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "configSnapshot",
+      "data": {
+        "environment": {
+          "temporary_configuration": true,
+          "path": "private"
+        }
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
   },
   {
     "name": "optional domain warning leaves original library operation successful",
-    "message": {"type": "personalLibraryResponse", "requestId": "library-putClip-1", "ok": true, "message": "", "domainWarning": "optional pack unavailable", "book": {"clips": []}, "books": []},
-    "valid": true, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-putClip-1",
+      "ok": true,
+      "message": "",
+      "domainWarning": "optional pack unavailable",
+      "book": {
+        "clips": []
+      },
+      "books": []
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
   },
   {
     "name": "domain catalog rejects a null pack",
-    "message": {"type": "personalLibraryResponse", "requestId": "domains-domainCatalog-1", "ok": true, "message": "", "books": [null]},
-    "valid": false, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "domains-domainCatalog-1",
+      "ok": true,
+      "message": "",
+      "books": [
+        null
+      ]
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
   },
   {
     "name": "domain catalog requires pack metrics for rendering",
-    "message": {"type": "personalLibraryResponse", "requestId": "domains-domainCatalog-1", "ok": true, "message": "", "books": [{"id": "idioms", "name": "idioms"}]},
-    "valid": false, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "domains-domainCatalog-1",
+      "ok": true,
+      "message": "",
+      "books": [
+        {
+          "id": "idioms",
+          "name": "idioms"
+        }
+      ]
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
   },
   {
     "name": "domain catalog accepts complete pack metadata",
-    "message": {"type": "personalLibraryResponse", "requestId": "domains-domainCatalog-1", "ok": true, "message": "", "books": [{"id": "idioms", "name": "idioms", "entries": 1, "bytes": 24, "license": "MIT", "source": "fixture", "version": "v1", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "exportable": true}]},
-    "valid": true, "surface": "settings", "direction": "server"
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "domains-domainCatalog-1",
+      "ok": true,
+      "message": "",
+      "books": [
+        {
+          "id": "idioms",
+          "name": "idioms",
+          "entries": 1,
+          "bytes": 24,
+          "license": "MIT",
+          "source": "fixture",
+          "version": "v1",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "exportable": true
+        }
+      ]
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "named current model IDs",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "apiModelListResult",
+      "requestId": "models-fixture",
+      "ok": true,
+      "message": "ok",
+      "models": [
+        "deepseek-flash"
+      ],
+      "modelDetails": [
+        {
+          "id": "deepseek-flash",
+          "name": "DeepSeek-V4.1-Flash"
+        }
+      ]
+    }
+  },
+  {
+    "name": "question answer with separate structure explanation",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "aiTaskResult",
+      "requestId": "question-fixture",
+      "ok": true,
+      "task": "question",
+      "message": "ok",
+      "completion": "",
+      "answers": [
+        {
+          "text": "草",
+          "pinyin": "cǎo",
+          "source": "本地 IDS 字形表",
+          "explanation": "艹在上，早在下"
+        }
+      ]
+    }
+  },
+  {
+    "name": "clear clipboard history scoped settings",
+    "surface": "settings",
+    "direction": "client",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryRequest",
+      "data": {
+        "requestId": "library-clear-fixture",
+        "action": "clearHistory"
+      }
+    }
   }
 ]
