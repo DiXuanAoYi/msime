@@ -22,3 +22,4 @@ engine/googlepinyinime-rev/data/*utf16*.txt binary
 
 # Pinned corpus bytes participate in the source SHA-256 manifest.
 assets/translation-library/sources/cncf-titles.json -text
+assets/hanzi-question/IDS.txt -text
