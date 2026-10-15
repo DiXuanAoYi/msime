@@ -896,7 +896,7 @@ bool StartRecording()
         MessageBoxW(nullptr,
                     config.asr_provider == "local" ? L"请先在设置的“语音输入 → 本地语音模型”中启动已下载的模型。"
                                                    : L"请先在设置的“语音输入”分区填写当前 ASR 提供商的 API Token。",
-                    L"水杉 IME", MB_OK | MB_ICONINFORMATION);
+                    L"知语输入法", MB_OK | MB_ICONINFORMATION);
         return false;
     }
     g_starting = true;
@@ -939,7 +939,8 @@ bool StartRecording()
             g_stream_inline_this_session.store(false);
             g_last_inline_preedit.clear();
             g_doubao_asr.reset();
-            MessageBoxW(nullptr, L"无法启动豆包流式语音识别。请检查 config.toml。", L"水杉 IME", MB_OK | MB_ICONERROR);
+            MessageBoxW(nullptr, L"无法启动豆包流式语音识别。请检查 config.toml。", L"知语输入法",
+                        MB_OK | MB_ICONERROR);
             g_starting = false;
             return false;
         }
@@ -952,7 +953,7 @@ bool StartRecording()
     if (!g_capture.start(AudioCallback))
     {
         AbortPendingStart("capture start failed");
-        MessageBoxW(nullptr, L"无法启动麦克风。", L"水杉 IME", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"无法启动麦克风。", L"知语输入法", MB_OK | MB_ICONERROR);
         return false;
     }
     if (g_abort_start.exchange(false))
@@ -980,7 +981,7 @@ void StopRecording()
     if (g_capture.callback_failed())
     {
         CancelRecording();
-        MessageBoxW(nullptr, L"录音中断，请重试。", L"水杉 IME", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"录音中断，请重试。", L"知语输入法", MB_OK | MB_ICONERROR);
         return;
     }
     const VoiceInputConfig config = GetConfiguredVoiceInput();
@@ -1072,7 +1073,7 @@ void StopRecording()
             }
             if (!recognition.error.empty())
             {
-                MessageBoxW(nullptr, string_to_wstring(recognition.error).c_str(), L"水杉 IME", MB_OK | MB_ICONERROR);
+                MessageBoxW(nullptr, string_to_wstring(recognition.error).c_str(), L"知语输入法", MB_OK | MB_ICONERROR);
             }
             const std::string text = recognition.error.empty() ? Polish(recognition.text, config) : std::string();
             if (!batch_recognition && !polishing && !stream_inline && g_voice_session == voice_session && !text.empty())

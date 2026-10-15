@@ -77,6 +77,8 @@ export function setupAboutSettings(): void {
   for (const [id, url] of [
     ['about-license-link', LICENSE_URL],
     ['about-privacy-link', PRIVACY_URL],
+    ['about-source-link', 'https://github.com/DiXuanAoYi/msime'],
+    ['about-notices-link', 'https://github.com/DiXuanAoYi/msime/blob/feature/voice-reply-studio/THIRD_PARTY_NOTICES.txt'],
   ] as const) {
     const button = document.getElementById(id);
     if (button instanceof HTMLButtonElement) {

@@ -783,7 +783,7 @@ nlohmann::json Handle(const nlohmann::json &request)
 {
     const auto action = request.value("action", "status");
     if (action == "preview")
-        Speak(request.value("text", "你好，欢迎使用水杉输入法。Hello, welcome!"), request.value("language", "zh"));
+        Speak(request.value("text", "你好，欢迎使用知语输入法。Hello, welcome!"), request.value("language", "zh"));
     if (action == "stop")
         Stop();
     json voices = json::array();

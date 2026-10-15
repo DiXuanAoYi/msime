@@ -41,6 +41,12 @@ function refreshServerState(): void {
 
 export function setupHelpSettings(): void {
   setupDefaultIme();
+  document.querySelectorAll<HTMLButtonElement>('[data-help-target]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      const target=button.dataset.helpTarget;
+      if(target)document.querySelector<HTMLElement>(`.sidebar .item[data-target="${target}"]`)?.click();
+    });
+  });
   document.querySelectorAll<HTMLInputElement>('input[name="network-proxy-mode"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       if (!radio.checked) return;

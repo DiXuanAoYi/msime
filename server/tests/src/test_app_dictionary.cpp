@@ -273,6 +273,137 @@ TEST_CASE(clipboard_history_delete_and_clear_preserve_saved_groups_and_phrases)
     REQUIRE_EQ(profile.StoredLibrary(), saved);
 }
 
+TEST_CASE(clipboard_copy_counts_migrate_persist_rank_and_reject_corrupt_store)
+{
+    IsolatedLibraryProfile profile;
+    {
+        std::ofstream config(profile.root / "config.toml");
+        config << "[utility]\nclipboard_history = true\n";
+    }
+    {
+        std::ofstream file(ClipboardHistory::StorePath());
+        file << json::array({"原有内容", "第二行\n汉字😀"}).dump();
+    }
+    auto entries = ClipboardHistory::LoadEntries();
+    REQUIRE_EQ(entries.size(), size_t(2));
+    REQUIRE_EQ(entries.front().copies, uint32_t(1));
+    REQUIRE(ClipboardHistory::AddText(L"原有内容"));
+    REQUIRE(ClipboardHistory::AddText(L"原有内容"));
+    REQUIRE(ClipboardHistory::AddText(L"后来复制"));
+    entries = ClipboardHistory::LoadEntries();
+    REQUIRE_EQ(entries.size(), size_t(3));
+    REQUIRE_EQ(entries.front().text, std::wstring(L"原有内容"));
+    REQUIRE_EQ(entries.front().copies, uint32_t(3));
+    REQUIRE_EQ(entries[1].text, std::wstring(L"后来复制"));
+    REQUIRE_EQ(entries[2].text, std::wstring(L"第二行\n汉字😀"));
+    const auto response = PersonalLibrary::Handle({{"action", "status"}}, nullptr);
+    REQUIRE(response.at("ok") == true);
+    REQUIRE_EQ(response.at("historyEntries").at(0).at("copies").get<uint32_t>(), uint32_t(3));
+    REQUIRE_EQ(response.at("history").size(), response.at("historyEntries").size());
+    const auto quick =
+        PersonalLibrary::Handle({{"action", "history"}, {"requestId", "library-history-fixture"}}, nullptr);
+    REQUIRE(quick.at("ok") == true);
+    REQUIRE(quick.at("type") == "personalLibraryResponse");
+    REQUIRE(quick.at("historyEntries") == response.at("historyEntries"));
+    REQUIRE(!quick.contains("book"));
+    // The committed file, rather than a process-local cache, contains the count.
+    json stored;
+    {
+        std::ifstream file(ClipboardHistory::StorePath());
+        file >> stored;
+    }
+    REQUIRE(stored.at(0).at("text") == "后来复制");
+    REQUIRE(stored.at(1).at("copies") == 3);
+    {
+        std::ofstream file(ClipboardHistory::StorePath());
+        file << "{broken";
+    }
+    REQUIRE(!ClipboardHistory::AddText(L"不得覆盖损坏文件"));
+    REQUIRE(!ClipboardHistory::RemoveText(L"原有内容"));
+    std::ifstream input(ClipboardHistory::StorePath());
+    REQUIRE_EQ(std::string(std::istreambuf_iterator<char>(input), {}), std::string("{broken"));
+}
+
+TEST_CASE(clipboard_shared_sequence_counts_one_copy_event_once_and_keeps_recent_retention)
+{
+    IsolatedLibraryProfile profile;
+    {
+        std::ofstream config(profile.root / "config.toml");
+        config << "[utility]\nclipboard_history = true\n";
+    }
+    const uint32_t sequence = 1000000000 + GetCurrentProcessId();
+    REQUIRE(ClipboardHistory::AddText(L"相同复制事件", sequence));
+    REQUIRE(!ClipboardHistory::AddText(L"相同复制事件", sequence));
+    REQUIRE(ClipboardHistory::AddText(L"相同复制事件", sequence + 1));
+    REQUIRE(!ClipboardHistory::AddText(L"相同复制事件", sequence));
+    REQUIRE_EQ(ClipboardHistory::LoadEntries().front().copies, uint32_t(2));
+    for (int i = 0; i < 50; ++i)
+        REQUIRE(ClipboardHistory::AddText(L"新内容" + std::to_wstring(i)));
+    const auto entries = ClipboardHistory::LoadEntries();
+    REQUIRE_EQ(entries.size(), ClipboardHistory::kMaxItems);
+    REQUIRE_EQ(entries.front().text, std::wstring(L"新内容49"));
+    REQUIRE(
+        std::none_of(entries.begin(), entries.end(), [](const auto &entry) { return entry.text == L"相同复制事件"; }));
+    {
+        std::ofstream file(ClipboardHistory::StorePath());
+        file << json::array({{{"text", "已达到计数上限"}, {"copies", ClipboardHistory::kMaxCopies}}}).dump();
+    }
+    REQUIRE(ClipboardHistory::AddText(L"已达到计数上限"));
+    REQUIRE_EQ(ClipboardHistory::LoadEntries().front().copies, ClipboardHistory::kMaxCopies);
+}
+
+TEST_CASE(clipboard_edit_keeps_counts_merges_duplicates_and_preserves_failure_input)
+{
+    IsolatedLibraryProfile profile;
+    std::ofstream(ClipboardHistory::StorePath())
+        << json::array({{{"text", "原文"}, {"copies", 2}}, {{"text", "已有文字"}, {"copies", 3}}}).dump();
+    auto reply =
+        PersonalLibrary::Handle({{"action", "editHistory"}, {"previousText", "原文"}, {"text", "新文字😀"}}, nullptr);
+    REQUIRE(reply.at("ok") == true);
+    REQUIRE_EQ(ClipboardHistory::LoadEntries().at(1).copies, uint32_t(2));
+    REQUIRE(ClipboardHistory::UpdateEntryText(L"新文字😀", L"已有文字"));
+    REQUIRE_EQ(ClipboardHistory::LoadEntries().size(), size_t(1));
+    REQUIRE_EQ(ClipboardHistory::LoadEntries().front().copies, uint32_t(5));
+    REQUIRE(!ClipboardHistory::UpdateEntryText(L"不存在", L"不能凭空添加"));
+    REQUIRE(!ClipboardHistory::UpdateEntryText(L"已有文字", std::wstring(4001, L'x')));
+    REQUIRE(!ClipboardHistory::UpdateEntryText(L"已有文字", L""));
+    REQUIRE_EQ(ClipboardHistory::LoadEntries().front().copies, uint32_t(5));
+    REQUIRE(!std::filesystem::exists(profile.root / "personal-library.json"));
+    std::ofstream(ClipboardHistory::StorePath()) << "{broken";
+    REQUIRE(!ClipboardHistory::UpdateEntryText(L"已有文字", L"不得覆盖"));
+    std::ifstream file(ClipboardHistory::StorePath());
+    REQUIRE_EQ(std::string(std::istreambuf_iterator<char>(file), {}), std::string("{broken"));
+}
+
+TEST_CASE(quote_catalog_is_read_only_and_custom_quote_groups_transfer_safely)
+{
+    IsolatedLibraryProfile profile;
+    std::ofstream(profile.root / "domain-input-sources" / "poetry.tsv")
+        << "# fixture\n海内存知己\thai nei cun zhi ji\t1\n重复\tchong fu\t1\n海内存知己\thai nei cun zhi ji\t1\n";
+    const auto catalog = PersonalLibrary::Handle({{"action", "quoteCatalog"}}, nullptr);
+    REQUIRE(catalog.at("ok") == true);
+    REQUIRE_EQ(catalog.at("quoteEntries").size(), size_t(2));
+    REQUIRE(!std::filesystem::exists(profile.root / "personal-library.json"));
+    auto reply =
+        PersonalLibrary::Handle({{"action", "putGroup"}, {"section", "quotes"}, {"name", "我的经典收藏"}}, nullptr);
+    REQUIRE(reply.at("ok") == true);
+    const auto group = reply.at("book").at("groups").back();
+    REQUIRE(group.at("kind") == "quotes");
+    REQUIRE(PersonalLibrary::Handle({{"action", "putClip"},
+                                     {"id", "my-quote"},
+                                     {"name", "自定义语录"},
+                                     {"text", "保留语录"},
+                                     {"group", group.at("id")}},
+                                    nullptr)
+                .at("ok") == true);
+    reply = PersonalLibrary::Handle({{"action", "removeGroup"}, {"id", group.at("id")}}, nullptr);
+    REQUIRE(reply.at("ok") == true);
+    REQUIRE(reply.at("book").at("clips").at(0).at("group") == "quotes");
+    const auto before = profile.StoredLibrary();
+    REQUIRE(PersonalLibrary::Handle({{"action", "removeGroup"}, {"id", "quotes"}}, nullptr).at("ok") == false);
+    REQUIRE_EQ(profile.StoredLibrary(), before);
+}
+
 TEST_CASE(optional_domain_catalog_failure_preserves_real_library_saves_and_reads)
 {
     IsolatedLibraryProfile profile;

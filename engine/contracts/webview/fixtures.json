@@ -1577,5 +1577,123 @@
         "action": "clearHistory"
       }
     }
+  },
+  {
+    "name": "clipboard copy count response",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": 12
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard rejects zero count",
+    "surface": "settings",
+    "direction": "server",
+    "valid": false,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard rejects overflow count",
+    "surface": "settings",
+    "direction": "server",
+    "valid": false,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": 2147483648
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard rejects string count",
+    "surface": "settings",
+    "direction": "server",
+    "valid": false,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": "12"
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard edit preserves text identity",
+    "surface": "settings",
+    "direction": "client",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryRequest",
+      "data": {
+        "requestId": "library-edit-fixture",
+        "action": "editHistory",
+        "previousText": "原文\n😀",
+        "text": "修改后的文字"
+      }
+    }
+  },
+  {
+    "name": "poetry quote catalog response",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-quoteCatalog-fixture",
+      "ok": true,
+      "message": "",
+      "quoteEntries": [
+        {
+          "id": "poetry-1",
+          "name": "青简 · 诗词名句",
+          "text": "海内存知己"
+        }
+      ]
+    }
   }
 ]

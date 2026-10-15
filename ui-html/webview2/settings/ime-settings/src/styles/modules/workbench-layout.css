@@ -3,11 +3,11 @@
 :is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) [hidden] { display: none !important; }
 :is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) :is(input, select, textarea, button) { font: inherit; }
 :is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) :is(input, select, textarea, button, summary, [role="switch"]):focus-visible { outline: 2px solid var(--accent-color) !important; outline-offset: 2px; }
-:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:not(.voice-secret-toggle):not(.dropdown-toggle):not(.voice-sound-expand):not(.number-stepper-btn):not([role="tab"]) {
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:not(.voice-secret-toggle):not(.dropdown-toggle):not(.voice-sound-expand):not(.number-stepper-btn):not([role="tab"]):not([data-library-view]):not([data-quote-source]) {
   padding: 8px 12px; min-height: 34px; border: 1px solid var(--control-border); border-radius: 7px;
   background: var(--surface-raised); color: var(--text-color); cursor: pointer; line-height: 1.45;
 }
-:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:not(.voice-secret-toggle):not(.dropdown-toggle):not(.voice-sound-expand):not(.number-stepper-btn):not([role="tab"]):hover:not(:disabled) { border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 10%, var(--surface-raised)); }
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:not(.voice-secret-toggle):not(.dropdown-toggle):not(.voice-sound-expand):not(.number-stepper-btn):not([role="tab"]):not([data-library-view]):not([data-quote-source]):hover:not(:disabled) { border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 10%, var(--surface-raised)); }
 :is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:disabled { cursor: default; opacity: .5; }
 :is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) :is(select option, select optgroup) {
   background: var(--surface-raised); color: var(--text-color);
@@ -60,7 +60,6 @@
 #personalLibraryPanel .library-card pre { line-height: 1.6; max-height: 9em; overflow: auto; color: var(--text-color); font: inherit; font-size: 13px; }
 #personalLibraryPanel .library-card strong { color: var(--text-color); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 #personalLibraryPanel #libraryRows { display: grid; gap: 10px; }
-#personalLibraryPanel .library-pager { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; margin: 14px 0; color: var(--text-secondary); font-size: 13px; }
 #personalLibraryPanel #libraryStatus { color: var(--text-secondary); line-height: 1.5; padding: 8px 10px; margin: 10px 0; border-radius: 6px; background: var(--surface-sunken); overflow-wrap: anywhere; }
 #personalLibraryPanel #libraryStatus:empty { display: none; }
 #personalLibraryPanel #libraryEditor { padding: 14px; margin: 12px 0; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface-subtle); }

@@ -97,7 +97,7 @@ it('uses the backend pack-specific export name and rejects an unsafe filename', 
   expect(first.download).toBe('msime-domain-idioms.tsv');
   expect(first.click).toHaveBeenCalledOnce();
   receive({requestId: 'domains-exportDomain-2', ok: true, message: '', exported: '测试词条', filename: '../other.tsv'});
-  expect(created.filter(node => node.tag === 'a').at(-1)!.download).toBe('水杉-领域输入词库.tsv');
+  expect(created.filter(node => node.tag === 'a').at(-1)!.download).toBe('知语-领域输入词库.tsv');
   vi.advanceTimersByTime(1000);
   expect(revoke).toHaveBeenCalledTimes(2);
 });

@@ -29,7 +29,7 @@ export function setupPersonalGlossaryEditor(save: (text: string) => void): void 
     const text = field.value;
     const error = validatePersonalGlossary(text);
     if (error) { status(error); return; }
-    if (!window.chrome?.webview) { status('请在水杉设置窗口中保存；浏览器预览不会写入配置。'); return; }
+    if (!window.chrome?.webview) { status('请在知语设置窗口中保存；浏览器预览不会写入配置。'); return; }
     waitingForSave = true;
     saveButton.disabled = true;
     status('正在保存…');

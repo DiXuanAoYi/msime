@@ -98,6 +98,11 @@ json Read()
         b["appLearning"] = json::array();
     if (!b["applications"].is_array() || !b["appLearning"].is_array())
         throw std::runtime_error("应用词库格式无效，未修改原文件");
+    const auto defaultGroups = Defaults().at("groups");
+    for (const auto &group : defaultGroups)
+        if (std::none_of(b["groups"].begin(), b["groups"].end(),
+                         [&](const json &existing) { return existing.at("id") == group.at("id"); }))
+            b["groups"].push_back(group);
     return b;
 }
 void Save(const json &b)
@@ -136,7 +141,7 @@ std::string Text(const json &r, const char *key, size_t max, bool empty = false)
         throw std::runtime_error(std::string("字段无效：") + key);
     return x;
 }
-void CopyText(HWND owner, const std::string &text)
+uint32_t CopyText(HWND owner, const std::string &text)
 {
     const auto s = string_to_wstring(text);
     const size_t bytes = (s.size() + 1) * sizeof(wchar_t);
@@ -159,11 +164,13 @@ void CopyText(HWND owner, const std::string &text)
     EmptyClipboard();
     const bool ok = SetClipboardData(CF_UNICODETEXT, h) != nullptr;
     CloseClipboard();
+    const auto sequence = GetClipboardSequenceNumber();
     if (!ok)
     {
         GlobalFree(h);
         throw std::runtime_error("复制失败");
     }
+    return sequence;
 }
 std::string NormalizeApp(std::string s)
 {
@@ -565,6 +572,49 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
     try
     {
         const auto action = r.at("action").get<std::string>();
+        if (action == "quoteCatalog")
+        {
+            const auto path = metasequoia::data_directory() / "domain-input-sources" / "poetry.tsv";
+            if (!std::filesystem::is_regular_file(path) || std::filesystem::file_size(path) > 4 * 1024 * 1024)
+                throw std::runtime_error("青简诗词名句词典缺失或过大，请修复安装包；自定义语录仍可使用");
+            std::ifstream file(path, std::ios::binary);
+            auto entries = json::array();
+            std::set<std::string> seen;
+            std::string line;
+            size_t index = 0;
+            while (std::getline(file, line))
+            {
+                const auto tab = line.find('\t');
+                if (line.empty() || line.front() == '#' || tab == std::string::npos || tab == 0)
+                    continue;
+                auto text = line.substr(0, tab);
+                if (!seen.insert(text).second)
+                    continue;
+                entries.push_back(
+                    {{"id", "poetry-" + std::to_string(++index)}, {"name", "青简 · 诗词名句"}, {"text", text}});
+            }
+            if (file.bad())
+                throw std::runtime_error("诗词词典读取失败");
+            response["quoteEntries"] = std::move(entries);
+            return response;
+        }
+        if (action == "history" || action == "editHistory")
+        {
+            if (action == "editHistory" &&
+                !ClipboardHistory::UpdateEntryText(string_to_wstring(Text(r, "previousText", 16384)),
+                                                   string_to_wstring(Text(r, "text", 16384))))
+                throw std::runtime_error(
+                    "编辑失败：记录已变化、内容为空或超过 4000 字，或磁盘无法保存；原记录未被覆盖");
+            response["history"] = json::array();
+            response["historyEntries"] = json::array();
+            for (const auto &entry : ClipboardHistory::LoadEntries())
+            {
+                const auto text = wstring_to_string(entry.text);
+                response["history"].push_back(text);
+                response["historyEntries"].push_back({{"text", text}, {"copies", entry.copies}});
+            }
+            return response;
+        }
         std::optional<std::wstring> pending_history_remove;
         bool pending_history_clear = false;
         Lock lock;
@@ -627,7 +677,7 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
             std::string body((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
             if (!file || body.find('\0') != std::string::npos)
                 throw std::runtime_error("领域输入词库读取失败");
-            response["exported"] = "# 水杉领域输入词库：" + item->at("name").get<std::string>() +
+            response["exported"] = "# 知语领域输入词库：" + item->at("name").get<std::string>() +
                                    "\n# 字段：词条<TAB>空格分隔拼音<TAB>词频\n# 来源：" +
                                    item->at("source").get<std::string>() + "\n# 许可：" +
                                    item->at("license").get<std::string>() + "；请随再分发保留许可与来源\n" + body;
@@ -680,7 +730,7 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
             const auto source = json::parse(Text(r, "payload", 4 * 1024 * 1024));
             if (source.value("version", 0) != 1 || source.value("kind", "") != "msime-application-dictionary" ||
                 !source.at("rules").is_array() || !source.at("learning").is_array())
-                throw std::runtime_error("请选择水杉应用词库 JSON 文件");
+                throw std::runtime_error("请选择知语应用词库 JSON 文件");
             const auto app = NormalizeApp(Text(r, "application", 260));
             size_t added = 0;
             for (auto row : source.at("rules"))
@@ -760,21 +810,29 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
             {
                 if (groups.size() >= 100)
                     throw std::runtime_error("分组限 100 个");
-                groups.push_back({{"id", Id()}, {"name", name}});
+                groups.push_back({{"id", Id()},
+                                  {"name", name},
+                                  {"kind", r.value("section", "clips") == "quotes" ? "quotes" : "clips"}});
             }
             changed = true;
         }
         else if (action == "removeGroup")
         {
+            if (r.value("id", "") == "phrases" || r.value("id", "") == "quotes")
+                throw std::runtime_error("常用语和语录为固定分类，请删除或转移自定义分组");
             auto id = Text(r, "id", 100);
             auto &groups = book["groups"];
             if (groups.size() < 2)
                 throw std::runtime_error("至少保留一个分组");
+            const auto removed =
+                std::find_if(groups.begin(), groups.end(), [&](const json &x) { return x.at("id") == id; });
+            const std::string destination =
+                removed != groups.end() && removed->value("kind", "clips") == "quotes" ? "quotes" : "phrases";
             groups.erase(std::remove_if(groups.begin(), groups.end(), [&](const json &x) { return x.at("id") == id; }),
                          groups.end());
             for (auto &x : book["clips"])
                 if (x.at("group") == id)
-                    x["group"] = groups[0].at("id");
+                    x["group"] = destination;
             changed = true;
         }
         else if (action == "putClip" || action == "putRule" || action == "favorite")
@@ -874,7 +932,11 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
         }
         else if (action == "copy")
         {
-            CopyText(owner, Text(r, "text", 512 * 1024));
+            const auto text = Text(r, "text", 512 * 1024);
+            const auto sequence = CopyText(owner, text);
+            // Capture synchronously so the returned count is current. The shared
+            // sequence claim prevents the monitor from counting this event again.
+            ClipboardHistory::AddText(string_to_wstring(text), sequence);
             response["message"] = "已复制，请自行粘贴；不会自动发送。";
         }
         else if (action == "study")
@@ -966,9 +1028,14 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
         }
         response["book"] = std::move(displayBook);
         response["history"] = json::array();
-        for (const auto &s : ClipboardHistory::Load())
-            if (!pending_history_clear && (!pending_history_remove || s != *pending_history_remove))
-                response["history"].push_back(wstring_to_string(s));
+        response["historyEntries"] = json::array();
+        for (const auto &entry : ClipboardHistory::LoadEntries())
+            if (!pending_history_clear && (!pending_history_remove || entry.text != *pending_history_remove))
+            {
+                const auto text = wstring_to_string(entry.text);
+                response["history"].push_back(text);
+                response["historyEntries"].push_back({{"text", text}, {"copies", entry.copies}});
+            }
         response["application"] = ForegroundApplication();
         // Prepare every response field before persistence. Optional display metadata must not make a completed save
         // appear to fail, and filtered display profiles must never erase their original records from disk.

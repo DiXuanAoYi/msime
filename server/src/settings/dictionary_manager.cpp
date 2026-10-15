@@ -240,22 +240,22 @@ json::object ExportUserDictionary(const std::string &dictionary)
     if (dictionary == "quanpin")
     {
         journal_kind = "pinyin";
-        filename = "水杉IME-拼音用户词库.txt";
+        filename = "知语IME-拼音用户词库.txt";
     }
     else if (dictionary == "wubi")
     {
         journal_kind = "wubi";
-        filename = "水杉IME-五笔用户词库.txt";
+        filename = "知语IME-五笔用户词库.txt";
     }
     else if (dictionary == "english")
     {
         journal_kind = "english";
-        filename = "水杉IME-英文用户词库.txt";
+        filename = "知语IME-英文用户词库.txt";
     }
     else if (dictionary == "quick")
     {
         journal_kind = "quick";
-        filename = "水杉IME-快捷短语用户词库.txt";
+        filename = "知语IME-快捷短语用户词库.txt";
     }
     else
     {

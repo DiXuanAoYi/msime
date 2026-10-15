@@ -105,7 +105,7 @@ export function setupReplyStudio(): void {
       return;
     }
     if (!window.chrome?.webview) {
-      status("请在水杉原生设置窗口中使用；浏览器预览不会调用模型。");
+      status("请在知语原生设置窗口中使用；浏览器预览不会调用模型。");
       return;
     }
     const context = value("rsContext"),

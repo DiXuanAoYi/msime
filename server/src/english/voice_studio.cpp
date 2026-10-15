@@ -82,7 +82,7 @@ std::filesystem::path ChooseFile(HWND owner, bool save)
     if (save)
     {
         dialog->SetDefaultExtension(L"wav");
-        dialog->SetFileName(L"水杉语音.wav");
+        dialog->SetFileName(L"知语语音.wav");
     }
     if (dialog->Show(owner) != S_OK)
         return {};

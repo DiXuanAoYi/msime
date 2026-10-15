@@ -397,7 +397,7 @@ export function setupPromptLibrary(
         );
         const a = document.createElement("a");
         a.href = url;
-        a.download = `水杉-${scope === "polish" ? "润色" : "AI联想"}-提示词.json`;
+        a.download = `知语-${scope === "polish" ? "润色" : "AI联想"}-提示词.json`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       } catch (e) {

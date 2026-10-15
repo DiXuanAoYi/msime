@@ -12,7 +12,7 @@ namespace
 // 系统用来标识 TSF 输入法的「语言:{CLSID}{Profile GUID}」串。
 // 与 windows/src/Global/Globals.cpp 的 MetasequoiaIMECLSID、MetasequoiaIMEGuidProfile 保持一致。
 constexpr wchar_t kProfileId[] = L"0804:{E3062E9A-D834-4637-8958-ED8CFA427D01}{4D59B1B4-D503-44AE-9259-BAD9BB2778AB}";
-// 水杉的 TSF 语言配置在系统里的注册位置，用来区分「没注册」和「没装中文语言」。
+// 知语的 TSF 语言配置在系统里的注册位置，用来区分「没注册」和「没装中文语言」。
 constexpr wchar_t kTipProfileKey[] = L"SOFTWARE\\Microsoft\\CTF\\TIP\\{E3062E9A-D834-4637-8958-ED8CFA427D01}"
                                      L"\\LanguageProfile\\0x00000804\\{4D59B1B4-D503-44AE-9259-BAD9BB2778AB}";
 
@@ -111,7 +111,7 @@ bool IsTipRegistered()
     return true;
 }
 
-// 旧版「设为默认」写的是替代默认输入法；仍指向水杉就恢复成「使用语言列表」。
+// 旧版「设为默认」写的是替代默认输入法；仍指向知语就恢复成「使用语言列表」。
 // 只是清理，失败不影响排序结果，不报错。
 void ClearOurInputMethodOverride()
 {
@@ -162,16 +162,16 @@ bool SetAsDefault(std::string &error)
     }
     else if (!before.enabled && !install(kProfileId, 0))
     {
-        error = IsTipRegistered() ? "无法把水杉输入法加入键盘列表，请先在系统设置中添加中文（简体）语言。"
-                                  : "水杉输入法没有在系统中注册，请重新安装输入法。";
+        error = IsTipRegistered() ? "无法把知语输入法加入键盘列表，请先在系统设置中添加中文（简体）语言。"
+                                  : "知语输入法没有在系统中注册，请重新安装输入法。";
     }
     else if (!set_default(kProfileId, 0))
     {
-        error = "系统拒绝了设置默认输入法的请求，请在系统设置中手动把水杉输入法移到第一位。";
+        error = "系统拒绝了设置默认输入法的请求，请在系统设置中手动把知语输入法移到第一位。";
     }
     else if (!QueryStatus().is_default)
     {
-        error = "系统没有应用这项设置，请在系统设置中手动把水杉输入法移到第一位。";
+        error = "系统没有应用这项设置，请在系统设置中手动把知语输入法移到第一位。";
     }
     else
     {

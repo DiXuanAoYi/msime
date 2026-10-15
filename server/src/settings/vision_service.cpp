@@ -344,7 +344,7 @@ json Handle(const json &request, HWND owner)
             }
             if (bytes.empty())
                 throw std::runtime_error("请先截图或导入照片");
-            wchar_t path[32768] = L"水杉截图.png";
+            wchar_t path[32768] = L"知语截图.png";
             OPENFILENAMEW of{};
             of.lStructSize = sizeof(of);
             of.hwndOwner = owner;

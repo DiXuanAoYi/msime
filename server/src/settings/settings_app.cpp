@@ -72,8 +72,8 @@ namespace json = boost::json;
 namespace
 {
 constexpr wchar_t kWindowClass[] = L"MetasequoiaImeSettingsWindow";
-constexpr wchar_t kWindowTitle[] = L"Metasequoia IME Settings";
-constexpr wchar_t kTestWindowTitle[] = L"水杉输入法 · 临时测试配置";
+constexpr wchar_t kWindowTitle[] = L"知语输入法 · 设置";
+constexpr wchar_t kTestWindowTitle[] = L"知语输入法 · 临时测试配置";
 bool g_temporary_configuration = false;
 constexpr wchar_t kSingleInstanceMutex[] = L"Local\\MetasequoiaImeSettings.SingleInstance";
 constexpr UINT kActivateExistingWindow = WM_APP + 1;
@@ -871,7 +871,7 @@ void ReportSettingsTaskError(const SettingsTaskDiagnostics::Context &context, co
 {
     if (std::string_view(context.operation) == "initialConfig" && !g_webview)
     {
-        MessageBoxW(g_settings_hwnd, L"设置加载失败，请重试。诊断已记录，输入法仍可使用。", L"水杉输入法",
+        MessageBoxW(g_settings_hwnd, L"设置加载失败，请重试。诊断已记录，输入法仍可使用。", L"知语输入法",
                     MB_OK | MB_ICONWARNING);
         return;
     }
@@ -1280,7 +1280,7 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 return [saved, completion = std::move(completion)] {
                     completion();
                     if (!saved)
-                        MessageBoxW(g_settings_hwnd, L"设置保存失败，请重试。", L"水杉输入法", MB_OK | MB_ICONWARNING);
+                        MessageBoxW(g_settings_hwnd, L"设置保存失败，请重试。", L"知语输入法", MB_OK | MB_ICONWARNING);
                 };
             });
         }
@@ -1298,7 +1298,7 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 {
                     ok = default_input_method::SetAsDefault(message);
                     if (ok)
-                        message = "水杉输入法已排在中文（简体）键盘的第一位；其他语言顺序保留。";
+                        message = "知语输入法已排在中文（简体）键盘的第一位；其他语言顺序保留。";
                 }
                 const auto status = default_input_method::QueryStatus();
                 json::object response = {{"type", "defaultImeResponse"},
@@ -1397,7 +1397,7 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
         {
             if (!NotifyImeServerRestart())
             {
-                MessageBoxW(g_settings_hwnd, L"未能重启输入法进程，请稍后重试。", L"水杉输入法",
+                MessageBoxW(g_settings_hwnd, L"未能重启输入法进程，请稍后重试。", L"知语输入法",
                             MB_OK | MB_ICONWARNING);
             }
         }
@@ -1598,7 +1598,7 @@ HRESULT FailWebView(HWND hwnd, const wchar_t *stage, HRESULT result)
     {
         g_webview_failed = true;
         const auto message = SettingsWebView::FailureMessage(stage, FAILED(result) ? result : E_FAIL);
-        MessageBoxW(hwnd, message.c_str(), L"水杉输入法 · 设置页面", MB_OK | MB_ICONERROR);
+        MessageBoxW(hwnd, message.c_str(), L"知语输入法 · 设置页面", MB_OK | MB_ICONERROR);
         ShowWindow(hwnd, SW_HIDE);
         PostMessageW(hwnd, kQuitSettings, 0, 0);
     }

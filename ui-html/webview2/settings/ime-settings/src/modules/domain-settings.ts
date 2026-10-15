@@ -129,7 +129,7 @@ export function setupDomainSettings():void {
    const a = document.createElement('a');
    a.href = url;
    a.download = typeof r.filename === 'string' && /^msime-domain-[a-z]+\.tsv$/.test(r.filename)
-    ? r.filename : '水杉-领域输入词库.tsv';
+    ? r.filename : '知语-领域输入词库.tsv';
    a.click();
    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }

@@ -571,8 +571,8 @@ void ReportSmallWindowWebviewUnavailable(HRESULT last_hr, SmallWindowWebviewFail
 
     const std::wstring message =
         environment
-            ? fmt::format(L"水杉输入法没能启动 WebView2 运行时，{}暂时无法显示。\r\n"
-                          L"Metasequoia IME could not start the WebView2 Runtime, so the following cannot be "
+            ? fmt::format(L"知语输入法没能启动 WebView2 运行时，{}暂时无法显示。\r\n"
+                          L"Zhiyu IME could not start the WebView2 Runtime, so the following cannot be "
                           L"shown for now: {}.\r\n\r\n"
                           L"请安装或修复 Microsoft Edge WebView2 Runtime 后重新登录：\r\n"
                           L"Install or repair the Microsoft Edge WebView2 Runtime, then sign in again:\r\n"
@@ -588,7 +588,7 @@ void ReportSmallWindowWebviewUnavailable(HRESULT last_hr, SmallWindowWebviewFail
                           L"错误码 / error: {:#x}",
                           hosts_zh, hosts_en, static_cast<unsigned>(last_hr));
     std::thread([message]() {
-        MessageBoxW(nullptr, message.c_str(), L"水杉输入法 / Metasequoia IME",
+        MessageBoxW(nullptr, message.c_str(), L"知语输入法 / Zhiyu IME",
                     MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST);
     }).detach();
 }

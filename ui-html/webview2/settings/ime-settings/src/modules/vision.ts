@@ -292,14 +292,14 @@ export function setupVision(): void {
   el("visionCopyTranslation").onclick = () => copy(value("visionTranslation"));
   el("visionExport").onclick = () =>
     download(
-      `水杉识别.${format === "html" ? "html" : format === "latex" ? "tex" : "txt"}`,
+      `知语识别.${format === "html" ? "html" : format === "latex" ? "tex" : "txt"}`,
       value("visionText"),
     );
   el("visionExportTranslation").onclick = () =>
-    download("水杉翻译.txt", value("visionTranslation"));
+    download("知语翻译.txt", value("visionTranslation"));
   el("visionRaw").onclick = () =>
     download(
-      "水杉识别原始结果.json",
+      "知语识别原始结果.json",
       JSON.stringify(raw, null, 2),
       "application/json",
     );
@@ -620,7 +620,7 @@ export function setupVision(): void {
   el("subtitleFinish").onclick = () => send("finish");
   el("subtitleStop").onclick = () => send("stop");
   el("subtitleExport").onclick = () =>
-    download("水杉字幕.srt", value("subtitleSrt"));
+    download("知语字幕.srt", value("subtitleSrt"));
   el("subtitleCopy").onclick = () => copy(value("subtitleSrt"));
   window.addEventListener("msime-chat-hidden", () => {
     stopCamera();

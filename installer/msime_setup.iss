@@ -18,9 +18,9 @@
 ; 上面两条都不把 PDB 打进包；要带符号用 .\test-symbols.ps1。
 ; 本仓库不包含任何预置代码签名证书。
 
-#define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.10.3"
-#define MyAppPublisher "Metasequoia"
+#define MyAppName      "知语输入法 Zhiyu IME"
+#define MyAppVersion   "0.10.4"
+#define MyAppPublisher "DiXuanAoYi"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
 ; 与 settings_app.cpp / settings_launcher.cpp 的 kQuitSettings 保持一致：WM_APP + 5。
@@ -47,6 +47,7 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\metasequoiaime
 DefaultGroupName={#MyAppName}
+UsePreviousGroup=no
 DisableDirPage=yes
 ; DisableDirPage=yes 时就绪页默认不显示目标目录，显式打开以便用户确认装到哪。
 AlwaysShowDirOnReadyPage=yes
@@ -71,8 +72,8 @@ Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.i
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-chinesesimplified.FinishedLabel=水杉输入法已安装完成。%n%n请保存正在编辑的内容，将安装或升级前已经打开的软件完整退出后重新打开（部分聊天软件需从托盘退出），以加载新版输入法及英文候选。仅关闭窗口或切换中英文可能不会生效。%n%n若仍未生效，可保存工作后注销 Windows 再登录。无需卸载或清空原有配置。
-english.FinishedLabel=Metasequoia IME has been installed.%n%nSave your work, then fully quit and reopen apps that were running before installation or upgrade. Some chat apps must be exited from the system tray. This loads the new IME and English candidates. Closing a window or switching input modes may not reload it.%n%nIf needed, save your work and sign out of Windows, then sign in again. Your existing settings can be kept.
+chinesesimplified.FinishedLabel=知语输入法已安装完成。%n%n请保存正在编辑的内容，将安装或升级前已经打开的软件完整退出后重新打开（部分聊天软件需从托盘退出），以加载新版输入法及英文候选。仅关闭窗口或切换中英文可能不会生效。%n%n若仍未生效，可保存工作后注销 Windows 再登录。无需卸载或清空原有配置。
+english.FinishedLabel=Zhiyu IME has been installed.%n%nSave your work, then fully quit and reopen apps that were running before installation or upgrade. Some chat apps must be exited from the system tray. This loads the new IME and English candidates. Closing a window or switching input modes may not reload it.%n%nIf needed, save your work and sign out of Windows, then sign in again. Your existing settings can be kept.
 
 [Dirs]
 Name: "{commonpf32}\metasequoiaime\{code:GetVersionDir}"
@@ -175,6 +176,14 @@ Name: "{group}\{#MyAppName}"; \
     Filename: "{commonpf64}\metasequoiaime\server\{#MySettingsExeName}"; \
     WorkingDir: "{commonpf64}\metasequoiaime\server"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
+
+[InstallDelete]
+; Rename only this product's old shortcuts; preserve custom files and the persisted installation identity.
+Type: files; Name: "{group}\Metasequoia IME 水杉输入法.lnk"
+Type: files; Name: "{group}\卸载 Metasequoia IME 水杉输入法.lnk"
+Type: files; Name: "{commonprograms}\Metasequoia IME 水杉输入法\Metasequoia IME 水杉输入法.lnk"
+Type: files; Name: "{commonprograms}\Metasequoia IME 水杉输入法\卸载 Metasequoia IME 水杉输入法.lnk"
+Type: dirifempty; Name: "{commonprograms}\Metasequoia IME 水杉输入法"
 
 [Registry]
 Root: HKLM; Subkey: "Software\Metasequoia\MetasequoiaIME"; \

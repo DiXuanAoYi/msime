@@ -27,7 +27,7 @@ export function setupVocabulary(update: (path: string, value: boolean | number) 
   });
   function request(action: 'overview' | 'export' | 'clear'): void {
     if (waiting) return;
-    if (!window.chrome?.webview) { status('请在水杉设置窗口中查看本机记录。'); return; }
+    if (!window.chrome?.webview) { status('请在知语设置窗口中查看本机记录。'); return; }
     waiting = `vocabulary-${Date.now()}-${++requestCounter}`;
     window.chrome.webview.postMessage(serializeHostMessage({ type: 'vocabularyRequest', data: { requestId: waiting, action } }));
     status('正在处理…');

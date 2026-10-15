@@ -147,4 +147,6 @@ release workflow 里的每一段 shell 都抽在 `scripts/ci/` 下，workflow �
 
 ## 提交
 
+本个人分支的后续交付默认只在本机修改、编译、测试和安装，保留用户配置、聊天上下文和模型。只有用户明确要求推送时，才向 GitHub 推送代码；创建或发布 Release、上传发行资产需要对应的明确授权。单纯推送代码不代表发布 Release；“继续”、本地验收或确认功能正常不代表推送授权。
+
 提交信息用 `type(scope): 摘要`，scope 用目录名（`windows`、`server`、`engine`、`ui`、`ui-html`、`installer`）。不要添加 `Co-Authored-By`、`Generated with` 或其他 AI 生成标记。

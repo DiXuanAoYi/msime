@@ -25,7 +25,7 @@ struct Entry
     const char *note;
 };
 const Entry catalog[] = {
-    {"desktop", "水杉神经整句 · 效果优先", "sentence-model-desktop.safetensors", "sentence", 25480184,
+    {"desktop", "知语神经整句 · 效果优先", "sentence-model-desktop.safetensors", "sentence", 25480184,
      "https://github.com/metasequoiaime/chinese-ime-lm/releases/download/model-v1/sentence-model-desktop.safetensors",
      "Apache-2.0", "约 24.30 MiB；原数据目录模型保留；与现有神经整句引擎兼容"},
     {"tongbian", "含章·通变 · 拼音生成", "hanzhang-tongbian-small.qjm", "p2c", 143814324,
@@ -158,7 +158,7 @@ std::filesystem::path PromptForModelFile(HWND owner, const std::string &id)
     if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog))))
     {
         const COMDLG_FILTERSPEC qjm[] = {{L"青简含章模型 (*.qjm)", L"*.qjm"}},
-                                desktop[] = {{L"水杉效果优先模型 (*.safetensors)", L"*.safetensors"}};
+                                desktop[] = {{L"知语效果优先模型 (*.safetensors)", L"*.safetensors"}};
         dialog->SetFileTypes(1, id == "desktop" ? desktop : qjm);
         dialog->SetTitle(L"选择用户自行下载的模型（原文件保留）");
         DWORD opts = 0;

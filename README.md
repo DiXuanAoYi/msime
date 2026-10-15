@@ -1,6 +1,10 @@
-# 水杉输入法
+# 知语输入法 · Zhiyu IME
 
-[官网](https://msime.app) · [用户文档](https://msime.app/docs/) · [隐私说明](PRIVACY.md) · [代码签名策略 / Code signing policy](docs/code-signing-policy.md) · [English README](README.en.md)
+本个人分支基于水杉输入法继续开发，借鉴青简输入法的词库与候选体验，扩展语音、发音、聊天辅助、OCR、翻译和个人资料管理。感谢上游作者与开源贡献者。用户配置、聊天上下文、已下载模型及已有输入法注册身份保持兼容。
+
+2026-10-15 更新（v0.10.4-chat.1）：产品显示名统一为“知语输入法”；剪贴板与资料库采用受限渲染的连续滚动列表，常用语、语录、语音收藏、软件词库及学习记录统一紧凑行高；帮助、关于页更新为当前功能说明。升级保留原配置、聊天上下文与已有模型。[完整更新与验证说明](docs/release-v0.10.4-chat.1.md)。下方上游文档与徽章用于水杉基础功能参考，个人分支说明以本仓库文档与安装后的帮助页为准。
+
+[水杉上游官网](https://msime.app) · [上游基础文档](https://msime.app/docs/) · [隐私说明](PRIVACY.md) · [代码签名策略 / Code signing policy](docs/code-signing-policy.md) · [English README](README.en.md)
 
 <!-- badges:start -->
 [![CI](https://img.shields.io/github/actions/workflow/status/metasequoiaime/MSIME-Windows/ci.yml?branch=develop&label=CI)](https://github.com/metasequoiaime/MSIME-Windows/actions/workflows/ci.yml)
@@ -18,7 +22,7 @@
 - **本个人分支安装包**：[DiXuanAoYi/msime Releases](https://github.com/DiXuanAoYi/msime/releases)。[水杉上游发行版](https://github.com/metasequoiaime/MSIME-Windows/releases)另行维护。
 - **安装步骤与常见问题**：[docs/installation.md](docs/installation.md)
 
-安装后用 `Win + 空格` 切换到水杉输入法。如果切换不过去、Server 反复退出或设置窗口一闪即关，多半是缺少 Visual C++ 2015–2022 Redistributable（**x64**），处理办法见安装文档的常见问题。
+安装后用 `Win + 空格` 切换到知语输入法。升级前已经运行的软件需完整退出后重开，才能加载新版名称及组件；无需清空原有配置。如果切换不过去、Server 反复退出或设置窗口一闪即关，可先检查 Visual C++ 2015–2022 Redistributable（**x64**），处理办法见安装文档的常见问题。
 
 其他平台：[macOS 与 iOS](https://github.com/metasequoiaime/MSIME-Apple) · [Linux](https://github.com/metasequoiaime/MSIME-Linux)
 
