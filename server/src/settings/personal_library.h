@@ -8,6 +8,12 @@ namespace PersonalLibrary
 {
 nlohmann::json Handle(const nlohmann::json &request, HWND owner);
 std::vector<std::string> AppWords(const std::string &application, const std::string &code);
+// Saved phrases for the clipboard panel, in book order. group is the display name of the phrase group.
+struct Phrase
+{
+    std::string group, name, text;
+};
+std::vector<Phrase> Phrases(size_t limit);
 std::string ForegroundApplication();
 std::string ProcessApplication(uint32_t process_id);
 // The serialized IPC worker binds the authenticated TSF origin before applying a key.

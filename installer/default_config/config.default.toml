@@ -633,7 +633,7 @@ local_options = "{}"
 local_voices = "{}"
 
 [vision]
-provider = "windows"
+provider = "smart"
 local_model = "glm-ocr"
 task = "document"
 max_tokens = "4096"
@@ -643,12 +643,63 @@ tencent_secret_key = ""
 tencent_region = "ap-guangzhou"
 baidu_api_key = ""
 baidu_secret_key = ""
-translation_provider = "dictionary"
+translation_provider = "text_model"
 source_language = "auto"
 target_language = "en"
 capture_x = "false"
 capture_y = "true"
 screen_interval_ms = "2000"
+# 快捷操作：截图后的行为、识字排版、翻译显示方式、历史记录。
+after_ocr_copy = "true"
+after_ocr_card = "true"
+line_mode = "smart"
+cjk_space = "false"
+table_format = "excel"
+auto_swap = "true"
+zh_target = "en"
+overlay_style = "cover"
+hold_alt_original = "true"
+skip_code = "true"
+live_refresh = "change"
+use_glossary = "true"
+enter_action = "copy"
+magnifier = "true"
+hide_toolbar = "true"
+history_enabled = "true"
+history_days = "30"
+text_provider = ""
+
+# 全局快捷键。留空表示不启用该动作；至少包含 Ctrl、Alt 或 Win 之一。
+[hotkeys]
+enabled = "true"
+shot = "Ctrl+Alt+X"
+ocr = "Ctrl+Alt+O"
+translate = "Ctrl+Alt+T"
+selection = "Ctrl+Alt+Y"
+live = "Ctrl+Alt+Shift+T"
+reply = "Ctrl+Alt+R"
+rewrite = "Ctrl+Alt+G"
+clip = "Ctrl+Alt+V"
+
+# 嘴替 · 回复：面板行为。语气、说话习惯与联系人记忆单独加密保存在数据目录。
+[reply]
+count = "3"
+length = "medium"
+source = "auto"
+context = "6"
+fill_mode = "insert"
+confirm_payload = "false"
+provider = ""
+reader_enabled = "false"
+
+# 剪贴板历史：排序、容量与隐私。是否记录由 [utility] clipboard_history 控制。
+[clipboard]
+sort = "recent"
+max_items = "200"
+retention_days = "30"
+respect_privacy_flag = "true"
+exclude_apps = "KeePass.exe;1Password.exe"
+pause_on_lock = "true"
 
 
 # Independent candidate translation; legacy preserves previous provider flags and the existing cloud master switch.

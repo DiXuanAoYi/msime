@@ -2,12 +2,15 @@
 #include "english/speech_service.h"
 #include "english/voice_studio.h"
 #include "settings/personal_library.h"
+#include "quick/quick_actions.h"
+#include "settings/feature_config.h"
 #include "settings/vision_config.h"
 #include "settings/local_ocr_models.h"
 #include "settings/translation_library.h"
 #include "settings/local_asr_models.h"
 #include "settings/local_tts_models.h"
 #include "assistant/service.h"
+#include "assistant/profile_store.h"
 #include "english/vocabulary_service.h"
 #include "engine/contracts/webview/validator.h"
 #include "config/ime_config.h"
@@ -809,6 +812,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
         {"endpoints", candidate_translation.endpoints}, {"models", candidate_translation.models}};
     payload["data"]["speech"] = Speech::GetConfig();
     payload["data"]["vision"] = VisionConfig::Get();
+    for (const char *section : {"hotkeys", "reply", "clipboard"})
+        payload["data"][section] = FeatureConfig::Get(section);
     payload["data"]["voice_input"]["polish_presets"] = std::move(polish_presets);
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();
@@ -1509,6 +1514,36 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 if (g_webview)
                     g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
             });
+        }
+        else if (type == "replyProfileRequest")
+        {
+            auto response = ReplyStudio::HandleProfileRequest(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "quickActionRequest")
+        {
+            const auto request = nlohmann::json::parse(json::serialize(value.at("data")));
+            const auto action = request.value("action", "");
+            nlohmann::json response = {{"type", "quickActionResponse"},
+                                       {"requestId", request.value("requestId", "")},
+                                       {"action", action},
+                                       {"ok", true},
+                                       {"message", ""}};
+            if (action == "run")
+            {
+                // The settings window steps aside so the action sees the app the user was working in.
+                if (Quick::Actions::Run(request.value("id", "")))
+                    ShowWindow(hwnd, SW_MINIMIZE);
+                else
+                {
+                    response["ok"] = false;
+                    response["message"] = "未知的快捷操作";
+                }
+            }
+            response["hotkeys"] = Quick::Actions::HotkeyStatus().value("hotkeys", nlohmann::json::object());
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
         }
         else if (type == "dictionaryLibraryRequest")
         {

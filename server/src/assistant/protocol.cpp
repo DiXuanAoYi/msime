@@ -14,7 +14,7 @@ void Validate(const json &r)
     if (!actions.count(action))
         throw std::runtime_error("未知操作。");
     for (const auto &field : {"requestId", "sessionId", "title", "context", "summary", "incoming", "intent", "mode",
-                              "kind", "platform", "task", "length", "relationship"})
+                              "kind", "platform", "task", "length", "relationship", "tonePrompt", "persona"})
     {
         if (r.contains(field) && !r[field].is_string())
             throw std::runtime_error("文本字段格式错误。");
@@ -22,7 +22,9 @@ void Validate(const json &r)
         const size_t limit = std::string(field) == "context"                                         ? 48000
                              : (std::string(field) == "incoming" || std::string(field) == "summary") ? 12000
                              : std::string(field) == "intent"                                        ? 4000
-                             : std::string(field) == "relationship"                                  ? 600
+                             : std::string(field) == "relationship"                                  ? 1500
+                             : std::string(field) == "tonePrompt"                                    ? 1200
+                             : std::string(field) == "persona"                                       ? 1500
                                                                                                      : 160;
         if (value.size() > limit || value.find('\0') != std::string::npos)
             throw std::runtime_error("内容过长，请分段导入或先精简上下文。");
@@ -43,7 +45,8 @@ void Validate(const json &r)
                 std::string::npos)
             throw std::runtime_error("会话标识无效。");
     }
-    if (action == "generate" && (!FindMode(r.value("mode", "")) || r.value("incoming", "").empty()))
+    if (action == "generate" &&
+        ((!FindMode(r.value("mode", "")) && r.value("tonePrompt", "").empty()) || r.value("incoming", "").empty()))
         throw std::runtime_error("请选择模式，并填写对方消息或待改写原文。");
     if (action == "summarize" && r.value("context", "").empty() && r.value("incoming", "").empty())
         throw std::runtime_error("请先添加需要总结的内容。");
@@ -67,7 +70,10 @@ json BuildPayload(const json &r, const std::string &model)
                   "{\"summary\":\"摘要\"}，摘要不超过 1500 字。";
     else
     {
-        system += std::string(FindMode(r.at("mode").get<std::string>())->prompt);
+        const auto *mode = FindMode(r.value("mode", ""));
+        system += mode ? std::string(mode->prompt) : r.value("tonePrompt", "");
+        if (!r.value("persona", "").empty())
+            system += "用户的说话习惯（回复要像用户自己说的，但不得违背事实）：" + r.value("persona", "") + "。";
         const auto task = r.value("task", r.value("mode", "") == "polish" ? "rewrite" : "reply");
         if (task == "rewrite")
             system += "本次任务是改写：incoming 是用户自己说的话，只重写原文，不能把它当作对方消息来回答。";

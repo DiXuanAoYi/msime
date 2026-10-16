@@ -3,6 +3,8 @@
 #include "settings/vision_protocol.h"
 #include "settings/vision_subtitles.h"
 #include "engine/core/data_path.h"
+#include "quick/quick_actions.h"
+#include "utils/protected_file.h"
 #include "utils/common_utils.h"
 #include <winrt/base.h>
 #include <commdlg.h>
@@ -121,17 +123,131 @@ void UpdateSubtitles(const json &lines, const std::string &srt)
     s.srt = srt;
     ++s.revision;
 }
+std::string Utf8Lower(std::string text)
+{
+    for (auto &c : text)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return text;
+}
+bool EndsSentence(const std::string &line)
+{
+    static const char *const marks[] = {"。", "！", "？", "：", "；", "…", "”", "）", ".", "!", "?", ":", ";"};
+    for (const auto *mark : marks)
+    {
+        const std::string m = mark;
+        if (line.size() >= m.size() && line.compare(line.size() - m.size(), m.size(), m) == 0)
+            return true;
+    }
+    return false;
+}
+bool StartsListItem(const std::string &line)
+{
+    if (line.empty())
+        return false;
+    const unsigned char c = static_cast<unsigned char>(line[0]);
+    if (c == '-' || c == '*' || c == '#' || c == '>')
+        return true;
+    size_t i = 0;
+    while (i < line.size() && std::isdigit(static_cast<unsigned char>(line[i])))
+        ++i;
+    return i > 0 && i < line.size() && (line[i] == '.' || line[i] == ')' || line[i] == ',');
+}
+// line_mode: smart joins hard-wrapped lines of a paragraph, one joins everything, keep leaves the lines alone.
+std::string ApplyLineMode(const std::string &text, const std::string &mode)
+{
+    if (mode == "keep")
+        return text;
+    std::vector<std::string> lines;
+    size_t start = 0;
+    while (start <= text.size())
+    {
+        auto end = text.find('\n', start);
+        if (end == std::string::npos)
+            end = text.size();
+        auto line = text.substr(start, end - start);
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+            line.pop_back();
+        lines.push_back(std::move(line));
+        start = end + 1;
+    }
+    std::string out;
+    for (size_t i = 0; i < lines.size(); ++i)
+    {
+        const auto &line = lines[i];
+        if (line.empty())
+        {
+            if (mode == "smart" && !out.empty() && out.back() != '\n')
+                out += '\n';
+            continue;
+        }
+        if (!out.empty() && out.back() != '\n')
+        {
+            const bool join = mode == "one" || (!EndsSentence(lines[i - 1]) && !StartsListItem(line));
+            out += join ? (static_cast<unsigned char>(out.back()) >= 0x80 || static_cast<unsigned char>(line[0]) >= 0x80
+                               ? ""
+                               : " ")
+                        : "\n";
+        }
+        out += line;
+    }
+    return out;
+}
+json PostProcess(json result, const VisionConfig::Config &config, const std::string &task)
+{
+    if (task != "document" || !result.contains("text") || !result["text"].is_string())
+        return result;
+    auto text = result["text"].get<std::string>();
+    if (config.at("cjk_space") != "true")
+        text = winrt::to_string(NormalizeChineseOcrSpacing(winrt::to_hstring(text).c_str()));
+    result["text"] = ApplyLineMode(text, config.at("line_mode"));
+    return result;
+}
+json RecognizeWith(const Image &im, const std::string &task, const std::function<bool()> &cancelled)
+{
+    auto config = VisionConfig::Get();
+    const auto provider = config.at("provider");
+    json result;
+    if (provider == "smart")
+    {
+        // Plain text is what Windows OCR does well and costs nothing; tables and formulas need a model.
+        if (task == "table" || task == "formula")
+        {
+            auto local = config;
+            local["provider"] = "local";
+            try
+            {
+                result = RecognizeRemote(local, Base64(EncodePng(im)), task, cancelled);
+            }
+            catch (const std::exception &e)
+            {
+                result = WindowsOcr(im, cancelled);
+                result["warning"] = std::string("本地模型不可用（") + e.what() + "），已改用 Windows OCR，仅提取文字。";
+            }
+        }
+        else
+        {
+            result = WindowsOcr(im, cancelled);
+            if (task == "code")
+                ReconstructCodeIndentation(result);
+        }
+    }
+    else if (provider == "windows")
+    {
+        if (task == "table" || task == "formula")
+            throw std::runtime_error("Windows OCR 仅提取文字。结构化表格与公式请在下方选择文档模型或云服务。");
+        result = WindowsOcr(im, cancelled);
+        if (task == "code")
+            ReconstructCodeIndentation(result);
+    }
+    else
+        result = RecognizeRemote(config, Base64(EncodePng(im)), task, cancelled);
+    return PostProcess(std::move(result), config, task);
+}
 json Ocr(const Image &im, const std::string &task)
 {
-    const auto config = VisionConfig::Get();
-    if (config.at("provider") == "windows" && (task == "table" || task == "formula"))
-        throw std::runtime_error("Windows OCR 仅提取文字。结构化表格与公式请在下方选择文档模型或云服务。");
-    auto result = config.at("provider") == "windows" ? WindowsOcr(im, Cancelled)
-                                                     : RecognizeRemote(config, Base64(EncodePng(im)), task, Cancelled);
+    auto result = RecognizeWith(im, task, Cancelled);
     if (Cancelled())
         return {};
-    if (config.at("provider") == "windows" && task == "code")
-        ReconstructCodeIndentation(result);
     auto text = result.value("text", "");
     {
         auto &s = Current();
@@ -209,6 +325,110 @@ Image Stitch(const std::vector<std::string> &frames, bool x, bool y)
         throw std::runtime_error(result.value("error", "拼接失败"));
     return DecodeImage(Read(dir / "stitch.png", MaxEncodedImageBytes));
 }
+void LiveLoop(RECT r, const std::string &source, const std::string &target, const std::string &task)
+{
+    const auto refresh = VisionConfig::Get().at("live_refresh");
+    const unsigned interval = refresh == "2s" ? 2000u : refresh == "5s" ? 5000u : 700u;
+    const std::string live = refresh == "change" ? "change" : "always";
+    std::vector<unsigned char> lastPixels;
+    std::vector<OverlayBlock> lastBlocks;
+    std::unordered_map<std::string, std::string> translations;
+    std::string cachedProvider;
+    std::string previousText;
+    bool firstFrame = true;
+    while (!Cancelled())
+    {
+        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
+            break;
+        HideTranslationOverlay();
+        Pause(100);
+        if (Cancelled())
+            break;
+        auto im = CaptureRectangle(r);
+        if (live == "change" && !firstFrame && im.pixels == lastPixels)
+        {
+            ShowTranslationOverlay(r, lastBlocks);
+            Pause(interval);
+            continue;
+        }
+        lastPixels = im.pixels;
+        UpdateImage(im, false);
+        auto result = Ocr(im, task);
+        if (Cancelled())
+            break;
+        const auto recognized = result.value("text", std::string());
+        if (firstFrame || recognized != previousText)
+        {
+            auto &s = Current();
+            std::lock_guard lock(s.mutex);
+            s.translation.clear();
+            ++s.revision;
+            firstFrame = false;
+            previousText = recognized;
+        }
+        auto blocks = OverlayBlocksForImage(result, im.width, im.height);
+        const auto supplied =
+            result.contains("blocks") && result.at("blocks").is_array() ? result.at("blocks").size() : size_t(0);
+        if (supplied > blocks.size())
+        {
+            auto &s = Current();
+            std::lock_guard lock(s.mutex);
+            if (!s.warning.empty())
+                s.warning += '\n';
+            s.warning += "部分文字缺少有效坐标或超过 256 "
+                         "块；不会伪造定位，请缩小框选区域，完整原文可在编辑区查看。";
+        }
+        const auto provider = VisionConfig::Get().at("translation_provider");
+        if (provider != cachedProvider || translations.size() > 1024)
+        {
+            translations.clear();
+            cachedProvider = provider;
+        }
+        std::vector<std::string> missing;
+        std::unordered_set<std::string> missingSet;
+        for (const auto &block : blocks)
+            if (!translations.count(block.source) && missingSet.insert(block.source).second)
+                missing.push_back(block.source);
+        const auto translated = TranslateBlocks(missing, source, target, Cancelled);
+        if (Cancelled())
+            break;
+        for (size_t i = 0; i < missing.size(); ++i)
+            translations.emplace(missing[i], translated[i]);
+        size_t unavailable = 0, regions = 0;
+        std::string combined;
+        for (auto &block : blocks)
+        {
+            if (Cancelled())
+                break;
+            if (block.region)
+                ++regions;
+            block.text = translations.at(block.source);
+            if (block.text.empty())
+                ++unavailable;
+            else
+            {
+                if (!combined.empty())
+                    combined += '\n';
+                combined += block.text;
+            }
+        }
+        if (Cancelled())
+            break;
+        {
+            auto &s = Current();
+            std::lock_guard lock(s.mutex);
+            s.translation = combined;
+            ++s.revision;
+        }
+        lastBlocks = blocks;
+        ShowTranslationOverlay(r, blocks);
+        Status("屏幕翻译中：" + std::to_string(blocks.size()) + " 个定位块" +
+               (regions ? "；文档模型仅提供区域定位" : "") +
+               (unavailable ? "；离线词典未收录 " + std::to_string(unavailable) + " 块，请选择整段翻译服务" : "") +
+               " · Esc 停止");
+        Pause(interval);
+    }
+}
 void Start(std::function<void()> work, HWND restore = nullptr)
 {
     auto &s = Current();
@@ -262,6 +482,122 @@ void Start(std::function<void()> work, HWND restore = nullptr)
     });
 }
 } // namespace
+namespace
+{
+constexpr wchar_t kHistoryLock[] = L"Local\\MetasequoiaImeVisionHistory";
+std::filesystem::path HistoryPath()
+{
+    return std::filesystem::path(CommonUtils::get_ime_data_path_w()) / L"vision-history.dat";
+}
+json ReadHistory()
+{
+    try
+    {
+        if (auto stored = ProtectedFile::Read(HistoryPath(), L"MetasequoiaIME vision history"))
+            if (stored->is_array())
+                return *stored;
+    }
+    catch (const std::exception &)
+    {
+    }
+    return json::array();
+}
+int64_t NowMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+} // namespace
+std::string MergeOcrLines(const std::string &text, const std::string &mode)
+{
+    return ApplyLineMode(text, mode);
+}
+json RecognizeImage(const Image &image, const std::string &task, const std::function<bool()> &cancelled)
+{
+    return RecognizeWith(image, task, cancelled);
+}
+bool Busy()
+{
+    std::lock_guard lock(Current().mutex);
+    return Current().busy;
+}
+bool StartLive(RECT rectangle, const std::string &source, const std::string &target, const std::string &task)
+{
+    {
+        std::lock_guard lock(Current().mutex);
+        if (Current().busy)
+            return false;
+    }
+    try
+    {
+        Start([rectangle, source, target, task] {
+            Pause(200);
+            if (!Cancelled())
+                LiveLoop(rectangle, source, target, task);
+        });
+    }
+    catch (const std::exception &)
+    {
+        return false;
+    }
+    return true;
+}
+void AddHistory(const std::string &kind, const std::string &text, const std::string &translation)
+{
+    const auto config = VisionConfig::Get();
+    if (config.at("history_enabled") != "true" || (text.empty() && translation.empty()))
+        return;
+    try
+    {
+        ProtectedFile::NamedLock lock(kHistoryLock);
+        if (!lock)
+            return;
+        auto history = ReadHistory();
+        const auto now = NowMs();
+        history.push_back({{"id", std::to_string(now) + "-" + std::to_string(history.size())},
+                           {"at", now},
+                           {"kind", kind},
+                           {"text", text.substr(0, 20000)},
+                           {"translation", translation.substr(0, 20000)}});
+        const int days = std::max(1, std::atoi(config.at("history_days").c_str()));
+        const auto oldest = now - static_cast<int64_t>(days) * 86400000;
+        json kept = json::array();
+        for (const auto &row : history)
+            if (row.value("at", int64_t(0)) >= oldest)
+                kept.push_back(row);
+        while (kept.size() > 200)
+            kept.erase(kept.begin());
+        ProtectedFile::Write(HistoryPath(), kept, L"MetasequoiaIME vision history");
+    }
+    catch (const std::exception &)
+    {
+    }
+}
+json HandleHistory(const json &request)
+{
+    const auto action = request.at("action").get<std::string>();
+    ProtectedFile::NamedLock lock(kHistoryLock);
+    if (!lock)
+        throw std::runtime_error("历史记录正忙，请重试");
+    auto history = ReadHistory();
+    if (action == "historyClear")
+        history = json::array();
+    else if (action == "historyDelete")
+    {
+        const auto id = request.value("id", "");
+        json kept = json::array();
+        for (const auto &row : history)
+            if (row.value("id", "") != id)
+                kept.push_back(row);
+        history = kept;
+    }
+    if (action != "history")
+        ProtectedFile::Write(HistoryPath(), history, L"MetasequoiaIME vision history");
+    json out = json::array();
+    for (auto it = history.rbegin(); it != history.rend(); ++it)
+        out.push_back(*it);
+    return out;
+}
 void Stop()
 {
     Current().cancel = true;
@@ -371,7 +707,11 @@ json Handle(const json &request, HWND owner)
             if (bytes.empty())
                 throw std::runtime_error("请先截图或导入照片");
             auto task = request.value("task", VisionConfig::Get().at("task"));
-            Start([bytes = std::move(bytes), task] { Ocr(DecodeImage(bytes), task); });
+            Start([bytes = std::move(bytes), task] {
+                auto result = Ocr(DecodeImage(bytes), task);
+                if (!Cancelled())
+                    AddHistory("ocr", result.value("text", std::string()), "");
+            });
         }
         else if (action == "translate")
         {
@@ -449,97 +789,7 @@ json Handle(const json &request, HWND owner)
                             UpdateImage(Stitch(frames, x, y));
                             return;
                         }
-                        std::unordered_map<std::string, std::string> translations;
-                        std::string cachedProvider;
-                        std::string previousText;
-                        bool firstFrame = true;
-                        while (!Cancelled())
-                        {
-                            if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
-                                break;
-                            HideTranslationOverlay();
-                            Pause(100);
-                            if (Cancelled())
-                                break;
-                            auto im = CaptureRectangle(r);
-                            UpdateImage(im, false);
-                            auto result = Ocr(im, task);
-                            if (Cancelled())
-                                break;
-                            const auto recognized = result.value("text", std::string());
-                            if (firstFrame || recognized != previousText)
-                            {
-                                auto &s = Current();
-                                std::lock_guard lock(s.mutex);
-                                s.translation.clear();
-                                ++s.revision;
-                                firstFrame = false;
-                                previousText = recognized;
-                            }
-                            auto blocks = OverlayBlocksForImage(result, im.width, im.height);
-                            const auto supplied = result.contains("blocks") && result.at("blocks").is_array()
-                                                      ? result.at("blocks").size()
-                                                      : size_t(0);
-                            if (supplied > blocks.size())
-                            {
-                                auto &s = Current();
-                                std::lock_guard lock(s.mutex);
-                                if (!s.warning.empty())
-                                    s.warning += '\n';
-                                s.warning += "部分文字缺少有效坐标或超过 256 "
-                                             "块；不会伪造定位，请缩小框选区域，完整原文可在编辑区查看。";
-                            }
-                            const auto provider = VisionConfig::Get().at("translation_provider");
-                            if (provider != cachedProvider || translations.size() > 1024)
-                            {
-                                translations.clear();
-                                cachedProvider = provider;
-                            }
-                            std::vector<std::string> missing;
-                            std::unordered_set<std::string> missingSet;
-                            for (const auto &block : blocks)
-                                if (!translations.count(block.source) && missingSet.insert(block.source).second)
-                                    missing.push_back(block.source);
-                            const auto translated = TranslateBlocks(missing, source, target, Cancelled);
-                            if (Cancelled())
-                                break;
-                            for (size_t i = 0; i < missing.size(); ++i)
-                                translations.emplace(missing[i], translated[i]);
-                            size_t unavailable = 0, regions = 0;
-                            std::string combined;
-                            for (auto &block : blocks)
-                            {
-                                if (Cancelled())
-                                    break;
-                                if (block.region)
-                                    ++regions;
-                                block.text = translations.at(block.source);
-                                if (block.text.empty())
-                                    ++unavailable;
-                                else
-                                {
-                                    if (!combined.empty())
-                                        combined += '\n';
-                                    combined += block.text;
-                                }
-                            }
-                            if (Cancelled())
-                                break;
-                            {
-                                auto &s = Current();
-                                std::lock_guard lock(s.mutex);
-                                s.translation = combined;
-                                ++s.revision;
-                            }
-                            ShowTranslationOverlay(r, blocks);
-                            Status("屏幕翻译中：" + std::to_string(blocks.size()) + " 个定位块" +
-                                   (regions ? "；文档模型仅提供区域定位" : "") +
-                                   (unavailable
-                                        ? "；离线词典未收录 " + std::to_string(unavailable) + " 块，请选择整段翻译服务"
-                                        : "") +
-                                   " · Esc 停止");
-                            Pause(static_cast<unsigned>(std::stoi(VisionConfig::Get().at("screen_interval_ms"))));
-                        }
+                        LiveLoop(r, source, target, task);
                     },
                     owner);
             }
@@ -548,6 +798,14 @@ json Handle(const json &request, HWND owner)
                 ShowWindow(owner, SW_SHOW);
                 throw;
             }
+        }
+        else if (action == "history" || action == "historyDelete" || action == "historyClear")
+            response["history"] = HandleHistory(request);
+        else if (action == "runQuick")
+        {
+            const auto id = request.value("id", "");
+            if (!Quick::Actions::Run(id))
+                throw std::runtime_error("未知的快捷操作");
         }
         else if (action != "status")
             throw std::runtime_error("不支持的截图操作");

@@ -612,11 +612,12 @@ namespace
 std::string RequestModelTranslation(const std::string &text, const std::string &source, const std::string &target,
                                     bool blocks, const std::function<bool()> &cancelled)
 {
-    const auto c = GetConfiguredVoiceInput();
-    const auto token = VoiceInput::ResolvePolishToken(c);
-    Require(token, "文本模型 API Token");
-    if (c.polish_endpoint.rfind("https://", 0) != 0 && c.polish_endpoint.rfind("http://127.0.0.1:", 0) != 0 &&
-        c.polish_endpoint.rfind("http://localhost:", 0) != 0)
+    const auto connection =
+        VoiceInput::ResolveTextModel(GetConfiguredVoiceInput(), VisionConfig::Get().at("text_provider"));
+    if (!connection.ready())
+        throw std::runtime_error("请先在“服务连接”里配置文本模型（接口、模型和 API Key）");
+    if (connection.endpoint.rfind("https://", 0) != 0 && connection.endpoint.rfind("http://127.0.0.1:", 0) != 0 &&
+        connection.endpoint.rfind("http://localhost:", 0) != 0)
         throw std::runtime_error("文本模型接口必须使用 HTTPS 或本机地址");
     const auto instruction =
         "Translate user text from " + source + " to " + target +
@@ -629,16 +630,13 @@ std::string RequestModelTranslation(const std::string &text, const std::string &
                      "Each element must have the same integer id and its translated text. Keep every id exactly once. "
                      "Never merge, omit or renumber blocks. Output no Markdown fences or commentary."
                    : "Output only the translation.");
-    json body = {{"model", VoiceInput::ResolvePolishModel(c)},
+    json body = {{"model", connection.model},
                  {"messages", {{{"role", "system"}, {"content", instruction}}, {{"role", "user"}, {"content", text}}}},
                  {"temperature", 0.2},
                  {"max_tokens", 8192}};
-    if (c.polish_provider == "deepseek")
-        body["thinking"] = {{"type", "disabled"}};
-    if (c.polish_provider == "siliconflow")
-        body["enable_thinking"] = false;
-    const auto out = Http(c.polish_endpoint, body.dump(),
-                          {"Content-Type: application/json", "Authorization: Bearer " + token}, cancelled);
+    VoiceInput::ApplyTextModelDefaults(connection, body);
+    const auto out = Http(connection.endpoint, body.dump(),
+                          {"Content-Type: application/json", "Authorization: Bearer " + connection.token}, cancelled);
     const auto result = out.at("choices").at(0).at("message").at("content").get<std::string>();
     if (result.empty())
         throw std::runtime_error("翻译结果为空");

@@ -53,7 +53,7 @@ std::string Read(const std::filesystem::path &p)
 TEST_CASE(reply_modes_are_available_to_voice_polish_and_have_unique_ids)
 {
     std::set<std::string_view> ids;
-    REQUIRE_EQ(ReplyStudio::Modes().size(), size_t{15});
+    REQUIRE_EQ(ReplyStudio::Modes().size(), size_t{19});
     for (const auto &m : ReplyStudio::Modes())
     {
         REQUIRE(ids.insert(m.id).second);

@@ -250,6 +250,27 @@ std::string ResolvePolishModel(const VoiceInputConfig &config)
     return config.polish_model.empty() ? DefaultPolishModel(config.polish_provider) : config.polish_model;
 }
 
+TextModelConnection ResolveTextModel(const VoiceInputConfig &config, std::string_view provider_override)
+{
+    TextModelConnection connection;
+    const std::string wanted = Lower(provider_override);
+    connection.provider = wanted.empty() ? Lower(config.polish_provider) : wanted;
+    connection.token = LookupToken(config.polish_tokens, connection.provider);
+    const bool same = connection.provider == Lower(config.polish_provider);
+    connection.endpoint =
+        same && !config.polish_endpoint.empty() ? config.polish_endpoint : DefaultPolishEndpoint(connection.provider);
+    connection.model = same ? ResolvePolishModel(config) : DefaultPolishModel(connection.provider);
+    return connection;
+}
+
+void ApplyTextModelDefaults(const TextModelConnection &connection, nlohmann::json &payload)
+{
+    if (connection.provider == "deepseek")
+        payload["thinking"] = {{"type", "disabled"}};
+    if (connection.provider == "siliconflow")
+        payload["enable_thinking"] = false;
+}
+
 const std::vector<PolishPromptPreset> &BuiltinPolishPromptPresets()
 {
     static const std::vector<PolishPromptPreset> presets = [] {

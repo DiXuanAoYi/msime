@@ -2,6 +2,7 @@
 #include "settings/config_update_dispatch.h"
 #include "config/ime_config.h"
 #include "english/speech_service.h"
+#include "settings/feature_config.h"
 #include "settings/vision_config.h"
 #include <string>
 #include <string_view>
@@ -294,6 +295,13 @@ bool ApplyConfigUpdate(const json::object &data)
         if (value.is_string())
             return SetConfiguredVoiceInputString(key, json::value_to<std::string>(value));
         return false;
+    }
+    for (const char *section : {"hotkeys", "reply", "clipboard"})
+    {
+        const std::string prefix = std::string(section) + ".";
+        if (path.rfind(prefix, 0) == 0)
+            return data.at("value").is_string() && FeatureConfig::Set(section, path.substr(prefix.size()),
+                                                                      json::value_to<std::string>(data.at("value")));
     }
     if (path.rfind("vision.", 0) == 0)
         return data.at("value").is_string() &&

@@ -419,6 +419,30 @@ void RecordSelection(const std::string &application, const std::string &code, co
     }
     Save(book);
 }
+std::vector<Phrase> Phrases(size_t limit)
+{
+    std::vector<Phrase> out;
+    try
+    {
+        const auto book = CachedBook();
+        std::map<std::string, std::string> names;
+        for (const auto &group : book->at("groups"))
+            names[group.value("id", "")] = group.value("name", "");
+        for (const auto &clip : book->at("clips"))
+        {
+            if (out.size() >= limit)
+                break;
+            const auto text = clip.value("text", "");
+            if (!text.empty())
+                out.push_back({names[clip.value("group", "")], clip.value("name", ""), text});
+        }
+    }
+    catch (const std::exception &)
+    {
+        // An unreadable book simply shows no phrases; the clipboard tab keeps working.
+    }
+    return out;
+}
 std::vector<std::string> AppWords(const std::string &application, const std::string &code)
 {
     if (application.empty() || code.empty())
@@ -598,8 +622,11 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
             response["quoteEntries"] = std::move(entries);
             return response;
         }
-        if (action == "history" || action == "editHistory")
+        if (action == "history" || action == "editHistory" || action == "pinHistory")
         {
+            if (action == "pinHistory" &&
+                !ClipboardHistory::SetPinned(string_to_wstring(Text(r, "text", 16384)), r.value("enabled", false)))
+                throw std::runtime_error("固定失败：记录已变化或磁盘无法保存；请刷新后重试");
             if (action == "editHistory" &&
                 !ClipboardHistory::UpdateEntryText(string_to_wstring(Text(r, "previousText", 16384)),
                                                    string_to_wstring(Text(r, "text", 16384))))
@@ -611,7 +638,11 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
             {
                 const auto text = wstring_to_string(entry.text);
                 response["history"].push_back(text);
-                response["historyEntries"].push_back({{"text", text}, {"copies", entry.copies}});
+                response["historyEntries"].push_back({{"text", text},
+                                                      {"copies", entry.copies},
+                                                      {"pinned", entry.pinned},
+                                                      {"at", entry.at},
+                                                      {"app", wstring_to_string(entry.app)}});
             }
             return response;
         }
@@ -1034,7 +1065,11 @@ nlohmann::json Handle(const nlohmann::json &r, HWND owner)
             {
                 const auto text = wstring_to_string(entry.text);
                 response["history"].push_back(text);
-                response["historyEntries"].push_back({{"text", text}, {"copies", entry.copies}});
+                response["historyEntries"].push_back({{"text", text},
+                                                      {"copies", entry.copies},
+                                                      {"pinned", entry.pinned},
+                                                      {"at", entry.at},
+                                                      {"app", wstring_to_string(entry.app)}});
             }
         response["application"] = ForegroundApplication();
         // Prepare every response field before persistence. Optional display metadata must not make a completed save

@@ -241,8 +241,8 @@ TEST_CASE(vision_base64_binary_roundtrip_and_subtitle_clock)
     REQUIRE(Vision::SubtitleTime(3661.125) == "01:01:01,125");
     REQUIRE(Vision::SubtitleTime(-1) == "00:00:00,000");
     REQUIRE(Vision::SubtitleTime(std::numeric_limits<double>::infinity()) == "00:00:00,000");
-    REQUIRE(VisionConfig::Defaults().at("provider") == "windows");
-    REQUIRE(VisionConfig::Defaults().at("translation_provider") == "dictionary");
+    REQUIRE(VisionConfig::Defaults().at("provider") == "smart");
+    REQUIRE(VisionConfig::Defaults().at("translation_provider") == "text_model");
 }
 TEST_CASE(personal_dictionary_is_scoped_toggleable_and_invalidates_cache)
 {

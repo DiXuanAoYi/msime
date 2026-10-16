@@ -3,6 +3,7 @@
 #include "context_store.h"
 #include "modes.h"
 #include "config/ime_config.h"
+#include "settings/feature_config.h"
 #include "voice-input/voice_providers.h"
 #include "utils/common_utils.h"
 #include "utils/network_proxy.h"
@@ -48,19 +49,16 @@ json Run(const json &request, const std::function<bool()> &cancelled)
             result["modes"].push_back({{"id", mode.id}, {"name", mode.name}, {"description", mode.description}});
         return result;
     }
-    auto config = GetConfiguredVoiceInput();
-    auto token = VoiceInput::ResolvePolishToken(config);
-    if (token.empty() || config.polish_endpoint.empty() || VoiceInput::ResolvePolishModel(config).empty())
-        throw std::runtime_error("请先在“语音输入 → 润色”配置模型、接口和 API Token。回复助手共用该配置。");
-    const auto &endpoint = config.polish_endpoint;
+    const auto connection =
+        VoiceInput::ResolveTextModel(GetConfiguredVoiceInput(), FeatureConfig::Get("reply", "provider"));
+    if (!connection.ready())
+        throw std::runtime_error("请先在“服务连接”里配置文本模型（接口、模型和 API Key）。回复助手和截图翻译共用它。");
+    const auto &endpoint = connection.endpoint;
     if (endpoint.rfind("https://", 0) != 0 && endpoint.rfind("http://127.0.0.1:", 0) != 0 &&
         endpoint.rfind("http://localhost:", 0) != 0)
         throw std::runtime_error("模型接口需要 HTTPS，或本机 localhost / 127.0.0.1 地址。");
-    auto payload = BuildPayload(request, VoiceInput::ResolvePolishModel(config));
-    if (config.polish_provider == "deepseek")
-        payload["thinking"] = {{"type", "disabled"}};
-    if (config.polish_provider == "siliconflow")
-        payload["enable_thinking"] = false;
+    auto payload = BuildPayload(request, connection.model);
+    VoiceInput::ApplyTextModelDefaults(connection, payload);
     auto body = payload.dump();
     Transfer transfer{{}, cancelled};
     CURL *curl = curl_easy_init();
@@ -68,7 +66,7 @@ json Run(const json &request, const std::function<bool()> &cancelled)
         throw std::runtime_error("网络初始化失败。");
     curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
-    headers = curl_slist_append(headers, ("Authorization: Bearer " + token).c_str());
+    headers = curl_slist_append(headers, ("Authorization: Bearer " + connection.token).c_str());
     curl_easy_setopt(curl, CURLOPT_URL, endpoint.c_str());
     NetworkProxy::ApplyToCurl(curl);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -106,6 +104,10 @@ json Run(const json &request, const std::function<bool()> &cancelled)
     }
 }
 } // namespace
+json RunRequest(const json &request, const std::function<bool()> &cancelled)
+{
+    return Run(request, cancelled);
+}
 Host::Host(std::function<void()> notify, bool chat) : queue_(std::move(notify), {})
 {
     if (chat)

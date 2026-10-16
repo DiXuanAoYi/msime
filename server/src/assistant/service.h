@@ -9,6 +9,8 @@
 namespace ReplyStudio
 {
 using Reply = std::function<void(const nlohmann::json &)>;
+// Runs one generate/summarize request synchronously on the calling (worker) thread.
+nlohmann::json RunRequest(const nlohmann::json &request, const std::function<bool()> &cancelled);
 // Created and drained on the owning window thread. One bounded request at a time.
 class Host
 {

@@ -14,6 +14,8 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <chrono>
+#include <sstream>
 
 namespace
 {
@@ -117,6 +119,128 @@ bool ParseBoolToken(std::string value)
     return value == "true" || value == "1" || value == "yes" || value == "on";
 }
 
+std::optional<std::string> ReadConfigString(const char *section, const char *key)
+{
+    const auto path = ConfigPath();
+    if (path.empty())
+        return std::nullopt;
+    std::ifstream input(path);
+    if (!input)
+        return std::nullopt;
+    const std::string header = std::string("[") + section + "]";
+    bool inSection = false;
+    for (std::string line; std::getline(input, line);)
+    {
+        const std::string trimmed = TrimCopy(line);
+        if (!trimmed.empty() && trimmed.front() == '[')
+        {
+            inSection = trimmed == header;
+            continue;
+        }
+        if (!inSection || trimmed.empty() || trimmed.front() == '#')
+            continue;
+        const size_t equals = trimmed.find('=');
+        if (equals == std::string::npos || TrimCopy(trimmed.substr(0, equals)) != key)
+            continue;
+        std::string value = TrimCopy(trimmed.substr(equals + 1));
+        if (!value.empty() && (value.front() == '"' || value.front() == '\''))
+        {
+            const size_t close = value.find(value.front(), 1);
+            return value.substr(1, close == std::string::npos ? std::string::npos : close - 1);
+        }
+        const size_t comment = value.find('#');
+        if (comment != std::string::npos)
+            value.resize(comment);
+        return TrimCopy(value);
+    }
+    return std::nullopt;
+}
+
+int64_t NowMs()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+std::wstring Lower(std::wstring text)
+{
+    for (auto &ch : text)
+        ch = static_cast<wchar_t>(towlower(ch));
+    return text;
+}
+
+std::wstring ProcessFileName(HWND window)
+{
+    if (!window)
+        return {};
+    DWORD pid = 0;
+    GetWindowThreadProcessId(window, &pid);
+    if (!pid)
+        return {};
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!process)
+        return {};
+    wchar_t buffer[MAX_PATH * 2]{};
+    DWORD size = static_cast<DWORD>(sizeof(buffer) / sizeof(buffer[0]));
+    std::wstring name;
+    if (QueryFullProcessImageNameW(process, 0, buffer, &size))
+    {
+        name.assign(buffer, size);
+        const auto slash = name.find_last_of(L"\\/");
+        if (slash != std::wstring::npos)
+            name.erase(0, slash + 1);
+    }
+    CloseHandle(process);
+    return name;
+}
+
+// Windows documents these registered formats for password managers and other sensitive sources.
+bool ClipboardAsksNotToBeRecorded()
+{
+    static const UINT excluded = RegisterClipboardFormatW(L"ExcludeClipboardContentFromMonitorProcessing");
+    static const UINT history = RegisterClipboardFormatW(L"CanIncludeInClipboardHistory");
+    if (excluded && IsClipboardFormatAvailable(excluded))
+        return true;
+    if (history && IsClipboardFormatAvailable(history))
+    {
+        if (HANDLE data = GetClipboardData(history))
+            if (const auto *value = static_cast<const DWORD *>(GlobalLock(data)))
+            {
+                const bool refuse = GlobalSize(data) >= sizeof(DWORD) && *value == 0;
+                GlobalUnlock(data);
+                return refuse;
+            }
+    }
+    return false;
+}
+
+bool WorkstationLocked()
+{
+    HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_SWITCHDESKTOP);
+    if (!desktop)
+        return true;
+    CloseDesktop(desktop);
+    return false;
+}
+
+void ApplyLimits(std::vector<ClipboardHistory::Entry> &items, const ClipboardHistory::Settings &settings,
+                 bool dropExpired)
+{
+    const int64_t now = NowMs();
+    if (dropExpired && settings.retentionDays > 0)
+    {
+        const int64_t span = int64_t(settings.retentionDays) * 86400000;
+        items.erase(
+            std::remove_if(items.begin(), items.end(),
+                           [&](const auto &entry) { return !entry.pinned && entry.at > 0 && now - entry.at > span; }),
+            items.end());
+    }
+    size_t kept = 0;
+    items.erase(std::remove_if(items.begin(), items.end(),
+                               [&](const auto &entry) { return !entry.pinned && ++kept > settings.maxItems; }),
+                items.end());
+}
+
 // Store newest-first for the existing retention policy; sort only the read projection.
 std::optional<std::vector<ClipboardHistory::Entry>> ReadStoreUnlocked()
 {
@@ -143,6 +267,9 @@ std::optional<std::vector<ClipboardHistory::Entry>> ReadStoreUnlocked()
         {
             std::string text;
             uint32_t copies = 1;
+            bool pinned = false;
+            int64_t at = 0;
+            std::wstring app;
             if (item.is_string())
                 text = item.get<std::string>();
             else
@@ -155,6 +282,12 @@ std::optional<std::vector<ClipboardHistory::Entry>> ReadStoreUnlocked()
                     return std::nullopt;
                 copies = static_cast<uint32_t>(count);
                 text = item.at("text").get<std::string>();
+                if (item.contains("pinned") && item.at("pinned").is_boolean())
+                    pinned = item.at("pinned").get<bool>();
+                if (item.contains("at") && item.at("at").is_number_integer())
+                    at = item.at("at").get<int64_t>();
+                if (item.contains("app") && item.at("app").is_string())
+                    app = Utf8ToWide(item.at("app").get<std::string>());
             }
             auto wide = Utf8ToWide(text);
             if (wide.empty() || text.find('\0') != std::string::npos)
@@ -162,10 +295,13 @@ std::optional<std::vector<ClipboardHistory::Entry>> ReadStoreUnlocked()
             const auto duplicate =
                 std::find_if(entries.begin(), entries.end(), [&](const auto &entry) { return entry.text == wide; });
             if (duplicate == entries.end())
-                entries.push_back({std::move(wide), copies});
+                entries.push_back({std::move(wide), copies, pinned, at, std::move(app)});
             else
+            {
                 duplicate->copies = static_cast<uint32_t>(
                     std::min<uint64_t>(ClipboardHistory::kMaxCopies, uint64_t(duplicate->copies) + copies));
+                duplicate->pinned = duplicate->pinned || pinned;
+            }
         }
         if (entries.size() > ClipboardHistory::kMaxItems)
             entries.resize(ClipboardHistory::kMaxItems);
@@ -235,7 +371,16 @@ bool WriteStoreUnlocked(const std::vector<ClipboardHistory::Entry> &items)
         return false;
     auto data = nlohmann::json::array();
     for (const auto &entry : items)
-        data.push_back({{"text", WideToUtf8(entry.text)}, {"copies", entry.copies}});
+    {
+        nlohmann::json row = {{"text", WideToUtf8(entry.text)}, {"copies", entry.copies}};
+        if (entry.pinned)
+            row["pinned"] = true;
+        if (entry.at)
+            row["at"] = entry.at;
+        if (!entry.app.empty())
+            row["app"] = WideToUtf8(entry.app);
+        data.push_back(std::move(row));
+    }
     const std::string payload = data.dump(2) + "\n";
     output.write(payload.data(), static_cast<std::streamsize>(payload.size()));
     output.close();
@@ -359,6 +504,7 @@ struct MonitorState
     HWND hwnd = nullptr;
     std::atomic<bool> running{false};
     DWORD lastSequence = 0;
+    std::atomic<ULONGLONG> suppressUntil{0};
 };
 
 MonitorState g_monitor;
@@ -374,6 +520,26 @@ void CaptureClipboardText(HWND hwnd)
     if (sequence == g_monitor.lastSequence)
         return;
 
+    if (GetTickCount64() < g_monitor.suppressUntil.load())
+    {
+        g_monitor.lastSequence = sequence;
+        return;
+    }
+    const auto settings = ClipboardHistory::LoadSettings();
+    if (settings.pauseOnLock && WorkstationLocked())
+    {
+        g_monitor.lastSequence = sequence;
+        return;
+    }
+    // The owner is only reliable while the clipboard still holds this copy, so read it before opening.
+    const std::wstring app = ProcessFileName(GetClipboardOwner());
+    if (!app.empty() && std::find(settings.excludedApps.begin(), settings.excludedApps.end(), Lower(app)) !=
+                            settings.excludedApps.end())
+    {
+        g_monitor.lastSequence = sequence;
+        return;
+    }
+
     if (!OpenClipboard(hwnd))
     {
         SetTimer(hwnd, kCaptureTimerId, kCaptureDebounceMs, nullptr);
@@ -382,6 +548,13 @@ void CaptureClipboardText(HWND hwnd)
     sequence = GetClipboardSequenceNumber();
 
     std::wstring text;
+    const bool refused = settings.respectPrivacyFlag && ClipboardAsksNotToBeRecorded();
+    if (refused)
+    {
+        CloseClipboard();
+        g_monitor.lastSequence = sequence;
+        return;
+    }
     if (HANDLE data = GetClipboardData(CF_UNICODETEXT))
     {
         if (const wchar_t *locked = static_cast<const wchar_t *>(GlobalLock(data)))
@@ -395,7 +568,7 @@ void CaptureClipboardText(HWND hwnd)
 
     text = NormalizeClipboardText(std::move(text));
     if (!text.empty())
-        ClipboardHistory::AddText(std::move(text), sequence);
+        ClipboardHistory::AddText(std::move(text), sequence, app);
 }
 
 LRESULT CALLBACK MonitorWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -492,8 +665,14 @@ std::vector<ClipboardHistory::Entry> ClipboardHistory::LoadEntries()
     auto entries = ReadStoreUnlocked();
     if (!entries)
         return {};
-    std::stable_sort(entries->begin(), entries->end(),
-                     [](const auto &a, const auto &b) { return a.copies > b.copies; });
+    const auto settings = LoadSettings();
+    ApplyLimits(*entries, settings, true);
+    // Storage order is newest first. Pinned entries lead; "frequent" re-sorts only the unpinned rest.
+    const auto firstUnpinned =
+        std::stable_partition(entries->begin(), entries->end(), [](const auto &e) { return e.pinned; });
+    if (!settings.sortRecent)
+        std::stable_sort(firstUnpinned, entries->end(),
+                         [](const auto &a, const auto &b) { return a.copies > b.copies; });
     return std::move(*entries);
 }
 
@@ -505,7 +684,7 @@ std::vector<std::wstring> ClipboardHistory::Load()
     return texts;
 }
 
-bool ClipboardHistory::AddText(std::wstring text, uint32_t clipboardSequence)
+bool ClipboardHistory::AddText(std::wstring text, uint32_t clipboardSequence, const std::wstring &app)
 {
     text = NormalizeClipboardText(std::move(text));
     if (text.empty() || !IsEnabled())
@@ -539,14 +718,18 @@ bool ClipboardHistory::AddText(std::wstring text, uint32_t clipboardSequence)
     const auto found =
         std::find_if(items->begin(), items->end(), [&](const auto &entry) { return entry.text == text; });
     uint32_t copies = 1;
+    bool pinned = false;
+    std::wstring source = app;
     if (found != items->end())
     {
         copies = found->copies < kMaxCopies ? found->copies + 1 : kMaxCopies;
+        pinned = found->pinned;
+        if (source.empty())
+            source = found->app;
         items->erase(found);
     }
-    items->insert(items->begin(), {std::move(text), copies});
-    if (items->size() > kMaxItems)
-        items->resize(kMaxItems);
+    items->insert(items->begin(), {std::move(text), copies, pinned, NowMs(), std::move(source)});
+    ApplyLimits(*items, LoadSettings(), true);
     if (!WriteStoreUnlocked(*items))
         return false;
     TraceCopySequence(clipboardSequence, captured->value() ? *captured->value() : 0, copies);
@@ -577,11 +760,13 @@ bool ClipboardHistory::UpdateEntryText(const std::wstring &previous, std::wstrin
     const size_t oldIndex = static_cast<size_t>(old - items->begin());
     const auto other =
         std::find_if(items->begin(), items->end(), [&](const auto &entry) { return entry.text == text; });
-    Entry replacement{std::move(text), old->copies};
+    Entry replacement = *old;
+    replacement.text = std::move(text);
     if (other != items->end())
     {
         replacement.copies =
             static_cast<uint32_t>(std::min<uint64_t>(kMaxCopies, uint64_t(replacement.copies) + other->copies));
+        replacement.pinned = replacement.pinned || other->pinned;
         const size_t otherIndex = static_cast<size_t>(other - items->begin());
         (*items)[std::min(oldIndex, otherIndex)] = std::move(replacement);
         items->erase(items->begin() + std::max(oldIndex, otherIndex));
@@ -607,6 +792,63 @@ bool ClipboardHistory::RemoveText(const std::wstring &text)
     if (items->size() == before)
         return false;
     return WriteStoreUnlocked(*items);
+}
+
+bool ClipboardHistory::SetPinned(const std::wstring &text, bool pinned)
+{
+    if (text.empty())
+        return false;
+    NamedMutex lock(kStoreMutexName);
+    if (!lock)
+        return false;
+    auto items = ReadStoreUnlocked();
+    if (!items)
+        return false;
+    const auto found =
+        std::find_if(items->begin(), items->end(), [&](const auto &entry) { return entry.text == text; });
+    if (found == items->end())
+        return false;
+    if (found->pinned == pinned)
+        return true;
+    found->pinned = pinned;
+    return WriteStoreUnlocked(*items);
+}
+
+ClipboardHistory::Settings ClipboardHistory::LoadSettings()
+{
+    Settings settings;
+    const auto number = [](const std::optional<std::string> &value, int fallback, int low, int high) {
+        if (!value)
+            return fallback;
+        try
+        {
+            size_t end = 0;
+            const int n = std::stoi(*value, &end);
+            return end == value->size() && n >= low && n <= high ? n : fallback;
+        }
+        catch (...)
+        {
+            return fallback;
+        }
+    };
+    const auto flag = [](const std::optional<std::string> &value, bool fallback) {
+        return value ? (*value == "true" ? true : *value == "false" ? false : fallback) : fallback;
+    };
+    if (const auto sort = ReadConfigString("clipboard", "sort"))
+        settings.sortRecent = *sort != "frequent";
+    settings.maxItems = static_cast<size_t>(number(ReadConfigString("clipboard", "max_items"), 200, 20, 500));
+    settings.retentionDays = number(ReadConfigString("clipboard", "retention_days"), 30, 0, 3650);
+    settings.respectPrivacyFlag = flag(ReadConfigString("clipboard", "respect_privacy_flag"), true);
+    settings.pauseOnLock = flag(ReadConfigString("clipboard", "pause_on_lock"), true);
+    const auto excluded = ReadConfigString("clipboard", "exclude_apps").value_or("KeePass.exe;1Password.exe");
+    std::stringstream stream(excluded);
+    for (std::string part; std::getline(stream, part, ';');)
+    {
+        part = TrimCopy(part);
+        if (!part.empty())
+            settings.excludedApps.push_back(Lower(Utf8ToWide(part)));
+    }
+    return settings;
 }
 
 void ClipboardHistory::Clear()
@@ -726,4 +968,9 @@ void ClipboardMonitor::Sync(bool enabled)
 bool ClipboardMonitor::IsRunning()
 {
     return g_monitor.running;
+}
+
+void ClipboardMonitor::SuppressFor(unsigned milliseconds)
+{
+    g_monitor.suppressUntil = GetTickCount64() + milliseconds;
 }

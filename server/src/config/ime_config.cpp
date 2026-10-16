@@ -6,6 +6,7 @@
 #include "config/ime_config_candidate_translation.h"
 #include "config/prompt_library.h"
 #include "settings/vision_config.h"
+#include "settings/feature_config.h"
 #include <Windows.h>
 #include <algorithm>
 #include <atomic>
@@ -750,6 +751,7 @@ bool LoadImeConfig()
         Speech::LoadConfig(tbl);
         LoadConfiguredCollocationGrammar(tbl);
         VisionConfig::Load(tbl);
+        FeatureConfig::Load(tbl);
         VoiceInputConfig voice;
         voice.enabled = tbl["voice_input"]["voice_input"].value_or(true);
         voice.hotkey_ralt = tbl["voice_input"]["hotkey_ralt"].value_or(true);

@@ -278,7 +278,7 @@ TEST_CASE(clipboard_copy_counts_migrate_persist_rank_and_reject_corrupt_store)
     IsolatedLibraryProfile profile;
     {
         std::ofstream config(profile.root / "config.toml");
-        config << "[utility]\nclipboard_history = true\n";
+        config << "[utility]\nclipboard_history = true\n[clipboard]\nsort = \"frequent\"\n";
     }
     {
         std::ofstream file(ClipboardHistory::StorePath());
@@ -329,7 +329,7 @@ TEST_CASE(clipboard_shared_sequence_counts_one_copy_event_once_and_keeps_recent_
     IsolatedLibraryProfile profile;
     {
         std::ofstream config(profile.root / "config.toml");
-        config << "[utility]\nclipboard_history = true\n";
+        config << "[utility]\nclipboard_history = true\n[clipboard]\nmax_items = \"20\"\n";
     }
     const uint32_t sequence = 1000000000 + GetCurrentProcessId();
     REQUIRE(ClipboardHistory::AddText(L"相同复制事件", sequence));
@@ -340,7 +340,7 @@ TEST_CASE(clipboard_shared_sequence_counts_one_copy_event_once_and_keeps_recent_
     for (int i = 0; i < 50; ++i)
         REQUIRE(ClipboardHistory::AddText(L"新内容" + std::to_wstring(i)));
     const auto entries = ClipboardHistory::LoadEntries();
-    REQUIRE_EQ(entries.size(), ClipboardHistory::kMaxItems);
+    REQUIRE_EQ(entries.size(), size_t(20)); // [clipboard] max_items, not the compile-time ceiling
     REQUIRE_EQ(entries.front().text, std::wstring(L"新内容49"));
     REQUIRE(
         std::none_of(entries.begin(), entries.end(), [](const auto &entry) { return entry.text == L"相同复制事件"; }));
@@ -355,6 +355,10 @@ TEST_CASE(clipboard_shared_sequence_counts_one_copy_event_once_and_keeps_recent_
 TEST_CASE(clipboard_edit_keeps_counts_merges_duplicates_and_preserves_failure_input)
 {
     IsolatedLibraryProfile profile;
+    {
+        std::ofstream config(profile.root / "config.toml");
+        config << "[clipboard]\nsort = \"frequent\"\n";
+    }
     std::ofstream(ClipboardHistory::StorePath())
         << json::array({{{"text", "原文"}, {"copies", 2}}, {{"text", "已有文字"}, {"copies", 3}}}).dump();
     auto reply =

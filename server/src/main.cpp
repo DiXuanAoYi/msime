@@ -1,5 +1,7 @@
 #include "ipc/event_listener.h"
 #include "log/fanylog.h"
+#include "quick/quick_actions.h"
+#include "quick/quick_thread.h"
 #include "window/ime_windows.h"
 #include <commctrl.h>
 #include <cstring>
@@ -198,6 +200,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
                                FanyNamedPipe::EnqueueMixedCandidates(std::move(result), input, generation);
                            });
 
+    Quick::Actions::EnableHotkeys(true);
+    Quick::Start();
+
     int ret = CreateCandidateWindow(hInstance);
 
     FanyNamedPipe::RegisterStatusSnapshotWindow(nullptr);
@@ -208,6 +213,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
     MixedCandidates::Stop();
     AiAssistant::Stop();
     CloudIme::Stop();
+    Quick::Stop();
     ClipboardMonitor::Stop();
     VoiceInput::Shutdown();
 
