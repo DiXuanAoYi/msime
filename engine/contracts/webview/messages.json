@@ -885,6 +885,12 @@
           },
           "relationship": {
             "type": "string"
+          },
+          "tonePrompt": {
+            "type": "string"
+          },
+          "persona": {
+            "type": "string"
           }
         },
         "required": [
@@ -1250,7 +1256,8 @@
               "removeHistory",
               "clearHistory",
               "editHistory",
-              "quoteCatalog"
+              "quoteCatalog",
+              "pinHistory"
             ]
           },
           "enabled": {
@@ -1359,7 +1366,11 @@
               "screen",
               "subtitles",
               "importSubtitles",
-              "translateSubtitles"
+              "translateSubtitles",
+              "history",
+              "historyDelete",
+              "historyClear",
+              "runQuick"
             ]
           },
           "image": {
@@ -1394,6 +1405,9 @@
           },
           "translate": {
             "type": "boolean"
+          },
+          "id": {
+            "type": "string"
           }
         },
         "required": [
@@ -1538,6 +1552,89 @@
               "setDefault",
               "openSystemSettings"
             ]
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "replyProfileRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "get",
+              "putTones",
+              "putPersona",
+              "putContact",
+              "deleteContact",
+              "clearRecords",
+              "messages",
+              "export"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "tones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {},
+              "required": []
+            }
+          },
+          "persona": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          },
+          "contact": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          }
+        },
+        "required": [
+          "requestId",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "quickActionRequest": {
+      "surfaces": [
+        "settings"
+      ],
+      "data": {
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "run",
+              "status"
+            ]
+          },
+          "id": {
+            "type": "string"
           }
         },
         "required": [
@@ -2604,6 +2701,15 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 2147483647
+              },
+              "pinned": {
+                "type": "boolean"
+              },
+              "at": {
+                "type": "integer"
+              },
+              "app": {
+                "type": "string"
               }
             },
             "required": [
@@ -2800,6 +2906,15 @@
         },
         "imageRevision": {
           "type": "number"
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          }
         },
         "srt": {
           "type": "string"
@@ -3015,6 +3130,100 @@
       "required": [
         "message",
         "automatic"
+      ],
+      "additionalProperties": false
+    },
+    "replyProfileResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "exported": {
+          "type": "string"
+        },
+        "recordCount": {
+          "type": "integer"
+        },
+        "tones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          }
+        },
+        "persona": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {},
+          "required": []
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          }
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {},
+            "required": []
+          }
+        }
+      },
+      "required": [
+        "requestId",
+        "action",
+        "ok",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "quickActionResponse": {
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "hotkeys": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {},
+          "required": []
+        }
+      },
+      "required": [
+        "requestId",
+        "action",
+        "ok",
+        "message"
       ],
       "additionalProperties": false
     }

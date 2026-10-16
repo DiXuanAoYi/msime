@@ -1695,5 +1695,94 @@
         }
       ]
     }
+  },
+  {
+    "name": "reply profile get",
+    "message": {
+      "type": "replyProfileRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "r1",
+        "action": "get"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply profile unknown action",
+    "message": {
+      "type": "replyProfileRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "r1",
+        "action": "drop"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "quick action run",
+    "message": {
+      "type": "quickActionRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "q1",
+        "action": "run",
+        "id": "ocr"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "quick action extra field",
+    "message": {
+      "type": "quickActionRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "q1",
+        "action": "run",
+        "id": "ocr",
+        "x": 1
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "vision history",
+    "message": {
+      "type": "visionRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "v1",
+        "action": "history"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "pin clipboard entry",
+    "message": {
+      "type": "personalLibraryRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "p1",
+        "action": "pinHistory",
+        "text": "a",
+        "enabled": true
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
   }
 ]
