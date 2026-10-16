@@ -1,7 +1,7 @@
 <div class="content" id="voice-settings">
 <div class="content-header"><span>语音与发音</span></div>
-<div class="voice-nav" role="tablist" aria-label="语音功能"><button type="button" role="tab" id="voiceTab-speech" data-voice-target="speech" aria-controls="voicePane-speech" aria-selected="true">发音与模型</button><button type="button" role="tab" id="voiceTab-studio" data-voice-target="studio" aria-controls="voicePane-studio" aria-selected="false">语音工作台</button><button type="button" role="tab" id="voiceTab-recognition" data-voice-target="recognition" aria-controls="voicePane-recognition" aria-selected="false">语音识别</button><button type="button" role="tab" id="voiceTab-polish" data-voice-target="polish" aria-controls="voicePane-polish" aria-selected="false">文本润色</button></div>
-<div id="voicePane-speech" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-speech" data-voice-pane="speech">
+<div class="voice-nav" role="tablist" aria-label="语音功能"><button type="button" role="tab" id="voiceTab-recognition" data-voice-target="recognition" aria-controls="voicePane-recognition" aria-selected="true">语音输入</button><button type="button" role="tab" id="voiceTab-polish" data-voice-target="polish" aria-controls="voicePane-polish" aria-selected="false" tabindex="-1">识别后润色</button><button type="button" role="tab" id="voiceTab-speech" data-voice-target="speech" aria-controls="voicePane-speech" aria-selected="false" tabindex="-1">朗读发音</button><button type="button" role="tab" id="voiceTab-studio" data-voice-target="studio" aria-controls="voicePane-studio" aria-selected="false" tabindex="-1">语音消息</button></div>
+<div id="voicePane-speech" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-speech" data-voice-pane="speech" hidden>
 <details class="section voice-section" id="speechPanel" open>
     <summary class="section-title">候选发音 · 文字转语音</summary>
     <p class="voice-description">按住 Ctrl 点击原词或译文朗读，不会上屏。默认离线；切换云服务后仅发送你点击的文字。</p>
@@ -41,7 +41,7 @@
     </details>
   </details>
 </div>
-<div id="voicePane-recognition" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-recognition" data-voice-pane="recognition" hidden>
+<div id="voicePane-recognition" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-recognition" data-voice-pane="recognition">
 <div class="section voice-section">
     <div class="section-header"><div><div class="section-title">启用语音输入</div><div class="voice-description">在右键菜单中点击“语音输入”开始或停止录音</div></div><div class="ftb-toggle-btn active" id="voiceEnabled" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
   </div>

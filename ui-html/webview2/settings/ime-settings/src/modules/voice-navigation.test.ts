@@ -22,7 +22,7 @@ it('switches existing panes without replacing controls and keeps studio deep lin
   const root={dataset:{} as Record<string,string>,querySelectorAll:(selector:string)=>selector==='[data-voice-pane]'?panes:tabs};
   vi.stubGlobal('document',{getElementById:(id:string)=>id==='voice-settings'?root:id==='voiceStudioPanel'?studio:null});
   setupVoiceNavigation();
-  expect(panes.map(x=>x.hidden)).toEqual([false,true,true,true]);
+  expect(panes.map(x=>x.hidden)).toEqual([true,true,false,true]);
   tabs[1].events.get('click')();expect(studio.open).toBe(true);
   expect(panes.map(x=>x.hidden)).toEqual([true,false,true,true]);
   expect(tabs[1].attributes['aria-selected']).toBe('true');

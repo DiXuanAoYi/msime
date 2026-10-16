@@ -1,6 +1,102 @@
 <div class="content" id="reply-studio-settings">
-  <div class="content-header"><span>嘴替 · 回复工作台</span></div>
-  <section class="section studio" id="replyStudio">
+<div class="qp" id="replyQuick">
+  <header class="phead">
+    <div><h1>嘴替 · 回复</h1><p class="lead">在聊天输入框里直接用：看懂对方的话，给你几种回法；或者把你打的草稿改得更得体。只填进输入框，不替你发送。</p></div>
+    <div class="phead-side"><span class="chip" id="rpReaderChip">读取聊天：关</span></div>
+  </header>
+  <div class="seg" role="tablist" aria-label="嘴替" data-seg="reply">
+    <button type="button" role="tab" data-tab="quick" aria-selected="true">快速使用</button>
+    <button type="button" role="tab" data-tab="tones" aria-selected="false">语气</button>
+    <button type="button" role="tab" data-tab="persona" aria-selected="false">我的风格</button>
+    <button type="button" role="tab" data-tab="contacts" aria-selected="false">联系人记忆</button>
+    <button type="button" role="tab" data-tab="reader" aria-selected="false">读取聊天</button>
+    <button type="button" role="tab" data-tab="bench" aria-selected="false">工作台</button>
+  </div>
+
+  <div class="tabpane" data-pane-of="reply" data-pane="quick">
+    <div class="duo">
+      <article class="hero-card">
+        <div class="hc-top"><span class="act-ic">回</span><div><h3>帮我回</h3><button class="hk" type="button" data-hk="reply" title="点击修改快捷键"></button></div></div>
+        <ol class="hc-steps"><li>停在聊天窗口，或者选中对方说的那句话</li><li>按快捷键，输入框上方出现几条回复</li><li>按数字键填入，改一改，自己按发送</li></ol>
+        <button class="btn primary" type="button" data-try="reply">试一试</button>
+      </article>
+      <article class="hero-card">
+        <div class="hc-top"><span class="act-ic">改</span><div><h3>帮我改</h3><button class="hk" type="button" data-hk="rewrite" title="点击修改快捷键"></button></div></div>
+        <ol class="hc-steps"><li>在输入框里随手打出大概意思</li><li>按快捷键，列出更礼貌、更简短等几种说法</li><li>按数字键直接替换输入框里的草稿</li></ol>
+        <button class="btn primary" type="button" data-try="rewrite">试一试</button>
+      </article>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>面板</h2></div>
+      <div class="row"><div class="row-l"><b>每次给出</b></div><div class="row-r"><div class="opt" data-cfg="reply.count"><button type="button" data-v="3">3 条</button><button type="button" data-v="5">5 条</button></div></div></div>
+      <div class="row"><div class="row-l"><b>默认长度</b><small>联系人记忆里单独设置的优先</small></div><div class="row-r"><div class="opt" data-cfg="reply.length"><button type="button" data-v="short">简短</button><button type="button" data-v="medium">适中</button><button type="button" data-v="long">详细</button></div></div></div>
+      <div class="row"><div class="row-l"><b>对方的话从哪里取</b></div><div class="row-r"><select data-cfg="reply.source" aria-label="对方的话从哪里取"><option value="auto">先读聊天窗口，读不到再用选中的文字</option><option value="selection">只用选中的文字</option><option value="clipboard">用剪贴板里的文字</option></select></div></div>
+      <div class="row"><div class="row-l"><b>一起参考的聊天记录</b><small>需要开启“读取聊天”；记录越多越懂语境，发送的内容也越多</small></div><div class="row-r"><select data-cfg="reply.context" aria-label="参考的聊天记录条数"><option value="0">不带</option><option value="6">最近 6 条</option><option value="20">最近 20 条</option></select></div></div>
+      <div class="row"><div class="row-l"><b>选中一条回复后</b><small>“只复制”不会碰你的输入框，由你自己粘贴</small></div><div class="row-r"><div class="opt" data-cfg="reply.fill_mode"><button type="button" data-v="insert">填进输入框</button><button type="button" data-v="copy">复制到剪贴板</button></div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>模型与隐私</h2></div>
+      <div class="row"><div class="row-l"><b>使用的文本模型</b><small>默认沿用语音润色选的那一家，也可以单独指定。密钥在“AI 与模型”页填写。</small></div><div class="row-r"><select data-cfg="reply.provider" aria-label="回复使用的文本模型"><option value="">跟随润色设置</option><option value="siliconflow">硅基流动</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="groq">Groq</option><option value="aliyun">阿里云百炼</option><option value="tencent">腾讯 TokenHub</option></select></div></div>
+      <div class="row"><div class="row-l"><b>每次生成会发送</b><small>对方的话、你补充的意思、所选条数的聊天记录、这个联系人的关系和备注，以及“我的风格”。不上传截图，不会自动发送任何消息。</small></div></div>
+    </div>
+  </div>
+
+  <div class="tabpane" data-pane-of="reply" data-pane="tones" hidden>
+    <div class="card">
+      <div class="card-h-row"><div class="card-h"><h2>面板里的语气</h2><p>开启的语气按这个顺序出现在面板标签上，按 Tab 依次切换。联系人的默认语气总在第一个。</p></div><button class="btn sm" type="button" id="toneAdd">＋ 新建语气</button></div>
+      <form class="tone-form" id="toneForm" hidden>
+        <label class="field">名称<input type="text" id="toneName" maxlength="10" placeholder="例如：客气地催款"></label>
+        <label class="field">怎么回（写给模型的说明）<textarea id="toneDesc" rows="2" maxlength="600" placeholder="例如：先感谢合作，再说明逾期天数和金额，给出明确付款日期，不威胁"></textarea></label>
+        <label class="field">示例回复（选填）<input type="text" id="toneEx" maxlength="300" placeholder="例如：王总您好，上月的款项已逾期 5 天，麻烦本周五前安排一下～"></label>
+        <div class="row-r left"><button class="btn sm primary" type="submit">保存</button><button class="btn sm" type="button" id="toneCancel">取消</button></div>
+      </form>
+      <div class="tones" id="toneList"></div>
+    </div>
+  </div>
+
+  <div class="tabpane" data-pane-of="reply" data-pane="persona" hidden>
+    <div class="persona">
+      <div class="card">
+        <div class="card-h"><h2>我的说话习惯</h2><p>让生成的回复更像你自己说的。对所有聊天生效，联系人记忆里的设置优先。</p></div>
+        <div class="row"><div class="row-l"><b>常用语气词</b></div><div class="row-r"><div class="chips" id="fillerChips"></div></div></div>
+        <div class="row"><div class="row-l"><b>表情</b></div><div class="row-r"><div class="opt" id="personaEmoji"><button type="button" data-v="none">不用</button><button type="button" data-v="some">偶尔</button><button type="button" data-v="many">常用</button></div></div></div>
+        <div class="row"><div class="row-l"><b>句末标点</b></div><div class="row-r"><div class="opt" id="personaPunct"><button type="button" data-v="normal">正常</button><button type="button" data-v="less">少用句号</button><button type="button" data-v="none">基本不用</button></div></div></div>
+        <div class="row"><div class="row-l"><b>称呼对方</b></div><div class="row-r"><div class="opt" id="personaAddress"><button type="button" data-v="contact">按联系人</button><button type="button" data-v="ni">都用“你”</button><button type="button" data-v="nin">都用“您”</button></div></div></div>
+        <div class="row"><div class="row-l"><b>不想出现的词</b></div><div class="row-r"><div class="chips" id="bannedChips"></div></div></div>
+        <div class="row"><div class="row-l"><b>关于我</b><small>选填。模型据此判断你的身份和分寸</small><textarea id="aboutMe" rows="2" maxlength="600" style="margin-top:8px"></textarea></div></div>
+      </div>
+      <div class="bp-wrap">
+        <div class="card">
+          <div class="card-h"><h2>效果预览</h2><p>同一条回复，套用你的习惯之后</p></div>
+          <div class="bp-l">模型原始回复</div>
+          <div class="bp" id="personaBefore">好的，我明天上午十点之前把方案发给您。如果有需要调整的地方，请随时告诉我。</div>
+          <div class="bp-l">套用后</div>
+          <div class="bp after" id="personaAfter"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabpane" data-pane-of="reply" data-pane="contacts" hidden>
+    <div class="hist-tools"><input type="search" id="ctQuery" placeholder="搜索联系人或群聊" aria-label="搜索联系人"><span class="row-r"><span class="small muted">打开“读取聊天”后会自动建立</span><button class="btn sm" type="button" id="ctAdd">＋ 添加</button></span></div>
+    <div class="ct"><div class="ct-list" id="ctList"></div><div class="ct-edit" id="ctEdit"></div></div>
+    <p class="small muted" style="margin:0">记忆用当前 Windows 帐户加密保存在本机，到期自动清理。导出的文件是明文，请自己保管。</p>
+  </div>
+
+  <div class="tabpane" data-pane-of="reply" data-pane="reader" hidden>
+    <div class="card">
+      <div class="row"><div class="row-l"><b>允许读取聊天窗口</b><small>只读取当前打开的聊天里已经显示的文字：不点击、不切换聊天、不发送。图片和语音不转写。关闭后，帮我回只用你选中或复制的文字。</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="reply.reader_enabled" aria-label="允许读取聊天窗口"></button></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>本机记录</h2></div>
+      <div class="row"><div class="row-l"><b id="rdSummary">0 位联系人 · 0 条聊天记录</b><small>保存期限跟随各联系人记忆的设置，到期自动清理</small></div><div class="row-r"><button class="btn sm danger" type="button" id="readerClear">清空记录</button></div></div>
+      <div class="confirm" id="readerClearConfirm" hidden>只删除本机保存的聊天记录，联系人备注和聊天软件不受影响。<button class="btn sm danger" type="button" id="readerClearYes">确认清空</button><button class="btn sm" type="button" id="readerClearNo">保留</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="tabpane" id="replyBench" data-pane-of="reply" data-pane="bench" hidden>
+<section class="section studio" id="replyStudio">
     <div class="studio-heading">
       <div>
         <h2>想好怎么回，再发出去</h2>
@@ -276,4 +372,5 @@
       </details>
     </details>
   </section>
+</div>
 </div>

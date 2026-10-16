@@ -1,4 +1,4 @@
-#visionPanel label {
+#visionBench label {
   display: inline-flex;
   gap: 8px;
   align-items: center;
@@ -11,9 +11,9 @@
   font-size: 14px;
   line-height: 1.6;
 }
-#visionPanel h2 { font-size: 20px; margin: 0 0 12px; }
-#visionPanel h3 { font-size: 16px; margin: 0 0 16px; }
-#visionPanel p { color: var(--text-secondary); overflow-wrap: anywhere; }
+#visionBench h2 { font-size: 20px; margin: 0 0 12px; }
+#visionBench h3 { font-size: 16px; margin: 0 0 16px; }
+#visionBench p { color: var(--text-secondary); overflow-wrap: anywhere; }
 #visionPanel :is(button, input, select, textarea) { font: inherit; }
 #visionPanel [hidden] {
   display: none !important;

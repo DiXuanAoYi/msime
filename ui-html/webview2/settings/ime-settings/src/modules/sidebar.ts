@@ -21,8 +21,16 @@ const setupLoaders: Record<string, () => Promise<void>> = {
   vision: async () => {
     (await import('./vision-layout')).setupVisionLayout();
     (await import('./vision')).setupVision();
+    (await import('./vision-quick')).setupVisionQuick();
   },
-  'personal-library': async () => { (await import('./personal-library')).setupPersonalLibrary(); },
+  'personal-library': async () => {
+    (await import('./personal-library')).setupPersonalLibrary();
+    const root = document.getElementById('personalLibraryPanel');
+    if (root && !root.dataset.quickReady) {
+      root.dataset.quickReady = '1';
+      (await import('./quick-controls')).bindQuickControls(root);
+    }
+  },
   appearance: async () => {
     const module = await import('./appearance');
     await module.setupAppearance();
@@ -54,7 +62,10 @@ const setupLoaders: Record<string, () => Promise<void>> = {
   'tools-settings': async () => {
     (await import('./tools-settings')).setupToolsSettings();
   },
-  'reply-studio': async () => { (await import('./reply-studio')).setupReplyStudio(); },
+  'reply-studio': async () => {
+    (await import('./reply-studio')).setupReplyStudio();
+    (await import('./reply-quick')).setupReplyQuick();
+  },
   'ai-settings': async () => {
     (await import('./ai-settings')).setupAiSettings();
   },

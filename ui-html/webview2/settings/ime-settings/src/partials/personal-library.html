@@ -1,4 +1,28 @@
 <div class="content" id="personalLibraryPanel">
+<div class="qp">
+  <header class="phead">
+    <div><h1>剪贴板与资料库</h1><p class="lead">复制过的内容和常用短语。在任意输入框按快捷键，光标旁就会出现列表，按数字键直接粘贴。</p></div>
+    <div class="phead-side"><button class="hk" type="button" data-hk="clip" title="点击修改快捷键"></button><button class="btn primary sm" type="button" data-try="clip">试一试</button></div>
+  </header>
+  <div class="seg" role="tablist" aria-label="剪贴板" data-seg="clip">
+    <button type="button" role="tab" data-tab="content" aria-selected="true">内容</button>
+    <button type="button" role="tab" data-tab="settings" aria-selected="false">设置</button>
+  </div>
+  <div class="tabpane" data-pane-of="clip" data-pane="settings" hidden>
+    <div class="card">
+      <div class="card-h"><h2>剪贴板记录</h2><p>是否记录复制内容，请用“内容”页里的开关。</p></div>
+      <div class="row"><div class="row-l"><b>排序</b><small>“最近优先”让刚复制的排第一；固定的内容总在最上面</small></div><div class="row-r"><div class="opt" data-cfg="clipboard.sort"><button type="button" data-v="recent">最近优先</button><button type="button" data-v="frequent">常用优先</button></div></div></div>
+      <div class="row"><div class="row-l"><b>最多保留</b></div><div class="row-r"><select data-cfg="clipboard.max_items" aria-label="最多保留条数"><option value="100">100 条</option><option value="200">200 条</option><option value="500">500 条</option></select><select data-cfg="clipboard.retention_days" aria-label="保留时长"><option value="7">7 天</option><option value="30">30 天</option><option value="0">一直保留</option></select></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>隐私</h2></div>
+      <div class="row"><div class="row-l"><b>跳过密码和敏感内容</b><small>密码管理器等软件复制时会标记“不要记录”，遵守这个标记</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="clipboard.respect_privacy_flag" aria-label="跳过敏感内容"></button></div></div>
+      <div class="row"><div class="row-l"><b>不记录这些软件</b><small>填程序文件名，用分号隔开，例如 KeePass.exe;1Password.exe</small></div><div class="row-r"><input type="text" data-cfg="clipboard.exclude_apps" aria-label="不记录的软件" style="width:320px" maxlength="400"></div></div>
+      <div class="row"><div class="row-l"><b>锁屏时暂停记录</b></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="clipboard.pause_on_lock" aria-label="锁屏时暂停记录"></button></div></div>
+    </div>
+  </div>
+</div>
+<div class="tabpane" id="libraryContent" data-pane-of="clip" data-pane="content">
   <div class="clipboard-heading">
     <div class="clipboard-heading-description">
       <div class="clipboard-title-row"><h2>剪贴板</h2><div class="ftb-toggle-btn" id="clipboardHistoryToggleBtn" role="switch" aria-label="剪贴板管理" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
@@ -104,4 +128,5 @@
   <div id="libraryContextMenu" class="clipboard-context-menu" role="menu" aria-label="内容操作" hidden></div>
   </div>
   </div>
+</div>
 </div>

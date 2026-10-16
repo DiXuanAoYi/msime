@@ -30,5 +30,5 @@ export function setupVoiceNavigation(): void {
       activateVoicePane(target.dataset.voiceTarget ?? 'speech'); target.focus();
     });
   });
-  activateVoicePane(root.dataset.voicePane ?? 'speech');
+  activateVoicePane(root.dataset.voicePane ?? 'recognition');
 }
