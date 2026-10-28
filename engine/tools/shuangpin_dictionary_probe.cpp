@@ -111,10 +111,21 @@ const char *source_name(CandidateSource source)
     }
 }
 
+// 输入域非空才多一项：没开领域词库的老场景，序列化和哈希与加这一项之前逐字一致。
+std::string domains_json(const WordItem &item)
+{
+    if (item.input_domains.empty())
+        return "";
+    std::string json = ",[";
+    for (std::size_t i = 0; i < item.input_domains.size(); ++i)
+        json += (i ? "," : "") + quote(item.input_domains[i]);
+    return json + "]";
+}
+
 std::string item_json(const WordItem &item)
 {
     return "[" + quote(item.pinyin) + "," + quote(item.canonical_pinyin) + "," + quote(item.word) + "," + std::to_string(item.weight) + ",\"" +
-           source_name(item.source) + "\"," + (item.sentence_association ? "1" : "0") + "]";
+           source_name(item.source) + "\"," + (item.sentence_association ? "1" : "0") + domains_json(item) + "]";
 }
 
 // {"n":条数,"h":全部内容的哈希,"top":前 8 项}
@@ -325,6 +336,73 @@ std::string constraints_json(const SyllableHelpcodes &helpcodes)
     return out + "]";
 }
 
+// 领域库每张 tbl_* 表抽几个键，场景的输入由它们按方案折成双拼。
+std::vector<std::string> sample_domain_keys(const fs::path &db_path, Lcg &rng)
+{
+    std::vector<std::string> keys;
+    sqlite3 *db = nullptr;
+    if (sqlite3_open_v2(db_path.string().c_str(), &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK)
+        return keys;
+    std::vector<std::string> tables;
+    sqlite3_stmt *list = nullptr;
+    sqlite3_prepare_v2(db, "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'tbl_%' ORDER BY name", -1, &list, nullptr);
+    while (list && sqlite3_step(list) == SQLITE_ROW)
+        tables.emplace_back(reinterpret_cast<const char *>(sqlite3_column_text(list, 0)));
+    sqlite3_finalize(list);
+    for (const auto &table : tables)
+    {
+        sqlite3_stmt *count = nullptr;
+        sqlite3_prepare_v2(db, ("SELECT count(*) FROM \"" + table + "\"").c_str(), -1, &count, nullptr);
+        long long rows = 0;
+        if (count && sqlite3_step(count) == SQLITE_ROW)
+            rows = sqlite3_column_int64(count, 0);
+        sqlite3_finalize(count);
+        for (int i = 0; i < 12 && rows > 0; ++i)
+        {
+            sqlite3_stmt *row = nullptr;
+            sqlite3_prepare_v2(db, ("SELECT key FROM \"" + table + "\" LIMIT 1 OFFSET " + std::to_string(rng.below(static_cast<std::uint32_t>(rows)))).c_str(), -1, &row, nullptr);
+            if (row && sqlite3_step(row) == SQLITE_ROW)
+                keys.emplace_back(reinterpret_cast<const char *>(sqlite3_column_text(row, 0)));
+            sqlite3_finalize(row);
+        }
+    }
+    sqlite3_close(db);
+    std::sort(keys.begin(), keys.end());
+    keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+    return keys;
+}
+
+// 领域词的全拼键折成这个方案的双拼串；有的整串、有的只留前几个音节、有的音节换成声母，音节在方案里没有码就放弃。
+std::string shuangpin_for_key(Lcg &rng, const ProfileInfo &profile, const std::string &key)
+{
+    std::vector<std::string> syllables;
+    std::size_t start = 0;
+    while (true)
+    {
+        const auto pos = key.find('\'', start);
+        syllables.push_back(key.substr(start, pos == std::string::npos ? std::string::npos : pos - start));
+        if (pos == std::string::npos)
+            break;
+        start = pos + 1;
+    }
+    if (rng.below(4) == 0 && syllables.size() > 1)
+        syllables.resize(1 + rng.below(static_cast<std::uint32_t>(syllables.size())));
+    std::string seq;
+    for (std::size_t i = 0; i < syllables.size(); ++i)
+    {
+        if (rng.below(6) == 0 || (i + 1 == syllables.size() && rng.below(5) == 0))
+        {
+            seq += syllables[i].substr(0, 1);
+            continue;
+        }
+        const auto code = profile.code_for.find(syllables[i]);
+        if (code == profile.code_for.end())
+            return "";
+        seq += code->second;
+    }
+    return seq;
+}
+
 void read_cases(std::ostream &out, const fs::path &resources, const std::vector<ProfileInfo> &profiles)
 {
     const metasequoia::RuntimePaths paths{resources, fs::temp_directory_path() / "msime_shuangpin_probe_user", fs::temp_directory_path() / "msime_shuangpin_probe_cache",
@@ -414,6 +492,59 @@ void read_cases(std::ostream &out, const fs::path &resources, const std::vector<
             if (rng.below(3) == 0)
                 out << head << ",\"op\":\"creating\",\"ret\":" << list_json(dictionary.generate_for_creating_word(seq)) << "}\n";
         }
+
+        // ---- 开了领域词库的读场景 ----
+        static const std::vector<std::string> packs = {"animals", "automotive", "finance", "food", "historical", "idioms", "it", "law", "medicine", "places", "poetry"};
+        std::uint64_t domain_seed = 0xd0a1d1c7ULL;
+        for (const char c : std::string(info.name))
+            domain_seed = domain_seed * 131 + static_cast<unsigned char>(c);
+        Lcg drng{domain_seed}; // 独立的随机流：老场景的输入不因加了这一块而变
+        Lcg key_rng{0x4b455953ULL};
+        static std::vector<std::string> domain_keys;
+        if (domain_keys.empty())
+            domain_keys = sample_domain_keys(resources / "domain-input.db", key_rng);
+        if (domain_keys.empty())
+        {
+            std::cerr << "读不到领域库键\n";
+            std::exit(1);
+        }
+        std::string enabled;
+        for (int scenario = 0; scenario < 120; ++scenario)
+        {
+            if (scenario % 6 == 0)
+            {
+                enabled.clear();
+                const std::uint32_t count = drng.below(5) == 0 ? packs.size() : 1 + drng.below(4);
+                for (std::uint32_t i = 0; i < count; ++i)
+                    enabled += (i ? "," : "") + drng.pick(packs);
+                dictionary.set_enabled_domain_dictionaries(enabled);
+            }
+            const std::string seq = shuangpin_for_key(drng, info, drng.pick(domain_keys));
+            if (seq.empty())
+                continue;
+            const std::string seg = ShuangpinUtil::pinyin_segmentation(seq, *info.profile);
+            const std::uint32_t association = drng.below(3);
+            const std::uint32_t fuzzy = drng.below(3) == 0 ? drng.below(1u << 11) : 0;
+            SentenceAssociationOptions options;
+            options.word_lattice = association >= 1;
+            options.show_next_on_duplicate = association == 2;
+            dictionary.set_sentence_association(options);
+            dictionary.set_fuzzy_pinyin(metasequoia::FuzzyPinyinOptions{fuzzy});
+            dictionary.set_syllable_helpcodes({});
+            dictionary.reset_cache();
+            const std::string head = "{\"kind\":\"read\",\"profile\":\"" + std::string(info.name) + "\",\"case\":" + std::to_string(cases++) + ",\"seq\":" + quote(seq) +
+                                     ",\"seg\":" + quote(seg) + ",\"assoc\":" + std::to_string(association) + ",\"fuzzy\":" + std::to_string(fuzzy) + ",\"constraints\":[],\"dom\":" + quote(enabled);
+            out << head << ",\"op\":\"generate\",\"ret\":" << list_json(dictionary.generate(seq, seg)) << "}\n";
+            const auto series = dictionary.generateSeries(seq, seg);
+            out << head << ",\"op\":\"series\",\"ret\":" << list_json(series) << "}\n";
+            if (seq.size() == 1)
+            {
+                auto candidates = series;
+                const bool expanded = dictionary.expand_initial_candidates(seq, candidates);
+                out << head << ",\"op\":\"expand\",\"expanded\":" << (expanded ? "true" : "false") << ",\"ret\":" << list_json(candidates) << "}\n";
+            }
+        }
+        dictionary.set_enabled_domain_dictionaries("");
     }
 }
 
