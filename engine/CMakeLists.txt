@@ -30,6 +30,7 @@ set(METASEQUOIA_IME_ENGINE_SOURCES
     common/helpcode_utils.cpp
     common/string_utils.cpp
     core/session.cpp
+    capi/msime_capi.cpp
     core/nine_key_session.cpp
     core/candidate_queries.cpp
     core/punctuation_policy.cpp
@@ -171,6 +172,10 @@ if(MSVC)
 else()
     target_compile_options(MetasequoiaImeEngine PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+# 黄金样本探针：把输入串清单喂给引擎并输出候选，作为其他实现（如 Rust 核心）的行为规格。只在显式指定目标时构建。
+add_executable(msime_golden_probe EXCLUDE_FROM_ALL tools/golden_probe.cpp)
+target_link_libraries(msime_golden_probe PRIVATE MetasequoiaIme::Engine)
 
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)

@@ -1,0 +1,38 @@
+# 引擎黄金样本
+
+给“另一个实现要和现在的引擎行为一致”用的规格：一份输入清单，加上现有 C++ 引擎对每条输入给出的预编辑和候选顺序。以后用 Rust 重写引擎的某一块（词库查询、切分、整句词格）时，输出对着这份比，一条一条对。
+
+| 文件 | 内容 |
+|---|---|
+| `corpus.tsv` | 输入清单，每行 `方案<TAB>按键`。发现新的输入问题就加一行 |
+| `expected.jsonl` | 现引擎的输出，每条保留前 40 个候选。提交进仓库，当作基线 |
+| `../../tools/golden_probe.cpp` | 生成输出的探针，走 `capi/msime_capi.h` 这层 C 接口 |
+| `../../tools/golden_compare.py` | 比对两份输出，列出差异 |
+| `../../capi/msime_capi.h` | 其他语言前端认的唯一接口 |
+
+## 重新生成或核对
+
+基线必须用**随包的出货词库**生成，不能用某个人本机正在学习的用户词库，否则每个人跑出来的权重都不同。用 `installer/app_data`（`Prepare-PackageFiles.ps1` 之后就有）复制一份当数据目录：
+
+```powershell
+# 1. 构建探针（它不进默认构建）。先配置一次，之后只需第二条
+cmake -S server -B server/build-release
+cmake --build server/build-release/engine --config Release --target msime_golden_probe
+
+# 2. 复制出货数据，避免动到原件
+Copy-Item installer/app_data $env:TEMP\golden-data -Recurse
+
+# 3. 跑样本
+server\build-release\engine\Release\msime_golden_probe.exe $env:TEMP\golden-data $env:TEMP\golden-data $env:TEMP\golden-data\cache engine\contracts\golden\corpus.tsv $env:TEMP\actual.jsonl
+
+# 4. 和基线比
+python engine/tools/golden_compare.py engine/contracts/golden/expected.jsonl $env:TEMP\actual.jsonl --top 20
+```
+
+退出码 0 表示和基线完全一致。同一份数据跑两遍结果逐字节相同（探针里 `learning` 关闭，不选词、不上屏）。
+
+## 改引擎后怎么办
+
+- 改动**不该**影响排序，比对出差异就是回归，先修。
+- 改动**该**影响排序（词库升级、排序策略调整），确认差异符合预期后重新生成并提交 `expected.jsonl`，提交说明里写清变了什么。
+- 重新生成时用 `golden_compare.py --trim 全量.jsonl expected.jsonl --top 40` 把全量输出裁成基线。
