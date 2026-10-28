@@ -3,7 +3,7 @@
 //!
 //! 纠错那一块（`autocorrect_cut_kbest`、`legal_input_correction_cuts`、`looks_like_jianpin_spelling` 等）不在这里。
 
-use crate::quanpin_query::{split_segments, Segments};
+use crate::quanpin_query::{is_complete_pinyin_input, split_segments, Segments};
 use crate::syllables::{is_intact, is_prefix, INTACT};
 
 /// 字面混合简拼的匹配程度。输入不带分隔符，词库行的读音是 `code`（敲的）、`canonical`（完整音节）：
@@ -310,4 +310,34 @@ pub fn to_google_spelling(segmentation: &str) -> String {
         .map(|chunk| SPELLINGS.iter().find(|(from, _)| *from == chunk).map_or(chunk, |(_, to)| *to))
         .collect::<Vec<_>>()
         .join("'")
+}
+
+/// 末尾的大写字母是辅助码：返回它的长度（0、1、2）。前面剩下的必须是完整拼音。
+pub fn detect_active_helpcode_length(raw_input: &str, raw_input_with_cases: &str) -> usize {
+    let input_with_cases = if raw_input_with_cases.is_empty() { raw_input } else { raw_input_with_cases };
+    if crate::helpcode::is_double_help_mode(input_with_cases) && raw_input.len() >= 2 && is_complete_pinyin_input(prefix_bytes(raw_input, raw_input.len() - 2)) {
+        return 2;
+    }
+    if crate::helpcode::is_single_help_mode(input_with_cases) && !raw_input.is_empty() && is_complete_pinyin_input(prefix_bytes(raw_input, raw_input.len() - 1)) {
+        return 1;
+    }
+    0
+}
+
+/// 去掉末尾的辅助码，剩下纯拼音。
+pub fn strip_active_helpcodes(raw_input: &str, raw_input_with_cases: &str) -> String {
+    let length = detect_active_helpcode_length(raw_input, raw_input_with_cases);
+    if length == 0 || raw_input.len() < length {
+        return raw_input.to_string();
+    }
+    prefix_bytes(raw_input, raw_input.len() - length).to_string()
+}
+
+/// C++ `substr(0, n)` 按字节；输入是 ASCII，万一混进多字节就退到前一个字符边界，而不是 panic。
+fn prefix_bytes(text: &str, length: usize) -> &str {
+    let mut end = length.min(text.len());
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
 }
