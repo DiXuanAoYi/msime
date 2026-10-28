@@ -9,6 +9,8 @@
 | `../../tools/golden_probe.cpp` | 生成输出的探针，走 `capi/msime_capi.h` 这层 C 接口 |
 | `../../tools/golden_compare.py` | 比对两份输出，列出差异 |
 | `../../capi/msime_capi.h` | 其他语言前端认的唯一接口 |
+| `ranking_cases.tsv`、`expected_ranking.jsonl` | 调频黄金用例及真实 `adjust_candidate_ranking` 的输出，探针是 `../../tools/ranking_probe.cpp`，用例由 `../../tools/gen_ranking_cases.py` 生成 |
+| `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对
 

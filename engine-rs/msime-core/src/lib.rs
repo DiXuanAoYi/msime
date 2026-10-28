@@ -12,7 +12,9 @@
 pub mod autocorrect;
 pub mod dict;
 pub mod fuzzy;
+pub mod helpcode;
 pub mod ranking;
+pub mod shuangpin;
 pub mod segment;
 pub mod syllables;
 pub mod table;

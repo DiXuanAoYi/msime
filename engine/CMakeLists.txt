@@ -181,6 +181,10 @@ target_link_libraries(msime_golden_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_ranking_probe EXCLUDE_FROM_ALL tools/ranking_probe.cpp)
 target_link_libraries(msime_ranking_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
 
+# 双拼与辅助码探针：导出方案表、解码、分段、取码与匹配的结果，当 Rust 实现的行为规格。
+add_executable(msime_helpshuang_probe EXCLUDE_FROM_ALL tools/helpshuang_probe.cpp)
+target_link_libraries(msime_helpshuang_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

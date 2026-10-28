@@ -14,12 +14,14 @@
 | 模糊音（十一条规则、近音路径、与精确候选按权重混排） | `src/fuzzy.rs`、`src/dict.rs` | `tests/golden.rs`：34 条输入、1012 个词，其中 2581 个模糊词，相对顺序和 C++ 一致 |
 | 纠错：错拼表（换位、邻键、漏键、多键）和静态表上的 k-best 切分 | `src/autocorrect.rs` | `tests/autocorrect_table_matches_cpp.rs`：四张表（806 / 3728 / 194 / 11044 个错拼键）和 `engine/quanpin/autocorrect_table.h` 逐项相同；`tests/golden.rs`：7 条输入、210 个词，首选词和相对顺序一致 |
 | 调频算法（选中项的目标名次、权重中点、整排重排、选中次数计数；只算该写的权重，不碰 SQLite） | `src/ranking.rs` | `tests/ranking_golden.rs`：`engine/contracts/golden/ranking_cases.tsv` 的 253 个用例（含权重相等、相邻、超上限、接近 i64 上限、混读音、显示顺序不等于权重顺序、连选触发次数），每行最终权重和真实 `adjust_candidate_ranking` 逐个相同；基线由 `msime_ranking_probe` 在合成词库上生成 |
+| 双拼：九套内置方案表、按键解码、贪心分段、转全拼、全码辅助判断 | `src/shuangpin.rs` | `tests/shuangpin_helpcode_golden.rs`：方案表原样相同；9 套方案 × 756 个码的解码相同；885 条随机串的分段、转全拼、全码辅助相同。方案表由脚本从 C++ 源码抽取，不是手抄 |
+| 辅助码：码表加载、取码、单码匹配与重排、双码匹配与筛选、大写结尾的模式判断 | `src/helpcode.rs` | 同上：6 套内置码表（共约 7.4 万行）、1621 个词的取码和匹配、重排与筛选逐项相同；基线由 `msime_helpshuang_probe` 导出 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
 1. 整句词格（Google 解码器、kenlm）
 2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
-3. 辅助码、双拼、五笔、日语
+3. 五笔、日语；双拼里的用户自定义方案（`BuildCustomShuangpinProfile`）和双拼词库查询（`shuangpin_query.cpp`、`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
 4. 英文与本地模式
 
 ### 纠错里还留在 C++ 的部分
@@ -63,3 +65,12 @@ anking-scratch engine\contracts\golden\expected_ranking.jsonl
 ```
 
 基线变了要在提交说明里写清为什么变。
+
+## 重新生成双拼与辅助码基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_helpshuang_probe
+server\build-release\engine\Release\msime_helpshuang_probe.exe engine\helpcode engine\contracts\golden\expected_helpshuang.jsonl
+```
+
+改了 `engine/shuangpin/shuangpin_profile.cpp` 的方案表后，要同时重新抽取 `src/shuangpin.rs` 末尾的方案函数：`python engine-rs/tools/extract_shuangpin_profiles.py`（脚本从 C++ 源码生成，没有手抄）。
