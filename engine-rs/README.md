@@ -232,7 +232,7 @@ server\build-release\engine\Release\msime_dictionary_state_probe.exe engine\cont
 
 ```powershell
 cmake --build server/build-release/engine --config Release --target msime_google_pinyin_probe
-server\build-release\engine\Release\msime_google_pinyin_probe.exe installer\app_data engine\contracts\golden\expected_google_pinyin.jsonl
+server\build-release\engine\Release\msime_google_pinyin_probe.exe installer\app_data\dict_pinyin.dat $env:TEMP\gpprobe_user.dat engine\contracts\golden\expected_google_pinyin.jsonl
 ```
 
 ## 重新生成神经重排基线
