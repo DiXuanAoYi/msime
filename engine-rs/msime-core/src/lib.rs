@@ -34,6 +34,7 @@ pub mod spelling_graph;
 pub mod segment;
 pub mod syllables;
 pub mod table;
+pub mod user_dictionary;
 pub mod vmode;
 pub mod wubi;
 

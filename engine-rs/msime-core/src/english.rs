@@ -222,3 +222,70 @@ fn load_custom_translations(path: &Path) -> (HashMap<String, String>, HashMap<St
     }
     (en_zh, zh_en)
 }
+
+// ---------------------------------------------------------------------------------------------
+// 写库：建表/升级旧表、写释义（移植自 `EnglishDictionary::ensure_schema` / `upsert_gloss`）
+// ---------------------------------------------------------------------------------------------
+
+/// 保证 `english.db` 有当前结构：`english_words` 是（词，显示）复合主键、带权重的 WITHOUT ROWID 表（旧库缺权重或
+/// 主键不对就迁移），加上两张释义表，`user_version` 置 3。库不存在时创建。
+pub fn ensure_schema(db_path: &str) -> bool {
+    let Ok(database) = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE) else {
+        return false;
+    };
+    let (mut has_weight, mut has_table, mut primary_key_columns) = (false, false, 0);
+    if let Ok(mut columns) = database.prepare("PRAGMA table_info(english_words)") {
+        if let Ok(rows) = columns.query_map([], |row| Ok((row.get::<_, Option<String>>(1)?, row.get::<_, i64>(5)?))) {
+            for (name, primary_key) in rows.flatten() {
+                has_table = true;
+                has_weight = has_weight || name.as_deref() == Some("weight");
+                if primary_key > 0 {
+                    primary_key_columns += 1;
+                }
+            }
+        }
+    }
+    let composite_primary_key = primary_key_columns == 2;
+    let create = "(word TEXT COLLATE BINARY NOT NULL,display TEXT NOT NULL,weight INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(word,display)) WITHOUT ROWID";
+    let english_words_ok = if !has_table {
+        database.execute_batch(&format!("CREATE TABLE english_words{create};")).is_ok()
+    } else if has_weight && composite_primary_key {
+        true
+    } else {
+        let copy_sql = if has_weight {
+            "INSERT OR IGNORE INTO english_words_new(word,display,weight) SELECT word,display,weight FROM english_words;"
+        } else {
+            "INSERT OR IGNORE INTO english_words_new(word,display,weight) SELECT word,display,0 FROM english_words;"
+        };
+        let migrated = database.execute_batch("BEGIN IMMEDIATE").is_ok()
+            && database.execute_batch(&format!("CREATE TABLE english_words_new{create}")).is_ok()
+            && database.execute_batch(copy_sql).is_ok()
+            && database.execute_batch("DROP TABLE english_words").is_ok()
+            && database.execute_batch("ALTER TABLE english_words_new RENAME TO english_words").is_ok();
+        let _ = database.execute_batch(if migrated { "COMMIT" } else { "ROLLBACK" });
+        migrated
+    };
+    english_words_ok
+        && database
+            .execute_batch(
+                "CREATE TABLE IF NOT EXISTS en_zh_glosses(english TEXT COLLATE BINARY PRIMARY KEY,chinese_gloss TEXT NOT NULL) WITHOUT ROWID;\
+                 CREATE TABLE IF NOT EXISTS zh_en_glosses(chinese TEXT COLLATE BINARY PRIMARY KEY,english_gloss TEXT NOT NULL) WITHOUT ROWID;\
+                 PRAGMA user_version=3;",
+            )
+            .is_ok()
+}
+
+/// 写一条释义（中译英或英译中），已有的覆盖。
+pub fn upsert_gloss(db_path: &str, chinese_to_english: bool, key: &str, gloss: &str) -> bool {
+    if db_path.is_empty() || key.is_empty() || gloss.is_empty() || !ensure_schema(db_path) {
+        return false;
+    }
+    let Ok(database) = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_WRITE) else { return false };
+    let _ = database.busy_timeout(std::time::Duration::from_millis(250));
+    let sql = if chinese_to_english {
+        "INSERT OR REPLACE INTO zh_en_glosses(chinese,english_gloss) VALUES(?1,?2)"
+    } else {
+        "INSERT OR REPLACE INTO en_zh_glosses(english,chinese_gloss) VALUES(?1,?2)"
+    };
+    database.execute(sql, rusqlite::params![key, gloss]).is_ok()
+}

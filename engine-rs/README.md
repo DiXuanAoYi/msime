@@ -29,13 +29,14 @@
 | 词格的词库查询（跨度只收键完全相等的行；ü 另一种写法归一；模糊近音同批查、每错一个音节扣一份分、按折后权重稳定排序、同字去重、截回上限） | `src/dict.rs`（`Dictionary::lattice_lookup`） | `tests/lattice_lookup_golden.rs`：在随包 `msime.db` 上 1119 个跨度（700 个随机跨度取自词库真有的键并混入 jv/lue 写法、查不到的键和不完整音节，加全部单音节键各一次），随机模糊音规则和上限；条数、内容哈希、前 12 项（键、词、权重、扣分）与真实 `make_lattice_db_lookup` 一致，其中 885 个开了模糊音、156 个带扣分、359 个吃满上限。基线由 `msime_lattice_lookup_probe` 导出 |
 | 双拼直接辅助码的拼写图（六种拼写：双拼两键、加一位辅码、两位辅码加斜杠/大写/不带标记、单声母；缩写边剪枝；大写标记严格档与兜底档；只留落在完整路径上的边；唯一路径判断） | `src/spelling_graph.rs` | `tests/spelling_graph_golden.rs`：九套内置方案 × 330 条随机输入串（2970 条，随机斜杠/大写标记开关，五种辅码谓词——空、哈希模 2/3/5、恒真——辅码表用确定的哈希函数代替，两边写同一个），边、分隔符、下一出字位置、唯一路径与真实 `build_spelling_graph` 一致，其中空图 208、唯一路径 1553、辅码边 2880。`single_path` 里 `min(count, 2)` 的上限换成 3 测不出（只有“是否恰好 1 条”起作用，等价变异）。基线由 `msime_spelling_graph_probe` 导出 |
 | 直接辅助码的整句解码（在拼写图上铺词、一次 Viterbi 同时定切分与用字；占位边、搭配尾窗、语言模型状态、MSVC 的 `partial_sort` 束截断）和解析器（辅码索引、选切分、改写请求为句中辅助码形状、纯双拼时放行） | `src/direct_lattice.rs`、`src/direct_resolver.rs`、`src/msvc_sort.rs` | `tests/direct_helpcode_golden.rs`：九套内置方案 × 220 条随机输入串。词库、码表、辅码谓词都是哈希合成的（两边同一套，权重互不相同）；1980 次解码（整句完整 779，987 次带真实 `sc.lm`）的音节、整句、键、词、分数逐项一致，词边缓存跑两次结果不变；1980 次解析器调用（改写请求 856，带辅码约束 163，解出整句 14）的是否改写、改写出的请求字段、整句一致。`partial_sort` 的平局次序照 MSVC 的堆实现搬过来（`msvc_sort`，日语解码共用），所以不必回避平局。C++ 的 `QueryRequest` 没移植，改写结果放在 `Rewrite`；跨按键的查词/整句/搭配分缓存只影响速度，没搬。辅码索引回查时“只收单字”的过滤在合成词库里测不出（码表里只有单字，等价变异）。基线由 `msime_direct_helpcode_probe` 导出，要 `sc.lm` |
+| 用户词库：操作日志（造词/删词/调频/重放，两库提交次序）、固定位置、调频的权重算法（中点、占用权重冲突、16 行重排、上限/下限/逼近 int64）、五笔/快捷短语/英文词的学习与槽位、日期时间格式顺序、个人词库的校验/编辑（回执、过期编辑检测）/分页、词库状态导出；`EnglishDictionary::ensure_schema` / `upsert_gloss` | `src/user_dictionary.rs`、`src/english.rs`（`ensure_schema`、`upsert_gloss`） | `tests/user_dictionary_golden.rs`：160 个场景 × 8 到 25 步随机操作（2651 步，28 种操作），每个场景从同一份合成 `msime.db`/`english.db` 和空日志出发；每步的返回值和执行后三个库逐表转储的哈希（不含 `updated_at`）与真实 `user_dictionary::*`、`edit_personal_dictionary`、`personal_dictionary_entries`、`stream_dictionary_state` 一致。合成词库里专门放了走进重排各分支的形状（权重超上限、成片相同、16 个连号、阶梯末位恰好等于下限、权重逼近 int64 上限、连号链撞上上限），探针把选中项摆到能走进这些分支的位置。变异检查：重排间隔与行数、上限、中点取整、阶梯起点、冲突阈值、阶梯下限边界、逼近上限判断、英文词长度边界、个人词库分页与回执 ID 长度边界都能被测出。测不出的是等价变异：`slot >= max_slot` 已提前返回，后面 `(slot + 1).min(max_slot)` 的 `min` 去不去都一样（英文槽位同理）；重放按 `updated_at, rowid` 排序在这套数据里无影响（各日志行落在词库的不同行上）。`ensure_schema` 只核对了建出的表名和 `user_version`，`upsert_gloss` 没有单独的基线。基线由 `msime_user_dictionary_probe` 导出，初始库一并提交 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
 1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及全拼/双拼词典层（`quanpin_dictionary.cpp`、`shuangpin_dictionary.cpp`）把各路来源编排成候选列表的那段（词格的词库查询 `make_lattice_db_lookup`、直接辅助码解码与解析器已移植）
-2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
-3. 五笔和日语里绑着用户词库的部分（调频、删词、造词写 SQLite）；双拼词库查询（`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
-4. 英文词典与本地模式里要写库的部分：`EnglishDictionary::ensure_schema` / `upsert_gloss`（建表、升级旧库、写入释义）、`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
+2. 用户词库里没搬的两处：`stage_dictionary_state`（把导入的状态暂存成新库）、按默认路径缓存连接（只是性能手段，Rust 每次打开新连接）
+3. 五笔和日语里调用用户词库的接线（用户词库本身已移植）；双拼词库查询（`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
+4. 本地模式：`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
 
 ### 纠错里还留在 C++ 的部分
 
@@ -179,4 +180,14 @@ server\build-release\engine\Release\msime_spelling_graph_probe.exe engine\contra
 ```powershell
 cmake --build server/build-release/engine --config Release --target msime_direct_helpcode_probe
 server\build-release\engine\Release\msime_direct_helpcode_probe.exe engine\contracts\golden\expected_direct_helpcode.jsonl installer\app_data\sc.lm
+```
+
+## 重新生成用户词库基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_user_dictionary_probe
+$work = Join-Path $env:TEMP 'udprobe'
+server\build-release\engine\Release\msime_user_dictionary_probe.exe $work engine\contracts\golden\expected_user_dictionary.jsonl
+Copy-Item $work\initial_main.db engine\contracts\golden\user_dictionary_initial_main.db
+Copy-Item $work\initial_english.db engine\contracts\golden\user_dictionary_initial_english.db
 ```
