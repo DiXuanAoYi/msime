@@ -251,6 +251,133 @@ pub fn sort_by<T>(items: &mut Vec<T>, items_less: impl Fn(&T, &T) -> bool) {
     items.extend(order.into_iter().map(|i| slots[i].take().expect("每个下标只用一次")));
 }
 
+/// MSVC 的 C 运行库 `qsort`：三数取中的快速排序，不超过 8 个元素的段用选择排序。
+/// 不稳定；Google 拼音解码器靠它排候选，同分候选的先后次序因此由这套算法决定。
+pub fn qsort_by<T>(items: &mut [T], cmp: impl Fn(&T, &T) -> i32) {
+    const CUTOFF: isize = 8;
+    let n = items.len() as isize;
+    if n < 2 {
+        return;
+    }
+    let c = |items: &[T], a: isize, b: isize| cmp(&items[a as usize], &items[b as usize]);
+    let swap = |items: &mut [T], a: isize, b: isize| {
+        if a != b {
+            items.swap(a as usize, b as usize);
+        }
+    };
+    let mut lostk: Vec<isize> = Vec::new();
+    let mut histk: Vec<isize> = Vec::new();
+    let (mut lo, mut hi) = (0isize, n - 1);
+    loop {
+        let size = hi - lo + 1;
+        let mut again = false;
+        if size <= CUTOFF {
+            let mut top = hi;
+            while top > lo {
+                let mut max = lo;
+                let mut p = lo + 1;
+                while p <= top {
+                    if c(items, p, max) > 0 {
+                        max = p;
+                    }
+                    p += 1;
+                }
+                swap(items, max, top);
+                top -= 1;
+            }
+        } else {
+            let mut mid = lo + size / 2;
+            if c(items, lo, mid) > 0 {
+                swap(items, lo, mid);
+            }
+            if c(items, lo, hi) > 0 {
+                swap(items, lo, hi);
+            }
+            if c(items, mid, hi) > 0 {
+                swap(items, mid, hi);
+            }
+            let (mut loguy, mut higuy) = (lo, hi);
+            loop {
+                if mid > loguy {
+                    loop {
+                        loguy += 1;
+                        if !(loguy < mid && c(items, loguy, mid) <= 0) {
+                            break;
+                        }
+                    }
+                }
+                if mid <= loguy {
+                    loop {
+                        loguy += 1;
+                        if !(loguy <= hi && c(items, loguy, mid) <= 0) {
+                            break;
+                        }
+                    }
+                }
+                loop {
+                    higuy -= 1;
+                    if !(higuy > mid && c(items, higuy, mid) > 0) {
+                        break;
+                    }
+                }
+                if higuy < loguy {
+                    break;
+                }
+                swap(items, loguy, higuy);
+                if mid == higuy {
+                    mid = loguy;
+                }
+            }
+            higuy += 1;
+            if mid < higuy {
+                loop {
+                    higuy -= 1;
+                    if !(higuy > mid && c(items, higuy, mid) == 0) {
+                        break;
+                    }
+                }
+            }
+            if mid >= higuy {
+                loop {
+                    higuy -= 1;
+                    if !(higuy > lo && c(items, higuy, mid) == 0) {
+                        break;
+                    }
+                }
+            }
+            if higuy - lo >= hi - loguy {
+                if lo < higuy {
+                    lostk.push(lo);
+                    histk.push(higuy);
+                }
+                if loguy < hi {
+                    lo = loguy;
+                    again = true;
+                }
+            } else {
+                if loguy < hi {
+                    lostk.push(loguy);
+                    histk.push(hi);
+                }
+                if lo < higuy {
+                    hi = higuy;
+                    again = true;
+                }
+            }
+        }
+        if again {
+            continue;
+        }
+        match (lostk.pop(), histk.pop()) {
+            (Some(l), Some(h)) => {
+                lo = l;
+                hi = h;
+            }
+            _ => return,
+        }
+    }
+}
+
 #[cfg(test)]
 mod sort_tests {
     use super::sort_by;

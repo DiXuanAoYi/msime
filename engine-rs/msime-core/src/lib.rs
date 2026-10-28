@@ -18,6 +18,7 @@ pub mod domain_dictionary;
 pub mod english;
 pub mod fuzzy;
 pub mod gram;
+pub mod google_pinyin;
 pub mod helpcode;
 pub mod japanese;
 pub mod kenlm;
