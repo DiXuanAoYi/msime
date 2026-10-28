@@ -119,6 +119,7 @@ export function conversationOrder(
 ): ["A" | "B", "A" | "B"] {
   return face !== swapped ? ["B", "A"] : ["A", "B"];
 }
+import { setupConversation } from "./vision-conversation";
 export function setupVision(): void {
   const root = el("visionPanel");
   if (!root || root.dataset.ready) return;
@@ -288,6 +289,7 @@ export function setupVision(): void {
     layout();
   };
   layout();
+  setupConversation();
   el("visionCopy").onclick = () => copy(value("visionText"));
   el("visionCopyTranslation").onclick = () => copy(value("visionTranslation"));
   el("visionExport").onclick = () =>
@@ -581,6 +583,7 @@ export function setupVision(): void {
       lastTranslation = message.translation;
       if (!busy || !pendingTranslation)
         el<HTMLTextAreaElement>(route).value = message.translation;
+      if (!busy || !pendingTranslation) el(route).dispatchEvent(new Event("change"));
     }
     if (!busy) pendingTranslation = false;
     if (!busy && message.error) resolveSubtitleFailure(message.subtitles);

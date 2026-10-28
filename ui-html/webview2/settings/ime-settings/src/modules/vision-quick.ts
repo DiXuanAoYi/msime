@@ -1,6 +1,7 @@
 import { serializeHostMessage } from "../../../../shared/messages";
 import { onHostMessage } from "../utils/host-messages";
-import { bindQuickControls, setSeg } from "./quick-controls";
+import { cloudOcrConnected, niuConnected, tencentTmtConnected, textModel, textModelChip } from "./connections";
+import { bindQuickControls, type ChipResolver, type ChipState, type RawReader } from "./quick-controls";
 
 export interface VisionHistoryRow {
   id: string;
@@ -35,13 +36,128 @@ export function filterHistory(rows: VisionHistoryRow[], kind: string, query: str
   });
 }
 
+const CLOUD_OCR = new Set(["shiliu", "tencent", "baidu"]);
 const BENCH_TABS = new Set(["image", "text", "conversation", "subtitles", "services"]);
 
+const LINE_SAMPLE =
+  "Offline sync keeps a full copy of your notes on this device. Changes you make without a connection are queued and uploaded automatically the next time you go online.";
+const LINE_SAMPLE_2 = "Before you begin, make sure at least 2 GB of free disk space is available.";
+
+function wrapLines(text: string, width: number): string {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line && line.length + word.length + 1 > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.join("\n");
+}
+
+/** What the "换行" option does to a screen paragraph, shown under the option. */
+export function linePreview(mode: string): string {
+  const two = `${LINE_SAMPLE}\n\n${LINE_SAMPLE_2}`;
+  if (mode === "keep") return two.split("\n\n").map((paragraph) => wrapLines(paragraph, 48)).join("\n\n");
+  if (mode === "one") return two.replace(/\n+/g, " ");
+  return two;
+}
+
+/** Local OCR model state as the "识字" tab shows it. */
+export interface LocalOcrState {
+  running: boolean;
+  downloaded: boolean;
+}
+
+type Value = (path: string) => string | undefined;
+
+function translationChip(value: Value, raw: RawReader): ChipState {
+  const provider = value("vision.translation_provider") || "text_model";
+  if (provider === "dictionary") return { text: "翻译：本机词典（只能查词）", tone: "warn" };
+  if (provider === "niutrans") {
+    return niuConnected(value) ? { text: "翻译：小牛翻译", tone: "good" } : { text: "翻译：小牛翻译（未连接）", tone: "warn" };
+  }
+  if (provider === "tencent") {
+    return tencentTmtConnected(value)
+      ? { text: "翻译：腾讯翻译", tone: "good" }
+      : { text: "翻译：腾讯翻译（未连接）", tone: "warn" };
+  }
+  const model = textModel(value, raw, value("vision.text_provider") || "");
+  return { text: `翻译：${model.label}${model.connected ? "" : "（未连接）"}`, tone: model.connected ? "good" : "warn" };
+}
+
+export function visionChips(local: () => LocalOcrState): Record<string, ChipResolver> {
+  return {
+    visionOcr: (value) => {
+      const provider = value("vision.provider") || "smart";
+      if (CLOUD_OCR.has(provider)) {
+        return cloudOcrConnected(value)
+          ? { text: "识字：云端", tone: "good" }
+          : { text: "识字：云端（未连接）", tone: "warn" };
+      }
+      if (provider === "windows") return { text: "识字：Windows 本机", tone: "good" };
+      if (provider === "local") return { text: "识字：本地模型", tone: local().downloaded ? "good" : "warn" };
+      return { text: "识字：智能", tone: "good" };
+    },
+    visionTr: translationChip,
+    ocrSmart: () =>
+      local().downloaded ? { text: "可用", tone: "good" } : { text: "本地模型未下载，先用 Windows", tone: "warn" },
+    ocrLocal: () => (local().downloaded ? { text: "已下载", tone: "good" } : { text: "未下载", tone: "off" }),
+    ocrCloud: (value) => (cloudOcrConnected(value) ? { text: "已连接", tone: "good" } : { text: "未连接", tone: "off" }),
+    ocrService: () => (local().running ? { text: "运行中", tone: "good" } : { text: "未运行", tone: "off" }),
+    trAi: (value, raw) => textModelChip(value, raw, value("vision.text_provider") || ""),
+    trNiu: (value) => (niuConnected(value) ? { text: "已连接", tone: "good" } : { text: "未连接", tone: "off" }),
+    trTencent: (value) => (tencentTmtConnected(value) ? { text: "已连接", tone: "good" } : { text: "未连接", tone: "off" }),
+  };
+}
+
+export function visionDerived(value: Value): Record<string, string> {
+  const provider = value("vision.provider") || "smart";
+  const translation = value("vision.translation_provider") || "text_model";
+  const cloud = CLOUD_OCR.has(provider);
+  return {
+    "vision.cloud_selected": String(cloud),
+    "vision.cloud_missing": String(cloud && !cloudOcrConnected(value)),
+    "vision.dict_selected": String(translation === "dictionary"),
+    "vision.ai_selected": String(translation === "text_model"),
+  };
+}
+
+/** Opens the 翻译工具 page and, once it has loaded, the tab the caller asked for. */
+export function openBenchTab(tab: string): void {
+  document.querySelector<HTMLElement>('.sidebar .item[data-target="vision-bench"]')?.click();
+  if (!BENCH_TABS.has(tab)) return;
+  let tries = 0;
+  const timer = window.setInterval(() => {
+    const button = document.querySelector<HTMLElement>(`#visionPanel [data-vision-tab="${tab}"]`);
+    if (button || ++tries > 40) {
+      window.clearInterval(timer);
+      button?.click();
+    }
+  }, 50);
+}
+
 export function setupVisionQuick(): void {
-  const root = document.getElementById("visionPanel");
+  const root = document.getElementById("visionSettings");
   if (!root || root.dataset.quickReady) return;
   root.dataset.quickReady = "1";
-  bindQuickControls(root);
+  const local: LocalOcrState = { running: false, downloaded: false };
+  const preview = root.querySelector<HTMLElement>("#visionLinePreview");
+  const controls = bindQuickControls(
+    root,
+    (path, value) => {
+      if (path === "vision.line_mode" && preview) preview.textContent = linePreview(value);
+    },
+    visionChips(() => local),
+    visionDerived,
+  );
+  const syncPreview = () => {
+    if (preview) preview.textContent = linePreview(controls.value("vision.line_mode") || "smart");
+  };
+  syncPreview();
 
   let rows: VisionHistoryRow[] = [];
   let kind = "all";
@@ -55,6 +171,10 @@ export function setupVisionQuick(): void {
         data: { requestId: `vq-${action}-0`, action: action as "history", ...(id ? { id } : {}) },
       }),
     );
+
+  window.chrome?.webview?.postMessage(
+    serializeHostMessage({ type: "localOcrRequest", data: { requestId: "vq-local-ocr", action: "status" } }),
+  );
 
   const copy = async (text: string) => {
     try {
@@ -122,6 +242,15 @@ export function setupVisionQuick(): void {
       render();
     }
   });
+  onHostMessage("localOcrResponse", (message) => {
+    if (message.type !== "localOcrResponse") return;
+    const models = Array.isArray(message.models)
+      ? (message.models as unknown as Array<{ status?: { state?: string } }>)
+      : [];
+    local.downloaded = models.some((row) => ["ready", "installed", "downloaded"].includes(String(row.status?.state ?? "")));
+    local.running = message.service?.state === "running";
+    controls.refresh();
+  });
 
   query.addEventListener("input", render);
   root.querySelector("#visionHistFilter")?.addEventListener("click", (event) => {
@@ -143,10 +272,7 @@ export function setupVisionQuick(): void {
 
   root.addEventListener("click", (event) => {
     const jump = (event.target as HTMLElement).closest<HTMLElement>("[data-bench]");
-    if (!jump) return;
-    setSeg(root, "vision", "bench");
-    const tab = jump.dataset.bench!;
-    if (BENCH_TABS.has(tab)) root.querySelector<HTMLElement>(`[data-vision-tab="${tab}"]`)?.click();
+    if (jump) openBenchTab(jump.dataset.bench!);
   });
   render();
 }

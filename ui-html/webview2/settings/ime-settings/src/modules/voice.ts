@@ -47,7 +47,7 @@ const ASR_DEFAULTS: Record<string, ProviderDefaults> = {
   }
 };
 
-const POLISH_DEFAULTS: Record<string, ProviderDefaults> = {
+export const POLISH_DEFAULTS: Record<string, ProviderDefaults> = {
   aliyun: { endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', model: 'qwen-plus' },
   tencent: { endpoint: 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions', model: 'hunyuan-turbos-latest' },
   siliconflow: {

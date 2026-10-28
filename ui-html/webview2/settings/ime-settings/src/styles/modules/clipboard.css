@@ -1,7 +1,7 @@
-#personalLibraryPanel .clipboard-heading { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+#personalLibraryPanel .clipboard-heading { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:12px; }
 #personalLibraryPanel .clipboard-heading-description { min-width:0; }
 #personalLibraryPanel .clipboard-title-row { display:flex; align-items:center; gap:10px; margin-bottom:7px; }
-#personalLibraryPanel .clipboard-heading h2 { margin:0; font-size:22px; }
+#personalLibraryPanel .clipboard-heading h2 { margin:0; font-size:16px; }
 #personalLibraryPanel .clipboard-heading-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
 #personalLibraryPanel .clipboard-heading p { color:var(--text-secondary); font-size:13px; margin:0; line-height:1.6; }
 #personalLibraryPanel .clipboard-workspace { display:grid; grid-template-columns:112px minmax(0,1fr); align-items:start; gap:14px; }
@@ -64,3 +64,8 @@
 #personalLibraryPanel .clipboard-item-heading small { flex:0 1 auto; max-width:60%; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 #personalLibraryPanel .clipboard-scroll-extent { width:1px; pointer-events:none; }
 @media(max-width:650px) { #personalLibraryPanel .clipboard-browser #libraryRows { max-height:350px; } }
+
+#personalLibraryPanel .library-search-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+#personalLibraryPanel .library-search-row input { flex:1; min-width:0; }
+#personalLibraryPanel #libraryGroups { margin-top:10px; }
+#personalLibraryPanel #libraryNewTop { flex:0 0 auto; width:auto; }

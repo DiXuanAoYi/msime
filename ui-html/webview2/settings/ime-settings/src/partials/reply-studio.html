@@ -2,7 +2,7 @@
 <div class="qp" id="replyQuick">
   <header class="phead">
     <div><h1>嘴替 · 回复</h1><p class="lead">在聊天输入框里直接用：看懂对方的话，给你几种回法；或者把你打的草稿改得更得体。只填进输入框，不替你发送。</p></div>
-    <div class="phead-side"><span class="chip" id="rpReaderChip">读取聊天：关</span></div>
+    <div class="phead-side"><button class="btn sm" type="button" data-open-conn="">服务连接</button><span class="chip off" data-chip="replyModel" hidden></span><span class="chip off" id="rpReaderChip">读取聊天：关</span></div>
   </header>
   <div class="seg" role="tablist" aria-label="嘴替" data-seg="reply">
     <button type="button" role="tab" data-tab="quick" aria-selected="true">快速使用</button>
@@ -16,12 +16,12 @@
   <div class="tabpane" data-pane-of="reply" data-pane="quick">
     <div class="duo">
       <article class="hero-card">
-        <div class="hc-top"><span class="act-ic">回</span><div><h3>帮我回</h3><button class="hk" type="button" data-hk="reply" title="点击修改快捷键"></button></div></div>
+        <div class="hc-top"><span class="act-ic"><svg class="ic"><use href="#i-reply"/></svg></span><div><h3>帮我回</h3><button class="hk" type="button" data-hk="reply" title="点击修改快捷键"></button></div></div>
         <ol class="hc-steps"><li>停在聊天窗口，或者选中对方说的那句话</li><li>按快捷键，输入框上方出现几条回复</li><li>按数字键填入，改一改，自己按发送</li></ol>
         <button class="btn primary" type="button" data-try="reply">试一试</button>
       </article>
       <article class="hero-card">
-        <div class="hc-top"><span class="act-ic">改</span><div><h3>帮我改</h3><button class="hk" type="button" data-hk="rewrite" title="点击修改快捷键"></button></div></div>
+        <div class="hc-top"><span class="act-ic"><svg class="ic"><use href="#i-pen"/></svg></span><div><h3>帮我改</h3><button class="hk" type="button" data-hk="rewrite" title="点击修改快捷键"></button></div></div>
         <ol class="hc-steps"><li>在输入框里随手打出大概意思</li><li>按快捷键，列出更礼貌、更简短等几种说法</li><li>按数字键直接替换输入框里的草稿</li></ol>
         <button class="btn primary" type="button" data-try="rewrite">试一试</button>
       </article>
@@ -36,14 +36,14 @@
     </div>
     <div class="card">
       <div class="card-h"><h2>模型与隐私</h2></div>
-      <div class="row"><div class="row-l"><b>使用的文本模型</b><small>默认沿用语音润色选的那一家，也可以单独指定。密钥在“AI 与模型”页填写。</small></div><div class="row-r"><select data-cfg="reply.provider" aria-label="回复使用的文本模型"><option value="">跟随润色设置</option><option value="siliconflow">硅基流动</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="groq">Groq</option><option value="aliyun">阿里云百炼</option><option value="tencent">腾讯 TokenHub</option></select></div></div>
+      <div class="row"><div class="row-l"><b>使用的文本模型</b><small>默认沿用语音润色选的那一家，也可以单独指定。密钥在“语音与发音 › 识别后润色”里填写。</small></div><div class="row-r"><select data-cfg="reply.provider" aria-label="回复使用的文本模型"><option value="">跟随润色设置</option><option value="siliconflow">硅基流动</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="groq">Groq</option><option value="aliyun">阿里云百炼</option><option value="tencent">腾讯 TokenHub</option></select></div></div>
       <div class="row"><div class="row-l"><b>每次生成会发送</b><small>对方的话、你补充的意思、所选条数的聊天记录、这个联系人的关系和备注，以及“我的风格”。不上传截图，不会自动发送任何消息。</small></div></div>
     </div>
   </div>
 
   <div class="tabpane" data-pane-of="reply" data-pane="tones" hidden>
     <div class="card">
-      <div class="card-h-row"><div class="card-h"><h2>面板里的语气</h2><p>开启的语气按这个顺序出现在面板标签上，按 Tab 依次切换。联系人的默认语气总在第一个。</p></div><button class="btn sm" type="button" id="toneAdd">＋ 新建语气</button></div>
+      <div class="card-h-row"><div class="card-h"><h2>面板里的语气</h2><p>开启的语气按这个顺序出现在面板标签上，按 Tab 依次切换。联系人的默认语气总在第一个。</p></div><button class="btn sm" type="button" id="toneAdd"><svg class="ic"><use href="#i-plus"/></svg>新建语气</button></div>
       <form class="tone-form" id="toneForm" hidden>
         <label class="field">名称<input type="text" id="toneName" maxlength="10" placeholder="例如：客气地催款"></label>
         <label class="field">怎么回（写给模型的说明）<textarea id="toneDesc" rows="2" maxlength="600" placeholder="例如：先感谢合作，再说明逾期天数和金额，给出明确付款日期，不威胁"></textarea></label>
@@ -78,7 +78,7 @@
   </div>
 
   <div class="tabpane" data-pane-of="reply" data-pane="contacts" hidden>
-    <div class="hist-tools"><input type="search" id="ctQuery" placeholder="搜索联系人或群聊" aria-label="搜索联系人"><span class="row-r"><span class="small muted">打开“读取聊天”后会自动建立</span><button class="btn sm" type="button" id="ctAdd">＋ 添加</button></span></div>
+    <div class="hist-tools"><input type="search" id="ctQuery" placeholder="搜索联系人或群聊" aria-label="搜索联系人"><span class="row-r"><span class="small muted">打开“读取聊天”后会自动建立</span><button class="btn sm" type="button" id="ctAdd"><svg class="ic"><use href="#i-plus"/></svg>添加</button></span></div>
     <div class="ct"><div class="ct-list" id="ctList"></div><div class="ct-edit" id="ctEdit"></div></div>
     <p class="small muted" style="margin:0">记忆用当前 Windows 帐户加密保存在本机，到期自动清理。导出的文件是明文，请自己保管。</p>
   </div>
@@ -87,207 +87,9 @@
     <div class="card">
       <div class="row"><div class="row-l"><b>允许读取聊天窗口</b><small>只读取当前打开的聊天里已经显示的文字：不点击、不切换聊天、不发送。图片和语音不转写。关闭后，帮我回只用你选中或复制的文字。</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="reply.reader_enabled" aria-label="允许读取聊天窗口"></button></div></div>
     </div>
-    <div class="card">
-      <div class="card-h"><h2>本机记录</h2></div>
-      <div class="row"><div class="row-l"><b id="rdSummary">0 位联系人 · 0 条聊天记录</b><small>保存期限跟随各联系人记忆的设置，到期自动清理</small></div><div class="row-r"><button class="btn sm danger" type="button" id="readerClear">清空记录</button></div></div>
-      <div class="confirm" id="readerClearConfirm" hidden>只删除本机保存的聊天记录，联系人备注和聊天软件不受影响。<button class="btn sm danger" type="button" id="readerClearYes">确认清空</button><button class="btn sm" type="button" id="readerClearNo">保留</button></div>
-    </div>
-  </div>
-</div>
-
-<div class="tabpane" id="replyBench" data-pane-of="reply" data-pane="bench" hidden>
-<section class="section studio" id="replyStudio">
-    <div class="studio-heading">
-      <div>
-        <h2>想好怎么回，再发出去</h2>
-        <p>粘贴对方的话，选一种语气，生成几条可以直接修改的回复。</p>
-      </div>
-      <button id="rsVoiceSettings" type="button">语音与模型配置 ↗</button>
-    </div>
-
-
-    <div class="studio-grid">
-      <label>我想做什么<select id="rsTask"><option value="reply">回复对方</option><option value="rewrite">改写我的话</option><option value="write">写生活 / 工作文案</option></select></label>
-      <label>回复长度<select id="rsLength"><option value="short">简短 · 1–2 句</option><option value="medium" selected>适中 · 2–4 句</option><option value="long">详细 · 说明完整</option></select></label>
-    </div>
-    <div id="rsQuickModes" class="studio-quick-modes" aria-label="常用聊天风格"></div>
-    <div class="studio-grid">
-      <label
-        >表达模式<select id="rsMode">
-          <option value="">正在读取模式…</option>
-        </select></label
-      ><label
-        >预备数量<select id="rsCount">
-          <option value="3">3 条 · 少而精</option>
-          <option value="5">5 条 · 多些选择</option>
-        </select></label
-      >
-    </div>
-    <p id="rsModeDescription" class="studio-note"></p>
-    <label
-      ><span id="rsIncomingLabel">对方刚发来的消息</span><textarea
-        id="rsIncoming"
-        rows="5"
-        maxlength="4000"
-        placeholder="例如：这周末有空吗？想不想一起吃饭？"
-      ></textarea>
-    </label>
-    <div class="studio-toolbar"><button id="rsExample" type="button">填入当前场景示例</button><span class="studio-note">也可以点击输入框后按 Ctrl+F9 口述</span></div>
-    <label>你们的关系 / 称呼<input id="rsRelationship" maxlength="150" placeholder="例如：认识不久的朋友、直属领导、正在磨合的恋人（选填）"></label>
-    <label
-      >我的想法与要求<input
-        id="rsIntent"
-        maxlength="1300"
-        placeholder="例如：我想去，但想换成周日下午；轻松一点，不要太热情"
-    /></label>
-    <div class="studio-checks">
-      <label
-        ><input
-          id="rsUseContext"
-          type="checkbox"
-          checked
-        />使用本会话上下文与摘要</label
-      ><label
-        ><input
-          id="rsAuto"
-          type="checkbox"
-        />新消息粘贴/输入后自动预备回复</label
-      >
-    </div>
-    <p id="rsActiveContext" class="studio-context-badge" aria-live="polite"></p>
-    <div class="studio-toolbar">
-      <label
-        >当前会话<select id="rsSessions">
-          <option value="">未保存的临时会话</option>
-        </select></label
-      ><button id="rsNew" type="button">新会话</button
-      ><button id="rsReload" type="button">读取会话列表</button>
-    </div>
-    <details>
-      <summary>联系人 / 群聊管理 · 保存与导出</summary>
-      <div class="studio-grid">
-        <label
-          >会话类型<select id="rsKind">
-            <option value="person">联系人 · 一人一份记忆</option>
-            <option value="group">群聊 · 一群一份记忆</option>
-          </select></label
-        ><label
-          >聊天软件 / 来源<input
-            id="rsPlatform"
-            maxlength="40"
-            placeholder="微信、QQ、企业微信、钉钉、飞书或其他"
-        /></label>
-      </div>
-      <div class="studio-grid">
-        <label
-          >会话名称<input
-            id="rsTitle"
-            maxlength="50"
-            placeholder="例如：同事小林 / 外卖评价" /></label
-        ><label
-          >保存期限<select id="rsRetention">
-            <option value="30">30 天</option>
-            <option value="90" selected>90 天</option>
-            <option value="365">365 天</option>
-          </select></label
-        >
-      </div>
-      <div class="studio-toolbar">
-        <button id="rsSave" type="button">保存上下文</button
-        ><button id="rsExport" type="button">导出文本</button
-        ><button id="rsDelete" type="button">删除此会话</button>
-      </div>
-      <div id="rsDeleteConfirm" class="studio-confirm" hidden>
-        只删除本会话的本地记忆，不影响聊天软件。<button
-          id="rsDeleteYes"
-          type="button"
-        >
-          确认删除</button
-        ><button id="rsDeleteNo" type="button">保留</button>
-      </div>
-      <p class="studio-note">
-        仅主动保存的上下文和摘要落盘，使用当前 Windows
-        账户加密。到期自动清理；最多 50 个会话。导出文件是明文，请自行保管。
-      </p>
-    </details>
-    <details>
-      <summary>发言记录与上下文 <span id="rsContextSize"></span></summary>
-      <p class="studio-note">
-        粘贴完整记录会原样保留，也可按发言人逐条追加；群聊请填写实际发言人。同名联系人可用软件、账号或备注区分。每个会话原文最多
-        48 KB。
-      </p>
-      <div class="studio-grid">
-        <label
-          >发言人<input
-            id="rsSpeaker"
-            maxlength="40"
-            placeholder="我 / 联系人姓名 / 群成员昵称" /></label
-        ><label
-          >发言时间（可选）<input id="rsMessageTime" type="datetime-local"
-        /></label>
-      </div>
-      <label
-        >追加一条发言<textarea
-          id="rsMessageText"
-          rows="3"
-          maxlength="4000"
-          placeholder="粘贴此人的原话，不会自动改写"
-        ></textarea>
-      </label>
-      <button id="rsAppend" type="button">追加到本会话记录</button>
-      <label
-        >对话背景 / 历史原文<textarea
-          id="rsContext"
-          rows="6"
-          maxlength="16000"
-          placeholder="可粘贴历史对话，建议用“我：”“对方：”区分。不同对象请使用不同会话。"
-        ></textarea>
-      </label>
-      <div class="studio-toolbar">
-        <label class="studio-file"
-          >导入 TXT<input
-            id="rsImport"
-            type="file"
-            accept=".txt,.md,text/plain" /></label
-        ><button id="rsSummarize" type="button">总结上下文</button>
-      </div>
-      <label
-        >摘要（可修改，生成后不会覆盖原文）<textarea
-          id="rsSummary"
-          rows="4"
-          maxlength="4000"
-          placeholder="事实、诉求、约定和待确认事项"
-        ></textarea>
-      </label>
-    </details>
-    <p id="rsSendPreview" class="studio-note" aria-live="polite"></p>
-    <div class="studio-toolbar studio-actions">
-      <button id="rsGenerate" class="studio-primary" type="button">
-        生成 3 条回复</button
-      ><button id="rsRegenerate" type="button">换一批</button><button id="rsCancel" type="button">取消生成</button>
-    </div>
-    <p class="studio-note">
-      生成和总结使用“语音与模型配置”中的文本模型，所用消息和上下文会发给该服务。语音关闭云端润色不影响这里的手动生成。不会自动发送。
-    </p>
-    <div id="rsStatus" role="status" aria-live="polite"></div>
-    <div id="rsReplies" class="studio-replies"></div>
-    <label
-      >选中的回复草稿（可继续修改）<textarea
-        id="rsDraft"
-        rows="4"
-        maxlength="4000"
-        placeholder="点击一条备选的“选为草稿”，再调整成自己的说法"
-      ></textarea>
-    </label>
-    <div class="studio-toolbar">
-      <button id="rsCopyDraft" type="button">复制草稿</button
-      ><button id="rsVoiceDraft" type="button">转成语音</button
-      ><button id="rsRemember" type="button">把本轮草稿加入上下文并保存</button>
-    </div>
-    <p class="studio-note">
-      草稿会标记为“尚未发送”，不会被当成已作出的承诺。关闭窗口不会保存未主动保存的内容。
-    </p>
-    <details id="chatReader" class="studio-monitor">
+        <div class="card" id="readerMonitorCard" data-show-if="reply.reader_enabled">
+      <div class="card-h"><h2>聊天窗口监测</h2><p>扫描已打开的聊天窗口，绑定到联系人记忆，并选择是否新消息自动准备回复。</p></div>
+<details id="chatReader" class="studio-monitor">
       <summary>聊天窗口只读监测 · 微信 / QQ / 企业微信 / 钉钉 / 飞书</summary>
       <p class="studio-note">
         读取当前已加载的聊天文本；微信昵称、企业微信标准浅色窗口使用本机
@@ -371,6 +173,88 @@
         <pre id="crHistoryText" class="studio-chat-preview"></pre>
       </details>
     </details>
-  </section>
+    </div>
+<div class="card" data-show-if="reply.reader_enabled">
+      <div class="card-h"><h2>本机记录</h2></div>
+      <div class="row"><div class="row-l"><b id="rdSummary">0 位联系人 · 0 条聊天记录</b><small>保存期限跟随各联系人记忆的设置，到期自动清理</small></div><div class="row-r"><button class="btn sm danger" type="button" id="readerClear">清空记录</button></div></div>
+      <div class="confirm" id="readerClearConfirm" hidden>只删除本机保存的聊天记录，联系人备注和聊天软件不受影响。<button class="btn sm danger" type="button" id="readerClearYes">确认清空</button><button class="btn sm" type="button" id="readerClearNo">保留</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="tabpane qp" id="replyBench" data-pane-of="reply" data-pane="bench" hidden>
+<section class="wbench" id="replyStudio">
+  <p class="small muted wb-lead">写长消息、整理多轮对话时用。快捷面板解决不了的，在这里慢慢改。生成和总结使用「服务连接」里选的文本模型，不会自动发送。</p>
+  <div class="wb">
+    <div class="wb-col wb-sessions">
+      <div class="wb-h">会话<button class="icon-btn" id="rsNew" type="button" title="新建一个不保存的临时会话" aria-label="新建会话"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+      <select id="rsSessions" hidden><option value="">未保存的临时会话</option></select>
+      <div class="wb-slist" id="wbSessions"></div>
+      <button class="btn sm" id="rsReload" type="button">刷新列表</button>
+      <details class="wb-more">
+        <summary>这个会话的设置</summary>
+        <label class="field">名称<input id="rsTitle" maxlength="50" placeholder="例如：同事小林 / 外卖评价"></label>
+        <label class="field">类型<select id="rsKind"><option value="person">联系人</option><option value="group">群聊</option></select></label>
+        <label class="field">聊天软件<input id="rsPlatform" maxlength="40" placeholder="微信、QQ、钉钉……"></label>
+        <label class="field">保存期限<select id="rsRetention"><option value="30">30 天</option><option value="90" selected>90 天</option><option value="365">365 天</option></select></label>
+        <div class="row-r left"><button class="btn sm primary" id="rsSave" type="button">保存</button><button class="btn sm" id="rsExport" type="button">导出</button><button class="btn sm danger" id="rsDelete" type="button">删除</button></div>
+        <div id="rsDeleteConfirm" class="confirm" hidden>只删除本会话的本机记忆，不影响聊天软件。<button id="rsDeleteYes" class="btn sm danger" type="button">确认删除</button><button id="rsDeleteNo" class="btn sm" type="button">保留</button></div>
+        <p class="small muted">仅主动保存的内容落盘，用当前 Windows 帐户加密，到期自动清理，最多 50 个会话。导出文件是明文。</p>
+      </details>
+    </div>
+
+    <div class="wb-col wb-chat">
+      <div class="wb-h"><span id="wbTitle">临时会话</span><span class="row-r"><span class="small muted" id="rsContextSize"></span><button class="btn sm" type="button" id="wbPasteBtn">粘贴聊天记录</button></span></div>
+      <div class="wb-msgs" id="wbMsgs" aria-label="聊天记录"></div>
+      <div class="wb-paste" id="wbPaste" hidden>
+        <label class="field">聊天记录（每行一条，“我：”“对方：”区分；原文原样保留）<textarea id="rsContext" rows="7" maxlength="16000" placeholder="林经理：明天几点开会？&#10;我：上午十点"></textarea></label>
+        <div class="row-r left"><label class="btn sm studio-file">导入 TXT<input id="rsImport" type="file" accept=".txt,.md,text/plain" hidden></label><button class="btn sm" type="button" id="wbPasteDone">收起</button></div>
+        <div class="wb-append">
+          <label class="field">发言人<input id="rsSpeaker" maxlength="40" placeholder="我 / 联系人姓名"></label>
+          <label class="field">时间（可选）<input id="rsMessageTime" type="datetime-local"></label>
+          <label class="field wide">追加一条<textarea id="rsMessageText" rows="2" maxlength="4000" placeholder="粘贴此人的原话，不会改写"></textarea></label>
+          <button class="btn sm" id="rsAppend" type="button">追加到记录</button>
+        </div>
+      </div>
+      <div class="wb-sum">
+        <div class="wb-sum-h"><b>记忆摘要</b><button class="btn sm" id="rsSummarize" type="button">总结上下文</button></div>
+        <textarea id="rsSummary" rows="3" maxlength="4000" aria-label="摘要" placeholder="事实、诉求、约定和待确认事项。总结后可以修改，不会覆盖原文。"></textarea>
+      </div>
+    </div>
+
+    <div class="wb-col wb-compose">
+      <div class="wb-h"><div class="opt" id="wbMode"><button type="button" data-wbm="reply" aria-pressed="true">帮我回</button><button type="button" data-wbm="rewrite" aria-pressed="false">帮我改</button><button type="button" data-wbm="write" aria-pressed="false">帮我写</button></div></div>
+      <select id="rsTask" hidden><option value="reply">回复对方</option><option value="rewrite">改写我的话</option><option value="write">写生活 / 工作文案</option></select>
+      <div class="wb-form">
+        <label class="field"><span id="rsIncomingLabel">对方刚发来的消息</span><textarea id="rsIncoming" rows="3" maxlength="4000" placeholder="例如：这周末有空吗？想不想一起吃饭？"></textarea></label>
+        <div class="wb-tools"><button class="btn sm" id="rsExample" type="button">填入示例</button><span class="small muted">点输入框后按 Ctrl+F9 可口述</span></div>
+        <div id="rsQuickModes" class="chips wb-tones" aria-label="常用语气"></div>
+        <div class="wb-grid">
+          <label class="field">语气 / 表达模式<select id="rsMode"><option value="">正在读取模式…</option></select></label>
+          <label class="field">长度<select id="rsLength"><option value="short">简短</option><option value="medium" selected>适中</option><option value="long">详细</option></select></label>
+          <label class="field">备选数量<select id="rsCount"><option value="3">3 条</option><option value="5">5 条</option></select></label>
+        </div>
+        <p id="rsModeDescription" class="small muted"></p>
+        <label class="field">我的想法（选填）<input id="rsIntent" maxlength="1300" placeholder="例如：我想去，但想换成周日下午；轻松一点"></label>
+        <label class="field">你们的关系（选填）<input id="rsRelationship" maxlength="150" placeholder="例如：直属领导、认识不久的朋友"></label>
+        <div class="wb-checks">
+          <label><input id="rsUseContext" type="checkbox" checked>参考左边的记录和摘要</label>
+          <label><input id="rsAuto" type="checkbox">粘贴新消息后自动预备</label>
+        </div>
+        <p id="rsActiveContext" class="small muted" aria-live="polite"></p>
+        <p id="rsSendPreview" class="small muted" aria-live="polite"></p>
+        <div class="row-r left"><button class="btn primary" id="rsGenerate" type="button">生成 3 条回复</button><button class="btn" id="rsRegenerate" type="button">换一批</button><button class="btn" id="rsCancel" type="button">取消</button></div>
+        <div id="rsStatus" class="small" role="status" aria-live="polite"></div>
+      </div>
+      <div class="wb-results studio-replies" id="rsReplies"></div>
+      <div class="wb-draft">
+        <label class="field">草稿（点一条结果的“选为草稿”，再改成你自己的说法）<textarea id="rsDraft" rows="3" maxlength="4000"></textarea></label>
+        <div class="row-r left"><button class="btn sm" id="rsCopyDraft" type="button"><svg class="ic"><use href="#i-copy"/></svg>复制草稿</button><button class="btn sm" id="rsVoiceDraft" type="button">转成语音消息</button><button class="btn sm" id="rsRemember" type="button">加入记录并保存</button></div>
+        <p class="small muted">草稿标记为“尚未发送”，不会当成已作出的承诺。关闭窗口不会保存没主动保存的内容。</p>
+      </div>
+    </div>
+  </div>
+  <button id="rsVoiceSettings" type="button" hidden></button>
+</section>
 </div>
 </div>

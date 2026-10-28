@@ -203,6 +203,7 @@ export function setupPersonalLibrary(): void {
     el('libraryClearHistory').hidden=view!=='history';
     el<HTMLButtonElement>('libraryClearHistory').disabled=!history.length;
     el("libraryGroups").hidden = !isClip&&!isQuote;
+    const top = document.getElementById("libraryNewTop"); if (top) top.hidden = !isClip&&!isQuote;
     const fixedGroup=['phrases','quotes'].includes(activeGroup);
     el<HTMLButtonElement>('libraryRenameGroup').disabled=fixedGroup;
     el<HTMLButtonElement>('libraryRemoveGroup').disabled=fixedGroup;
@@ -361,6 +362,7 @@ export function setupPersonalLibrary(): void {
     status('');
     renderFromStart();
   };
+  document.getElementById("libraryNewTop")?.addEventListener("click", () => el("libraryNew").click());
   el("libraryNew").onclick = ()=>openEditor(value('libraryView')==='quotes'?'quotes':'clips');
   el('libraryNewRule').onclick=()=>openEditor('rules');
   root.querySelectorAll<HTMLButtonElement>('[data-quote-source]').forEach(tab=>tab.onclick=()=>{quoteSource=tab.dataset.quoteSource??'all';el('libraryRows').scrollTop=0;render();});

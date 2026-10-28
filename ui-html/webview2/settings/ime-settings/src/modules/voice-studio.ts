@@ -58,7 +58,7 @@ export function setupVoiceStudio():void{
   for(const id of ['studioText','studioLanguage','studioVoice','studioRate'])field(id)?.addEventListener('input',()=>{dirty=true;refreshDialect();updateButtons();});
   field('studioDevice')?.addEventListener('change',updateButtons);
   field('studioFavorite')?.addEventListener('click',()=>{if(!artifact||dirty)return;personalAction('favorite',{artifactId:artifact,name:(field<HTMLTextAreaElement>('studioText')?.value??'收藏语音').slice(0,60)});});
-  onHostMessage('personalLibraryResponse',message=>{if(message.requestId.startsWith('library-favorite-')&&field('studioStatus'))field('studioStatus')!.textContent=message.ok?'已收藏，可在“剪贴板与资料库”的语音收藏中播放、复制。':message.message;});
+  onHostMessage('personalLibraryResponse',message=>{if(message.requestId.startsWith('library-favorite-')&&field('studioStatus'))field('studioStatus')!.textContent=message.ok?'已收藏，可在下方“语音收藏”里播放、复制。':message.message;});
   field('studioGenerate')?.addEventListener('click',()=>{
     const text=field<HTMLTextAreaElement>('studioText')!.value.trim();const bytes=new TextEncoder().encode(text).length;
     if(!bytes||bytes>2000){field('studioStatus')!.textContent='请输入 1–2000 UTF-8 字节的文字，过长内容请分段。';return;}

@@ -36,6 +36,7 @@ const MODULE_IDS = [
   'reply-studio',
   'personal-library',
   'vision',
+  'vision-bench',
   'shortcut',
   'help-settings',
   'about-settings',

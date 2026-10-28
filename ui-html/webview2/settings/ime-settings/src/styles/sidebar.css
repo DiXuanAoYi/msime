@@ -136,6 +136,22 @@
   opacity: 1;
 }
 
+.sidebar .icon .ic {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+.sidebar .item:hover .icon .ic,
+.sidebar .item.active .icon .ic {
+  opacity: 1;
+}
+
 html[data-theme="light"] .sidebar .icon img {
   filter: invert(1) brightness(0.25);
 }

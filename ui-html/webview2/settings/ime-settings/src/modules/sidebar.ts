@@ -19,12 +19,20 @@ const BACKGROUND_MODULES = [
 
 const setupLoaders: Record<string, () => Promise<void>> = {
   vision: async () => {
+    (await import('./vision-quick')).setupVisionQuick();
+  },
+  'vision-bench': async () => {
     (await import('./vision-layout')).setupVisionLayout();
     (await import('./vision')).setupVision();
-    (await import('./vision-quick')).setupVisionQuick();
+    const root = document.getElementById('visionPanel');
+    if (root && !root.dataset.quickReady) {
+      root.dataset.quickReady = '1';
+      (await import('./quick-controls')).bindQuickControls(root);
+    }
   },
   'personal-library': async () => {
     (await import('./personal-library')).setupPersonalLibrary();
+    (await import('./page-links')).resetLibraryExtras();
     const root = document.getElementById('personalLibraryPanel');
     if (root && !root.dataset.quickReady) {
       root.dataset.quickReady = '1';
@@ -43,6 +51,11 @@ const setupLoaders: Record<string, () => Promise<void>> = {
   },
   dict: async () => {
     (await import('./dict')).setupDictionary();
+    const root = document.getElementById('dictLearningLinks');
+    if (root && !root.dataset.quickReady) {
+      root.dataset.quickReady = '1';
+      (await import('./quick-controls')).bindQuickControls(root);
+    }
   },
   skin: async () => {
     await (await import('./skin')).setupSkin();
@@ -50,6 +63,22 @@ const setupLoaders: Record<string, () => Promise<void>> = {
   },
   voice: async () => {
     (await import('./voice')).setupVoiceInput();
+    const root = document.getElementById('voice-settings');
+    if (root && !root.dataset.quickReady) {
+      root.dataset.quickReady = '1';
+      const { bindQuickControls } = await import('./quick-controls');
+      const { voiceChips, asrCardChip } = await import('./connections');
+      bindQuickControls(root, undefined, {
+        voiceAsr: (value, raw) => voiceChips(value, raw).asr,
+        voicePolish: (value, raw) => voiceChips(value, raw).polish,
+        asrLocal: (value, raw) => asrCardChip('local', value, raw),
+        asrDoubao: (value, raw) => asrCardChip('doubao', value, raw),
+        asrOpenai: (value, raw) => asrCardChip('openai', value, raw),
+        asrAliyun: (value, raw) => asrCardChip('aliyun', value, raw),
+        asrTencent: (value, raw) => asrCardChip('tencent', value, raw),
+      });
+      (await import('./voice-hero')).setupVoiceHero();
+    }
   },
   'screenkb-settings': async () => {
     (await import('./screenkb-settings')).setupScreenKeyboardSettings();
@@ -64,6 +93,7 @@ const setupLoaders: Record<string, () => Promise<void>> = {
   },
   'reply-studio': async () => {
     (await import('./reply-studio')).setupReplyStudio();
+    (await import('./reply-bench')).setupReplyBench();
     (await import('./reply-quick')).setupReplyQuick();
   },
   'ai-settings': async () => {
@@ -71,6 +101,11 @@ const setupLoaders: Record<string, () => Promise<void>> = {
   },
   shortcut: async () => {
     (await import('./shortcut')).setupShortcut();
+    const root = document.getElementById('shortcut-settings');
+    if (root && !root.dataset.quickReady) {
+      root.dataset.quickReady = '1';
+      (await import('./quick-controls')).bindQuickControls(root);
+    }
   },
   'floating-toolbar': async () => {
     (await import('./floating-toolbar')).setupFloatingToolbar();

@@ -1,6 +1,7 @@
 import { serializeHostMessage } from "../../../../shared/messages";
 import { onHostMessage } from "../utils/host-messages";
 import { updateConfig } from "./config-sync";
+import { openLibraryView, openPage } from "./page-links";
 import "../styles/modules/quick-pages.css";
 
 /**
@@ -9,14 +10,32 @@ import "../styles/modules/quick-pages.css";
  * configUpdate path as the rest of the settings, so a failed write leaves the old value on screen.
  */
 
-type Snapshot = Record<string, Record<string, string> | undefined>;
+type Snapshot = Record<string, Record<string, unknown> | undefined>;
+
+export type ChipTone = "good" | "warn" | "bad" | "off" | "accent" | "plain";
+export interface ChipState {
+  text: string;
+  tone: ChipTone;
+}
+/** Reads a raw config value (objects included), e.g. the per-provider token maps. */
+export type RawReader = (path: string) => unknown;
+/** Resolves a status chip (data-chip="name") from the latest config values. */
+export type ChipResolver = (value: (path: string) => string | undefined, raw: RawReader) => ChipState | null;
+/** Adds computed flags (data-show-if="vision.xyz") on top of the real config values. */
+export type Deriver = (value: (path: string) => string | undefined, raw: RawReader) => Record<string, string>;
 
 let counter = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${++counter}`;
 
-export function configValue(snapshot: Snapshot, path: string): string | undefined {
+export function rawValue(snapshot: Snapshot, path: string): unknown {
   const [section, key] = path.split(".");
   return snapshot[section]?.[key];
+}
+
+export function configValue(snapshot: Snapshot, path: string): string | undefined {
+  const value = rawValue(snapshot, path);
+  if (value === undefined || value === null || typeof value === "object") return undefined;
+  return String(value);
 }
 
 /** "Ctrl+Alt+X" -> ["Ctrl", "Alt", "X"]; empty text means the action has no key. */
@@ -96,12 +115,22 @@ export function postQuickAction(action: "run" | "status", id?: string): void {
 export interface QuickControls {
   /** Latest config values, so page code can read what the controls show. */
   value(path: string): string | undefined;
+  /** Raw config value (objects included). */
+  raw(path: string): unknown;
   /** Re-applies the last snapshot (after the page rendered more controls). */
   refresh(): void;
 }
 
-export function bindQuickControls(root: HTMLElement, onChange?: (path: string, value: string) => void): QuickControls {
+export function bindQuickControls(
+  root: HTMLElement,
+  onChange?: (path: string, value: string) => void,
+  chips: Record<string, ChipResolver> = {},
+  derive?: Deriver,
+): QuickControls {
   let snapshot: Snapshot = {};
+  let derived: Record<string, string> = {};
+  const read = (path: string) => derived[path] ?? configValue(snapshot, path);
+  const raw: RawReader = (path) => rawValue(snapshot, path);
   let hotkeyState: Record<string, { combo?: string; ok?: boolean; error?: string }> = {};
   const hotkeyErrors = new Map<string, HTMLElement>();
 
@@ -110,12 +139,13 @@ export function bindQuickControls(root: HTMLElement, onChange?: (path: string, v
       const raw = node.dataset.showIf ?? "";
       const negate = raw.startsWith("!");
       const path = negate ? raw.slice(1) : raw;
-      const value = configValue(snapshot, path) === "true";
+      const value = read(path) === "true";
       node.hidden = negate ? value : !value;
     });
   };
 
   const apply = () => {
+    derived = derive ? derive((path) => configValue(snapshot, path), raw) : {};
     root.querySelectorAll<HTMLElement>("[data-cfg]").forEach((node) => {
       const path = node.dataset.cfg!;
       const value = configValue(snapshot, path);
@@ -125,16 +155,29 @@ export function bindQuickControls(root: HTMLElement, onChange?: (path: string, v
         if (document.activeElement !== node) node.value = value;
       } else {
         node.querySelectorAll<HTMLElement>("[data-v]").forEach((button) => {
-          button.setAttribute("aria-pressed", String(button.dataset.v === value));
+          const any = button.dataset.any?.split(" ") ?? [];
+          button.setAttribute("aria-pressed", String(button.dataset.v === value || any.includes(value)));
         });
       }
     });
     root.querySelectorAll<HTMLElement>("button.hk[data-hk]").forEach((button) => {
       if (button.classList.contains("capturing")) return;
-      renderCombo(button, snapshot.hotkeys?.[button.dataset.hk!] ?? "");
+      renderCombo(button, String(snapshot.hotkeys?.[button.dataset.hk!] ?? ""));
     });
     applyVisibility();
+    paintChips();
     paintHotkeyStatus();
+  };
+
+  const paintChips = () => {
+    root.querySelectorAll<HTMLElement>("[data-chip]").forEach((node) => {
+      const resolve = chips[node.dataset.chip!];
+      const state = resolve?.(read, raw);
+      node.hidden = !state;
+      if (!state) return;
+      node.className = `chip ${state.tone}`;
+      node.textContent = state.text;
+    });
   };
 
   const paintHotkeyStatus = () => {
@@ -180,7 +223,10 @@ export function bindQuickControls(root: HTMLElement, onChange?: (path: string, v
     const choice = target.closest<HTMLElement>("[data-cfg] > button[data-v], [data-cfg] button[data-v]");
     const holder = choice?.closest<HTMLElement>("[data-cfg]");
     if (choice && holder && !(holder instanceof HTMLSelectElement) && root.contains(holder)) {
-      write(holder.dataset.cfg!, choice.dataset.v!);
+      const any = choice.dataset.any?.split(" ") ?? [];
+      const current = configValue(snapshot, holder.dataset.cfg!) ?? "";
+      if (any.includes(current)) return;
+      write(holder.dataset.cfg!, choice.dataset.w ?? choice.dataset.v!);
       return;
     }
     const tab = target.closest<HTMLElement>(".seg[data-seg] button[data-tab]");
@@ -192,6 +238,22 @@ export function bindQuickControls(root: HTMLElement, onChange?: (path: string, v
     if (jump) {
       const [name, name2] = jump.dataset.gotoTab!.split(":");
       setSeg(root, name, name2);
+      return;
+    }
+    const go = target.closest<HTMLElement>("[data-goto]");
+    if (go) {
+      const [page, tab] = go.dataset.goto!.split(":");
+      openPage(page, tab);
+      return;
+    }
+    const libraryJump = target.closest<HTMLElement>("[data-lib-jump]");
+    if (libraryJump) {
+      openLibraryView(libraryJump.dataset.libJump!);
+      return;
+    }
+    const conn = target.closest<HTMLElement>("[data-open-conn]");
+    if (conn) {
+      void import("./connections-drawer").then((m) => m.openConnections(conn.dataset.openConn ?? ""));
       return;
     }
     const nav = target.closest<HTMLElement>("[data-nav]");
@@ -270,7 +332,8 @@ export function bindQuickControls(root: HTMLElement, onChange?: (path: string, v
   postQuickAction("status");
 
   return {
-    value: (path) => configValue(snapshot, path),
+    value: read,
+    raw,
     refresh: apply,
   };
 }

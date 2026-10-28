@@ -92,7 +92,8 @@ it("binds every config path used by the new pages to a key the Server knows", ()
   const known: Record<string, string[]> = {
     vision: ["provider", "after_ocr_copy", "after_ocr_card", "line_mode", "cjk_space", "translation_provider",
       "text_provider", "auto_swap", "zh_target", "source_language", "target_language", "live_refresh",
-      "history_enabled", "history_days"],
+      "history_enabled", "history_days", "enter_action", "magnifier", "hide_toolbar", "table_format", "overlay_style",
+      "hold_alt_original", "skip_code", "use_glossary"],
     reply: ["count", "length", "source", "context", "fill_mode", "provider", "reader_enabled"],
     clipboard: ["sort", "max_items", "retention_days", "respect_privacy_flag", "exclude_apps", "pause_on_lock"],
     hotkeys: ["enabled"],
@@ -108,7 +109,8 @@ it("binds every config path used by the new pages to a key the Server knows", ()
 
 it("keeps ids unique and the old workbench controls inside the new pages", () => {
   const mustKeep: Record<string, string[]> = {
-    vision: ["visionPanel", "visionCapture", "visionText", "visionBench"],
+    vision: ["visionSettings", "visionHistGrid", "visionLinePreview"],
+    "vision-bench": ["visionPanel", "visionCapture", "visionText", "visionBench"],
     "reply-studio": ["replyStudio", "rsGenerate", "rsReplies", "replyBench"],
     "personal-library": ["personalLibraryPanel", "libraryRows", "librarySearch", "libraryContent"],
   };

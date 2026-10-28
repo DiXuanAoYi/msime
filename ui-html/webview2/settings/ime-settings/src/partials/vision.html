@@ -1,71 +1,80 @@
-<div id="visionPanel" class="content">
+<div id="visionSettings" class="content">
 <div class="qp">
   <header class="phead">
     <div><h1>截图 · OCR · 翻译</h1><p class="lead">在任何软件里按快捷键直接用，不用先打开这个窗口。这里负责改快捷键、试用和调整偏好。</p></div>
-    <div class="phead-side"><label class="row-r" style="gap:8px"><span class="small muted">全局快捷键</span><button class="tg" type="button" role="switch" data-cfg="hotkeys.enabled" aria-label="启用全局快捷键" aria-checked="true"></button></label></div>
+    <div class="phead-side"><button class="btn sm" type="button" data-open-conn="">服务连接</button><span class="chip off" data-chip="visionOcr" hidden></span><span class="chip off" data-chip="visionTr" hidden></span></div>
   </header>
   <div class="seg" role="tablist" aria-label="截图与翻译" data-seg="vision">
     <button type="button" role="tab" data-tab="actions" aria-selected="true">快捷操作</button>
     <button type="button" role="tab" data-tab="ocr" aria-selected="false">识字</button>
     <button type="button" role="tab" data-tab="translate" aria-selected="false">翻译</button>
     <button type="button" role="tab" data-tab="history" aria-selected="false">历史记录</button>
-    <button type="button" role="tab" data-tab="bench" aria-selected="false">工作台</button>
   </div>
 
   <div class="tabpane" data-pane-of="vision" data-pane="actions">
     <div class="acts">
       <article class="act lg">
-        <div class="act-top"><span class="act-ic">字</span><button class="hk" type="button" data-hk="ocr" title="点击修改快捷键"></button></div>
+        <div class="act-top"><span class="act-ic"><svg class="ic"><use href="#i-ocr"/></svg></span><button class="hk" type="button" data-hk="ocr" title="点击修改快捷键"></button></div>
         <h3>截图识字</h3>
-        <p>框选后立刻识别。文字自动复制，结果贴在选区旁。普通文字用 Windows OCR，遇到表格、代码、公式自动换本地模型。</p>
+        <p>框选后立刻识别。文字自动复制，结果贴在选区旁；识别后可以一键改成表格或代码格式。</p>
         <button class="btn primary sm" type="button" data-try="ocr">试一试</button>
       </article>
       <article class="act lg">
-        <div class="act-top"><span class="act-ic">译</span><button class="hk" type="button" data-hk="translate" title="点击修改快捷键"></button></div>
+        <div class="act-top"><span class="act-ic"><svg class="ic"><use href="#i-tr"/></svg></span><button class="hk" type="button" data-hk="translate" title="点击修改快捷键"></button></div>
         <h3>截图翻译</h3>
-        <p>译文直接盖在原文的位置，同时在选区下方给出完整译文，一键复制。</p>
+        <p>译文直接盖在原文的位置，表格、排版都不乱。按住 Alt 看原文，也可以转成实时翻译。</p>
         <button class="btn primary sm" type="button" data-try="translate">试一试</button>
       </article>
       <article class="act">
-        <div class="act-top"><span class="act-ic">截</span><button class="hk" type="button" data-hk="shot" title="点击修改快捷键"></button></div>
+        <div class="act-top"><span class="act-ic"><svg class="ic"><use href="#i-shot"/></svg></span><button class="hk" type="button" data-hk="shot" title="点击修改快捷键"></button></div>
         <h3>截图</h3>
-        <p>框选后直接复制到剪贴板，粘贴就能用。</p>
+        <p>复制、保存、钉在屏幕上，或者接着识字、翻译。</p>
         <button class="btn sm" type="button" data-try="shot">试一试</button>
       </article>
       <article class="act">
-        <div class="act-top"><span class="act-ic">选</span><button class="hk" type="button" data-hk="selection" title="点击修改快捷键"></button></div>
+        <div class="act-top"><span class="act-ic"><svg class="ic"><use href="#i-sel"/></svg></span><button class="hk" type="button" data-hk="selection" title="点击修改快捷键"></button></div>
         <h3>划词翻译</h3>
-        <p>选中任意文字再按快捷键，译文出现在光标旁。</p>
+        <p>选中任意文字再按快捷键。单词给读音和释义，句子给译文。</p>
         <button class="btn sm" type="button" data-try="selection">试一试</button>
       </article>
       <article class="act">
-        <div class="act-top"><span class="act-ic">实</span><button class="hk" type="button" data-hk="live" title="点击修改快捷键"></button></div>
+        <div class="act-top"><span class="act-ic"><svg class="ic"><use href="#i-live"/></svg></span><button class="hk" type="button" data-hk="live" title="点击修改快捷键"></button></div>
         <h3>实时翻译</h3>
-        <p>持续翻译屏幕上的一块区域，适合外文游戏、视频字幕和软件界面。按 Esc 停止。</p>
+        <p>持续翻译屏幕上的一块区域，适合外文游戏、视频字幕和软件界面。</p>
         <button class="btn sm" type="button" data-try="live">试一试</button>
       </article>
     </div>
 
     <div class="card">
-      <div class="card-h"><h2>更多翻译工具</h2><p>这些需要在窗口里操作，放在“工作台”里。</p></div>
-      <div class="row"><div class="row-l"><b>对话翻译</b><small>面对面交流：两种语言各占一边，可把对方那一侧翻转 180°。</small></div><div class="row-r"><button class="btn sm" type="button" data-bench="conversation">打开</button></div></div>
-      <div class="row"><div class="row-l"><b>声音转字幕 · 字幕文件翻译</b><small>麦克风或系统声音实时出字幕，也可以导入 SRT / VTT 逐段翻译并保留时间轴。</small></div><div class="row-r"><button class="btn sm" type="button" data-bench="subtitles">打开</button></div></div>
-      <div class="row"><div class="row-l"><b>图片识别工作台</b><small>导入照片或用摄像头拍照，对照原图逐段修改，导出文字或原始 JSON；支持长截图。</small></div><div class="row-r"><button class="btn sm" type="button" data-bench="image">打开</button></div></div>
+      <div class="card-h"><h2>截图之后</h2><p>框选完成后出现的工具条，以及截图的保存方式。</p></div>
+      <div class="row"><div class="row-l"><b>按 Enter 时</b><small>其他操作按工具条，或按单键：O 识字、T 翻译、P 钉在屏幕、S 保存</small></div><div class="row-r"><div class="opt" data-cfg="vision.enter_action"><button type="button" data-v="copy">复制图片</button><button type="button" data-v="save">保存文件</button><button type="button" data-v="ocr">识字</button></div></div></div>
+      <div class="row"><div class="row-l"><b>保存位置</b><small>图片\知语截图\知语截图_日期_时间.png</small></div></div>
+      <div class="row"><div class="row-l"><b>截图时显示放大镜和取色</b></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.magnifier" aria-label="截图时显示放大镜和取色"></button></div></div>
+      <div class="row"><div class="row-l"><b>截图时隐藏悬浮工具栏和候选窗</b></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.hide_toolbar" aria-label="截图时隐藏悬浮工具栏"></button></div></div>
+      <div class="row"><div class="row-l"><b>长截图</b><small>框选后滚动鼠标滚轮，自动判断方向并拼接，按 Enter 完成。最多 60 屏。</small></div><div class="row-r"><span class="chip plain">在“翻译工具”里使用</span><button class="btn sm" type="button" data-nav="vision-bench">打开</button></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>更多翻译工具</h2><p>需要一直开着的工具在单独的页面里运行，不占用这里。</p></div>
+      <div class="row"><div class="tool-row"><span class="tool-ic"><svg class="ic"><use href="#i-chat"/></svg></span><div class="row-l"><b>对话翻译</b><small>面对面交流：两种语言各占一边，可把对方那一侧翻转 180°。</small></div></div><div class="row-r"><button class="btn sm" type="button" data-bench="conversation">打开</button></div></div>
+      <div class="row"><div class="tool-row"><span class="tool-ic"><svg class="ic"><use href="#i-sub"/></svg></span><div class="row-l"><b>声音转字幕</b><small>麦克风或系统声音实时出字幕，可同时翻译，导出 SRT。</small></div></div><div class="row-r"><button class="btn sm" type="button" data-bench="subtitles">打开</button></div></div>
+      <div class="row"><div class="tool-row"><span class="tool-ic"><svg class="ic"><use href="#i-tr"/></svg></span><div class="row-l"><b>字幕文件翻译</b><small>导入 SRT / VTT，逐段翻译并保留时间轴。</small></div></div><div class="row-r"><button class="btn sm" type="button" data-bench="subtitles">打开</button></div></div>
+      <div class="row"><div class="tool-row"><span class="tool-ic"><svg class="ic"><use href="#i-img"/></svg></span><div class="row-l"><b>图片识别工作台</b><small>导入照片或用摄像头拍照，对照原图逐段修改，导出文字或原始 JSON。</small></div></div><div class="row-r"><button class="btn sm" type="button" data-bench="image">打开</button></div></div>
     </div>
   </div>
 
   <div class="tabpane" data-pane-of="vision" data-pane="ocr" hidden>
     <div class="card">
-      <div class="card-h"><h2>识别引擎</h2><p>不用在识别前选“文字 / 表格 / 代码”，引擎会自己判断。</p></div>
+      <div class="card-h"><h2>识别引擎</h2><p>不用在识别前选“文字 / 表格 / 代码”，引擎会自己判断，识别后也能切换。</p></div>
       <div class="engs" data-cfg="vision.provider">
-        <button class="eng" type="button" data-v="smart"><span class="rec">推荐</span><b>智能</b><small>普通文字用 Windows OCR，遇到表格、公式自动换本地模型；本地模型没装则退回 Windows OCR 并提示</small></button>
-        <button class="eng" type="button" data-v="windows"><b>Windows 本机</b><small>离线，很快；表格和公式只能提取文字，代码缩进按位置估算</small></button>
-        <button class="eng" type="button" data-v="local"><b>本地模型</b><small>离线，擅长表格、公式、代码；需要先在“工作台 › 模型与服务”下载</small></button>
-        <button class="eng" type="button" data-v="shiliu"><b>石榴智能（云端）</b><small>会上传你框选的图片</small></button>
-        <button class="eng" type="button" data-v="tencent"><b>腾讯云 OCR</b><small>会上传你框选的图片</small></button>
-        <button class="eng" type="button" data-v="baidu"><b>百度智能云 OCR</b><small>会上传你框选的图片</small></button>
+        <button class="eng" type="button" data-v="smart"><span class="rec">推荐</span><b>智能</b><small>普通文字用 Windows OCR，遇到表格、代码、公式自动换本地模型</small><span class="chip good" data-chip="ocrSmart"></span></button>
+        <button class="eng" type="button" data-v="windows"><b>Windows 本机</b><small>离线，约 0.2 秒；代码缩进和公式结构会丢失</small><span class="chip good">可用</span></button>
+        <button class="eng" type="button" data-v="local"><b>本地模型</b><small>GLM-OCR，离线；擅长表格、公式、代码，约 1–2 秒</small><span class="chip off" data-chip="ocrLocal"></span></button>
+        <button class="eng" type="button" data-v="cloud" data-any="shiliu tencent baidu" data-w="shiliu"><b>云端</b><small>石榴、腾讯云、百度；会上传你框选的图片</small><span class="chip off" data-chip="ocrCloud"></span></button>
       </div>
-      <div class="row"><div class="row-l"><b>云端凭据与本地模型</b><small>云端密钥、本地模型下载和启动都在“工作台 › 模型与服务”里。</small></div><div class="row-r"><button class="btn sm" type="button" data-bench="services">打开</button></div></div>
+      <div class="callout" data-show-if="vision.cloud_missing"><p>云端 OCR 还没有连接。识别时会先用 Windows OCR 代替，并提示你去连接。</p><button class="btn sm" type="button" data-bench="services">打开服务连接</button></div>
+      <div class="row" data-show-if="vision.cloud_selected"><div class="row-l"><b>云端服务</b><small>凭据在“翻译工具 › 模型与服务”里填写，只保存在本机。</small></div><div class="row-r"><select data-cfg="vision.provider" aria-label="云端 OCR 服务"><option value="shiliu">石榴智能</option><option value="tencent">腾讯云 OCR</option><option value="baidu">百度智能云 OCR</option></select></div></div>
+      <div class="row"><div class="row-l"><b>本地模型 GLM-OCR</b><small>使用显卡加速，首次识别需要约 5 秒载入</small></div><div class="row-r"><span class="chip off" data-chip="ocrService"></span><button class="btn sm" type="button" data-bench="services">管理模型</button></div></div>
     </div>
     <div class="card">
       <div class="card-h"><h2>识别完成后</h2></div>
@@ -74,8 +83,10 @@
     </div>
     <div class="card">
       <div class="card-h"><h2>排版</h2></div>
-      <div class="row"><div class="row-l"><b>换行</b><small>屏幕上一段文字常被折成好几行，默认把它们合回段落；代码和表格不受影响</small></div><div class="row-r"><div class="opt" data-cfg="vision.line_mode"><button type="button" data-v="smart">合并成段落</button><button type="button" data-v="keep">保留原换行</button><button type="button" data-v="one">合成一行</button></div></div></div>
-      <div class="row"><div class="row-l"><b>保留中英文之间的空格</b><small>关闭时去掉汉字之间被 OCR 误加的空格</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.cjk_space" aria-label="保留中英文之间的空格"></button></div></div>
+      <div class="row"><div class="row-l"><b>换行</b><small>屏幕上一段文字常被折成好几行，默认把它们合回段落</small></div><div class="row-r"><div class="opt" data-cfg="vision.line_mode"><button type="button" data-v="smart">合并成段落</button><button type="button" data-v="keep">保留原换行</button><button type="button" data-v="one">合成一行</button></div></div></div>
+      <pre class="oc-code" id="visionLinePreview" aria-label="换行效果预览"></pre>
+      <div class="row"><div class="row-l"><b>中英文之间加空格</b><small>“使用 OCR 识别”而不是“使用OCR识别”</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.cjk_space" aria-label="中英文之间加空格"></button></div></div>
+      <div class="row"><div class="row-l"><b>表格复制为</b><small>“表格软件”格式可以直接粘贴进 Excel / WPS 表格</small></div><div class="row-r"><div class="opt" data-cfg="vision.table_format"><button type="button" data-v="excel">表格软件</button><button type="button" data-v="md">Markdown</button><button type="button" data-v="html">HTML</button></div></div></div>
     </div>
   </div>
 
@@ -83,23 +94,32 @@
     <div class="card">
       <div class="card-h"><h2>翻译服务</h2><p>截图翻译、划词翻译、实时翻译共用这里的选择。</p></div>
       <div class="engs" data-cfg="vision.translation_provider">
-        <button class="eng" type="button" data-v="text_model"><span class="rec">推荐</span><b>AI 模型</b><small>用已配置的文本模型；整句通顺，能看懂上下文</small></button>
-        <button class="eng" type="button" data-v="niutrans"><b>小牛翻译</b><small>专业机器翻译，速度快，按字符计费</small></button>
-        <button class="eng" type="button" data-v="tencent"><b>腾讯翻译</b><small>只支持已开通的老帐号，新帐号无法开通</small></button>
-        <button class="eng" type="button" data-v="custom"><b>自定义翻译</b><small>使用你在翻译设置里填写的接口</small></button>
-        <button class="eng" type="button" data-v="dictionary"><b>本机词典</b><small>完全离线，只能查单词和短语</small></button>
+        <button class="eng" type="button" data-v="text_model"><span class="rec">推荐</span><b>AI 模型</b><small>用「服务连接」里的文本模型；整句通顺，能看懂上下文</small><span class="chip off" data-chip="trAi"></span></button>
+        <button class="eng" type="button" data-v="niutrans"><b>小牛翻译</b><small>专业机器翻译，速度快，按字符计费</small><span class="chip off" data-chip="trNiu"></span></button>
+        <button class="eng" type="button" data-v="tencent"><b>腾讯翻译</b><small>只支持已开通的老帐号，新帐号无法开通</small><span class="chip off" data-chip="trTencent"></span></button>
+        <button class="eng" type="button" data-v="dictionary"><b>本机词典</b><small>完全离线，只能查单词和短语</small><span class="chip warn">只能查词</span></button>
       </div>
-      <div class="row"><div class="row-l"><b>使用的文本模型</b><small>“AI 模型”用哪一家的密钥。默认沿用语音润色选的那一家；密钥在“AI 与模型”页填写。</small></div><div class="row-r"><select data-cfg="vision.text_provider" aria-label="翻译使用的文本模型"><option value="">跟随润色设置</option><option value="siliconflow">硅基流动</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="groq">Groq</option><option value="aliyun">阿里云百炼</option><option value="tencent">腾讯 TokenHub</option></select></div></div>
+      <div class="callout" data-show-if="vision.dict_selected"><p>本机词典不能翻译整句。截图翻译和实时翻译只会标出认识的词。要整句翻译，请连接一个 AI 模型或翻译服务。</p><button class="btn sm" type="button" data-open-conn="">打开服务连接</button></div>
+      <div class="row" data-show-if="vision.ai_selected"><div class="row-l"><b>使用的模型</b><small>与嘴替、识别后润色共用</small></div><div class="row-r"><select data-cfg="vision.text_provider" aria-label="翻译使用的文本模型"><option value="">跟随润色设置</option><option value="siliconflow">硅基流动</option><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="groq">Groq</option><option value="aliyun">阿里云百炼</option><option value="tencent">腾讯 TokenHub</option></select><button class="btn sm" type="button" data-open-conn="">更换</button></div></div>
     </div>
     <div class="card">
       <div class="card-h"><h2>语言</h2></div>
       <div class="row"><div class="row-l"><b>中外自动互译</b><small>看到外文译成中文，看到中文译成你常用的外语，不用每次切换方向</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.auto_swap" aria-label="中外自动互译"></button></div></div>
       <div class="row" data-show-if="vision.auto_swap"><div class="row-l"><b>中文译成</b></div><div class="row-r"><select data-cfg="vision.zh_target" aria-label="中文译成"><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="fr">法语</option><option value="de">德语</option><option value="es">西班牙语</option><option value="ru">俄语</option></select></div></div>
-      <div class="row" data-show-if="!vision.auto_swap"><div class="row-l"><b>翻译方向</b></div><div class="row-r"><select data-cfg="vision.source_language" aria-label="原文语言"><option value="auto">自动检测</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="zh">中文</option></select><span class="muted">→</span><select data-cfg="vision.target_language" aria-label="译文语言"><option value="zh">中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></div></div>
+      <div class="row" data-show-if="!vision.auto_swap"><div class="row-l"><b>翻译方向</b></div><div class="row-r"><select data-cfg="vision.source_language" aria-label="原文语言"><option value="auto">自动检测</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option><option value="zh">中文</option></select><svg class="ic muted"><use href="#i-arrow"/></svg><select data-cfg="vision.target_language" aria-label="译文语言"><option value="zh">中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></div></div>
     </div>
     <div class="card">
-      <div class="card-h"><h2>实时翻译</h2></div>
-      <div class="row"><div class="row-l"><b>刷新</b><small>“画面变化时”只在画面变了才重新识别，省电也省调用次数</small></div><div class="row-r"><div class="opt" data-cfg="vision.live_refresh"><button type="button" data-v="change">画面变化时</button><button type="button" data-v="2s">每 2 秒</button><button type="button" data-v="5s">每 5 秒</button></div></div></div>
+      <div class="card-h"><h2>截图翻译</h2></div>
+      <div class="row"><div class="row-l"><b>显示方式</b></div>
+        <div class="styles" data-cfg="vision.overlay_style">
+          <button class="sty" type="button" data-v="cover"><div class="mini"><div class="lines"><i></i><i></i><i style="width:40%"></i></div><div class="ov">译文盖在原文位置</div></div><b>覆盖原文</b><span class="small muted">排版不变，按住 Alt 看原文</span></button>
+          <button class="sty" type="button" data-v="card"><div class="mini"><div class="lines"><i></i><i></i><i style="width:40%"></i></div><div class="side-card">译文卡片</div></div><b>旁边卡片</b><span class="small muted">原文不动，译文列在选区旁</span></button>
+        </div>
+      </div>
+      <div class="row"><div class="row-l"><b>按住 Alt 临时看原文</b></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.hold_alt_original" aria-label="按住 Alt 看原文"></button></div></div>
+      <div class="row"><div class="row-l"><b>代码和公式保持原文</b></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.skip_code" aria-label="代码和公式保持原文"></button></div></div>
+      <div class="row"><div class="row-l"><b>实时翻译刷新</b><small>“画面变化时”只在文字变了才重新识别，省电也省调用次数</small></div><div class="row-r"><div class="opt" data-cfg="vision.live_refresh"><button type="button" data-v="change">画面变化时</button><button type="button" data-v="2s">每 2 秒</button><button type="button" data-v="5s">每 5 秒</button></div></div></div>
+      <div class="row"><div class="row-l"><b>使用个人译词表</b><small>在 输入 › 候选词翻译 里编辑</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.use_glossary" aria-label="使用个人译词表"></button></div></div>
     </div>
   </div>
 
@@ -107,351 +127,9 @@
     <div class="hist-tools"><input type="search" id="visionHistQuery" placeholder="搜索识别出的文字或译文" aria-label="搜索历史记录"><div class="opt" id="visionHistFilter"><button type="button" data-v="all" aria-pressed="true">全部</button><button type="button" data-v="ocr">识字</button><button type="button" data-v="translate">翻译</button><button type="button" data-v="selection">划词</button></div></div>
     <div class="hist" id="visionHistGrid"></div>
     <div class="card">
-      <div class="row"><div class="row-l"><b>保存历史记录</b><small>识别出的文字和译文加密保存在本机，不上传</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.history_enabled" aria-label="保存历史记录"></button></div></div>
+      <div class="row"><div class="row-l"><b>保存历史记录</b><small>截图缩略图、识别文字和译文只存在本机</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="vision.history_enabled" aria-label="保存历史记录"></button></div></div>
       <div class="row"><div class="row-l"><b>保留</b></div><div class="row-r"><select data-cfg="vision.history_days" aria-label="保留时长"><option value="7">7 天</option><option value="30">30 天</option><option value="90">90 天</option></select><button class="btn sm danger" type="button" id="visionHistClear">清空历史</button></div></div>
     </div>
   </div>
-</div>
-
-<div class="tabpane" id="visionBench" data-pane-of="vision" data-pane="bench" hidden>
-<div class="vision-navigation"><div class="vision-tabs" role="tablist" aria-label="截图与翻译工作台"><button type="button" role="tab" id="vision-tab-image" data-vision-tab="image" aria-controls="vision-pane-image" aria-selected="true" tabindex="0">图片 · OCR</button><button type="button" role="tab" id="vision-tab-text" data-vision-tab="text" aria-controls="vision-pane-text" aria-selected="false" tabindex="-1">文字 · 屏幕翻译</button><button type="button" role="tab" id="vision-tab-conversation" data-vision-tab="conversation" aria-controls="vision-pane-conversation" aria-selected="false" tabindex="-1">对话翻译</button><button type="button" role="tab" id="vision-tab-subtitles" data-vision-tab="subtitles" aria-controls="vision-pane-subtitles" aria-selected="false" tabindex="-1">字幕</button><button type="button" role="tab" id="vision-tab-services" data-vision-tab="services" aria-controls="vision-pane-services" aria-selected="false" tabindex="-1">模型与服务</button></div>
-<div class="vision-status-bar">  <button id="visionStop">停止 / 取消</button><p id="visionStatus" role="status" aria-live="polite">就绪</p>
-  <p id="visionWarning" class="vision-warning" role="status" hidden></p>
-</div></div>
-<div id="visionServiceBar" class="vision-service-bar" hidden><div class="vision-service-grid"><label
-      >服务
-      <select id="visionTranslationProvider" data-vision="translation_provider">
-        <option value="dictionary">本机词典（词语查询）</option>
-        <option value="text_model">已配置的文本润色 API</option>
-        <option value="tencent">腾讯传统翻译（已开通的存量帐号）</option>
-        <option value="niutrans">已配置的小牛翻译</option>
-        <option value="custom">已配置的自定义翻译</option>
-      </select></label
-    ><label
-      >原文语言
-      <select id="visionSource" data-vision="source_language"></select></label
-    ><label
-      >译文语言
-      <select id="visionTarget" data-vision="target_language"></select
-    ></label></div><details><summary>翻译服务说明与开通</summary>    <p>
-      整段翻译使用所选服务；本机词典只查询已收录的词句。云端凭据沿用语音/翻译设置，点击翻译才提交原文。
-    </p>    <p>腾讯传统文本翻译已停止接入新帐号，旧帐号额度与限流以厂商为准。
-      新用户可以在文本模型 API 中配置腾讯 TokenHub 或其他翻译模型。
-      <a href="https://cloud.tencent.com/document/product/551/104415" data-open="https://cloud.tencent.com/document/product/551/104415">腾讯开通与迁移说明</a>
-    </p></details></div>
-<section role="tabpanel" id="vision-pane-image" aria-labelledby="vision-tab-image" data-vision-pane="image"><div class="section voice-section">
-    <h3>1. 获取图片</h3>
-    <div class="local-asr-actions">
-      <button id="visionCapture">框选截图</button
-      ><button id="visionLong">长截图</button
-      ><label
-        ><input
-          id="visionX"
-          type="checkbox"
-          data-vision="capture_x"
-        />左右</label
-      ><label
-        ><input
-          id="visionY"
-          type="checkbox"
-          checked
-          data-vision="capture_y"
-        />上下</label
-      ><button id="visionFinish">完成长截图</button
-      >
-    </div>
-    <details class="vision-help"><summary>长截图操作说明</summary><p>
-      长截图：框选后缓慢滚动，每次保留大半画面重叠，按 Esc
-      完成。双方向请沿相邻区域逐行移动，未经过的区域不会被补造。相同画面自动跳过，
-      最多采集 60 个不同画面或 3 分钟；图像上限 6400 万像素，拼接失败时保留第一张原图。
-    </p></details>
-    <div class="local-asr-actions">
-      <label
-        >导入照片
-        <input
-          id="visionFile"
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/bmp" /></label
-      ><button id="visionCamera">打开摄像头</button
-      ><button id="visionShutter" disabled>拍照</button
-      ><button id="visionCameraStop" disabled>关闭摄像头</button
-      ><button id="visionSaveImage">保存原图</button>
-    </div>
-    <video
-      id="visionVideo"
-      hidden
-      autoplay
-      muted
-      playsinline
-      style="max-width: 100%; max-height: 360px"
-    ></video>
-    <img
-      id="visionImage"
-      hidden
-      alt="待识别原图"
-      style="
-        max-width: 100%;
-        max-height: 460px;
-        object-fit: contain;
-        margin-top: 12px;
-      "
-    />
-    <p id="visionDimensions"></p>
-  </div>
-<div class="section voice-section">
-    <h3>2. 识别与编辑</h3>
-    <label
-      >识别服务
-      <select id="visionProvider" data-vision="provider">
-        <option value="windows">Windows 本机 OCR（离线）</option>
-        <option value="local">下载的本地模型（离线）</option>
-        <option value="shiliu">石榴智能 OCR（云端）</option>
-        <option value="tencent">腾讯云 OCR</option>
-        <option value="baidu">百度智能云 OCR</option>
-      </select></label
-    >
-    <label
-      >内容
-      <select id="visionTask" data-vision="task">
-        <option value="document">混合文档</option>
-        <option value="text">文字</option>
-        <option value="table">表格 → HTML</option>
-        <option value="formula">公式 → LaTeX</option>
-        <option value="code">代码</option>
-      </select></label
-    >
-    <label
-      >本地最大输出长度
-      <input
-        type="number"
-        min="128"
-        max="8192"
-        step="128"
-        value="4096"
-        data-vision="max_tokens"
-    /></label>
-    <button id="visionRecognize">识别图片</button>
-    <p id="visionPrivacy">
-      默认本机离线；选择云端后，点击识别会把当前图片发送到所选服务。Windows 通用
-      OCR 可能丢失代码缩进、下划线和公式结构；此类内容请选文档模型并核对原图。
-    </p>
-<div data-vision-source-host="image"><div id="visionSourceEditor" class="vision-source-editor">    <textarea
-      id="visionText"
-      rows="12"
-      aria-label="可编辑的识别原文"
-      placeholder="识别结果，可编辑，也可直接粘贴文字翻译"
-      spellcheck="false"
-      style="
-        width: 100%;
-        box-sizing: border-box;
-        font-family: Consolas, &quot;Microsoft YaHei&quot;, monospace;
-      "
-    ></textarea>
-    <div class="local-asr-actions">
-      <button id="visionCopy">复制文字</button
-      ><button id="visionExport">导出编辑结果</button
-      ><button id="visionRaw">导出原始识别 JSON</button>
-    </div>
-</div>
-</div>  </div>
-</section>
-<section role="tabpanel" id="vision-pane-text" aria-labelledby="vision-tab-text" data-vision-pane="text" hidden><div class="section voice-section">    <h3>文字与屏幕翻译</h3>
-<div data-vision-source-host="text"></div>
-    <div class="local-asr-actions">
-      <button id="visionTranslate">翻译编辑后的文字</button
-      ><button id="visionScreen">框选并启动屏幕翻译</button
-      ><label
-        >刷新间隔（毫秒）<input
-          data-vision="screen_interval_ms"
-          type="number"
-          min="1500"
-          max="30000"
-          step="500"
-          value="2000"
-      /></label>
-    </div>
-    <p>
-      屏幕翻译持续读取框选区域，在识别文字的位置逐块覆盖译文，其他画面保持可见。
-      文档模型只返回区域坐标时按文档区域覆盖；没有坐标则降级整区展示。按 Esc
-      停止并清除覆盖；停止后可在下方继续编辑和保存。译文过长时覆盖区域会裁切，完整译文保留在编辑区。
-    </p>
-    <textarea
-      id="visionTranslation"
-      rows="9"
-      aria-label="可编辑的译文"
-      style="width: 100%; box-sizing: border-box"
-    ></textarea>
-    <div class="local-asr-actions">
-      <button id="visionCopyTranslation">复制译文</button
-      ><button id="visionExportTranslation">保存译文</button>
-    </div>
-  </div>
-</section>
-<section role="tabpanel" id="vision-pane-conversation" aria-labelledby="vision-tab-conversation" data-vision-pane="conversation" hidden><div class="section voice-section">
-    <h3>对话翻译</h3>
-    <div class="local-asr-actions">
-      <label
-        >显示
-        <select id="conversationLayout">
-          <option value="parallel">并排</option>
-          <option value="face">面对面</option>
-        </select></label
-      ><button id="conversationFlip">翻转对面文字 180°</button
-      ><button id="conversationSwap">对调双方位置</button>
-    </div>
-    <div id="conversationCards" class="vision-conversation">
-      <div id="conversationA" class="vision-speaker">
-        <h4>我方</h4>
-        <label
-          >语言
-          <select id="conversationLangA"></select></label
-        ><textarea
-          id="conversationTextA"
-          rows="5"
-          aria-label="我方原文"
-        ></textarea
-        ><button id="conversationTranslateA">翻译给对方</button
-        ><textarea
-          id="conversationResultA"
-          rows="5"
-          aria-label="我方话语的译文"
-        ></textarea>
-      </div>
-      <div id="conversationB" class="vision-speaker">
-        <h4>对方</h4>
-        <label
-          >语言
-          <select id="conversationLangB"></select></label
-        ><textarea
-          id="conversationTextB"
-          rows="5"
-          aria-label="对方原文"
-        ></textarea
-        ><button id="conversationTranslateB">翻译给我</button
-        ><textarea
-          id="conversationResultB"
-          rows="5"
-          aria-label="对方话语的译文"
-        ></textarea>
-      </div>
-    </div>
-  </div>
-</section>
-<section role="tabpanel" id="vision-pane-subtitles" aria-labelledby="vision-tab-subtitles" data-vision-pane="subtitles" hidden><div class="section voice-section">
-    <h3>声音 → 字幕 / 字幕翻译</h3>
-    <p>
-      沿用已启动的本地语音识别模型，约每 5
-      秒识别一段。开启翻译后使用上方选择的翻译服务。识别不会上屏或发送。
-    </p>
-    <div class="local-asr-actions">
-      <label>导入 SRT / VTT
-        <input id="subtitleFile" type="file" accept=".srt,.vtt,.txt,text/plain,text/vtt" />
-      </label>
-      <button id="subtitleTranslateDocument">翻译当前字幕，保留时间轴</button>
-      <button id="subtitlePreviousDraft" disabled>切换到上一个字幕草稿（保留两份）</button>
-    </div>
-    <p>导入支持 UTF-8、UTF-16、GB18030，最多 1 MB / 2000 段；VTT 导出为 SRT。
-      选择云服务后，点击翻译会逐段提交当前字幕。开始新的声音采集会替换当前字幕，请先导出需要保留的编辑结果。
-    </p>
-    <label
-      >声音来源
-      <select id="subtitleSource">
-        <option value="microphone">麦克风</option>
-        <option value="playback">系统播放声音</option>
-      </select></label
-    ><label><input type="checkbox" id="subtitleTranslate" />同时翻译</label
-    ><button id="subtitleStart">开始字幕</button
-    ><button id="subtitleFinish">完成并识别最后一段</button
-    ><button id="subtitleStop">立即停止</button
-    >
-    <p id="subtitleEditStatus" role="status">还没有字幕</p>
-    <div id="subtitleSegments" class="subtitle-segments"></div>
-    <details class="subtitle-advanced">
-      <summary>高级 SRT 编辑（含时间轴）</summary>
-      <textarea
-      id="subtitleSrt"
-      rows="12"
-      aria-label="可编辑的 SRT 字幕"
-      style="width: 100%; box-sizing: border-box"
-      placeholder="字幕含时间轴，可以编辑后导出"
-      ></textarea>
-      <button id="subtitleParseEdited">解析编辑后的字幕，继续分段编辑</button>
-    </details>
-    <button id="subtitleExport">导出 SRT</button
-    ><button id="subtitleCopy">复制字幕</button>
-  </div>
-</section>
-<section role="tabpanel" id="vision-pane-services" aria-labelledby="vision-tab-services" data-vision-pane="services" hidden>  <details class="section voice-section">
-    <summary>云 OCR 凭据（自动保存）</summary>
-    <p>凭据仅保存在本机配置中。没有凭据也可使用 Windows 本机 OCR。</p>
-    <p>
-      <a
-        data-open="https://market.shiliuai.com/general-ocr"
-        href="https://market.shiliuai.com/general-ocr"
-        >石榴智能：开通与购买</a
-      >
-      ·
-      <a
-        data-open="https://market.shiliuai.com/doc/general-ocr"
-        href="https://market.shiliuai.com/doc/general-ocr"
-        >接口文档</a
-      >
-    </p>
-    <label
-      >APPCODE
-      <input type="password" autocomplete="off" data-vision="shiliu_appcode"
-    /></label>
-    <p>
-      <a
-        data-open="https://console.cloud.tencent.com/ocr"
-        href="https://console.cloud.tencent.com/ocr"
-        >腾讯云 OCR 控制台</a
-      >
-    </p>
-    <label
-      >SecretId
-      <input
-        type="password"
-        autocomplete="off"
-        data-vision="tencent_secret_id" /></label
-    ><label
-      >SecretKey
-      <input
-        type="password"
-        autocomplete="off"
-        data-vision="tencent_secret_key" /></label
-    ><label
-      >地域 <input value="ap-guangzhou" data-vision="tencent_region"
-    /></label>
-    <p>
-      <a
-        data-open="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"
-        href="https://console.bce.baidu.com/ai/#/ai/ocr/overview/index"
-        >百度智能云 OCR 控制台</a
-      >
-    </p>
-    <label
-      >API Key
-      <input
-        type="password"
-        autocomplete="off"
-        data-vision="baidu_api_key" /></label
-    ><label
-      >Secret Key
-      <input type="password" autocomplete="off" data-vision="baidu_secret_key"
-    /></label>
-  </details>
-  <details id="localOcrPanel" class="section voice-section">
-    <summary>本地 OCR 模型 · 按需下载</summary>
-    <p>
-      只在点击下载时获取模型。大小指权重和模型文件，首次启动的运行依赖另计；不会自动下载其他模型。
-    </p>
-    <button id="localOcrRefresh">刷新</button
-    ><button id="localOcrStop">停止本地服务</button>
-    <p id="localOcrStatus"></p>
-    <div id="localOcrModels"></div>
-  </details>
-</section>
-
 </div>
 </div>

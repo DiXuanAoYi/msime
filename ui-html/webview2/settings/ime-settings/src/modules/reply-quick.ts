@@ -1,5 +1,6 @@
 import { serializeHostMessage } from "../../../../shared/messages";
 import { onHostMessage } from "../utils/host-messages";
+import { textModel } from "./connections";
 import { bindQuickControls } from "./quick-controls";
 
 export interface Tone {
@@ -81,9 +82,18 @@ export function setupReplyQuick(): void {
   const root = document.getElementById("reply-studio-settings");
   if (!root || root.dataset.quickReady) return;
   root.dataset.quickReady = "1";
-  const controls = bindQuickControls(root, (path) => {
-    if (path === "reply.reader_enabled") paintReader();
-  });
+  const controls = bindQuickControls(
+    root,
+    (path) => {
+      if (path === "reply.reader_enabled") paintReader();
+    },
+    {
+      replyModel: (value, raw) => {
+        const model = textModel(value, raw, value("reply.provider") || "");
+        return { text: `模型：${model.label}${model.connected ? "" : "（未连接）"}`, tone: model.connected ? "good" : "warn" };
+      },
+    },
+  );
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>(`#${id}`)!;
 
   let tones: Tone[] = [];
@@ -119,10 +129,10 @@ export function setupReplyQuick(): void {
       row.className = `tone${tone.on ? "" : " off"}`;
       const move = document.createElement("div");
       move.className = "tone-move";
-      for (const [label, delta] of [["▲", -1], ["▼", 1]] as const) {
+      for (const [icon, delta] of [["up", -1], ["down", 1]] as const) {
         const b = document.createElement("button");
         b.type = "button";
-        b.textContent = label;
+        b.innerHTML = `<svg class="ic"><use href="#i-${icon}"/></svg>`;
         b.setAttribute("aria-label", delta < 0 ? "上移" : "下移");
         b.onclick = () => saveTones(moveTone(tones, index, delta));
         move.append(b);
