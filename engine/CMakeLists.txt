@@ -233,6 +233,18 @@ target_link_libraries(msime_user_dictionary_probe PRIVATE MetasequoiaIme::Engine
 add_executable(msime_shuangpin_dictionary_probe EXCLUDE_FROM_ALL tools/shuangpin_dictionary_probe.cpp)
 target_link_libraries(msime_shuangpin_dictionary_probe PRIVATE MetasequoiaIme::Engine)
 
+# 全拼词库探针：真实的 QuanpinDictionary（不带纠错）在随包 msime.db 上查询、模糊音、单字母扩展，在合成小词库上造词/调频/删词。
+add_executable(msime_quanpin_dictionary_probe EXCLUDE_FROM_ALL tools/quanpin_dictionary_probe.cpp)
+target_link_libraries(msime_quanpin_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
+# 全拼纠错探针：真实的 autocorrect_cut_kbest、legal_input_correction_cuts、correction_cut_for_reading 等在随机手误输入上的输出。
+add_executable(msime_quanpin_autocorrect_probe EXCLUDE_FROM_ALL tools/quanpin_autocorrect_probe.cpp)
+target_link_libraries(msime_quanpin_autocorrect_probe PRIVATE MetasequoiaIme::Engine)
+
+# 领域词库探针：真实的 domain_dictionary::Dictionary 在随包 domain-input.db 上的查询、精确切分、词格跨度与合并。
+add_executable(msime_domain_dictionary_probe EXCLUDE_FROM_ALL tools/domain_dictionary_probe.cpp)
+target_link_libraries(msime_domain_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)
