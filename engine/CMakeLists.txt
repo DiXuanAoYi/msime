@@ -229,6 +229,10 @@ target_link_libraries(msime_direct_helpcode_probe PRIVATE MetasequoiaIme::Engine
 add_executable(msime_user_dictionary_probe EXCLUDE_FROM_ALL tools/user_dictionary_probe.cpp)
 target_link_libraries(msime_user_dictionary_probe PRIVATE MetasequoiaIme::Engine)
 
+# 双拼词库探针：真实的 ShuangpinDictionary 在随包 msime.db 和合成小词库上跑查询、辅助码、造词/调频/删词，另带 std::sort 平局次序的样本。
+add_executable(msime_shuangpin_dictionary_probe EXCLUDE_FROM_ALL tools/shuangpin_dictionary_probe.cpp)
+target_link_libraries(msime_shuangpin_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

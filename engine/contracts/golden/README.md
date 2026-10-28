@@ -22,6 +22,7 @@
 | `expected_spelling_graph.jsonl` | 直接辅助码拼写图的规格：探针 `../../tools/spelling_graph_probe.cpp` 对九套内置方案跑随机输入串，辅码谓词用确定的哈希函数代替辅码表，记录边、分隔符、下一出字位置和唯一路径 |
 | `expected_direct_helpcode.jsonl` | 直接辅助码整句解码与解析器的规格：探针 `../../tools/direct_helpcode_probe.cpp` 在哈希合成的词库/码表上跑真实 `decode_best_path` 和 `Resolver::resolve`；带语言模型的场景要 `sc.lm` |
 | `expected_user_dictionary.jsonl`、`user_dictionary_initial_main.db`、`user_dictionary_initial_english.db` | 用户词库的规格：探针 `../../tools/user_dictionary_probe.cpp` 从同一份合成词库（两个 `.db`）和空日志出发，用真实 `user_dictionary::*`、`edit_personal_dictionary` 等顺序跑 160 个场景的随机操作；一行一步（参数、返回值、三个库逐表转储的哈希，不含 `updated_at`），`{"kind":"scenario"}` 行开新场景 |
+| `expected_shuangpin_dictionary.jsonl`、`shuangpin_dictionary_initial.db` | 双拼词库的规格：探针 `../../tools/shuangpin_dictionary_probe.cpp` 用真实 `ShuangpinDictionary` 和 `quanpin::cut_pinyin_by_mode` 导出四类记录——`sort`（`std::sort` 的平局次序）、`cut`（全拼切分）、`read`（随包 `msime.db` 上的查询与辅助码）、写库场景（合成小词库上的造词/调频/删词，每步带返回值和库状态哈希，`{"kind":"scenario"}` 行开新场景）；读和写要 `installer/app_data/`（`msime.db`、`sc.lm`、`helpcodes/`） |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对
