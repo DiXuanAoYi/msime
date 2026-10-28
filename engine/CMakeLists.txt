@@ -205,6 +205,10 @@ target_link_libraries(msime_local_modes_probe PRIVATE MetasequoiaIme::Engine ${M
 add_executable(msime_gram_probe EXCLUDE_FROM_ALL tools/gram_probe.cpp)
 target_link_libraries(msime_gram_probe PRIVATE MetasequoiaIme::Engine)
 
+# 自定义双拼方案探针：对内置方案随机改动后用真实的 BuildCustomShuangpinProfile 构建，导出错误信息和方案表。
+add_executable(msime_custom_shuangpin_probe EXCLUDE_FROM_ALL tools/custom_shuangpin_probe.cpp)
+target_link_libraries(msime_custom_shuangpin_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

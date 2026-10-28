@@ -5,7 +5,8 @@
 //! 方案表由脚本从 C++ 源码机械抽取（没有手抄），`tests/shuangpin_helpcode_golden.rs` 再把表原样和 C++ 导出的表比一遍，
 //! 并对所有一到两个字符的按键码比解码结果。
 //!
-//! 输入按 ASCII 处理，和 C++ 一样按字节切；用户自定义方案（`BuildCustomShuangpinProfile`）还在 C++。
+//! 输入按 ASCII 处理，和 C++ 一样按字节切；用户自定义方案（`build_custom_profile`）见下方，测试见
+//! `tests/custom_shuangpin_golden.rs`。
 
 use crate::syllables::INTACT;
 use std::collections::{BTreeMap, HashSet};
@@ -180,6 +181,232 @@ pub fn full_help_codes(input: &str) -> String {
         codes.swap(0, 1);
     }
     String::from_utf8_lossy(&codes).into_owned()
+}
+
+// ---------------------------------------------------------------------------------------------
+// 用户自定义方案：移植自 engine/shuangpin/shuangpin_custom_profile.cpp。
+// ---------------------------------------------------------------------------------------------
+
+/// 零声母音节怎么编码：`o` 前缀、`a` 前缀、首字母加韵母键，或两个字母的韵母直接拼全。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZeroInitialRule {
+    LetterO,
+    LetterA,
+    FirstLetter,
+    FullPinyin,
+}
+
+pub fn parse_zero_initial_rule(name: &str) -> Option<ZeroInitialRule> {
+    match name {
+        "o" => Some(ZeroInitialRule::LetterO),
+        "a" => Some(ZeroInitialRule::LetterA),
+        "first_letter" => Some(ZeroInitialRule::FirstLetter),
+        "full_pinyin" => Some(ZeroInitialRule::FullPinyin),
+        _ => None,
+    }
+}
+
+/// 用户写的布局；键是用户原样写的（可以带大写），建方案时再统一小写。
+#[derive(Debug, Clone)]
+pub struct CustomLayout {
+    pub name: String,
+    pub zero_initial_rule: ZeroInitialRule,
+    pub initials: BTreeMap<String, String>,
+    pub finals: BTreeMap<String, String>,
+    pub zero_initial_overrides: BTreeMap<String, String>,
+}
+
+const REQUIRED_FINALS: [&str; 33] = [
+    "a", "o", "e", "i", "u", "v", "ai", "ei", "ui", "ao", "ou", "iu", "ie", "ue", "ve", "an", "en", "in", "un", "ang", "eng", "ing", "ong",
+    "ia", "iao", "ian", "iang", "iong", "ua", "uo", "uai", "uan", "uang",
+];
+const ZERO_INITIAL_FINALS: [&str; 12] = ["a", "ai", "an", "ang", "ao", "e", "ei", "en", "eng", "er", "o", "ou"];
+const ALL_INITIALS: [&str; 23] =
+    ["b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r", "z", "c", "s", "y", "w", "zh", "ch", "sh"];
+const RETROFLEX_INITIALS: [&str; 3] = ["zh", "ch", "sh"];
+const MAX_REPORTED_CONFLICTS: usize = 8;
+
+fn is_final_key(key: &str) -> bool {
+    key.len() == 1 && (key.as_bytes()[0].is_ascii_lowercase() || key == ";")
+}
+
+fn zero_initial_code(rule: ZeroInitialRule, final_part: &str, key: &str) -> String {
+    match rule {
+        ZeroInitialRule::LetterO => return format!("o{key}"),
+        ZeroInitialRule::LetterA => return format!("a{key}"),
+        ZeroInitialRule::FullPinyin if final_part.len() == 2 => return final_part.to_string(),
+        _ => {}
+    }
+    format!("{}{key}", &final_part[..1])
+}
+
+/// 按布局打字时怎么拆一个音节；声母为空表示零声母音节。
+fn split_syllable(syllable: &str) -> (&str, &str) {
+    let bytes = syllable.as_bytes();
+    if bytes.len() > 2 && bytes[1] == b'h' && b"zcs".contains(&bytes[0]) {
+        return syllable.split_at(2);
+    }
+    if b"aeo".contains(&bytes[0]) {
+        return ("", syllable);
+    }
+    syllable.split_at(1)
+}
+
+fn check_round_trip(profile: &Profile, errors: &mut Vec<String>) {
+    let mut sorted: Vec<&str> = decodable_syllables().iter().copied().collect();
+    sorted.sort_unstable();
+    let mut conflicts = 0usize;
+    for syllable in sorted {
+        // j/q/x/y 把 ü 写成 u，解码器不产生它们的 v 写法。
+        if matches!(syllable.as_bytes()[0], b'j' | b'q' | b'x' | b'y') && syllable.contains('v') {
+            continue;
+        }
+        let (initial, final_part) = split_syllable(syllable);
+        let code = if initial.is_empty() {
+            match profile.zero_initials.get(syllable) {
+                Some(code) => code.clone(),
+                None => continue,
+            }
+        } else {
+            let Some(final_key) = profile.finals.get(final_part).filter(|_| !final_part.is_empty()) else { continue };
+            format!("{}{final_key}", profile.initials.get(initial).map(String::as_str).unwrap_or(initial))
+        };
+        let decoded = to_pinyin(&code, profile);
+        if decoded == syllable {
+            continue;
+        }
+        conflicts += 1;
+        if conflicts <= MAX_REPORTED_CONFLICTS {
+            errors.push(if decoded.is_empty() {
+                format!("音节 {syllable} 按 {code} 输入时无法识别")
+            } else {
+                format!("音节 {syllable} 按 {code} 输入时会被读成 {decoded}")
+            });
+        }
+    }
+    if conflicts > MAX_REPORTED_CONFLICTS {
+        errors.push(format!("另有 {} 个音节存在同样的冲突", conflicts - MAX_REPORTED_CONFLICTS));
+    }
+}
+
+/// 由用户布局建方案，并把每个音节按布局打一遍、再用输入时的同一个解码器读回来，证明方案没有歧义。
+/// 失败时返回全部错误信息（中文，直接给用户看）。
+pub fn build_custom_profile(layout: &CustomLayout) -> Result<Profile, Vec<String>> {
+    let mut errors: Vec<String> = Vec::new();
+    let mut result = Profile { name: layout.name.clone(), initials: BTreeMap::new(), zero_initials: BTreeMap::new(), finals: BTreeMap::new() };
+
+    // 键 → 用这个键打的声母。没挪过的单字母声母默认就在自己那个键上。
+    let mut initial_owner: std::collections::HashMap<String, String> =
+        ALL_INITIALS.iter().filter(|i| i.len() == 1).map(|i| (i.to_string(), i.to_string())).collect();
+    for (raw_initial, raw_key) in &layout.initials {
+        let (initial, key) = (raw_initial.to_ascii_lowercase(), raw_key.to_ascii_lowercase());
+        if !ALL_INITIALS.contains(&initial.as_str()) {
+            errors.push(format!("未知的声母「{raw_initial}」"));
+            continue;
+        }
+        if key.len() != 1 || !key.as_bytes()[0].is_ascii_lowercase() {
+            errors.push(format!("声母 {initial} 的按键必须是一个英文字母，现在是「{raw_key}」"));
+            continue;
+        }
+        result.initials.insert(initial, key);
+    }
+    for initial in RETROFLEX_INITIALS {
+        if !result.initials.contains_key(initial) && errors.is_empty() {
+            errors.push(format!("缺少声母 {initial} 的按键"));
+        }
+    }
+    if errors.is_empty() {
+        // 被挪走的声母，把默认的那个键让出来。
+        for initial in result.initials.keys().filter(|i| i.len() == 1) {
+            initial_owner.remove(initial);
+        }
+        for (initial, key) in &result.initials {
+            match initial_owner.get(key) {
+                Some(owner) if owner != initial => errors.push(format!("声母 {owner} 和 {initial} 都在 {key} 键上")),
+                Some(_) => {}
+                None => {
+                    initial_owner.insert(key.clone(), initial.clone());
+                }
+            }
+        }
+    }
+
+    let mut er_key = String::new();
+    for (raw_final, raw_key) in &layout.finals {
+        let (final_part, key) = (raw_final.to_ascii_lowercase(), raw_key.to_ascii_lowercase());
+        if final_part != "er" && !REQUIRED_FINALS.contains(&final_part.as_str()) {
+            errors.push(format!("未知的韵母「{raw_final}」"));
+            continue;
+        }
+        if !is_final_key(&key) {
+            errors.push(format!("韵母 {final_part} 的按键必须是一个英文字母或分号，现在是「{raw_key}」"));
+            continue;
+        }
+        if final_part == "er" {
+            er_key = key;
+        } else {
+            result.finals.insert(final_part, key);
+        }
+    }
+    // 只给了 ue 或 ve 之一，另一个照抄。
+    if !result.finals.contains_key("ue") {
+        if let Some(key) = result.finals.get("ve").cloned() {
+            result.finals.insert("ue".into(), key);
+        }
+    }
+    if !result.finals.contains_key("ve") {
+        if let Some(key) = result.finals.get("ue").cloned() {
+            result.finals.insert("ve".into(), key);
+        }
+    }
+    let missing: Vec<&str> = REQUIRED_FINALS.iter().copied().filter(|f| !result.finals.contains_key(*f)).collect();
+    if !missing.is_empty() {
+        errors.push(format!("缺少韵母的按键：{}", missing.join("、")));
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    // 多数方案把 er 放在 R 上，文件里没写就用它。
+    if er_key.is_empty() {
+        er_key = "r".into();
+    }
+    for final_part in ZERO_INITIAL_FINALS {
+        let key = if final_part == "er" { er_key.as_str() } else { result.finals[final_part].as_str() };
+        result.zero_initials.insert(final_part.to_string(), zero_initial_code(layout.zero_initial_rule, final_part, key));
+    }
+    for (raw_final, raw_code) in &layout.zero_initial_overrides {
+        let (final_part, code) = (raw_final.to_ascii_lowercase(), raw_code.to_ascii_lowercase());
+        if !ZERO_INITIAL_FINALS.contains(&final_part.as_str()) {
+            errors.push(format!("「{raw_final}」不是零声母音节，可以单独指定的只有 a、ai、an、ang、ao、e、ei、en、eng、er、o、ou"));
+            continue;
+        }
+        if code.len() != 2 || !code.as_bytes()[0].is_ascii_lowercase() || !is_final_key(&code[1..]) {
+            errors.push(format!("零声母 {final_part} 的编码必须是两个键（第二个可以是分号），现在是「{raw_code}」"));
+            continue;
+        }
+        result.zero_initials.insert(final_part, code);
+    }
+    let mut zero_owner: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+    for final_part in ZERO_INITIAL_FINALS {
+        let code = result.zero_initials[final_part].as_str();
+        match zero_owner.get(code) {
+            Some(owner) => errors.push(format!("零声母 {owner} 和 {final_part} 的编码都是 {code}")),
+            None => {
+                zero_owner.insert(code, final_part);
+            }
+        }
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    check_round_trip(&result, &mut errors);
+    if errors.is_empty() {
+        Ok(result)
+    } else {
+        Err(errors)
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

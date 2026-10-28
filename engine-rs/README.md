@@ -24,12 +24,13 @@
 | 本地模式：Unicode（U+XXXX）、V 模式（数字读法/大写/金额/算式）、Shift+T 日期时间（唤醒词与指定日期时间的形状、农历 1900–2100）、表情、颜文字、超级简拼（全拼/双拼）、快捷短语查询与插入位置 | `src/vmode.rs`、`src/datetime.rs`、`src/local.rs`、`src/lunar_table.rs` | `tests/local_modes_golden.rs`：317 个 Unicode 输入、552 个 V 模式输入加 300 组数字读法、900 个日期时间输入（含 252 个农历、556 个指定日期时间）、表情 384 / 颜文字 344 / 超级简拼 560 次查询、90 个快捷短语编码加 300 个插入位置场景，全部逐项相同。农历表由脚本从 C++ 源码抽出；基线由 `msime_local_modes_probe` 导出 |
 | 英文词典：前缀补全、中英释义（自定义翻译侧车 > 清简词库 + 行业词包 > 旧表，义项合并去重，可按 ID 禁用词包） | `src/english.rs` | 同上：315 次前缀补全、441 次释义（含禁用组合、191 次多义项合并）、1040 次翻译词包查询逐项相同 |
 | octagram `.gram` 语法模型读取器（搭配强度 `query`：上下文窗口、搭配/弱搭配/句尾惩罚；UTF-8 压缩编码；darts-clone 双数组遍历） | `src/gram.rs` | `tests/gram_golden.rs`：真模型约 390MB、另外下载，所以用探针现建一份格式相同的合成模型（`synthetic.gram`，7337 个键，字符池覆盖两字节区边界、变长区、补充平面、ASCII）；300 个文本的编码与码点辅助（含非法字节和 NUL）、2500 次查询（命中 939）的分数和统计与真实 `GramDb` 一致，逐位相同 95% 以上，其余差 1 ulp——MSVC 把 `值 / 10000.0` 编成了乘倒数。基线由 `msime_gram_probe` 导出 |
+| 双拼用户自定义方案（布局校验、ue/ve 互补、er 默认 r、四种零声母规则与覆盖、声母/零声母抢键检测、全音节往返检查） | `src/shuangpin.rs`（`build_custom_profile`） | `tests/custom_shuangpin_golden.rs`：探针对九套内置方案随机改动 1200 次（换键、删项、未知项、非法按键、大小写、共用键），1197 个布局的成败、方案表（成功 277 个）和错误信息与真实 `BuildCustomShuangpinProfile` 一致。C++ 布局表是 `unordered_map`，错误先后、抢键谁先到、共用键时解码读成哪个都随遍历顺序而变，所以前半段错误按多重集比、声母冲突只比键、往返段比条数和汇总行；小写后撞名的 3 个布局跳过。基线由 `msime_custom_shuangpin_probe` 导出 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
 1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及词典层把词库查询接成词格 `lookup` 的那段胶水（`quanpin_dictionary.cpp` 的 `lattice_lookup`）
 2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
-3. 五笔和日语里绑着用户词库的部分（调频、删词、造词写 SQLite）；双拼里的用户自定义方案（`BuildCustomShuangpinProfile`）和双拼词库查询（`shuangpin_query.cpp`、`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
+3. 五笔和日语里绑着用户词库的部分（调频、删词、造词写 SQLite）；双拼词库查询（`shuangpin_query.cpp`、`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
 4. 英文词典与本地模式里要写库的部分：`EnglishDictionary::ensure_schema` / `upsert_gloss`（建表、升级旧库、写入释义）、`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
 
 ### 纠错里还留在 C++ 的部分
@@ -140,3 +141,10 @@ server\build-release\engine\Release\msime_gram_probe.exe engine\contracts\golden
 ```
 
 两个文件要一起提交：`synthetic.gram` 是探针现建的合成模型，`expected_gram.jsonl` 是真实 `GramDb` 在它上面的输出。
+
+## 重新生成自定义双拼基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_custom_shuangpin_probe
+server\build-release\engine\Release\msime_custom_shuangpin_probe.exe engine\contracts\golden\expected_custom_shuangpin.jsonl
+```
