@@ -1,3 +1,4 @@
+#include "companion/companion_feed.h"
 #include "ipc/event_listener.h"
 #include "log/fanylog.h"
 #include "quick/quick_actions.h"
@@ -119,6 +120,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
     // Initialize config
     InitImeConfig();
     VoiceInput::Initialize();
+    Companion::Start();
     Global::candidate_ui.page_size = GetConfiguredCandidatePageSize();
 
     ::InitIpc();
@@ -215,6 +217,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
     CloudIme::Stop();
     Quick::Stop();
     ClipboardMonitor::Stop();
+    Companion::Stop();
     VoiceInput::Shutdown();
 
     pipe_running = false;

@@ -1,3 +1,4 @@
+#include "companion/companion_feed.h"
 #include "english/candidate_speech.h"
 #include "window/candidate_presenter.h"
 
@@ -1570,6 +1571,11 @@ void CandidatePresenter::ShowFromGlobalState(POINT caret)
     PlaceAndShow(caret, widthDip, heightDip, cardLeftDip, cardTopDip, scale);
     ::is_global_wnd_cand_shown = true;
     Global::SetCandidateWindowRenderedVisible(true);
+    {
+        RECT bounds{};
+        if (GetWindowRect(hwnd_, &bounds))
+            Companion::SetCandidate(true, bounds);
+    }
     // PlaceAndShow paints synchronously, so the page is on screen now. Echo the generation of the
     // snapshot that was actually rendered (not the latest published one) so a pending digit/space
     // selection can settle against the same page the user is looking at.
@@ -1586,6 +1592,7 @@ void CandidatePresenter::Hide()
     ResetDecorationMotion();
     ::is_global_wnd_cand_shown = false;
     Global::SetCandidateWindowRenderedVisible(false);
+    Companion::SetCandidate(false, RECT{});
     hoverArmed_ = false;
     wheelDeltaAccumulator_ = 0;
     if (impl_ && impl_->list)

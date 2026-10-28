@@ -1,3 +1,4 @@
+#include "companion/companion_feed.h"
 #include <msime/voice/audio_capture.h>
 #include <msime/voice/provider_protocol.h>
 #include <msime/voice/stt_service.h>
@@ -963,6 +964,7 @@ bool StartRecording()
         return false;
     }
     g_recording = true;
+    Companion::SetVoiceRecording(true);
     g_starting = false;
     g_overlay.set_input_level(0.0f);
     g_overlay.set_listening(true);
@@ -986,6 +988,7 @@ void StopRecording()
     }
     const VoiceInputConfig config = GetConfiguredVoiceInput();
     g_recording = false;
+    Companion::SetVoiceRecording(false);
     g_ralt_lock_mode = false;
     g_overlay.set_listening(false);
     g_overlay.set_input_level(0.0f);
@@ -1129,6 +1132,7 @@ void CancelRecording()
     }
     const VoiceInputConfig config = GetConfiguredVoiceInput();
     g_recording = false;
+    Companion::SetVoiceRecording(false);
     {
         std::lock_guard<std::mutex> send_lock(g_send_mutex);
         ++g_voice_session;
