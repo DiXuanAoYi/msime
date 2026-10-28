@@ -213,6 +213,10 @@ target_link_libraries(msime_custom_shuangpin_probe PRIVATE MetasequoiaIme::Engin
 add_executable(msime_shuangpin_query_probe EXCLUDE_FROM_ALL tools/shuangpin_query_probe.cpp)
 target_link_libraries(msime_shuangpin_query_probe PRIVATE MetasequoiaIme::Engine)
 
+# 输入方案探针：全拼、双拼、五笔、日语罗马字吃随机按键，导出每一步生成的 QueryRequest 和预编辑。
+add_executable(msime_scheme_probe EXCLUDE_FROM_ALL tools/scheme_probe.cpp)
+target_link_libraries(msime_scheme_probe PRIVATE MetasequoiaIme::Engine)
+
 # 词格词库查询探针：真实的 make_lattice_db_lookup 在随包 msime.db 上查跨度（拼写归一、模糊变体、扣分、排序截断）。
 add_executable(msime_lattice_lookup_probe EXCLUDE_FROM_ALL tools/lattice_lookup_probe.cpp)
 target_link_libraries(msime_lattice_lookup_probe PRIVATE MetasequoiaIme::Engine)
