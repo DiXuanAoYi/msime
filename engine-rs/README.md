@@ -26,6 +26,7 @@
 | octagram `.gram` 语法模型读取器（搭配强度 `query`：上下文窗口、搭配/弱搭配/句尾惩罚；UTF-8 压缩编码；darts-clone 双数组遍历） | `src/gram.rs` | `tests/gram_golden.rs`：真模型约 390MB、另外下载，所以用探针现建一份格式相同的合成模型（`synthetic.gram`，7337 个键，字符池覆盖两字节区边界、变长区、补充平面、ASCII）；300 个文本的编码与码点辅助（含非法字节和 NUL）、2500 次查询（命中 939）的分数和统计与真实 `GramDb` 一致，逐位相同 95% 以上，其余差 1 ulp——MSVC 把 `值 / 10000.0` 编成了乘倒数。基线由 `msime_gram_probe` 导出 |
 | 双拼用户自定义方案（布局校验、ue/ve 互补、er 默认 r、四种零声母规则与覆盖、声母/零声母抢键检测、全音节往返检查） | `src/shuangpin.rs`（`build_custom_profile`） | `tests/custom_shuangpin_golden.rs`：探针对九套内置方案随机改动 1200 次（换键、删项、未知项、非法按键、大小写、共用键），1197 个布局的成败、方案表（成功 277 个）和错误信息与真实 `BuildCustomShuangpinProfile` 一致。C++ 布局表是 `unordered_map`，错误先后、抢键谁先到、共用键时解码读成哪个都随遍历顺序而变，所以前半段错误按多重集比、声母冲突只比键、往返段比条数和汇总行；小写后撞名的 3 个布局跳过。基线由 `msime_custom_shuangpin_probe` 导出 |
 | 双拼输入串处理：分段、音节边界、转全拼、手动分隔符、有效长度与前缀映射、全码辅助长度、大小写还原；句中辅助码（反引号/分号/大写触发）的解析、装饰、各光标位置“能否接反引号/第二码/分号”的判断；约束匹配与缓存签名 | `src/shuangpin_query.rs`、`src/mid_sentence.rs` | `tests/shuangpin_query_golden.rs`：九套内置方案 × 260 条随机输入串（2340 条，用方案里真能解出音节的两键码拼，掺单键、大写辅助码、反引号段、分隔符、杂字符；含辅助码段 625、双辅助码状态 108、带大写还原 1290），每条十几项输出与真实 `shuangpin::*` 一致，光标逐位置核对。`segment_raw_boundaries` 末尾的 `dedup` 看不出是否有触发路径（去掉后测试仍绿），保留以对齐 C++ |
+| 词格的词库查询（跨度只收键完全相等的行；ü 另一种写法归一；模糊近音同批查、每错一个音节扣一份分、按折后权重稳定排序、同字去重、截回上限） | `src/dict.rs`（`Dictionary::lattice_lookup`） | `tests/lattice_lookup_golden.rs`：在随包 `msime.db` 上 1119 个跨度（700 个随机跨度取自词库真有的键并混入 jv/lue 写法、查不到的键和不完整音节，加全部单音节键各一次），随机模糊音规则和上限；条数、内容哈希、前 12 项（键、词、权重、扣分）与真实 `make_lattice_db_lookup` 一致，其中 885 个开了模糊音、156 个带扣分、359 个吃满上限。基线由 `msime_lattice_lookup_probe` 导出 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
@@ -155,4 +156,11 @@ server\build-release\engine\Release\msime_custom_shuangpin_probe.exe engine\cont
 ```powershell
 cmake --build server/build-release/engine --config Release --target msime_shuangpin_query_probe
 server\build-release\engine\Release\msime_shuangpin_query_probe.exe engine\contracts\golden\expected_shuangpin_query.jsonl
+```
+
+## 重新生成词格查询基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_lattice_lookup_probe
+server\build-release\engine\Release\msime_lattice_lookup_probe.exe installer\app_data\msime.db engine\contracts\golden\expected_lattice_lookup.jsonl
 ```

@@ -1,5 +1,6 @@
 //! 全拼词库（`msime.db`）的只读查询。
 
+use crate::lattice::Lexeme;
 use crate::table::{key, table_name};
 use rusqlite::{Connection, OpenFlags};
 use std::path::Path;
@@ -16,6 +17,27 @@ pub struct KeyedEntry {
     pub key: String,
     pub text: String,
     pub weight: i64,
+}
+
+/// 词格里模糊读音的行每错一个音节扣的分（对数），和模糊变体的路径数上限。
+const FUZZY_LATTICE_PENALTY_LOG: f64 = 1.0;
+const FUZZY_LATTICE_VARIANT_LIMIT: usize = 16;
+
+/// ü 的两种写法归一到词库存的那一种：j/q/x/y 后面写 u，l/n 后面写 v。
+fn canonical_syllable(syllable: &str) -> &str {
+    match syllable {
+        "jv" => "ju",
+        "qv" => "qu",
+        "xv" => "xu",
+        "yv" => "yu",
+        "jve" => "jue",
+        "qve" => "que",
+        "xve" => "xue",
+        "yve" => "yue",
+        "lue" => "lve",
+        "nue" => "nve",
+        other => other,
+    }
 }
 
 pub struct Dictionary {
@@ -136,6 +158,47 @@ impl Dictionary {
         }
         result.sort_by(|a, b| b.weight.cmp(&a.weight)); // 稳定排序
         Ok(result)
+    }
+
+    /// 整句词格的一次词库查询，对应 C++ `quanpin::make_lattice_db_lookup` 返回的函数。
+    ///
+    /// 只收键与跨度完全相等的行（不降级到前缀和简拼，否则 `gun'qi` 会捞出 `gun'qiu` 的词，造句读音对不上）；
+    /// ü 的另一种写法先归一到词库存的那种；开了模糊音时近音读音同批查，每个与敲出读音不同的音节扣一份分，
+    /// 再按折后权重排序、同字去重、截回 `span_limit`。
+    pub fn lattice_lookup(&self, span: &[String], span_limit: i32, fuzzy_rules: u32) -> rusqlite::Result<Vec<Lexeme>> {
+        let normalized: Vec<String> = span.iter().map(|s| canonical_syllable(s).to_string()).collect();
+        let mut keys = vec![normalized.clone()];
+        for mut variant in crate::fuzzy::fuzzy_segmentations(&normalized, fuzzy_rules, FUZZY_LATTICE_VARIANT_LIMIT) {
+            variant.iter_mut().for_each(|s| *s = canonical_syllable(s).to_string());
+            keys.push(variant);
+        }
+        // 模糊变体与敲出的读音同批查（同表一条 SQL）。LIMIT 按表计，放宽到每个键一份，再截回 span_limit。
+        let limit = span_limit.saturating_mul(keys.len() as i32);
+        let rows = if limit <= 0 { Vec::new() } else { self.query_exact_paths(&keys, limit as usize)? };
+        let mut lexemes: Vec<Lexeme> = rows
+            .into_iter()
+            .map(|row| {
+                let mut lexeme = Lexeme { key: row.key.clone(), value: row.text, weight: row.weight, ..Lexeme::default() };
+                if keys.len() > 1 {
+                    // 每个与敲出读音不同的音节扣一份分：一个词里错两个音，比只错一个更不可能。
+                    for (typed, found) in normalized.iter().zip(row.key.split('\'')) {
+                        if found != typed {
+                            lexeme.penalty += FUZZY_LATTICE_PENALTY_LOG;
+                        }
+                    }
+                }
+                lexeme
+            })
+            .collect();
+        if keys.len() > 1 {
+            let adjusted = |l: &Lexeme| l.weight as f64 * 10f64.powf(-l.penalty);
+            lexemes.sort_by(|a, b| adjusted(b).partial_cmp(&adjusted(a)).unwrap_or(std::cmp::Ordering::Equal)); // 稳定排序
+            // 同一个字两种读音都收（多音字），只留排在前面的那行。
+            let mut seen = std::collections::HashSet::new();
+            lexemes.retain(|l| seen.insert(l.value.clone()));
+            lexemes.truncate(span_limit.max(0) as usize);
+        }
+        Ok(lexemes)
     }
 
     /// 精确候选：整串先查，再依次查越来越短的前缀（候选覆盖的输入越长越靠前），同一个词只留最先出现的。
