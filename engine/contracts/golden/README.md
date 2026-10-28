@@ -13,6 +13,7 @@
 | `expected_lattice.jsonl` | 词格解码与合并的随机场景（带解码时实际查询到的词表）及真实 `decode_word_lattice` / `merge_lattice_candidates` 的输出，探针是 `../../tools/lattice_probe.cpp`；不含语言模型 |
 | `expected_lattice_lm.jsonl` | 同一个探针带真实 `sc.lm` 跑出的解码场景（含词库平局项、读音先验）；平局会让 `partial_sort` 的次序不确定，这类场景探针不收 |
 | `lm_words.txt`、`expected_lm.jsonl` | kenlm 读取器的词表，以及真实 `ngram::LanguageModel` 对其中词的下标、单词分数和 700 个句子的逐词分数，探针是 `../../tools/lm_probe.cpp`；要用随包的 `installer/app_data/sc.lm` |
+| `expected_wubi_japanese.jsonl` | 罗马字转换（穷举哈希加随机抽样）、五笔按键与 `wubi86` 码表查询、日语按键、模型词条查询、整句解码、矩阵搜索和候选提供者的输出，探针是 `../../tools/wubi_japanese_probe.cpp`；要用随包的 `msime.db` 和 `dict_japanese.dat` |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对

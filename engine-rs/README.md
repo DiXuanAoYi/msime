@@ -18,12 +18,15 @@
 | 辅助码：码表加载、取码、单码匹配与重排、双码匹配与筛选、大写结尾的模式判断 | `src/helpcode.rs` | 同上：6 套内置码表（共约 7.4 万行）、1621 个词的取码和匹配、重排与筛选逐项相同；基线由 `msime_helpshuang_probe` 导出 |
 | 整句词格：词图构建、Viterbi 束搜索、n-best 回溯去重、字约束、字级搭配回调、读音先验、与已有候选合并的全部来源规则（词格/搭配/两种神经重排/Unigram 共识） | `src/lattice.rs` | `tests/lattice_golden.rs`：150 个无模型解码场景（484 条路径，句子、键、词序、输入域逐项相同，分数误差 1e-9 内）、80 个带真实 `sc.lm` 的解码场景（257 条路径，含词库平局项与读音先验）和 150 个合并场景逐项相同；基线由 `msime_lattice_probe` 导出，带着解码时实际查询到的词表回放 |
 | kenlm 二进制语言模型读取器（`sc.lm`，`-q 4 -a 22` 的量化 trie：词表哈希、量化表、Bhiksha 指针压缩、位压缩 n-gram、回退） | `src/kenlm.rs` | `tests/kenlm_golden.rs`：3000+ 个词的下标和单词分数、700 句（含 300 条沿真实二元/三元组走的贪心链）逐词累计分数与 C++ **逐位相同**；`KenLm` 实现 `lattice::LanguageModel`，上一行的带模型词格场景就是用它回放的。基线由 `msime_lm_probe` 导出；没有 `sc.lm`（`installer/app_data/sc.lm` 或 `MSIME_LM`）时这两组测试跳过 |
+| 日语罗马字 ↔ 假名（165 项映射表、促音/拨音/长音规则、没打完的尾巴、前缀对应的假名集合、假名转回罗马字） | `src/romaji.rs`、`src/romaji_table.rs` | `tests/wubi_japanese_golden.rs`：全部 ≤3 位（含 `'`、`-`）和 4 位字母共 479740 个输入的转换结果、475254 个前缀的假名集合，与 C++ 逐项相同（滚动哈希）；1500 条随机输入、944 条假名串逐项相同。映射表由脚本从 C++ 源码抽出，不是手抄 |
+| 五笔：按键方案（四码上限、混输放宽长度、z 通配）和 `wubi86` 码表查询（精确码优先、权重序、同字去重、GLOB 通配、50 行截断） | `src/wubi.rs` | 同上：350 个按键序列的逐步预编辑、请求和按键记录相同；1029 次码表查询（含 211 次通配）的候选、权重、次序相同 |
+| 日语：按键方案、Mozc 词典模型读取与词条查询（精确/前缀/更长前缀/接续）、整句解码、矩阵搜索、候选提供者的拼装与云候选插入 | `src/japanese.rs` | 同上：300 个日语按键序列；1500 对连接成本；124 个假名前缀；290 个输入（230 个完整读音，其中 169 个有 6 个以上假名、104 个有 10 个以上，含手写的自然句子和“词＋助词＋词尾”拼出的句子；另 60 个没打完的）的词条查询、整句解码、矩阵搜索；721 个输入的完整候选列表；12 个带云候选缓存的查询，全部逐项相同。基线由 `msime_wubi_japanese_probe` 导出，模型 128 万个词条 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
 1. 整句词格剩下的：octagram `.gram` 搭配模型、Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及词典层把词库查询接成词格 `lookup` 的那段胶水（`quanpin_dictionary.cpp` 的 `lattice_lookup`）
 2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
-3. 五笔、日语；双拼里的用户自定义方案（`BuildCustomShuangpinProfile`）和双拼词库查询（`shuangpin_query.cpp`、`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
+3. 五笔和日语里绑着用户词库的部分（调频、删词、造词写 SQLite）；双拼里的用户自定义方案（`BuildCustomShuangpinProfile`）和双拼词库查询（`shuangpin_query.cpp`、`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
 4. 英文与本地模式
 
 ### 纠错里还留在 C++ 的部分
@@ -41,9 +44,18 @@ Rust 只有“静态错拼表 + k-best 切分”。下面这些仍是 C++ 的行
 - 没对过的：octagram `.gram` 搭配模型、神经重排（合并时只对过“有重排器”这一层的来源规则，重排器本身用桩函数）、词典层把词库查询接成 `lookup` 的胶水；
 - 平局：C++ 用 `std::sort` / `partial_sort`，平局次序是实现定义的，Rust 用稳定排序。无模型基线的场景里音节不重复、权重与汉字互不相同，避开了平局；带模型的基线里，未登录词罚分相同，分数完全相等的路径很容易出现，探针会多解 4 条 n-best 来检测，**只要平局落在前 n 条里或恰好卡在 n-best 边界，这个场景就不进基线**。真实输入里的平局两边可能排得不同，但这类句子总分相等，选哪个都对；基线没法为此作证。
 
+### 五笔与日语里没有对过、或要留意的部分
+
+- 没移植：云候选缓存本身（`JapaneseCandidateProvider::dynamic_candidates_`，一个 128 项的环形缓冲，Rust 的 `Provider::query` 只接受调用方传入的那一份）、五笔的调频/删词/造词（写用户词库的事务）、日语词库的 `short_prefix_index_` 缓存（Rust 每次直接扫描，结果相同，只是慢一点）；
+- **平局次序是实现定义的，Rust 照着 MSVC 的算法写**：句子解码和矩阵搜索用 `std::partial_sort` 截断，同代价的路径谁在前由堆算法决定。随机基线里真的撞上了（"いえが言えをします" 和 "言えがいえをします" 同为 18053），用稳定排序会排反，所以 `partial_sort_by_cost` 把 MSVC 的堆操作原样搬了过来，并用基线核对；换一个标准库实现，C++ 这一侧的次序可能不同。`std::sort` 在 ≤32 个元素时是插入排序（稳定），这里每处都在这个范围里，用稳定排序；
+- 同理，`HiraganaToRomaji` 里同一个假名有几种等长写法时（じ → ji/zi，ぇ → xe/le，ちゃ → cha/cya/tya……）C++ 取哪个取决于 `unordered_map` 的遍历次序，量到的结果（じ→zi、ふ→fu、ちゃ→cya 但 ちょ→cho……）固定在 `romaji.rs` 的 `TIE_CHOICE` 里，并由基线逐项核对。这个函数只用来做显示/提示，没有候选排序依赖它；
+- 日语搜索回退路径的疑似缺陷见下。
+
 ### 发现的疑似缺陷（C++）
 
 `niihao` 只开“多键”（`autocorrect=8`）时候选为空；`nihaoo`、`shangg` 同样只开多键是正常的，`niihao` 开邻键或全开也正常。黄金样本 `expected_options.jsonl` 已把这个行为记成基线，修之前先确认是不是有意为之。
+
+`JapaneseSentenceDecoder::PrefixLemmasContinuing` 一遇到读音不比前缀长的词条就 `break`，而词库按读音排序，读音恰好等于前缀的词条排在最前面——只要词库里有读音等于已打读音的词条，这个函数就一个也不返回。后果是矩阵搜索在“有没打完的罗马字”时，补不上“已打读音 + 下一个假名”开头的更长词条（候选提供者另外调了 `PrefixLemmas`，所以用户多半还是能看到联想）。Rust 保留了这个行为，`tests/wubi_japanese_golden.rs` 把它记成基线；修之前先确认是不是有意为之。
 
 ## 运行测试
 
@@ -98,3 +110,12 @@ server\build-release\engine\Release\msime_lm_probe.exe installer\app_data\sc.lm 
 ```
 
 `lm_words.txt` 是词表（每行一个词，常用词在前、夹未登录词），换了模型要重新挑。
+
+## 重新生成五笔与日语基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_wubi_japanese_probe
+server\build-release\engine\Release\msime_wubi_japanese_probe.exe installer\app_data\msime.db installer\app_data\dict_japanese.dat engine\contracts\golden\expected_wubi_japanese.jsonl
+```
+
+必须用随包的 `msime.db` 和 `dict_japanese.dat`。罗马字映射表变了要重新抽取：`python engine-rs/tools/extract_romaji_table.py`。

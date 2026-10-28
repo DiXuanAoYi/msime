@@ -193,6 +193,10 @@ target_link_libraries(msime_lattice_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_lm_probe EXCLUDE_FROM_ALL tools/lm_probe.cpp)
 target_link_libraries(msime_lm_probe PRIVATE MetasequoiaIme::Engine)
 
+# 五笔与日语探针：导出罗马字转换、五笔方案与码表查询、日语词条/整句/候选提供者的结果，当 Rust 实现的行为规格。
+add_executable(msime_wubi_japanese_probe EXCLUDE_FROM_ALL tools/wubi_japanese_probe.cpp)
+target_link_libraries(msime_wubi_japanese_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

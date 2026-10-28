@@ -13,13 +13,17 @@ pub mod autocorrect;
 pub mod dict;
 pub mod fuzzy;
 pub mod helpcode;
+pub mod japanese;
 pub mod kenlm;
 pub mod lattice;
 pub mod ranking;
+pub mod romaji;
+mod romaji_table;
 pub mod shuangpin;
 pub mod segment;
 pub mod syllables;
 pub mod table;
+pub mod wubi;
 
 pub use dict::{dedupe_by_text, Dictionary, Entry, KeyedEntry};
 pub use segment::{cut_min_segments, cut_min_segments_prefix};
