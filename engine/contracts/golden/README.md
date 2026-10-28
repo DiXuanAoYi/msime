@@ -21,6 +21,7 @@
 | `expected_lattice_lookup.jsonl` | 词格词库查询的规格：探针 `../../tools/lattice_lookup_probe.cpp` 在随包 `msime.db` 上用真实 `make_lattice_db_lookup` 查随机跨度和全部单音节键，记录条数、内容哈希和前 12 项；要用随包的 `msime.db` |
 | `expected_spelling_graph.jsonl` | 直接辅助码拼写图的规格：探针 `../../tools/spelling_graph_probe.cpp` 对九套内置方案跑随机输入串，辅码谓词用确定的哈希函数代替辅码表，记录边、分隔符、下一出字位置和唯一路径 |
 | `expected_direct_helpcode.jsonl` | 直接辅助码整句解码与解析器的规格：探针 `../../tools/direct_helpcode_probe.cpp` 在哈希合成的词库/码表上跑真实 `decode_best_path` 和 `Resolver::resolve`；带语言模型的场景要 `sc.lm` |
+| `expected_user_dictionary.jsonl`、`user_dictionary_initial_main.db`、`user_dictionary_initial_english.db` | 用户词库的规格：探针 `../../tools/user_dictionary_probe.cpp` 从同一份合成词库（两个 `.db`）和空日志出发，用真实 `user_dictionary::*`、`edit_personal_dictionary` 等顺序跑 160 个场景的随机操作；一行一步（参数、返回值、三个库逐表转储的哈希，不含 `updated_at`），`{"kind":"scenario"}` 行开新场景 |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对

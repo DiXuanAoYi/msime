@@ -225,6 +225,10 @@ target_link_libraries(msime_spelling_graph_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_direct_helpcode_probe EXCLUDE_FROM_ALL tools/direct_helpcode_probe.cpp)
 target_link_libraries(msime_direct_helpcode_probe PRIVATE MetasequoiaIme::Engine)
 
+# 用户词库探针：真实的 user_dictionary::* / 个人词库 / 词库状态读取在合成词库上跑随机操作序列，导出返回值和库状态哈希。
+add_executable(msime_user_dictionary_probe EXCLUDE_FROM_ALL tools/user_dictionary_probe.cpp)
+target_link_libraries(msime_user_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)
