@@ -10,6 +10,7 @@
 | `../../tools/golden_compare.py` | 比对两份输出，列出差异 |
 | `../../capi/msime_capi.h` | 其他语言前端认的唯一接口 |
 | `ranking_cases.tsv`、`expected_ranking.jsonl` | 调频黄金用例及真实 `adjust_candidate_ranking` 的输出，探针是 `../../tools/ranking_probe.cpp`，用例由 `../../tools/gen_ranking_cases.py` 生成 |
+| `expected_lattice.jsonl` | 词格解码与合并的随机场景（带解码时实际查询到的词表）及真实 `decode_word_lattice` / `merge_lattice_candidates` 的输出，探针是 `../../tools/lattice_probe.cpp`；不含语言模型 |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对

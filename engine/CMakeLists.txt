@@ -185,6 +185,10 @@ target_link_libraries(msime_ranking_probe PRIVATE MetasequoiaIme::Engine ${METAS
 add_executable(msime_helpshuang_probe EXCLUDE_FROM_ALL tools/helpshuang_probe.cpp)
 target_link_libraries(msime_helpshuang_probe PRIVATE MetasequoiaIme::Engine)
 
+# 词格探针：对随机场景跑真实的 decode_word_lattice / merge_lattice_candidates，输出输入与结果，当 Rust 实现的规格。
+add_executable(msime_lattice_probe EXCLUDE_FROM_ALL tools/lattice_probe.cpp)
+target_link_libraries(msime_lattice_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)
