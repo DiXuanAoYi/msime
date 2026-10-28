@@ -388,3 +388,7 @@ option(METASEQUOIA_IME_BUILD_VOICE "Build shared voice input capabilities" OFF)
 if(METASEQUOIA_IME_BUILD_VOICE)
     add_subdirectory(voice)
 endif()
+
+# 词库状态暂存探针：真实的 stage_dictionary_state / prepare_runtime_paths，当 Rust 实现的规格。
+add_executable(msime_dictionary_state_probe EXCLUDE_FROM_ALL tools/dictionary_state_probe.cpp)
+target_link_libraries(msime_dictionary_state_probe PRIVATE MetasequoiaIme::Engine)
