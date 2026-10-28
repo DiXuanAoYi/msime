@@ -1,0 +1,12 @@
+# 英文词典探针用的人工翻译侧车样例（格式 源<Tab>释义）
+apple	苹果（自定义）
+run	跑；运行（自定义）
+AI Controller	AI 控制器（自定义）
+苹果	apple (custom)
+太阳	the sun; sol
+
+  love  	爱；喜欢
+bad line without tab
+	empty source
+cat	
+水	water (custom)

@@ -10,12 +10,16 @@
 //! 还没做的（仍在 C++）：纠错、模糊音、整句词格、联想、用户词库调频。
 
 pub mod autocorrect;
+pub mod datetime;
 pub mod dict;
+pub mod english;
 pub mod fuzzy;
 pub mod helpcode;
 pub mod japanese;
 pub mod kenlm;
 pub mod lattice;
+pub mod local;
+mod lunar_table;
 pub mod ranking;
 pub mod romaji;
 mod romaji_table;
@@ -23,6 +27,7 @@ pub mod shuangpin;
 pub mod segment;
 pub mod syllables;
 pub mod table;
+pub mod vmode;
 pub mod wubi;
 
 pub use dict::{dedupe_by_text, Dictionary, Entry, KeyedEntry};

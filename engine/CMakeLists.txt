@@ -197,6 +197,10 @@ target_link_libraries(msime_lm_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_wubi_japanese_probe EXCLUDE_FROM_ALL tools/wubi_japanese_probe.cpp)
 target_link_libraries(msime_wubi_japanese_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
 
+# 英文词典与本地模式探针：导出 Unicode、V 模式、日期时间、表情、颜文字、超级简拼、快捷短语和英文词典的结果，当 Rust 实现的行为规格。
+add_executable(msime_local_modes_probe EXCLUDE_FROM_ALL tools/local_modes_probe.cpp)
+target_link_libraries(msime_local_modes_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)
