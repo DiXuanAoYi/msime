@@ -26,7 +26,7 @@ struct App {
     sized: bool,
     passthrough: bool,
     screen: (f32, f32),
-    sprite: character::Sprite,
+    sprite: character::Sprites,
 }
 
 impl App {
@@ -165,15 +165,19 @@ fn cursor_point() -> Option<(f32, f32)> {
 }
 
 /// 默认用内置的大肥鱼；`ZHIYU_COMPANION_SPRITE` 指向别的 PNG（例如另一款皮肤的 character.png）就换成它。
-fn load_sprite(ctx: &egui::Context) -> character::Sprite {
+fn load_sprite(ctx: &egui::Context) -> character::Sprites {
     if let Some(path) = std::env::var_os("ZHIYU_COMPANION_SPRITE") {
         if let Ok(bytes) = std::fs::read(&path) {
-            if let Ok(sprite) = character::Sprite::load(ctx, &bytes) {
-                return sprite;
+            if let Ok(full) = character::Sprite::load(ctx, &bytes) {
+                let peek = character::Sprite::load(ctx, &bytes).expect("同一张图不会解码失败");
+                return character::Sprites { full, peek };
             }
         }
     }
-    character::Sprite::load(ctx, character::BIGFISH).expect("内置立绘损坏")
+    character::Sprites {
+        full: character::Sprite::load(ctx, character::BIGFISH).expect("内置立绘损坏"),
+        peek: character::Sprite::load(ctx, character::BIGFISH_PEEK).expect("内置探头立绘损坏"),
+    }
 }
 
 fn main() -> eframe::Result {

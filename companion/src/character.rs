@@ -15,6 +15,14 @@ const INK: Color32 = Color32::from_rgb(52, 40, 84);
 
 /// 内置的大肥鱼（来自 `skins/bigfish`，随仓库同一授权）。
 pub const BIGFISH: &[u8] = include_bytes!("../assets/bigfish.png");
+/// 「大肥鱼·探头」：只有上半身，下沿是平的，正好搭在候选窗上沿往里看（来自 `skins/bigfish-peek`）。
+pub const BIGFISH_PEEK: &[u8] = include_bytes!("../assets/bigfish-peek.png");
+
+/// 站在地上、跳起来、听声音用整身；趴在候选窗上看你打字用探头。
+pub struct Sprites {
+    pub full: Sprite,
+    pub peek: Sprite,
+}
 
 pub struct Sprite {
     texture: TextureHandle,
@@ -54,7 +62,11 @@ fn motion(pose: Pose, t: f32) -> Motion {
 }
 
 /// 脚底中心 `feet`，`facing` 为 1 保持原图朝向、-1 左右镜像，`t` 是秒。
-pub fn draw(painter: &Painter, sprite: &Sprite, feet: Pos2, facing: f32, pose: Pose, t: f32) {
+pub fn draw(painter: &Painter, sprites: &Sprites, feet: Pos2, facing: f32, pose: Pose, t: f32) {
+    if pose == Pose::Perch {
+        return draw_peek(painter, &sprites.peek, feet, facing, t);
+    }
+    let sprite = &sprites.full;
     let m = motion(pose, t);
     let h = HEIGHT;
     let w = h * sprite.aspect;
@@ -101,6 +113,24 @@ pub fn draw(painter: &Painter, sprite: &Sprite, feet: Pos2, facing: f32, pose: P
         }
         _ => {}
     }
+}
+
+/// 探头：下沿贴着候选窗上沿（`feet.y`），在窗沿后面轻轻上下探，下沿以下的部分裁掉，像趴在窗后。
+fn draw_peek(painter: &Painter, sprite: &Sprite, feet: Pos2, facing: f32, t: f32) {
+    const WIDTH: f32 = 124.0;
+    let h = WIDTH / sprite.aspect;
+    let rise = ((t * 1.7).sin() * 0.5 + 0.5) * 7.0; // 0~7：缩下去一点又探出来
+    let sway = (t * 1.3).sin() * 2.0;
+    let left = feet.x - WIDTH * 0.5 + sway;
+    let top = feet.y - h + 6.0 - rise * 0.0 + (7.0 - rise);
+    let clip = egui::Rect::from_min_max(pos2(feet.x - WIDTH, feet.y - h - 20.0), pos2(feet.x + WIDTH, feet.y));
+    let (u0, u1) = if facing >= 0.0 { (0.0, 1.0) } else { (1.0, 0.0) };
+    painter.with_clip_rect(clip).image(
+        sprite.texture.id(),
+        egui::Rect::from_min_size(pos2(left, top), Vec2::new(WIDTH, h)),
+        egui::Rect::from_min_max(pos2(u0, 0.0), pos2(u1, 1.0)),
+        Color32::WHITE,
+    );
 }
 
 /// 双手按在耳朵（头两侧的鱼鳍）上，旁边冒几道声波。
