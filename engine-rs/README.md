@@ -31,22 +31,19 @@
 | 直接辅助码的整句解码（在拼写图上铺词、一次 Viterbi 同时定切分与用字；占位边、搭配尾窗、语言模型状态、MSVC 的 `partial_sort` 束截断）和解析器（辅码索引、选切分、改写请求为句中辅助码形状、纯双拼时放行） | `src/direct_lattice.rs`、`src/direct_resolver.rs`、`src/msvc_sort.rs` | `tests/direct_helpcode_golden.rs`：九套内置方案 × 220 条随机输入串。词库、码表、辅码谓词都是哈希合成的（两边同一套，权重互不相同）；1980 次解码（整句完整 779，987 次带真实 `sc.lm`）的音节、整句、键、词、分数逐项一致，词边缓存跑两次结果不变；1980 次解析器调用（改写请求 856，带辅码约束 163，解出整句 14）的是否改写、改写出的请求字段、整句一致。`partial_sort` 的平局次序照 MSVC 的堆实现搬过来（`msvc_sort`，日语解码共用），所以不必回避平局。C++ 的 `QueryRequest` 没移植，改写结果放在 `Rewrite`；跨按键的查词/整句/搭配分缓存只影响速度，没搬。辅码索引回查时“只收单字”的过滤在合成词库里测不出（码表里只有单字，等价变异）。基线由 `msime_direct_helpcode_probe` 导出，要 `sc.lm` |
 | 用户词库：操作日志（造词/删词/调频/重放，两库提交次序）、固定位置、调频的权重算法（中点、占用权重冲突、16 行重排、上限/下限/逼近 int64）、五笔/快捷短语/英文词的学习与槽位、日期时间格式顺序、个人词库的校验/编辑（回执、过期编辑检测）/分页、词库状态导出；`EnglishDictionary::ensure_schema` / `upsert_gloss` | `src/user_dictionary.rs`、`src/english.rs`（`ensure_schema`、`upsert_gloss`） | `tests/user_dictionary_golden.rs`：160 个场景 × 8 到 25 步随机操作（2651 步，28 种操作），每个场景从同一份合成 `msime.db`/`english.db` 和空日志出发；每步的返回值和执行后三个库逐表转储的哈希（不含 `updated_at`）与真实 `user_dictionary::*`、`edit_personal_dictionary`、`personal_dictionary_entries`、`stream_dictionary_state` 一致。合成词库里专门放了走进重排各分支的形状（权重超上限、成片相同、16 个连号、阶梯末位恰好等于下限、权重逼近 int64 上限、连号链撞上上限），探针把选中项摆到能走进这些分支的位置。变异检查：重排间隔与行数、上限、中点取整、阶梯起点、冲突阈值、阶梯下限边界、逼近上限判断、英文词长度边界、个人词库分页与回执 ID 长度边界都能被测出。测不出的是等价变异：`slot >= max_slot` 已提前返回，后面 `(slot + 1).min(max_slot)` 的 `min` 去不去都一样（英文槽位同理）；重放按 `updated_at, rowid` 排序在这套数据里无影响（各日志行落在词库的不同行上）。`ensure_schema` 只核对了建出的表名和 `user_version`，`upsert_gloss` 没有单独的基线。基线由 `msime_user_dictionary_probe` 导出，初始库一并提交 |
 | 双拼词库（按双拼切分查全拼词库：整串、声母、前缀子串、单字母 24 条与扩展；句中辅助码约束；单码/双码辅助码筛选与重排；词格整句并入候选；造词/调频/删词的 SQL 与校验、写库和日志）；共用的全拼切分（贪心、带纠错的别名表）、按来源区分的混合简拼、`std::sort` | `src/shuangpin_dictionary.rs`、`src/quanpin_query.rs`、`src/dict.rs`（`QuerySource`、`query_initial`、`query_keyed_flat`）、`src/msvc_sort.rs`（`sort_by`） | `tests/shuangpin_dictionary_golden.rs`：四类。**切分** 4500 条（随机音节、手误写法、同一个有歧义的写法重复多遍；纠错与贪心不同 1565，多条路径 386，不完整 2406）的贪心/纠错路径、是否完整拼音、简拼与真实 `cut_pinyin_by_mode` 一致。**`std::sort`** 204 个数组（大小 0 到 5000，平局很多）的最终下标顺序与 MSVC 一致（`<algorithm>` 的内省排序照头文件搬）。**读**：随包 `msime.db` 上九套方案 × 70 个随机输入串，`generate`/`generateSeries`/句中辅助码筛选/单码双码辅助码/单字母扩展/查权重/造词查询共 2600 多次，条数、内容哈希、前 8 项与真实 `ShuangpinDictionary` 一致（随机词格开关、显示下一条、模糊音规则、句中辅助码约束）。**写**：54 个场景 683 步的造词/调频/删词（含双拼原串、带分隔符/不带分隔符的全拼、带手误的全拼），返回值和词库、日志逐表转储的哈希一致。变异检查：双拼声母严格匹配、单字母上限、单码末字优先、权重 +1、前缀子串循环、受约束跨度上限、别名表各条、纠错路径上限与排序键都能被测出。测不出的是等价变异：`query_keyed_flat` 换稳定排序（SQL 已按权重降序，随包词库上这一步不改变次序；排序本身由 `std::sort` 那组样本单独核对）；`do_validate` 里 `jp.len() != han_count` 改成 `>`（前面已有段数等于字数的检查）；n-best 条数 12 改 5（显示下一条的场景里没出现第 6 条以后的差别）；纠错路径排序的第三个键（别名备选的名次，生成次序本来就是它）。没搬的见下面的清单。读和写要 `installer/app_data/` 下的 `msime.db`、`sc.lm`、`helpcodes/`（或 `MSIME_APP_DATA`），缺了就跳过。基线由 `msime_shuangpin_dictionary_probe` 导出，合成小词库一并提交 |
+| 全拼词库（按切分查词库：整串、前缀子串、稀疏拼音回退；等音节数切分的备选并入；词格整句并入；字面混合简拼/整词领衔；合法输入上等音节数切分的整句仲裁；模糊音并入；单字母 24 条与扩展；造词/调频/删词）和纠错层（k-best 纠错切分、合法输入上的手误读法与仲裁、读音对回敲的字母、上下文消解、纠错标记） | `src/quanpin_dictionary.rs`、`src/quanpin_utils.rs`（音节图、完整/最少音节切分、别名归一）、`src/autocorrect.rs`（`autocorrect_cut_kbest`、`legal_input_correction_cuts`、`correction_cut_for_reading` 等）、`src/lattice.rs`（`Item` 多了 `fuzzy`、`corrected_from`） | `tests/quanpin_dictionary_golden.rs`：随包 `msime.db` 上 3100 个输入（取自词库真键的整串、前缀、简拼、混拼、没打完的尾音节、ü 别名、手动分隔符、最少音节数打平的歧义串、手误输入 × 16 种纠错掩码、开了领域词库的输入）的 `query` / `fuzzy_candidates` / `expand_initial_candidates` / `find_candidate`，随机整句开关、模糊音、显式切分和用户调频日志；合成小词库上 60 个场景 719 步的造词/调频/删词，返回值和逐表转储的哈希一致。`tests/quanpin_autocorrect_golden.rs`：k-best 3000、k=1 的细节 600、合法输入 2500、读音对回敲的字母 2500、简拼形状 1500。变异检查（约 140 处变异，分页/比例/路径上限/稳定排序/各个门槛）：能被测出的都补了数据；测不出的是等价变异或浮点边界平局（浮点打分恰好相等的分支、n-best 条数 12→11 需要 12 条以上路径、`reopen` 在 Rust 里没有对应的缓存可失效）。没搬的：Google 解码器整句、神经重排、万象语法搭配、`handleVkCode`、`insert_word_to_series_cache`、各种结果缓存。基线由 `msime_quanpin_dictionary_probe`、`msime_quanpin_autocorrect_probe` 导出，合成小词库一并提交 |
+| 领域词库（随包 `domain-input.db`，按词包过滤的 TEMP 视图，只读、失败即整库关闭；`query`/`exact`/`lattice` 带输入域；`merge`）；已接进全拼和双拼词库（`set_enabled_domain_dictionaries`，并入查询、备选切分、模糊候选、词格跨度和合法输入仲裁） | `src/domain_dictionary.rs`、`src/dict.rs`（`Dictionary::from_connection`） | `tests/domain_dictionary_golden.rs`：200 次切换启用集合 × 14 步（`query` 1097 条非空 237、`exact` 577 条非空 151、`lattice` 552 条非空 119、`merge` 574 条非空 219）与 300 条启用串归一，条数、哈希、前 8 项（含输入域）一致。全拼/双拼的基线里另有开了领域词库的读场景（全拼 700 个输入、双拼 9 套方案 × 120 个，带输入域的候选行 1357 / 1456 条）。C++ 的 `membership` 结果缓存没搬（只影响速度）。已知差异：`merge_alternative_segmentations` 在词库没有备选整词、只有领域词库有时，C++ 对空向量取 `front()`（未定义行为），Rust 当作没有保护位 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
-1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排、领域词库（默认关）；以及全拼词典层（`quanpin_dictionary.cpp`）把各路来源编排成候选列表的那段。双拼词典层（`shuangpin_dictionary.cpp`）的数据部分已移植，没搬的是它的按键状态机 `handleVkCode`、`resolve_direct_helpcode`（直接辅助码解析器的接线）、`query_single_char_rows`，以及各种结果缓存（只影响速度）
+1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排。全拼词典层（`quanpin_dictionary.cpp`）和纠错层、领域词库已移植，没搬的是按键状态机 `handleVkCode`、`insert_word_to_series_cache` 和各种结果缓存（只影响速度）。双拼词典层（`shuangpin_dictionary.cpp`）的数据部分已移植，没搬的是它的按键状态机 `handleVkCode`、`resolve_direct_helpcode`（直接辅助码解析器的接线）、`query_single_char_rows`，以及各种结果缓存
 2. 用户词库里没搬的两处：`stage_dictionary_state`（把导入的状态暂存成新库）、按默认路径缓存连接（只是性能手段，Rust 每次打开新连接）
 3. 五笔和日语里调用用户词库的接线（用户词库本身已移植）；辅助码在候选窗里的实际接线
 4. 本地模式：`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
 
-### 纠错里还留在 C++ 的部分
+### 纠错
 
-Rust 只有“静态错拼表 + k-best 切分”。下面这些仍是 C++ 的行为，黄金样本里对应的输入不拿来对照（`tests/golden.rs` 的 `AUTOCORRECT_CPP_ONLY` 逐条列出）：
-
-- **简拼形状闸**：像简拼的输入（`nhao` = n+hao）不纠错，保留 您好；
-- **合法输入闸**：本身合法的输入（`tianqi`）主切不动，纠错读法只在整句打分里参与；
-- **表外生成读法**：任意字母替换/插入，只有静态表完全解释不了才出场（`nihap` 的 你还）；
-- **头部纠错 + 简拼尾**、**纠错读法与字面整词的混排仲裁**。
+错拼表、k-best 切分和全拼词典层上的纠错（简拼形状闸、合法输入闸、表外生成读法、头部纠错 + 简拼尾、纠错读法与字面整词的混排仲裁、上下文消解）都已移植，由 `tests/quanpin_autocorrect_golden.rs` 和 `tests/quanpin_dictionary_golden.rs` 对照真实 C++。`tests/golden.rs` 里的 `AUTOCORRECT_CPP_ONLY` 是更早只有静态表时留下的清单，这些输入现在由词典层的黄金样本覆盖。
 
 ### 整句词格里没有对过的部分
 
@@ -193,6 +190,15 @@ Copy-Item $work\initial_main.db engine\contracts\golden\user_dictionary_initial_
 Copy-Item $work\initial_english.db engine\contracts\golden\user_dictionary_initial_english.db
 ```
 
+## 重新生成全拼词库基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_quanpin_dictionary_probe
+$work = Join-Path $env:TEMP 'qpdprobe'
+server\build-release\engine\Release\msime_quanpin_dictionary_probe.exe installer\app_data $work engine\contracts\golden\expected_quanpin_dictionary.jsonl
+Copy-Item $work\quanpin_dictionary_initial.db engine\contracts\golden\quanpin_dictionary_initial.db
+```
+
 ## 重新生成双拼词库基线
 
 ```powershell
@@ -200,4 +206,12 @@ cmake --build server/build-release/engine --config Release --target msime_shuang
 $work = Join-Path $env:TEMP 'spdprobe'
 server\build-release\engine\Release\msime_shuangpin_dictionary_probe.exe installer\app_data $work engine\contracts\golden\expected_shuangpin_dictionary.jsonl
 Copy-Item $work\shuangpin_dictionary_initial.db engine\contracts\golden\shuangpin_dictionary_initial.db
+```
+
+## 重新生成纠错与领域词库基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_quanpin_autocorrect_probe msime_domain_dictionary_probe
+server\build-release\engine\Release\msime_quanpin_autocorrect_probe.exe engine\contracts\golden\expected_quanpin_autocorrect.jsonl
+server\build-release\engine\Release\msime_domain_dictionary_probe.exe installer\app_data\domain-input.db engine\contracts\golden\expected_domain_dictionary.jsonl
 ```
