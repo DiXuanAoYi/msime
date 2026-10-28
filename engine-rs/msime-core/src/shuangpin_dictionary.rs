@@ -131,6 +131,8 @@ fn item(pinyin: &str, word: &str, weight: i64, source: Source, canonical: &str) 
         input_domains: Vec::new(),
         fuzzy: false,
         corrected_from: String::new(),
+        scheme: Default::default(),
+        fixed_position: 0,
     }
 }
 

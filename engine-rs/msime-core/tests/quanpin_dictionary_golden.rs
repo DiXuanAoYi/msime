@@ -216,6 +216,7 @@ fn sentence_sources_match_cpp() {
         };
         dictionary.set_sentence_association(association);
         dictionary.set_rescoring_context(record["context"].as_str().unwrap());
+        dictionary.reset_cache();
         sources.worker.clear();
         let (raw, seg) = (record["raw"].as_str().unwrap(), record["seg"].as_str().unwrap());
         let (autocorrect, fuzzy) = (record["ac"].as_u64().unwrap() as u32, record["fuzzy"].as_u64().unwrap() as u32);
@@ -228,8 +229,10 @@ fn sentence_sources_match_cpp() {
         // 一次查询可能排了不止一批（主切分、字面切分各一批，同一模型一次只算一批）：算完就重查，直到结果不再变。
         let second = loop {
             wait_for_worker(&sources);
+            dictionary.reset_cache();
             let again = dictionary.query(raw, seg, autocorrect, fuzzy);
             wait_for_worker(&sources);
+            dictionary.reset_cache();
             let settled = dictionary.query(raw, seg, autocorrect, fuzzy);
             if list_json(&settled) == list_json(&again) {
                 break settled;

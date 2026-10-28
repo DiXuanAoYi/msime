@@ -391,6 +391,9 @@ pub struct Item {
     pub fuzzy: bool,
     /// 非空表示候选来自纠错解释，值是纠错前敲的字母。
     pub corrected_from: String,
+    /// 产出这个候选的输入方案：五笔拼音混输的组合里两边的候选共存，调频、删除按候选自己的方案走。
+    pub scheme: crate::request::SchemeType,
+    pub fixed_position: i32,
 }
 
 /// 对 n-best 的第二意见：只能重排，不许增删改。返回 false 表示弃权。
@@ -463,6 +466,8 @@ fn select_distinct(
         input_domains: path.input_domains.clone(),
         fuzzy: false,
         corrected_from: String::new(),
+        scheme: Default::default(),
+        fixed_position: 0,
     })
 }
 
@@ -698,6 +703,8 @@ mod tests {
             input_domains: vec![],
             fuzzy: false,
             corrected_from: String::new(),
+            scheme: Default::default(),
+            fixed_position: 0,
         }
     }
 

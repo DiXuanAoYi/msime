@@ -9,12 +9,14 @@
 //!
 //! 没搬的：
 //! - 按键状态机 `handleVkCode`、`insert_word_to_series_cache`；
-//! - 各种结果缓存（只影响速度；写库后 C++ 会清缓存，这里每次都重新查）。`expand_initial_candidates` 在 C++ 里
-//!   还会把扩展后的列表写回缓存，这里不模拟。
+//! - 逐前缀的词库行缓存、切分缓存、纠错裁决缓存、词格路径与跨度缓存（只影响速度）。整串的结果缓存（`series_cache`）
+//!   是语义的一部分：云/AI 候选经 `insert_word_to_series_cache` 插进缓存里的那份列表，下一次同键查询原样取出，
+//!   所以这一层照 C++ 搬了，清缓存的时机也一样（写库、换开关、换前文、词库被别的连接改过）。
 
 use crate::dict::{Dictionary, KeyedEntry, QuerySource};
 use crate::domain_dictionary::{self, DomainDictionary};
 use crate::autocorrect::{self, looks_like_jianpin_spelling, Cut};
+use crate::cache::Cache;
 use crate::fuzzy;
 use crate::helpcode;
 use crate::lattice::{self, Item, LanguageModel, Lexeme, Path as LatticePath, Source};
@@ -31,6 +33,7 @@ use crate::syllables::{is_intact, is_prefix};
 use crate::table::table_name;
 use crate::user_dictionary::{self, DictionaryKind};
 use rusqlite::{Connection, OpenFlags};
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -96,7 +99,14 @@ fn item(pinyin: &str, word: &str, weight: i64, source: Source, canonical: &str) 
         input_domains: Vec::new(),
         fuzzy: false,
         corrected_from: String::new(),
+        scheme: Default::default(),
+        fixed_position: 0,
     }
+}
+
+/// 云/AI 候选：权重 1，没有规范读音。
+pub(crate) fn dynamic_item(pinyin: &str, word: &str, source: Source) -> Item {
+    item(pinyin, word, 1, source, "")
 }
 
 fn keyed_item(code: &str, row: &KeyedEntry) -> Item {
@@ -205,6 +215,8 @@ fn merge_fuzzy_items(exact: Vec<Item>, mut fuzzy_items: Vec<Item>) -> Vec<Item> 
 #[derive(Default)]
 struct SeriesQueryResolution {
     segmentation: String,
+    /// 整串结果缓存的键：纠错过的、合法输入上带纠错读法的各占一个槽，关掉纠错后不会读到它们。
+    cache_key: String,
     corrected_segments: Segments,
     /// 与主切同一档手误代价（纠正边数和权重和都相等）的备选读法，和主切按词频竞争。
     alternative_corrected_cuts: Vec<Segments>,
@@ -292,7 +304,27 @@ fn resolve_series_query(raw_input: &str, segments: &[String], autocorrect_types:
     } else {
         join_segments(segments)
     };
+    // 合法输入带纠错读法时候选列表也变了，同样要另占缓存槽。
+    let cache_prefix = if result.corrected_input {
+        "C:"
+    } else if result.legal_corrected_cuts.is_empty() {
+        ""
+    } else {
+        "L:"
+    };
+    result.cache_key = format!("{cache_prefix}{}", series_cache_key(raw_input, &result.segmentation));
+    // 字面兜底取决于敲的字母，哪怕两种手误共用一个纠错键。
+    if result.corrected_input {
+        result.cache_key.push('\x1f');
+        result.cache_key.push_str(raw_input);
+    }
     result
+}
+
+/// 整串结果缓存的键：手动分隔符的输入与没有的分开放。
+fn series_cache_key(raw_input: &str, segmentation: &str) -> String {
+    let prefix = if raw_input.contains('\'') { "M:" } else { "A:" };
+    format!("{prefix}{}", if segmentation.is_empty() { raw_input } else { segmentation })
 }
 
 pub struct QuanpinDictionary<'a> {
@@ -306,6 +338,10 @@ pub struct QuanpinDictionary<'a> {
     /// 上屏的前文，神经重排给模型看的条件前缀。
     rescoring_context: String,
     fuzzy_rules: u32,
+    /// 整串结果缓存（C++ 的 `series_cache_`，容量 128），键见 `series_cache_key` 与 `SeriesQueryResolution::cache_key`。
+    series_cache: RefCell<Cache<Vec<Item>>>,
+    /// 词库上一次见到的 `PRAGMA data_version`，别的连接改过库就清缓存。
+    data_version: Cell<i64>,
     pinyin_sequence: String,
     pinyin_segmentation: String,
     /// 纠错的备选读法（同档与贵档），给纠错标记用。
@@ -325,6 +361,8 @@ impl<'a> QuanpinDictionary<'a> {
             sources: None,
             rescoring_context: String::new(),
             fuzzy_rules: 0,
+            series_cache: RefCell::new(Cache::new(128)),
+            data_version: Cell::new(-1),
             pinyin_sequence: String::new(),
             pinyin_segmentation: String::new(),
             pinyin_alternative_segmentations: Vec::new(),
@@ -341,7 +379,9 @@ impl<'a> QuanpinDictionary<'a> {
     }
 
     pub fn set_enabled_domain_dictionaries(&mut self, csv: &str) {
-        self.domain.set_enabled(csv);
+        if self.domain.set_enabled(csv) {
+            self.reset_cache();
+        }
     }
 
     pub fn enabled_domain_dictionaries(&self) -> &str {
@@ -350,10 +390,36 @@ impl<'a> QuanpinDictionary<'a> {
 
     fn reopen(&mut self) {
         self.dictionary = Dictionary::open(&self.db_path).ok();
+        self.reset_cache();
+    }
+
+    /// 清掉所有结果缓存（写库、换开关时）。
+    pub fn reset_cache(&self) {
+        self.series_cache.borrow_mut().clear();
+    }
+
+    /// 只清装着整句排序的那层：神经重排的结果与前文只影响整句的位置。
+    pub fn reset_sentence_cache(&self) {
+        self.series_cache.borrow_mut().clear();
+    }
+
+    /// 别的连接（设置页、另一个进程）改过词库就清缓存。
+    fn reset_cache_if_database_changed(&self) {
+        let Some(dictionary) = &self.dictionary else { return };
+        let Ok(version) = dictionary.connection().query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0)) else { return };
+        if self.data_version.get() >= 0 && version != self.data_version.get() {
+            self.reset_cache();
+        }
+        self.data_version.set(version);
     }
 
     pub fn set_sentence_association(&mut self, association: SentenceAssociation) {
+        if self.association == association {
+            return;
+        }
         self.association = association;
+        // 开关变了，之前缓存的候选列表按旧开关算出，必须清掉。
+        self.reset_cache();
     }
 
     /// 接上整句来源的共享资源（全拼、双拼词库可以共用同一份）。
@@ -364,7 +430,18 @@ impl<'a> QuanpinDictionary<'a> {
 
     /// 上屏的前文；只有神经重排会读它。
     pub fn set_rescoring_context(&mut self, context: &str) {
+        if self.rescoring_context == context {
+            return;
+        }
         self.rescoring_context = context.to_string();
+        // 上文只经神经重排进入候选：没有生效的神经模型时缓存与上文无关，不清（每次上屏都会换上文）。
+        let rescoring_active = self.sources.as_deref().is_some_and(|sources| {
+            (self.association.neural_keyboard && sources.keyboard_model().is_some())
+                || (self.association.neural_desktop && sources.desktop_model(&self.association.neural_desktop_model).is_some())
+        });
+        if rescoring_active {
+            self.reset_sentence_cache();
+        }
     }
 
     /// 最近一次 `query` 的输入串。
@@ -393,6 +470,10 @@ impl<'a> QuanpinDictionary<'a> {
 
     /// 对应 C++ `QuanpinDictionary::query`。`autocorrect_types` 是 [`autocorrect`] 里的类型位掩码，0 = 不纠错。
     pub fn query(&mut self, raw_input: &str, segmentation: &str, autocorrect_types: u32, fuzzy_rules: u32) -> Vec<Item> {
+        // 词格要按同一套规则收模糊读音；规则变了，按旧规则算出的缓存作废。
+        if self.fuzzy_rules != fuzzy_rules {
+            self.reset_cache();
+        }
         self.fuzzy_rules = fuzzy_rules;
         let mut result = self.query_exact(raw_input, segmentation, autocorrect_types);
         if fuzzy_rules != 0 && !raw_input.is_empty() {
@@ -423,6 +504,14 @@ impl<'a> QuanpinDictionary<'a> {
             .chain(&resolution.costlier_corrected_cuts)
             .map(|cut| join_segments(cut))
             .collect();
+
+        // 纠错过的结果另占一个缓存槽，不会把兜底的尾巴带进拼对了的同键输入。
+        if self.series_cache.borrow_mut().find(&resolution.cache_key).is_some() {
+            self.reset_cache_if_database_changed();
+            if let Some(cached) = self.series_cache.borrow_mut().find(&resolution.cache_key) {
+                return cached;
+            }
+        }
 
         let mut alternative_segmentations: Vec<Segments> = Vec::new();
         let mut seen_segmentations: HashSet<String> = HashSet::from([primary_segmentation.clone()]);
@@ -497,6 +586,7 @@ impl<'a> QuanpinDictionary<'a> {
             append_unique_words(&mut literal_mixed, &result);
             result = literal_mixed;
         }
+        self.series_cache.borrow_mut().insert(&resolution.cache_key, result.clone());
         result
     }
 
@@ -832,6 +922,7 @@ impl<'a> QuanpinDictionary<'a> {
             merged.push(candidate);
         }
         *candidates = merged;
+        self.series_cache.borrow_mut().insert(&series_cache_key(&self.pinyin_sequence, &self.pinyin_segmentation), candidates.clone());
         true
     }
 
@@ -850,6 +941,11 @@ impl<'a> QuanpinDictionary<'a> {
         let Some(dictionary) = &self.dictionary else { return result };
         if rules == 0 {
             return result;
+        }
+        self.reset_cache_if_database_changed();
+        let cache_key = format!("fuzzy:{rules}:{segmentation}");
+        if let Some(cached) = self.series_cache.borrow_mut().find(&cache_key) {
+            return cached;
         }
         let segments = split_segments(segmentation);
         let mut budget = 128usize;
@@ -877,6 +973,7 @@ impl<'a> QuanpinDictionary<'a> {
             }
             domain_dictionary::merge(&mut result, domain_rows);
         }
+        self.series_cache.borrow_mut().insert(&cache_key, result.clone());
         result
     }
 
@@ -1210,6 +1307,34 @@ impl<'a> QuanpinDictionary<'a> {
         }
         let _ = user_dictionary::record_user_insert(&self.journal_path, DictionaryKind::Pinyin, pinyin, word, 10000, "");
         self.reopen();
+        OK
+    }
+
+    /// 把云/AI 候选插进这个读音对应的缓存列表（读音按纠错切分重新切）。
+    pub fn insert_word_to_series_cache(&self, pinyin: &str, word: &str, source: Source) -> i32 {
+        if pinyin.is_empty() || word.is_empty() {
+            return ERROR_CODE;
+        }
+        let cuts = cut_pinyin_by_mode(pinyin, CutMode::Correction);
+        let segmentation = cuts.first().map_or_else(|| pinyin.to_string(), |cut| join_segments(cut));
+        self.insert_word_to_series_cache_key(&series_cache_key(pinyin, &segmentation), pinyin, word, source)
+    }
+
+    /// 同上，但键与这次请求的查询一致（纠错、合法输入上的纠错读法各占一个槽）。
+    pub fn insert_word_to_series_cache_for_request(&self, raw_input: &str, segmentation: &str, autocorrect_types: u32, word: &str, source: Source) -> i32 {
+        if raw_input.is_empty() || word.is_empty() {
+            return ERROR_CODE;
+        }
+        let segments = self.resolve_segments(raw_input, segmentation);
+        let resolution = resolve_series_query(raw_input, &segments, autocorrect_types);
+        self.insert_word_to_series_cache_key(&resolution.cache_key, raw_input, word, source)
+    }
+
+    fn insert_word_to_series_cache_key(&self, cache_key: &str, pinyin: &str, word: &str, source: Source) -> i32 {
+        let mut cache = self.series_cache.borrow_mut();
+        let mut list = cache.get(cache_key).unwrap_or_default();
+        crate::cache::insert_dynamic_candidate(&mut list, pinyin, word, source, true);
+        cache.insert(cache_key, list);
         OK
     }
 

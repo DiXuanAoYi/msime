@@ -239,6 +239,8 @@ fn items(value: &Value) -> Vec<Item> {
             input_domains: strings(&i["domains"]),
             fuzzy: false,
             corrected_from: String::new(),
+            scheme: Default::default(),
+            fixed_position: 0,
         })
         .collect()
 }

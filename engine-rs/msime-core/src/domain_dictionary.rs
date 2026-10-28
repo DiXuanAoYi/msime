@@ -95,6 +95,8 @@ impl DomainDictionary {
                 input_domains: self.membership(dictionary, &row.key, &row.text),
                 fuzzy: false,
                 corrected_from: String::new(),
+                scheme: Default::default(),
+                fixed_position: 0,
             })
             .collect()
     }
