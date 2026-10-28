@@ -201,6 +201,10 @@ target_link_libraries(msime_wubi_japanese_probe PRIVATE MetasequoiaIme::Engine $
 add_executable(msime_local_modes_probe EXCLUDE_FROM_ALL tools/local_modes_probe.cpp)
 target_link_libraries(msime_local_modes_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
 
+# octagram .gram 探针：现建一份合成模型，用真实的 GramDb 跑编码与查询，当 Rust 读取器的行为规格。
+add_executable(msime_gram_probe EXCLUDE_FROM_ALL tools/gram_probe.cpp)
+target_link_libraries(msime_gram_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

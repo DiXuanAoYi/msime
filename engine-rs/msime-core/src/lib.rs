@@ -14,6 +14,7 @@ pub mod datetime;
 pub mod dict;
 pub mod english;
 pub mod fuzzy;
+pub mod gram;
 pub mod helpcode;
 pub mod japanese;
 pub mod kenlm;

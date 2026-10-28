@@ -23,10 +23,11 @@
 | 日语：按键方案、Mozc 词典模型读取与词条查询（精确/前缀/更长前缀/接续）、整句解码、矩阵搜索、候选提供者的拼装与云候选插入 | `src/japanese.rs` | 同上：300 个日语按键序列；1500 对连接成本；124 个假名前缀；290 个输入（230 个完整读音，其中 169 个有 6 个以上假名、104 个有 10 个以上，含手写的自然句子和“词＋助词＋词尾”拼出的句子；另 60 个没打完的）的词条查询、整句解码、矩阵搜索；721 个输入的完整候选列表；12 个带云候选缓存的查询，全部逐项相同。基线由 `msime_wubi_japanese_probe` 导出，模型 128 万个词条 |
 | 本地模式：Unicode（U+XXXX）、V 模式（数字读法/大写/金额/算式）、Shift+T 日期时间（唤醒词与指定日期时间的形状、农历 1900–2100）、表情、颜文字、超级简拼（全拼/双拼）、快捷短语查询与插入位置 | `src/vmode.rs`、`src/datetime.rs`、`src/local.rs`、`src/lunar_table.rs` | `tests/local_modes_golden.rs`：317 个 Unicode 输入、552 个 V 模式输入加 300 组数字读法、900 个日期时间输入（含 252 个农历、556 个指定日期时间）、表情 384 / 颜文字 344 / 超级简拼 560 次查询、90 个快捷短语编码加 300 个插入位置场景，全部逐项相同。农历表由脚本从 C++ 源码抽出；基线由 `msime_local_modes_probe` 导出 |
 | 英文词典：前缀补全、中英释义（自定义翻译侧车 > 清简词库 + 行业词包 > 旧表，义项合并去重，可按 ID 禁用词包） | `src/english.rs` | 同上：315 次前缀补全、441 次释义（含禁用组合、191 次多义项合并）、1040 次翻译词包查询逐项相同 |
+| octagram `.gram` 语法模型读取器（搭配强度 `query`：上下文窗口、搭配/弱搭配/句尾惩罚；UTF-8 压缩编码；darts-clone 双数组遍历） | `src/gram.rs` | `tests/gram_golden.rs`：真模型约 390MB、另外下载，所以用探针现建一份格式相同的合成模型（`synthetic.gram`，7337 个键，字符池覆盖两字节区边界、变长区、补充平面、ASCII）；300 个文本的编码与码点辅助（含非法字节和 NUL）、2500 次查询（命中 939）的分数和统计与真实 `GramDb` 一致，逐位相同 95% 以上，其余差 1 ulp——MSVC 把 `值 / 10000.0` 编成了乘倒数。基线由 `msime_gram_probe` 导出 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
-1. 整句词格剩下的：octagram `.gram` 搭配模型、Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及词典层把词库查询接成词格 `lookup` 的那段胶水（`quanpin_dictionary.cpp` 的 `lattice_lookup`）
+1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及词典层把词库查询接成词格 `lookup` 的那段胶水（`quanpin_dictionary.cpp` 的 `lattice_lookup`）
 2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
 3. 五笔和日语里绑着用户词库的部分（调频、删词、造词写 SQLite）；双拼里的用户自定义方案（`BuildCustomShuangpinProfile`）和双拼词库查询（`shuangpin_query.cpp`、`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
 4. 英文词典与本地模式里要写库的部分：`EnglishDictionary::ensure_schema` / `upsert_gloss`（建表、升级旧库、写入释义）、`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
@@ -43,7 +44,7 @@ Rust 只有“静态错拼表 + k-best 切分”。下面这些仍是 C++ 的行
 ### 整句词格里没有对过的部分
 
 - 对过的：无模型时的启发式打分、惩罚分、字级搭配回调、字约束、束宽、n-best 去重、合并规则；带真实 kenlm 模型时的逐词打分、词库平局项（`dictionary_tiebreak`）和读音先验（`reading_prior*`）；
-- 没对过的：octagram `.gram` 搭配模型、神经重排（合并时只对过“有重排器”这一层的来源规则，重排器本身用桩函数）、词典层把词库查询接成 `lookup` 的胶水；
+- 没对过的：octagram 的接线（`.gram` 读取器本身已对过，词格里用它做重排的那层只对过“有重排器”这一层）、神经重排（合并时只对过“有重排器”这一层的来源规则，重排器本身用桩函数）、词典层把词库查询接成 `lookup` 的胶水；
 - 平局：C++ 用 `std::sort` / `partial_sort`，平局次序是实现定义的，Rust 用稳定排序。无模型基线的场景里音节不重复、权重与汉字互不相同，避开了平局；带模型的基线里，未登录词罚分相同，分数完全相等的路径很容易出现，探针会多解 4 条 n-best 来检测，**只要平局落在前 n 条里或恰好卡在 n-best 边界，这个场景就不进基线**。真实输入里的平局两边可能排得不同，但这类句子总分相等，选哪个都对；基线没法为此作证。
 
 ### 五笔与日语里没有对过、或要留意的部分
@@ -130,3 +131,12 @@ server\build-release\engine\Release\msime_local_modes_probe.exe installer\app_da
 ```
 
 必须用随包的词库；自定义翻译用 `custom_translations_fixture.txt`（而不是用户机器上的侧车文件）。农历表变了要重新抽取：`python engine-rs/tools/extract_lunar_table.py`。
+
+## 重新生成 octagram 基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_gram_probe
+server\build-release\engine\Release\msime_gram_probe.exe engine\contracts\golden\synthetic.gram engine\contracts\golden\expected_gram.jsonl
+```
+
+两个文件要一起提交：`synthetic.gram` 是探针现建的合成模型，`expected_gram.jsonl` 是真实 `GramDb` 在它上面的输出。
