@@ -1,22 +1,36 @@
-//! 把一串全拼切成音节。移植自 `engine/quanpin/quanpin_utils.cpp` 的 `cut_one_piece_min_segments`
-//! （`intact_only = true` 的那条路径）。
+//! 把一串全拼切成音节。移植自 `engine/quanpin/quanpin_utils.cpp` 的 `cut_one_piece_min_segments`。
 //!
 //! 规则：切成最少的音节；音节数相同时，首个音节取更短的。后一条是有意的，
 //! 不要改成“向前取最长”（`xian` 会被切成 `xian` 而不是 `xi'an`，`fangan` 则相反）。
 //! 切不开返回 `None`。
 
-use crate::syllables::is_intact;
+use crate::syllables::{is_intact, is_prefix};
 use std::collections::HashMap;
 
+/// 只认完整音节（C++ 的 `intact_only = true`）。
 pub fn cut_min_segments(pinyin: &str) -> Option<Vec<String>> {
+    cut(pinyin, is_intact)
+}
+
+/// 音节的前缀也算一段（`intact_only = false`），所以 `nh` 是 n、h，`zhongg` 是 zhong、g。
+pub fn cut_min_segments_prefix(pinyin: &str) -> Option<Vec<String>> {
+    cut(pinyin, is_prefix)
+}
+
+fn cut(pinyin: &str, accepts: fn(&str) -> bool) -> Option<Vec<String>> {
     if pinyin.is_empty() || !pinyin.is_ascii() {
         return None;
     }
     let mut memo: HashMap<usize, Option<Vec<String>>> = HashMap::new();
-    solve(pinyin, 0, &mut memo)
+    solve(pinyin, 0, accepts, &mut memo)
 }
 
-fn solve(text: &str, start: usize, memo: &mut HashMap<usize, Option<Vec<String>>>) -> Option<Vec<String>> {
+fn solve(
+    text: &str,
+    start: usize,
+    accepts: fn(&str) -> bool,
+    memo: &mut HashMap<usize, Option<Vec<String>>>,
+) -> Option<Vec<String>> {
     if start == text.len() {
         return Some(Vec::new());
     }
@@ -27,19 +41,17 @@ fn solve(text: &str, start: usize, memo: &mut HashMap<usize, Option<Vec<String>>
     // 和 C++ 一样从最长的片段往短试；平局时后试到的更短首音节会替换前一个。
     for end in (start + 1..=text.len()).rev() {
         let piece = &text[start..end];
-        if !is_intact(piece) {
+        if !accepts(piece) {
             continue;
         }
-        let Some(rest) = solve(text, end, memo) else { continue };
+        let Some(rest) = solve(text, end, accepts, memo) else { continue };
         let mut candidate = Vec::with_capacity(1 + rest.len());
         candidate.push(piece.to_string());
         candidate.extend(rest);
         best = match best {
             None => Some(candidate),
             Some(current) if candidate.len() < current.len() => Some(candidate),
-            Some(current)
-                if candidate.len() == current.len() && candidate[0].len() < current[0].len() =>
-            {
+            Some(current) if candidate.len() == current.len() && candidate[0].len() < current[0].len() => {
                 Some(candidate)
             }
             keep => keep,
@@ -77,6 +89,17 @@ mod tests {
     fn backtracks_instead_of_getting_stuck_on_a_greedy_cut() {
         // 贪心取 jin 会剩下切不动的 uta。
         assert_eq!(cut("zaijinuta").unwrap(), ["zai", "ji", "nu", "ta"]);
+    }
+
+    #[test]
+    fn prefix_mode_treats_initials_and_unfinished_syllables_as_segments() {
+        assert_eq!(cut_min_segments_prefix("nh").unwrap(), ["n", "h"]);
+        assert_eq!(cut_min_segments_prefix("srf").unwrap(), ["s", "r", "f"]);
+        assert_eq!(cut_min_segments_prefix("nih").unwrap(), ["ni", "h"]);
+        assert_eq!(cut_min_segments_prefix("zhongg").unwrap(), ["zhong", "g"]);
+        // sh 既可以是 s、h 两段，也可以是 shi 的前缀一段：段数少的赢。
+        assert_eq!(cut_min_segments_prefix("sh").unwrap(), ["sh"]);
+        assert_eq!(cut_min_segments_prefix("iii"), None);
     }
 
     #[test]

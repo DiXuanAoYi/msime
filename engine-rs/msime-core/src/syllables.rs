@@ -52,3 +52,8 @@ pub const INTACT: &[&str] = &[
 pub fn is_intact(piece: &str) -> bool {
     INTACT.contains(&piece)
 }
+
+/// 任何一个音节的前缀（含音节本身），用于简拼和没打完的音节：`z`、`zh`、`zho` 都算。
+pub fn is_prefix(piece: &str) -> bool {
+    !piece.is_empty() && INTACT.iter().any(|syllable| syllable.starts_with(piece))
+}
