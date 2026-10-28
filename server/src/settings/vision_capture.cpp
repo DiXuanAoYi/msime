@@ -1,4 +1,5 @@
 #include "settings/vision_capture.h"
+#include "settings/vision_config.h"
 #include "utils/common_utils.h"
 #include <Windows.h>
 #include <windowsx.h>
@@ -40,7 +41,65 @@ struct Selection
     POINT start{}, end{};
     RECT desktop{};
     bool dragging = false, done = false, cancelled = false;
+    HWND magnifier = nullptr;
 };
+constexpr int kMagZoom = 8, kMagSpan = 15, kMagBox = kMagZoom * kMagSpan;
+LRESULT CALLBACK MagnifierProc(HWND h, UINT message, WPARAM w, LPARAM l)
+{
+    if (message == WM_ERASEBKGND)
+        return 1;
+    if (message != WM_PAINT)
+        return DefWindowProcW(h, message, w, l);
+    PAINTSTRUCT ps;
+    HDC dc = BeginPaint(h, &ps);
+    POINT cursor{};
+    GetCursorPos(&cursor);
+    HDC screen = GetDC(nullptr);
+    RECT client{};
+    GetClientRect(h, &client);
+    HBRUSH back = CreateSolidBrush(RGB(30, 30, 34));
+    FillRect(dc, &client, back);
+    DeleteObject(back);
+    SetStretchBltMode(dc, COLORONCOLOR);
+    StretchBlt(dc, 2, 2, kMagBox, kMagBox, screen, cursor.x - kMagSpan / 2, cursor.y - kMagSpan / 2, kMagSpan,
+               kMagSpan, SRCCOPY);
+    HPEN pen = CreatePen(PS_SOLID, 1, RGB(255, 255, 255));
+    auto oldPen = SelectObject(dc, pen);
+    auto oldBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
+    const int cell = 2 + (kMagSpan / 2) * kMagZoom;
+    Rectangle(dc, cell, cell, cell + kMagZoom + 1, cell + kMagZoom + 1);
+    SelectObject(dc, oldBrush);
+    SelectObject(dc, oldPen);
+    DeleteObject(pen);
+    const COLORREF pixel = GetPixel(screen, cursor.x, cursor.y);
+    wchar_t label[64]{};
+    swprintf_s(label, L"#%02X%02X%02X   %d, %d", GetRValue(pixel), GetGValue(pixel), GetBValue(pixel), cursor.x,
+               cursor.y);
+    SetBkMode(dc, TRANSPARENT);
+    SetTextColor(dc, RGB(240, 240, 240));
+    RECT text{6, kMagBox + 4, client.right - 4, client.bottom};
+    DrawTextW(dc, label, -1, &text, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    ReleaseDC(nullptr, screen);
+    EndPaint(h, &ps);
+    return 0;
+}
+void MoveMagnifier(HWND h)
+{
+    POINT cursor{};
+    GetCursorPos(&cursor);
+    MONITORINFO monitor{sizeof(monitor)};
+    GetMonitorInfoW(MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST), &monitor);
+    RECT own{};
+    GetWindowRect(h, &own);
+    const int width = own.right - own.left, height = own.bottom - own.top;
+    int x = cursor.x + 24, y = cursor.y + 24;
+    if (x + width > monitor.rcMonitor.right)
+        x = cursor.x - 24 - width;
+    if (y + height > monitor.rcMonitor.bottom)
+        y = cursor.y - 24 - height;
+    SetWindowPos(h, HWND_TOPMOST, x, y, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    InvalidateRect(h, nullptr, FALSE);
+}
 LRESULT CALLBACK PickProc(HWND hwnd, UINT message, WPARAM w, LPARAM l)
 {
     auto *p = reinterpret_cast<Selection *>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
@@ -59,6 +118,8 @@ LRESULT CALLBACK PickProc(HWND hwnd, UINT message, WPARAM w, LPARAM l)
         SetCapture(hwnd);
         return 0;
     case WM_MOUSEMOVE:
+        if (p->magnifier)
+            MoveMagnifier(p->magnifier);
         if (p->dragging)
         {
             p->end = {GET_X_LPARAM(l), GET_Y_LPARAM(l)};
@@ -115,6 +176,8 @@ class Overlay
     std::vector<OverlayBlock> blocks_;
     bool shown_ = false;
     std::atomic<bool> quitting_{false};
+    bool peeking_ = false;
+    static constexpr UINT_PTR kPeekTimer = 77;
     static LRESULT CALLBACK Proc(HWND h, UINT m, WPARAM w, LPARAM l)
     {
         auto *p = reinterpret_cast<Overlay *>(GetWindowLongPtrW(h, GWLP_USERDATA));
@@ -134,9 +197,31 @@ class Overlay
                 SetWindowPos(h, HWND_TOPMOST, r.left, r.top, r.right - r.left, r.bottom - r.top,
                              SWP_NOACTIVATE | SWP_SHOWWINDOW);
                 InvalidateRect(h, nullptr, TRUE);
+                p->peeking_ = false;
+                SetTimer(h, kPeekTimer, 60, nullptr);
             }
             else
+            {
+                KillTimer(h, kPeekTimer);
                 ShowWindow(h, SW_HIDE);
+            }
+            return 0;
+        }
+        if (m == WM_TIMER && w == kPeekTimer)
+        {
+            // Holding Alt shows the original text under the translation; letting go brings the translation back.
+            bool shown = false;
+            {
+                std::lock_guard lock(p->mutex_);
+                shown = p->shown_;
+            }
+            const bool alt = shown && VisionConfig::Get().at("hold_alt_original") == "true" &&
+                             (GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+            if (shown && alt != p->peeking_)
+            {
+                p->peeking_ = alt;
+                ShowWindow(h, alt ? SW_HIDE : SW_SHOWNOACTIVATE);
+            }
             return 0;
         }
         if (m == WM_PAINT)
@@ -271,7 +356,7 @@ Overlay &OverlayWindow()
     return overlay;
 }
 } // namespace
-RECT PickRectangle(HWND owner)
+RECT PickRectangle(HWND owner, bool magnifier)
 {
     Selection s;
     s.desktop = {GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN), 0, 0};
@@ -296,6 +381,19 @@ RECT PickRectangle(HWND owner)
     SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     SetForegroundWindow(h);
     SetFocus(h);
+    if (magnifier)
+    {
+        WNDCLASSW m{};
+        m.lpfnWndProc = MagnifierProc;
+        m.hInstance = c.hInstance;
+        m.lpszClassName = L"MetasequoiaCaptureMagnifier";
+        RegisterClassW(&m);
+        s.magnifier = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT,
+                                      m.lpszClassName, L"", WS_POPUP, 0, 0, kMagBox + 4, kMagBox + 28, nullptr,
+                                      nullptr, c.hInstance, nullptr);
+        if (s.magnifier)
+            MoveMagnifier(s.magnifier);
+    }
     MSG message{};
     while (!s.done)
     {
@@ -310,6 +408,8 @@ RECT PickRectangle(HWND owner)
         TranslateMessage(&message);
         DispatchMessageW(&message);
     }
+    if (s.magnifier)
+        DestroyWindow(s.magnifier);
     DestroyWindow(h);
     if (s.cancelled)
     {

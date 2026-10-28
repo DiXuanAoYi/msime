@@ -25,7 +25,8 @@ struct OverlayBlock
 std::string OverlayDisplayText(const std::string &text, const std::string &format);
 std::vector<OverlayBlock> OverlayBlocksForImage(const nlohmann::json &result, unsigned width, unsigned height);
 std::vector<RECT> ImageTileRegions(unsigned width, unsigned height, unsigned tileSize = 2048, unsigned overlap = 96);
-RECT PickRectangle(HWND owner);
+// magnifier: show a zoomed view of the pixels under the cursor with their colour while picking.
+RECT PickRectangle(HWND owner, bool magnifier = false);
 Image CaptureRectangle(RECT rectangle);
 Image DecodeImage(const std::string &bytes);
 std::string EncodePng(const Image &image);

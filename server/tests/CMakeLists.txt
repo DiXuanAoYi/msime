@@ -171,6 +171,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/settings/vision_capture.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/vision_protocol.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/vision_service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/ocr_table.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/vision_subtitles.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/local_ocr_models.cpp"
     "${CMAKE_SOURCE_DIR}/src/settings/local_tts_models.cpp"

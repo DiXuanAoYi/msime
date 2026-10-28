@@ -1,4 +1,5 @@
 #include "settings/vision_service.h"
+#include "settings/ocr_table.h"
 #include "settings/vision_capture.h"
 #include "settings/vision_protocol.h"
 #include "settings/vision_subtitles.h"
@@ -194,6 +195,13 @@ std::string ApplyLineMode(const std::string &text, const std::string &mode)
 }
 json PostProcess(json result, const VisionConfig::Config &config, const std::string &task)
 {
+    if (result.contains("text") && result["text"].is_string() && result.value("format", "text") == "html")
+    {
+        // A table copied as HTML is useless to paste; "excel" / "md" turn it into rows the target app understands.
+        result["text"] = ConvertHtmlTables(result["text"].get<std::string>(), config.at("table_format"));
+        if (config.at("table_format") != "html")
+            result["format"] = "text";
+    }
     if (task != "document" || !result.contains("text") || !result["text"].is_string())
         return result;
     auto text = result["text"].get<std::string>();

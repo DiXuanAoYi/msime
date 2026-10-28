@@ -15,6 +15,7 @@
 #include "settings/vision_service.h"
 #include "utils/common_utils.h"
 #include "utils/hotkey_combo.h"
+#include <ShlObj.h>
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -277,6 +278,30 @@ std::string ChooseTarget(const std::wstring &text)
 
 // ----------------------------------------------------------------------------------- screen actions
 
+// Saves a screenshot into the Pictures folder (subfolder 知语截图) and returns where it went; empty on failure.
+std::wstring SaveShot(const Vision::Image &image)
+{
+    PWSTR pictures = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_Pictures, 0, nullptr, &pictures)))
+        return {};
+    const std::filesystem::path folder = std::filesystem::path(pictures) / L"知语截图";
+    CoTaskMemFree(pictures);
+    std::error_code ignored;
+    std::filesystem::create_directories(folder, ignored);
+    SYSTEMTIME now{};
+    GetLocalTime(&now);
+    wchar_t name[64]{};
+    swprintf_s(name, L"知语截图_%04d%02d%02d_%02d%02d%02d.png", now.wYear, now.wMonth, now.wDay, now.wHour,
+               now.wMinute, now.wSecond);
+    const auto file = folder / name;
+    const auto bytes = Vision::EncodePng(image);
+    std::ofstream out(file, std::ios::binary);
+    if (!out)
+        return {};
+    out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    return out.good() ? file.wstring() : std::wstring();
+}
+
 void AfterCapture(const std::string &kind, RECT region);
 
 void PickAndRun(const std::string &kind)
@@ -288,7 +313,7 @@ void PickAndRun(const std::string &kind)
     RECT region{};
     try
     {
-        region = Vision::PickRectangle(nullptr);
+        region = Vision::PickRectangle(nullptr, VisionConfig::Get().at("magnifier") == "true");
     }
     catch (const std::exception &)
     {
@@ -300,11 +325,13 @@ void PickAndRun(const std::string &kind)
     AfterCapture(kind, region);
 }
 
-void AfterCapture(const std::string &kind, RECT region)
+void AfterCapture(const std::string &requested, RECT region)
 {
     const uint64_t generation = NextGeneration();
     const auto cancelled = CancelledFor(generation);
     const auto config = VisionConfig::Get();
+    // With "按 Enter 时" set to 识字 the screenshot key behaves like 识字; set to 保存 it writes a file instead of copying.
+    const std::string kind = requested == "shot" && config.at("enter_action") == "ocr" ? "ocr" : requested;
     const RECT anchor{region.left, region.bottom, region.right, region.bottom};
     if (kind == "live")
     {
@@ -336,10 +363,14 @@ void AfterCapture(const std::string &kind, RECT region)
             return;
         if (kind == "shot")
         {
-            const bool ok = SetClipboardImage(image);
+            const bool save = config.at("enter_action") == "save";
+            const std::wstring saved = save ? SaveShot(image) : std::wstring();
+            const bool ok = save ? !saved.empty() : SetClipboardImage(image);
             Post([=] {
                 if (g_generation.load() == generation)
-                    ShowCard(anchor, L"截图", L"", L"", ok ? L"截图已复制到剪贴板，直接粘贴即可。" : L"复制截图失败。",
+                    ShowCard(anchor, L"截图", L"", save && ok ? saved : L"",
+                             save ? (ok ? L"截图已保存。" : L"保存截图失败。")
+                                  : (ok ? L"截图已复制到剪贴板，直接粘贴即可。" : L"复制截图失败。"),
                              L"Esc 关闭", {}, true);
             });
             return;
@@ -418,7 +449,7 @@ void AfterCapture(const std::string &kind, RECT region)
         Post([=] {
             if (g_generation.load() != generation)
                 return;
-            if (error.empty() && !blocks.empty())
+            if (error.empty() && !blocks.empty() && config.at("overlay_style") == "cover")
                 Vision::ShowTranslationOverlay(region, blocks);
             const auto body = Wide(combined);
             ShowCard(

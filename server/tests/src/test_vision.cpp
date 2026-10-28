@@ -4,6 +4,7 @@
 #include "settings/vision_config.h"
 #include "settings/personal_library.h"
 #include "settings/vision_service.h"
+#include "settings/ocr_table.h"
 #include "settings/vision_capture.h"
 #include <fstream>
 #include <thread>
@@ -268,4 +269,15 @@ TEST_CASE(personal_dictionary_is_scoped_toggleable_and_invalidates_cache)
     REQUIRE(PersonalLibrary::AppWords("fixtureeditor.exe", "isolationtest").empty());
     rule["application"] = "../bad.exe";
     REQUIRE(PersonalLibrary::Handle(rule, nullptr).at("ok") == false);
+}
+
+TEST_CASE(vision_ocr_tables_follow_the_chosen_copy_format)
+{
+    const std::string html =
+        "before<table><tr><th>名称</th><th>数量</th></tr><tr><td>苹果 &amp; 梨</td><td>3</td></tr></table>after";
+    REQUIRE(Vision::ConvertHtmlTables(html, "excel") == "before名称\t数量\n苹果 & 梨\t3after");
+    REQUIRE(Vision::ConvertHtmlTables(html, "md") ==
+            "before| 名称 | 数量 |\n| --- | --- |\n| 苹果 & 梨 | 3 |after");
+    REQUIRE(Vision::ConvertHtmlTables(html, "html") == html);
+    REQUIRE(Vision::ConvertHtmlTables("no table here", "excel") == "no table here");
 }
