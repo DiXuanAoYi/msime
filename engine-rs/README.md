@@ -33,11 +33,12 @@
 | 双拼词库（按双拼切分查全拼词库：整串、声母、前缀子串、单字母 24 条与扩展；句中辅助码约束；单码/双码辅助码筛选与重排；词格整句并入候选；造词/调频/删词的 SQL 与校验、写库和日志）；共用的全拼切分（贪心、带纠错的别名表）、按来源区分的混合简拼、`std::sort` | `src/shuangpin_dictionary.rs`、`src/quanpin_query.rs`、`src/dict.rs`（`QuerySource`、`query_initial`、`query_keyed_flat`）、`src/msvc_sort.rs`（`sort_by`） | `tests/shuangpin_dictionary_golden.rs`：四类。**切分** 4500 条（随机音节、手误写法、同一个有歧义的写法重复多遍；纠错与贪心不同 1565，多条路径 386，不完整 2406）的贪心/纠错路径、是否完整拼音、简拼与真实 `cut_pinyin_by_mode` 一致。**`std::sort`** 204 个数组（大小 0 到 5000，平局很多）的最终下标顺序与 MSVC 一致（`<algorithm>` 的内省排序照头文件搬）。**读**：随包 `msime.db` 上九套方案 × 70 个随机输入串，`generate`/`generateSeries`/句中辅助码筛选/单码双码辅助码/单字母扩展/查权重/造词查询共 2600 多次，条数、内容哈希、前 8 项与真实 `ShuangpinDictionary` 一致（随机词格开关、显示下一条、模糊音规则、句中辅助码约束）。**写**：54 个场景 683 步的造词/调频/删词（含双拼原串、带分隔符/不带分隔符的全拼、带手误的全拼），返回值和词库、日志逐表转储的哈希一致。变异检查：双拼声母严格匹配、单字母上限、单码末字优先、权重 +1、前缀子串循环、受约束跨度上限、别名表各条、纠错路径上限与排序键都能被测出。测不出的是等价变异：`query_keyed_flat` 换稳定排序（SQL 已按权重降序，随包词库上这一步不改变次序；排序本身由 `std::sort` 那组样本单独核对）；`do_validate` 里 `jp.len() != han_count` 改成 `>`（前面已有段数等于字数的检查）；n-best 条数 12 改 5（显示下一条的场景里没出现第 6 条以后的差别）；纠错路径排序的第三个键（别名备选的名次，生成次序本来就是它）。没搬的见下面的清单。读和写要 `installer/app_data/` 下的 `msime.db`、`sc.lm`、`helpcodes/`（或 `MSIME_APP_DATA`），缺了就跳过。基线由 `msime_shuangpin_dictionary_probe` 导出，合成小词库一并提交 |
 | 全拼词库（按切分查词库：整串、前缀子串、稀疏拼音回退；等音节数切分的备选并入；词格整句并入；字面混合简拼/整词领衔；合法输入上等音节数切分的整句仲裁；模糊音并入；单字母 24 条与扩展；造词/调频/删词）和纠错层（k-best 纠错切分、合法输入上的手误读法与仲裁、读音对回敲的字母、上下文消解、纠错标记） | `src/quanpin_dictionary.rs`、`src/quanpin_utils.rs`（音节图、完整/最少音节切分、别名归一）、`src/autocorrect.rs`（`autocorrect_cut_kbest`、`legal_input_correction_cuts`、`correction_cut_for_reading` 等）、`src/lattice.rs`（`Item` 多了 `fuzzy`、`corrected_from`） | `tests/quanpin_dictionary_golden.rs`：随包 `msime.db` 上 3100 个输入（取自词库真键的整串、前缀、简拼、混拼、没打完的尾音节、ü 别名、手动分隔符、最少音节数打平的歧义串、手误输入 × 16 种纠错掩码、开了领域词库的输入）的 `query` / `fuzzy_candidates` / `expand_initial_candidates` / `find_candidate`，随机整句开关、模糊音、显式切分和用户调频日志；合成小词库上 60 个场景 719 步的造词/调频/删词，返回值和逐表转储的哈希一致。`tests/quanpin_autocorrect_golden.rs`：k-best 3000、k=1 的细节 600、合法输入 2500、读音对回敲的字母 2500、简拼形状 1500。变异检查（约 140 处变异，分页/比例/路径上限/稳定排序/各个门槛）：能被测出的都补了数据；测不出的是等价变异或浮点边界平局（浮点打分恰好相等的分支、n-best 条数 12→11 需要 12 条以上路径、`reopen` 在 Rust 里没有对应的缓存可失效）。没搬的：Google 解码器整句、神经重排、万象语法搭配、`handleVkCode`、`insert_word_to_series_cache`、各种结果缓存。基线由 `msime_quanpin_dictionary_probe`、`msime_quanpin_autocorrect_probe` 导出，合成小词库一并提交 |
 | 领域词库（随包 `domain-input.db`，按词包过滤的 TEMP 视图，只读、失败即整库关闭；`query`/`exact`/`lattice` 带输入域；`merge`）；已接进全拼和双拼词库（`set_enabled_domain_dictionaries`，并入查询、备选切分、模糊候选、词格跨度和合法输入仲裁） | `src/domain_dictionary.rs`、`src/dict.rs`（`Dictionary::from_connection`） | `tests/domain_dictionary_golden.rs`：200 次切换启用集合 × 14 步（`query` 1097 条非空 237、`exact` 577 条非空 151、`lattice` 552 条非空 119、`merge` 574 条非空 219）与 300 条启用串归一，条数、哈希、前 8 项（含输入域）一致。全拼/双拼的基线里另有开了领域词库的读场景（全拼 700 个输入、双拼 9 套方案 × 120 个，带输入域的候选行 1357 / 1456 条）。C++ 的 `membership` 结果缓存没搬（只影响速度）。已知差异：`merge_alternative_segmentations` 在词库没有备选整词、只有领域词库有时，C++ 对空向量取 `front()`（未定义行为），Rust 当作没有保护位 |
+| 运行时目录与词库代际（`prepare_runtime_paths`：三个根目录互不重叠、SQLite 备份接口拷词库、重放日志、`.ready` 标记、整体改名、切回已就绪代际时再重放一遍；`stage_dictionary_state`：在新建的代际目录里按记录流重建日志——词条、固定位置、选择计数，越界/重复/超限整体失败并删掉本次目录） | `src/runtime_paths.rs`（`rusqlite` 开了 `backup` 特性） | `tests/dictionary_state_golden.rs`：260 个暂存场景（成功 106，失败 154：空键、超长、权重/位置/计数越界、身份重复、位置冲突、记录上限、目标目录已存在或落在资源目录里、非法内容 ID）比成败、目录是否留下、暂存出的日志与词库转储哈希、再导出的状态；80 个 `prepare` 场景（新建、重复、日志里多了改动后再准备、换内容 ID、根目录重叠、缺文件的旧代、已有 `.incoming`、非法 ID）比每次调用的成败和结果转储哈希。基线由 `msime_dictionary_state_probe` 导出，初始库用用户词库探针的两份。C++ 里 `std::filesystem::permissions(owner_all)` 在 Windows 上没有效果，没搬 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
 1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排。全拼词典层（`quanpin_dictionary.cpp`）和纠错层、领域词库已移植，没搬的是按键状态机 `handleVkCode`、`insert_word_to_series_cache` 和各种结果缓存（只影响速度）。双拼词典层（`shuangpin_dictionary.cpp`）的数据部分已移植，没搬的是它的按键状态机 `handleVkCode`、`resolve_direct_helpcode`（直接辅助码解析器的接线）、`query_single_char_rows`，以及各种结果缓存
-2. 用户词库里没搬的两处：`stage_dictionary_state`（把导入的状态暂存成新库）、按默认路径缓存连接（只是性能手段，Rust 每次打开新连接）
+2. 用户词库里没搬的一处：按默认路径缓存连接（只是性能手段，Rust 每次打开新连接）。`stage_dictionary_state` 和 `prepare_runtime_paths` 已移植
 3. 五笔和日语里调用用户词库的接线（用户词库本身已移植）；辅助码在候选窗里的实际接线
 4. 本地模式：`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
 
@@ -214,4 +215,12 @@ Copy-Item $work\shuangpin_dictionary_initial.db engine\contracts\golden\shuangpi
 cmake --build server/build-release/engine --config Release --target msime_quanpin_autocorrect_probe msime_domain_dictionary_probe
 server\build-release\engine\Release\msime_quanpin_autocorrect_probe.exe engine\contracts\golden\expected_quanpin_autocorrect.jsonl
 server\build-release\engine\Release\msime_domain_dictionary_probe.exe installer\app_data\domain-input.db engine\contracts\golden\expected_domain_dictionary.jsonl
+```
+
+## 重新生成词库状态基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_dictionary_state_probe
+$work = Join-Path $env:TEMP 'dsprobe'
+server\build-release\engine\Release\msime_dictionary_state_probe.exe engine\contracts\golden\user_dictionary_initial_main.db engine\contracts\golden\user_dictionary_initial_english.db $work engine\contracts\golden\expected_dictionary_state.jsonl
 ```

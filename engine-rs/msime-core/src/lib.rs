@@ -37,6 +37,7 @@ pub mod segment;
 pub mod syllables;
 pub mod table;
 pub mod quanpin_dictionary;
+pub mod runtime_paths;
 pub mod quanpin_query;
 pub mod quanpin_utils;
 pub mod user_dictionary;
