@@ -28,6 +28,7 @@
 | 双拼输入串处理：分段、音节边界、转全拼、手动分隔符、有效长度与前缀映射、全码辅助长度、大小写还原；句中辅助码（反引号/分号/大写触发）的解析、装饰、各光标位置“能否接反引号/第二码/分号”的判断；约束匹配与缓存签名 | `src/shuangpin_query.rs`、`src/mid_sentence.rs` | `tests/shuangpin_query_golden.rs`：九套内置方案 × 260 条随机输入串（2340 条，用方案里真能解出音节的两键码拼，掺单键、大写辅助码、反引号段、分隔符、杂字符；含辅助码段 625、双辅助码状态 108、带大写还原 1290），每条十几项输出与真实 `shuangpin::*` 一致，光标逐位置核对。`segment_raw_boundaries` 末尾的 `dedup` 看不出是否有触发路径（去掉后测试仍绿），保留以对齐 C++ |
 | 词格的词库查询（跨度只收键完全相等的行；ü 另一种写法归一；模糊近音同批查、每错一个音节扣一份分、按折后权重稳定排序、同字去重、截回上限） | `src/dict.rs`（`Dictionary::lattice_lookup`） | `tests/lattice_lookup_golden.rs`：在随包 `msime.db` 上 1119 个跨度（700 个随机跨度取自词库真有的键并混入 jv/lue 写法、查不到的键和不完整音节，加全部单音节键各一次），随机模糊音规则和上限；条数、内容哈希、前 12 项（键、词、权重、扣分）与真实 `make_lattice_db_lookup` 一致，其中 885 个开了模糊音、156 个带扣分、359 个吃满上限。基线由 `msime_lattice_lookup_probe` 导出 |
 | 双拼直接辅助码的拼写图（六种拼写：双拼两键、加一位辅码、两位辅码加斜杠/大写/不带标记、单声母；缩写边剪枝；大写标记严格档与兜底档；只留落在完整路径上的边；唯一路径判断） | `src/spelling_graph.rs` | `tests/spelling_graph_golden.rs`：九套内置方案 × 330 条随机输入串（2970 条，随机斜杠/大写标记开关，五种辅码谓词——空、哈希模 2/3/5、恒真——辅码表用确定的哈希函数代替，两边写同一个），边、分隔符、下一出字位置、唯一路径与真实 `build_spelling_graph` 一致，其中空图 208、唯一路径 1553、辅码边 2880。`single_path` 里 `min(count, 2)` 的上限换成 3 测不出（只有“是否恰好 1 条”起作用，等价变异）。基线由 `msime_spelling_graph_probe` 导出 |
+| 直接辅助码的整句解码（在拼写图上铺词、一次 Viterbi 同时定切分与用字；占位边、搭配尾窗、语言模型状态、MSVC 的 `partial_sort` 束截断）和解析器（辅码索引、选切分、改写请求为句中辅助码形状、纯双拼时放行） | `src/direct_lattice.rs`、`src/direct_resolver.rs`、`src/msvc_sort.rs` | `tests/direct_helpcode_golden.rs`：九套内置方案 × 220 条随机输入串。词库、码表、辅码谓词都是哈希合成的（两边同一套，权重互不相同）；1980 次解码（整句完整 779，987 次带真实 `sc.lm`）的音节、整句、键、词、分数逐项一致，词边缓存跑两次结果不变；1980 次解析器调用（改写请求 856，带辅码约束 163，解出整句 14）的是否改写、改写出的请求字段、整句一致。`partial_sort` 的平局次序照 MSVC 的堆实现搬过来（`msvc_sort`，日语解码共用），所以不必回避平局。C++ 的 `QueryRequest` 没移植，改写结果放在 `Rewrite`；跨按键的查词/整句/搭配分缓存只影响速度，没搬。辅码索引回查时“只收单字”的过滤在合成词库里测不出（码表里只有单字，等价变异）。基线由 `msime_direct_helpcode_probe` 导出，要 `sc.lm` |
 
 ## 还在 C++ 里的块（按建议顺序）
 
@@ -171,4 +172,11 @@ server\build-release\engine\Release\msime_lattice_lookup_probe.exe installer\app
 ```powershell
 cmake --build server/build-release/engine --config Release --target msime_spelling_graph_probe
 server\build-release\engine\Release\msime_spelling_graph_probe.exe engine\contracts\golden\expected_spelling_graph.jsonl
+```
+
+## 重新生成直接辅助码基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_direct_helpcode_probe
+server\build-release\engine\Release\msime_direct_helpcode_probe.exe engine\contracts\golden\expected_direct_helpcode.jsonl installer\app_data\sc.lm
 ```

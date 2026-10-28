@@ -11,6 +11,8 @@
 
 pub mod autocorrect;
 pub mod datetime;
+pub mod direct_lattice;
+pub mod direct_resolver;
 pub mod dict;
 pub mod english;
 pub mod fuzzy;
@@ -21,6 +23,7 @@ pub mod kenlm;
 pub mod lattice;
 pub mod local;
 mod lunar_table;
+pub mod msvc_sort;
 pub mod mid_sentence;
 pub mod ranking;
 pub mod romaji;

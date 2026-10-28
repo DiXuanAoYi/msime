@@ -221,6 +221,10 @@ target_link_libraries(msime_lattice_lookup_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_spelling_graph_probe EXCLUDE_FROM_ALL tools/spelling_graph_probe.cpp)
 target_link_libraries(msime_spelling_graph_probe PRIVATE MetasequoiaIme::Engine)
 
+# 直接辅助码整句解码与解析器探针：真实的 decode_best_path / Resolver::resolve 在合成词库上跑随机输入串。
+add_executable(msime_direct_helpcode_probe EXCLUDE_FROM_ALL tools/direct_helpcode_probe.cpp)
+target_link_libraries(msime_direct_helpcode_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)
