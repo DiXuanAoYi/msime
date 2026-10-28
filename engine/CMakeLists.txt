@@ -392,3 +392,7 @@ endif()
 # 词库状态暂存探针：真实的 stage_dictionary_state / prepare_runtime_paths，当 Rust 实现的规格。
 add_executable(msime_dictionary_state_probe EXCLUDE_FROM_ALL tools/dictionary_state_probe.cpp)
 target_link_libraries(msime_dictionary_state_probe PRIVATE MetasequoiaIme::Engine)
+
+# 神经重排探针：真实的 neural::SentenceModel / rerank_order，当 Rust 实现的规格。
+add_executable(msime_neural_probe EXCLUDE_FROM_ALL tools/neural_probe.cpp)
+target_link_libraries(msime_neural_probe PRIVATE MetasequoiaIme::Engine)

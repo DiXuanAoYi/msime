@@ -27,6 +27,7 @@
 | `expected_quanpin_autocorrect.jsonl` | 全拼纠错层的规格：探针 `../../tools/quanpin_autocorrect_probe.cpp` 导出五类记录——`kbest`/`cut1`（`autocorrect_cut_kbest` 与 k=1 的细节：随机手误输入 × 16 种类型掩码 × k=1/3/9，逐段音节、敲的字母、起点、是否纠正、权重，纠正边数、权重和、是否带生成式边）、`legal`（合法输入上的手误读法）、`reading`（读音对回敲的字母）、`jianpin`（简拼形状闸）；不读词库，不需要 `app_data` |
 | `expected_domain_dictionary.jsonl` | 领域词库的规格：探针 `../../tools/domain_dictionary_probe.cpp` 在随包 `domain-input.db` 上用真实 `domain_dictionary::Dictionary` 导出 `ids`、`normalize`（启用串归一）、`enable`（切换启用集合）、`query`、`exact`、`lattice`、`merge`，条数、哈希、前 8 项含输入域；要 `installer/app_data/domain-input.db` |
 | `expected_dictionary_state.jsonl` | 词库状态暂存与运行时目录的规格：探针 `../../tools/dictionary_state_probe.cpp` 用真实 `stage_dictionary_state` / `prepare_runtime_paths` 导出两类记录——`stage`（随机记录流，含越界/重复/超限等坏记录，新目录/已存在/落在资源目录里，合法与非法的内容 ID；记成败、目录是否留下、暂存出的日志与词库转储哈希、再导出的状态哈希）、`prepare`（新建、重复、日志里多了改动、根目录重叠、缺文件的旧代、已有 `.incoming`、非法 ID；记每次调用的成败和结果哈希）；初始库是 `user_dictionary_initial_main.db` / `user_dictionary_initial_english.db` |
+| `expected_neural.jsonl` | 神经重排的规格：探针 `../../tools/neural_probe.cpp` 用真实 `neural::SentenceModel` / `rerank_order` 在随包 `sentence-model.safetensors` 上导出 `load`（整份、截断、改字节的成败，窗口长度、署名、许可、若干字符的 token id）、`next`（`next_log_probabilities` 前 5 名与分布和）、`score`（`score_sentences`，双精度 %.17g）、`rerank`（随机静态分、λ、路径上限、前文，导出次序）、`last`（`last_characters`）；要 `installer/app_data/sentence-model.safetensors` |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对
