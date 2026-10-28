@@ -1,0 +1,57 @@
+# 带选项的黄金样本：`方案<TAB>按键<TAB>选项`，选项是 `fuzzy=模糊音位掩码`、`autocorrect=纠错类型位掩码`。
+# 模糊音位：z/zh=1 c/ch=2 s/sh=4 n/l=8 f/h=16 r/l=32 an/ang=64 en/eng=128 in/ing=256 ian/iang=512 uan/uang=1024
+# 纠错位：换位=1 邻键=2 漏键=4 多键=8
+# --- 模糊音：z/zh c/ch s/sh ---
+quanpin	zongguo	fuzzy=7
+quanpin	sishi	fuzzy=7
+quanpin	cidian	fuzzy=7
+quanpin	zhidao	fuzzy=7
+quanpin	shishi	fuzzy=7
+quanpin	zi	fuzzy=1
+quanpin	zhi	fuzzy=1
+quanpin	si	fuzzy=4
+quanpin	shi	fuzzy=4
+# --- 模糊音：n/l f/h r/l ---
+quanpin	lihao	fuzzy=8
+quanpin	nuli	fuzzy=8
+quanpin	nanren	fuzzy=8
+quanpin	laoshi	fuzzy=8
+quanpin	fei	fuzzy=16
+quanpin	huwu	fuzzy=16
+quanpin	huanying	fuzzy=16
+quanpin	re	fuzzy=32
+quanpin	le	fuzzy=32
+# --- 模糊音：前后鼻音 ---
+quanpin	wanshang	fuzzy=64
+quanpin	fan	fuzzy=64
+quanpin	feng	fuzzy=128
+quanpin	fen	fuzzy=128
+quanpin	xinxi	fuzzy=256
+quanpin	jingli	fuzzy=256
+quanpin	mingtian	fuzzy=256
+quanpin	pingguo	fuzzy=256
+quanpin	jiangnan	fuzzy=512
+quanpin	xiangmu	fuzzy=512
+quanpin	guangzhou	fuzzy=1024
+quanpin	huan	fuzzy=1024
+# --- 模糊音：全部打开 ---
+quanpin	nihao	fuzzy=2047
+quanpin	zhongguo	fuzzy=2047
+quanpin	shurufa	fuzzy=2047
+quanpin	xianzai	fuzzy=2047
+# --- 纠错：换位、邻键、漏键、多键 ---
+quanpin	nihoa	autocorrect=15
+quanpin	nihap	autocorrect=15
+quanpin	nhao	autocorrect=15
+quanpin	niihao	autocorrect=15
+quanpin	zhongugo	autocorrect=15
+quanpin	xiexei	autocorrect=15
+quanpin	tianqi	autocorrect=15
+quanpin	shurufa	autocorrect=15
+quanpin	nihoa	autocorrect=1
+quanpin	nihap	autocorrect=2
+quanpin	nhao	autocorrect=4
+quanpin	niihao	autocorrect=8
+# --- 纠错：一整句里有手误 ---
+quanpin	jintiantianqihenhaoa	autocorrect=15
+quanpin	womenyiqiqukanbiqing	autocorrect=15

@@ -10,6 +10,7 @@
  *   - 返回 int 的函数：1 表示按键被引擎处理（宿主应吞掉这个键），0 表示没处理（宿主放行给应用）。
  *   - 上屏文字用 msime_commit_text 取；快照用 msime_snapshot_json 取。
  *   - 接口只增不改；加字段进 JSON，不改已有字段的含义。版本见 msime_abi_version。
+ *   - msime_options 只在末尾加字段，调用方要先整体清零（`msime_options options = {0}`）。
  */
 #include <stddef.h>
 
@@ -34,6 +35,9 @@ extern "C"
         const char *scheme;        /* "quanpin"（默认）、"shuangpin"、"wubi"、"japanese"；NULL 视为 quanpin */
         int helpcode;              /* 辅助码，0 关 1 开 */
         int learning;              /* 候选学习，0 关 1 开 */
+        /* 以下两项是 ABI 版本 2 加的，放在末尾；按版本 1 编译的调用方不会设置它们，必须先整体清零。 */
+        unsigned fuzzy_rules;      /* 模糊音位掩码，见 core/fuzzy_pinyin_options.h，0 为精确匹配 */
+        unsigned autocorrect_types; /* 全拼纠错类型位掩码，见 quanpin/quanpin_utils.h，0 关 */
     } msime_options;
 
     enum msime_command

@@ -21,8 +21,14 @@ def load(path):
             if not line:
                 continue
             row = json.loads(line)
-            rows[(row["scheme"], row["keys"])] = row
+            rows[(row["scheme"], row["keys"], row.get("fuzzy", 0), row.get("autocorrect", 0))] = row
     return rows
+
+
+def label(key):
+    """输入的可读名：方案 按键，带选项的再补上模糊音/纠错掩码。"""
+    extra = (f" fuzzy={key[2]}" if key[2] else "") + (f" autocorrect={key[3]}" if key[3] else "")
+    return f"{key[0]} {key[1]}{extra}"
 
 
 def main():
@@ -48,7 +54,7 @@ def main():
     different = 0
     for key in expected:
         if key not in actual:
-            print(f"缺少：{key[0]} {key[1]}")
+            print(f"缺少：{label(key)}")
             different += 1
             continue
         a, b = expected[key]["snapshot"], actual[key]["snapshot"]
@@ -66,10 +72,10 @@ def main():
             problems.append(f"候选第 {index + 1} 位起不同：{left[index:index + 3]} ≠ {right[index:index + 3]}")
         if problems:
             different += 1
-            print(f"{key[0]} {key[1]}：" + "；".join(problems))
+            print(f"{label(key)}：" + "；".join(problems))
     extra = set(actual) - set(expected)
     for key in sorted(extra):
-        print(f"多出：{key[0]} {key[1]}")
+        print(f"多出：{label(key)}")
     print(f"共 {len(expected)} 条，{different} 条有差异，{len(extra)} 条多出")
     return 1 if different or extra else 0
 

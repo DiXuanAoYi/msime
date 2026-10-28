@@ -2,7 +2,8 @@
 //
 // 用法：msime_golden_probe <资源目录> <用户数据目录> <缓存目录> <样本文件> [输出文件]
 //
-// 样本文件每行一条：`方案<TAB>按键`，例如 `quanpin<TAB>nihao`；空行和 # 开头的行跳过。
+// 样本文件每行一条：`方案<TAB>按键[<TAB>选项...]`，例如 `quanpin<TAB>nihao`；空行和 # 开头的行跳过。
+// 选项是 `名=值`：`fuzzy=模糊音位掩码`、`autocorrect=纠错类型位掩码`（十进制），不写就是关闭。
 // 每条先逐个按键输入，再取一次快照，输出一行 JSON：
 //   {"scheme":"quanpin","keys":"nihao","snapshot":{...msime_snapshot_json...}}
 // 不选词、不提交，所以不会改动用户词库；`learning` 固定关闭，保证重复运行结果一致。
@@ -69,8 +70,32 @@ int main(int argc, char **argv)
             continue;
         }
         const std::string scheme = line.substr(0, tab);
-        const std::string keys = line.substr(tab + 1);
-        msime_options options{argv[1], argv[2], argv[3], scheme.c_str(), 1, 0};
+        std::string keys = line.substr(tab + 1);
+        unsigned fuzzy = 0, autocorrect = 0;
+        std::string option_text;
+        if (const auto second = keys.find('\t'); second != std::string::npos)
+        {
+            option_text = keys.substr(second + 1);
+            keys.resize(second);
+        }
+        for (std::size_t at = 0; at < option_text.size();)
+        {
+            const auto end = option_text.find('\t', at);
+            const std::string item = option_text.substr(at, end == std::string::npos ? std::string::npos : end - at);
+            if (item.rfind("fuzzy=", 0) == 0)
+                fuzzy = static_cast<unsigned>(std::stoul(item.substr(6)));
+            else if (item.rfind("autocorrect=", 0) == 0)
+                autocorrect = static_cast<unsigned>(std::stoul(item.substr(12)));
+            at = end == std::string::npos ? option_text.size() : end + 1;
+        }
+        msime_options options{};
+        options.resources_dir = argv[1];
+        options.user_data_dir = argv[2];
+        options.cache_dir = argv[3];
+        options.scheme = scheme.c_str();
+        options.helpcode = 1;
+        options.fuzzy_rules = fuzzy;
+        options.autocorrect_types = autocorrect;
         char error[256] = {};
         msime_session *session = msime_session_create(&options, error, sizeof(error));
         if (!session)
@@ -81,8 +106,8 @@ int main(int argc, char **argv)
         }
         for (const char key : keys)
             msime_character(session, key, 0);
-        out << "{\"scheme\":" << JsonString(scheme) << ",\"keys\":" << JsonString(keys)
-            << ",\"snapshot\":" << msime_snapshot_json(session) << "}\n";
+        out << "{\"scheme\":" << JsonString(scheme) << ",\"keys\":" << JsonString(keys) << ",\"fuzzy\":" << fuzzy
+            << ",\"autocorrect\":" << autocorrect << ",\"snapshot\":" << msime_snapshot_json(session) << "}\n";
         msime_session_destroy(session);
     }
     return failures == 0 ? 0 : 1;

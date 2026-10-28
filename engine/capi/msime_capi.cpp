@@ -9,7 +9,7 @@
 
 namespace
 {
-constexpr int kAbiVersion = 1;
+constexpr int kAbiVersion = 2;
 
 void WriteError(char *buffer, size_t length, const std::string &message)
 {
@@ -128,6 +128,8 @@ extern "C"
             session_options.paths.dictionaries = session_options.paths.user_data;
             session_options.helpcode = options->helpcode != 0;
             session_options.learning = options->learning != 0;
+            session_options.fuzzy_pinyin.rules = options->fuzzy_rules;
+            session_options.autocorrect_types = options->autocorrect_types;
             auto handle = std::make_unique<msime_session>();
             handle->session = std::make_unique<metasequoia::Session>(std::move(session_options));
             return handle.release();

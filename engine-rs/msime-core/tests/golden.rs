@@ -22,7 +22,11 @@ fn open() -> Option<Dictionary> {
 }
 
 fn golden_rows() -> Vec<Value> {
-    let text = std::fs::read_to_string(root().join("engine/contracts/golden/expected.jsonl")).unwrap();
+    rows_of("expected.jsonl")
+}
+
+fn rows_of(file: &str) -> Vec<Value> {
+    let text = std::fs::read_to_string(root().join("engine/contracts/golden").join(file)).unwrap();
     text.lines()
         .filter(|l| !l.trim().is_empty())
         .map(|l| serde_json::from_str::<Value>(l).unwrap())
@@ -114,4 +118,30 @@ fn jianpin_and_unfinished_syllables_keep_the_cpp_engines_relative_order() {
     assert!(checked >= 10, "只核对了 {checked} 条简拼输入");
     assert!(compared_words >= 80, "只比较了 {compared_words} 个词");
     eprintln!("简拼查询：核对了 {checked} 条输入、{compared_words} 个词");
+}
+
+#[test]
+fn fuzzy_pinyin_keeps_the_cpp_engines_relative_order() {
+    use msime_core::fuzzy::{matched_letters, merge_fuzzy_candidates};
+    let Some(dictionary) = open() else { return };
+    let (mut checked, mut fuzzy_words, mut compared_words) = (0, 0, 0);
+    for row in rows_of("expected_options.jsonl") {
+        let rules = row["fuzzy"].as_u64().unwrap_or(0) as u32;
+        if rules == 0 || row["autocorrect"].as_u64().unwrap_or(0) != 0 || row["scheme"] != "quanpin" {
+            continue;
+        }
+        let keys = row["keys"].as_str().unwrap();
+        let Some(typed) = syllables(keys) else { continue };
+        let exact = dictionary.exact_candidates(&typed, 100).unwrap();
+        let fuzzy = dictionary.fuzzy_candidates(&typed, rules).unwrap();
+        let merged = merge_fuzzy_candidates(exact, fuzzy, matched_letters);
+        fuzzy_words += merged.iter().filter(|c| c.fuzzy).count();
+        let texts: Vec<String> = merged.iter().take(30).map(|c| c.text.clone()).collect();
+        let label = format!("{keys}（fuzzy={rules}）");
+        compared_words += assert_same_relative_order(&label, &texts, &golden_texts(&row));
+        checked += 1;
+    }
+    assert!(checked >= 20, "只核对了 {checked} 条模糊音输入");
+    assert!(fuzzy_words >= 100, "只出现了 {fuzzy_words} 个模糊词，模糊路径可能没起作用");
+    eprintln!("模糊音：核对了 {checked} 条输入、{compared_words} 个词，其中模糊词合计 {fuzzy_words}");
 }
