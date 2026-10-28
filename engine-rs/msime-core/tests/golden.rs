@@ -145,3 +145,40 @@ fn fuzzy_pinyin_keeps_the_cpp_engines_relative_order() {
     assert!(fuzzy_words >= 100, "只出现了 {fuzzy_words} 个模糊词，模糊路径可能没起作用");
     eprintln!("模糊音：核对了 {checked} 条输入、{compared_words} 个词，其中模糊词合计 {fuzzy_words}");
 }
+
+/// C++ 在纠错之前还有几道 Rust 没接管的闸和仲裁，下面这些输入走的是那几条路，所以不在对照范围里：
+/// - 简拼形状闸：`nhao` 像 n+hao 的简拼，C++ 直接不纠错，保留 您好；
+/// - 合法输入闸：`tianqi`、`shurufa` 本身合法，主切不动，纠错读法只在整句打分里参与；
+/// - 表外生成读法：`nihap` 的“你还”来自任意字母替换，只有静态表无法解释时才出场，这里的混排取舍还在 C++；
+/// - `niihao` 只开“多键”时 C++ 返回空候选，开别的类型或全开都有 你好，疑似边角缺陷，见 README。
+const AUTOCORRECT_CPP_ONLY: [(&str, u64); 6] =
+    [("nhao", 15), ("nhao", 4), ("tianqi", 15), ("shurufa", 15), ("nihap", 15), ("nihap", 2)];
+
+#[test]
+fn autocorrect_primary_cut_keeps_the_cpp_engines_relative_order() {
+    use msime_core::autocorrect::tables;
+    let Some(dictionary) = open() else { return };
+    let tables = tables();
+    let (mut checked, mut compared_words) = (0, 0);
+    for row in rows_of("expected_options.jsonl") {
+        let types = row["autocorrect"].as_u64().unwrap_or(0);
+        if types == 0 || row["fuzzy"].as_u64().unwrap_or(0) != 0 {
+            continue;
+        }
+        let keys = row["keys"].as_str().unwrap();
+        if AUTOCORRECT_CPP_ONLY.contains(&(keys, types)) || golden_texts(&row).is_empty() {
+            continue;
+        }
+        let cuts = tables.cut_kbest(keys, types as u32, 9);
+        let primary = cuts.first().unwrap_or_else(|| panic!("{keys}（autocorrect={types}）：Rust 没有纠错读法"));
+        let words = dictionary.exact_candidates(&primary.syllables(), 100).unwrap();
+        let texts: Vec<String> = words.iter().take(30).map(|c| c.text.clone()).collect();
+        let label = format!("{keys}（autocorrect={types}，读法 {:?}）", primary.syllables());
+        compared_words += assert_same_relative_order(&label, &texts, &golden_texts(&row));
+        // 首位必须就是 C++ 的首位：纠错的意义在于把正确的词放到最前。
+        assert_eq!(texts.first(), golden_texts(&row).first(), "{label}：首选词不同");
+        checked += 1;
+    }
+    assert!(checked >= 7, "只核对了 {checked} 条纠错输入");
+    eprintln!("纠错：核对了 {checked} 条输入、{compared_words} 个词；另有 {} 条走 C++ 的仲裁，不在对照内", AUTOCORRECT_CPP_ONLY.len());
+}

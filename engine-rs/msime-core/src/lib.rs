@@ -9,6 +9,7 @@
 //!
 //! 还没做的（仍在 C++）：纠错、模糊音、整句词格、联想、用户词库调频。
 
+pub mod autocorrect;
 pub mod dict;
 pub mod fuzzy;
 pub mod segment;
