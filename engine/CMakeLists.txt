@@ -177,6 +177,10 @@ endif()
 add_executable(msime_golden_probe EXCLUDE_FROM_ALL tools/golden_probe.cpp)
 target_link_libraries(msime_golden_probe PRIVATE MetasequoiaIme::Engine)
 
+# 调频探针：用合成词库跑真实的 adjust_candidate_ranking，输出调完的权重，当 Rust 调频算法的规格。
+add_executable(msime_ranking_probe EXCLUDE_FROM_ALL tools/ranking_probe.cpp)
+target_link_libraries(msime_ranking_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

@@ -13,11 +13,12 @@
 | 简拼、没打完的音节（精确键 → 键前缀 → 混合简拼 → 纯简拼的查询顺序，按词去重） | `src/segment.rs`、`src/dict.rs` | `tests/golden.rs`：`n`、`nh`、`zg`、`srf`、`zgr`、`wm`、`jt`、`mt`、`bj`、`sh` 等输入的相对顺序和 C++ 一致 |
 | 模糊音（十一条规则、近音路径、与精确候选按权重混排） | `src/fuzzy.rs`、`src/dict.rs` | `tests/golden.rs`：34 条输入、1012 个词，其中 2581 个模糊词，相对顺序和 C++ 一致 |
 | 纠错：错拼表（换位、邻键、漏键、多键）和静态表上的 k-best 切分 | `src/autocorrect.rs` | `tests/autocorrect_table_matches_cpp.rs`：四张表（806 / 3728 / 194 / 11044 个错拼键）和 `engine/quanpin/autocorrect_table.h` 逐项相同；`tests/golden.rs`：7 条输入、210 个词，首选词和相对顺序一致 |
+| 调频算法（选中项的目标名次、权重中点、整排重排、选中次数计数；只算该写的权重，不碰 SQLite） | `src/ranking.rs` | `tests/ranking_golden.rs`：`engine/contracts/golden/ranking_cases.tsv` 的 253 个用例（含权重相等、相邻、超上限、接近 i64 上限、混读音、显示顺序不等于权重顺序、连选触发次数），每行最终权重和真实 `adjust_candidate_ranking` 逐个相同；基线由 `msime_ranking_probe` 在合成词库上生成 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
 1. 整句词格（Google 解码器、kenlm）
-2. 用户词库、调频与学习
+2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
 3. 辅助码、双拼、五笔、日语
 4. 英文与本地模式
 
@@ -48,3 +49,17 @@ cargo test
 - 词库只读打开，不写、不产生 -wal 文件。
 - 用户词库的写入走事务和回放日志，要等到那一块再碰，不要提前自己写。
 - C++ 的行为是规格：发现 Rust 和 C++ 不一致，先查是不是 C++ 的有意设计（`engine/AGENTS.md` 里有几条踩过的坑），不要自作主张“修正”。
+
+## 重新生成调频基线
+
+改了 `engine/tools/gen_ranking_cases.py` 或 C++ 的调频逻辑后：
+
+```powershell
+python engine/tools/gen_ranking_cases.py engine/contracts/golden/ranking_cases.tsv
+cmake --build server/build-release/engine --config Release --target msime_ranking_probe
+server\build-release\engine\Release\msime_ranking_probe.exe engine\contracts\golden\ranking_cases.tsv $env:TEMP\ranking-scratch engine\contracts\golden\expected_ranking.jsonl
+anking_cases.tsv $env:TEMP
+anking-scratch engine\contracts\golden\expected_ranking.jsonl
+```
+
+基线变了要在提交说明里写清为什么变。

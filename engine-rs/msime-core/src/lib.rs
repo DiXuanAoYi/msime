@@ -12,6 +12,7 @@
 pub mod autocorrect;
 pub mod dict;
 pub mod fuzzy;
+pub mod ranking;
 pub mod segment;
 pub mod syllables;
 pub mod table;
