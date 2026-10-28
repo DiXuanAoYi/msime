@@ -387,6 +387,10 @@ pub struct Item {
     pub source: Source,
     pub sentence_association: bool,
     pub input_domains: Vec<String>,
+    /// 模糊音读出来的候选：敲出的读音与词库里的读音可能不同。
+    pub fuzzy: bool,
+    /// 非空表示候选来自纠错解释，值是纠错前敲的字母。
+    pub corrected_from: String,
 }
 
 /// 对 n-best 的第二意见：只能重排，不许增删改。返回 false 表示弃权。
@@ -457,6 +461,8 @@ fn select_distinct(
         source,
         sentence_association: true,
         input_domains: path.input_domains.clone(),
+        fuzzy: false,
+        corrected_from: String::new(),
     })
 }
 
@@ -690,6 +696,8 @@ mod tests {
             source,
             sentence_association: false,
             input_domains: vec![],
+            fuzzy: false,
+            corrected_from: String::new(),
         }
     }
 

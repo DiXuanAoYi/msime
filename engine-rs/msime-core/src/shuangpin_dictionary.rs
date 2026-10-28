@@ -5,11 +5,11 @@
 //!
 //! 没搬的（C++ 里也各自是独立的来源或接线，Rust 这边还没有对应的块）：
 //! - Google 解码器整句、神经重排、万象语法搭配——`SentenceAssociation` 里只有词格两个开关；
-//! - 领域词库（默认关，开了才会并进候选）；
 //! - 按键状态机 `handleVkCode`、直接辅助码的 `resolve_direct_helpcode` 接线、`query_single_char_rows`；
 //! - 各种结果缓存（只影响速度；写库后 C++ 会清缓存，这里每次都重新查）。
 
 use crate::dict::{Dictionary, KeyedEntry, QuerySource};
+use crate::domain_dictionary::{self, DomainDictionary};
 use crate::helpcode::{self, Keymap, SingleMatch};
 use crate::lattice::{self, CharConstraint, Item, LanguageModel, Lexeme, Source};
 use crate::quanpin_query::{
@@ -27,6 +27,8 @@ pub const OK: i32 = 0;
 pub const ERROR_CODE: i32 = -1;
 
 const INITIAL_CANDIDATE_LIMIT: usize = 24;
+/// 领域词库 `query` 的默认条数上限。
+const DOMAIN_QUERY_LIMIT: usize = 128;
 /// 词库读连接等一次提交的时间，对应 C++ 的 `kDictionaryBusyTimeoutMs`。
 const DICTIONARY_BUSY_TIMEOUT: Duration = Duration::from_millis(250);
 
@@ -47,6 +49,7 @@ pub struct ShuangpinDictionary<'a> {
     association: SentenceAssociation,
     fuzzy_rules: u32,
     syllable_helpcodes: Vec<SyllableHelpcode>,
+    domain: DomainDictionary,
 }
 
 fn remove_delimiters(segmented: &str) -> String {
@@ -66,6 +69,8 @@ fn item(pinyin: &str, word: &str, weight: i64, source: Source, canonical: &str) 
         source,
         sentence_association: false,
         input_domains: Vec::new(),
+        fuzzy: false,
+        corrected_from: String::new(),
     }
 }
 
@@ -82,9 +87,24 @@ impl<'a> ShuangpinDictionary<'a> {
             association: SentenceAssociation::default(),
             fuzzy_rules: 0,
             syllable_helpcodes: Vec::new(),
+            domain: DomainDictionary::new(&db_path.with_file_name("domain-input.db")),
         };
         dictionary.reopen();
         dictionary
+    }
+
+    /// 领域词库默认取 `msime.db` 同目录的 `domain-input.db`；资源不在那里时用它指过去。
+    pub fn with_domain_database(mut self, path: &Path) -> Self {
+        self.domain = DomainDictionary::new(path);
+        self
+    }
+
+    pub fn set_enabled_domain_dictionaries(&mut self, csv: &str) {
+        self.domain.set_enabled(csv);
+    }
+
+    pub fn enabled_domain_dictionaries(&self) -> &str {
+        self.domain.enabled()
     }
 
     fn reopen(&mut self) {
@@ -129,7 +149,9 @@ impl<'a> ShuangpinDictionary<'a> {
             return Vec::new();
         }
         let rows = dictionary.query_keyed_flat(&segments, i32::MAX as usize, QuerySource::Shuangpin).unwrap_or_default();
-        rows.into_iter().map(|row| item(pinyin_sequence, &row.text, row.weight, Source::Database, &row.key)).collect()
+        let mut result: Vec<Item> = rows.into_iter().map(|row| item(pinyin_sequence, &row.text, row.weight, Source::Database, &row.key)).collect();
+        domain_dictionary::merge(&mut result, self.domain.query(&segments, pinyin_sequence, DOMAIN_QUERY_LIMIT, QuerySource::Shuangpin));
+        result
     }
 
     fn query_initial_from_quanpin_database(&self, code: &str, limit: i64) -> Vec<Item> {
@@ -139,7 +161,9 @@ impl<'a> ShuangpinDictionary<'a> {
         }
         let initial = self.quanpin_segmentation(code);
         let rows = dictionary.query_initial(&initial, limit).unwrap_or_default();
-        rows.into_iter().map(|row| item(code, &row.text, row.weight, Source::Database, &row.key)).collect()
+        let mut result: Vec<Item> = rows.into_iter().map(|row| item(code, &row.text, row.weight, Source::Database, &row.key)).collect();
+        domain_dictionary::merge(&mut result, self.domain.query(&[initial], code, limit.max(0) as usize, QuerySource::Shuangpin));
+        result
     }
 
     pub fn generate(&self, pinyin_sequence: &str, pinyin_segmentation: &str) -> Vec<Item> {
@@ -195,6 +219,12 @@ impl<'a> ShuangpinDictionary<'a> {
     fn lattice_lookup(&self, span: &[String], limit: i32) -> Vec<Lexeme> {
         let Some(dictionary) = &self.dictionary else { return Vec::new() };
         let mut rows = dictionary.lattice_lookup(span, limit, self.fuzzy_rules).unwrap_or_default();
+        for row in self.domain.lattice(span, limit, self.fuzzy_rules) {
+            match rows.iter_mut().find(|base| base.key == row.key && base.value == row.value) {
+                None => rows.push(row),
+                Some(duplicate) => duplicate.input_domains = row.input_domains,
+            }
+        }
         rows.sort_by(|a, b| {
             let lhs = a.weight as f64 * 10f64.powf(-a.penalty);
             let rhs = b.weight as f64 * 10f64.powf(-b.penalty);

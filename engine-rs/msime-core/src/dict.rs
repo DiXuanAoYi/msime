@@ -58,6 +58,11 @@ impl Dictionary {
         Ok(Self { connection })
     }
 
+    /// 用现成的连接（领域词库在自己的连接上建了临时视图，把各张表过滤成启用的词包）。
+    pub fn from_connection(connection: Connection) -> Self {
+        Self { connection }
+    }
+
     /// 底层只读连接，给需要自己拼 SQL 的调用方。
     pub fn connection(&self) -> &Connection {
         &self.connection

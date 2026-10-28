@@ -76,14 +76,17 @@ fn source_name(source: Source) -> &'static str {
 }
 
 fn item_json(item: &Item) -> String {
+    // 输入域非空才多一项，和探针一致。
+    let domains = if item.input_domains.is_empty() { String::new() } else { format!(",[{}]", item.input_domains.iter().map(|d| quote(d)).collect::<Vec<_>>().join(",")) };
     format!(
-        "[{},{},{},{},\"{}\",{}]",
+        "[{},{},{},{},\"{}\",{}{}]",
         quote(&item.pinyin),
         quote(&item.canonical_pinyin),
         quote(&item.word),
         item.weight,
         source_name(item.source),
-        i32::from(item.sentence_association)
+        i32::from(item.sentence_association),
+        domains
     )
 }
 
@@ -174,6 +177,7 @@ fn read_queries_match_cpp() {
         dictionary.set_sentence_association(SentenceAssociation { word_lattice: association >= 1, show_next_on_duplicate: association == 2 });
         dictionary.set_fuzzy_pinyin(record["fuzzy"].as_u64().unwrap() as u32);
         dictionary.set_syllable_helpcodes(constraints_of(&record["constraints"]));
+        dictionary.set_enabled_domain_dictionaries(record["dom"].as_str().unwrap_or(""));
         let (seq, seg) = (record["seq"].as_str().unwrap(), record["seg"].as_str().unwrap());
         let op = record["op"].as_str().unwrap();
         let got = match op {

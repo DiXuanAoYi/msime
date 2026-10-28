@@ -237,6 +237,8 @@ fn items(value: &Value) -> Vec<Item> {
             source: source_of(i["source"].as_str().unwrap()),
             sentence_association: i["sentence_association"].as_bool().unwrap(),
             input_domains: strings(&i["domains"]),
+            fuzzy: false,
+            corrected_from: String::new(),
         })
         .collect()
 }
