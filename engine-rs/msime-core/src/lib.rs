@@ -13,6 +13,7 @@ pub mod autocorrect;
 pub mod dict;
 pub mod fuzzy;
 pub mod helpcode;
+pub mod kenlm;
 pub mod lattice;
 pub mod ranking;
 pub mod shuangpin;

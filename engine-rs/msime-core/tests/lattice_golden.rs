@@ -4,15 +4,17 @@
 //! 实际被查询到的词表，所以这里用同一份词表回放，不需要复现随机数。基线里没有语言模型（C++ 的模型不能被替换），
 //! 核对的是启发式打分、惩罚分、字级搭配回调、字约束、束宽与 n-best 去重，以及合并进候选列表的全部来源规则。
 
+use msime_core::kenlm::KenLm;
 use msime_core::lattice::{
-    decode_word_lattice, merge_lattice_candidates, CharConstraint, Item, Lexeme, Options, Path, Source, SourcedReranker,
+    decode_word_lattice, merge_lattice_candidates, CharConstraint, Item, LanguageModel, Lexeme, Options, Path, Source, SourcedReranker,
 };
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn scenarios(kind: &str) -> Vec<Value> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../engine/contracts/golden/expected_lattice.jsonl");
+    let file = if kind == "decode_lm" { "expected_lattice_lm.jsonl" } else { "expected_lattice.jsonl" };
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../engine/contracts/golden").join(file);
     std::fs::read_to_string(path)
         .unwrap()
         .lines()
@@ -69,6 +71,10 @@ struct Settings {
     include_lattice_best: bool,
     include_collocation_best: bool,
     show_next_on_duplicate: bool,
+    dictionary_tiebreak: f64,
+    reading_prior: f64,
+    reading_prior_share: f64,
+    reading_prior_floor: f64,
 }
 
 fn settings(o: &Value) -> Settings {
@@ -84,6 +90,10 @@ fn settings(o: &Value) -> Settings {
         include_lattice_best: o["include_lattice_best"].as_bool().unwrap(),
         include_collocation_best: o["include_collocation_best"].as_bool().unwrap(),
         show_next_on_duplicate: o["show_next_on_duplicate"].as_bool().unwrap(),
+        dictionary_tiebreak: o["dictionary_tiebreak"].as_f64().unwrap(),
+        reading_prior: o["reading_prior"].as_f64().unwrap(),
+        reading_prior_share: o["reading_prior_share"].as_f64().unwrap(),
+        reading_prior_floor: o["reading_prior_floor"].as_f64().unwrap(),
     }
 }
 
@@ -97,6 +107,10 @@ fn apply<'a>(options: &mut Options<'a>, s: &Settings, scorer: &'a dyn Fn(&str, &
     options.include_lattice_best = s.include_lattice_best;
     options.include_collocation_best = s.include_collocation_best;
     options.show_next_on_duplicate = s.show_next_on_duplicate;
+    options.dictionary_tiebreak = s.dictionary_tiebreak;
+    options.reading_prior = s.reading_prior;
+    options.reading_prior_share = s.reading_prior_share;
+    options.reading_prior_floor = s.reading_prior_floor;
     if s.collocation {
         options.collocation_scorer = Some(scorer);
         options.collocation_weight = s.collocation_weight;
@@ -115,55 +129,84 @@ fn lookup_in(map: &HashMap<String, Vec<Lexeme>>) -> impl Fn(&[String]) -> Vec<Le
     move |span| map.get(&span.join("'")).cloned().unwrap_or_default()
 }
 
+/// 回放一个解码场景并和基线比；返回 (路径数, 是否带字约束, 是否带搭配回调)。
+fn check_decode(number: usize, row: &Value, model: Option<&dyn LanguageModel>) -> (usize, bool, bool) {
+    let syllables = strings(&row["syllables"]);
+    let s = settings(&row["options"]);
+    let main = lexicon(&row["lexicon"]);
+    let constrained_map = lexicon(&row["constrained"]);
+    let lookup = lookup_in(&main);
+    let constrained_lookup = lookup_in(&constrained_map);
+
+    // 每个约束一个闭包：首个码点 % modulus != reject。
+    let rules: Vec<(usize, u32, u32)> = row["constraints"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| (c["syllable"].as_u64().unwrap() as usize, c["modulus"].as_u64().unwrap() as u32, c["reject"].as_u64().unwrap() as u32))
+        .collect();
+    let accepts: Vec<Box<dyn Fn(&str) -> bool>> =
+        rules.iter().map(|&(_, modulus, reject)| Box::new(move |h: &str| first_codepoint(h) % modulus != reject) as Box<dyn Fn(&str) -> bool>).collect();
+
+    let mut options = Options::default();
+    apply(&mut options, &s, &collocation);
+    options.language_model = model;
+    for (index, &(syllable, _, _)) in rules.iter().enumerate() {
+        options.char_constraints.push(CharConstraint { syllable, accept: accepts[index].as_ref() });
+    }
+    if row["separate_constrained_lookup"].as_bool().unwrap() {
+        options.constrained_lookup = Some(&constrained_lookup);
+    }
+
+    let paths = decode_word_lattice(&syllables, &lookup, &options);
+    let expected = row["paths"].as_array().unwrap();
+    let label = format!("解码场景 {number}（{} 个音节，beam {}，nbest {}）", syllables.len(), s.beam, s.nbest);
+    assert_eq!(paths.len(), expected.len(), "{label}：路径条数 {:?}", paths.iter().map(|p| &p.sentence).collect::<Vec<_>>());
+    for (index, (got, want)) in paths.iter().zip(expected).enumerate() {
+        assert_eq!(got.sentence, want["sentence"].as_str().unwrap(), "{label}：第 {index} 条句子；Rust 全部：{:?}", paths.iter().map(|p| (&p.sentence, p.log_prob)).collect::<Vec<_>>());
+        assert_eq!(got.key, want["key"].as_str().unwrap(), "{label}：第 {index} 条键");
+        assert_eq!(got.words, strings(&want["words"]), "{label}：第 {index} 条词序");
+        assert_eq!(got.input_domains, strings(&want["domains"]), "{label}：第 {index} 条输入域");
+        assert!(close(got.log_prob, want["log_prob"].as_f64().unwrap()), "{label}：第 {index} 条分数 {} ≠ {}", got.log_prob, want["log_prob"]);
+    }
+    (paths.len(), !rules.is_empty(), s.collocation && s.collocation_weight > 0.0)
+}
+
 #[test]
 fn decoded_n_best_equals_the_cpp_decoder() {
     let (mut checked, mut with_paths, mut path_count, mut constrained, mut collocated) = (0, 0, 0, 0, 0);
     for (number, row) in scenarios("decode").into_iter().enumerate() {
-        let syllables = strings(&row["syllables"]);
-        let s = settings(&row["options"]);
-        let main = lexicon(&row["lexicon"]);
-        let constrained_map = lexicon(&row["constrained"]);
-        let lookup = lookup_in(&main);
-        let constrained_lookup = lookup_in(&constrained_map);
-
-        // 每个约束一个闭包：首个码点 % modulus != reject。
-        let rules: Vec<(usize, u32, u32)> = row["constraints"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|c| (c["syllable"].as_u64().unwrap() as usize, c["modulus"].as_u64().unwrap() as u32, c["reject"].as_u64().unwrap() as u32))
-            .collect();
-        let accepts: Vec<Box<dyn Fn(&str) -> bool>> =
-            rules.iter().map(|&(_, modulus, reject)| Box::new(move |h: &str| first_codepoint(h) % modulus != reject) as Box<dyn Fn(&str) -> bool>).collect();
-
-        let mut options = Options::default();
-        apply(&mut options, &s, &collocation);
-        for (index, &(syllable, _, _)) in rules.iter().enumerate() {
-            options.char_constraints.push(CharConstraint { syllable, accept: accepts[index].as_ref() });
-        }
-        if row["separate_constrained_lookup"].as_bool().unwrap() {
-            options.constrained_lookup = Some(&constrained_lookup);
-        }
-
-        let paths = decode_word_lattice(&syllables, &lookup, &options);
-        let expected = row["paths"].as_array().unwrap();
-        let label = format!("解码场景 {number}（{} 个音节，beam {}，nbest {}）", syllables.len(), s.beam, s.nbest);
-        assert_eq!(paths.len(), expected.len(), "{label}：路径条数 {:?}", paths.iter().map(|p| &p.sentence).collect::<Vec<_>>());
-        for (index, (got, want)) in paths.iter().zip(expected).enumerate() {
-            assert_eq!(got.sentence, want["sentence"].as_str().unwrap(), "{label}：第 {index} 条句子");
-            assert_eq!(got.key, want["key"].as_str().unwrap(), "{label}：第 {index} 条键");
-            assert_eq!(got.words, strings(&want["words"]), "{label}：第 {index} 条词序");
-            assert_eq!(got.input_domains, strings(&want["domains"]), "{label}：第 {index} 条输入域");
-            assert!(close(got.log_prob, want["log_prob"].as_f64().unwrap()), "{label}：第 {index} 条分数 {} ≠ {}", got.log_prob, want["log_prob"]);
-        }
+        let (paths, has_constraint, has_collocation) = check_decode(number, &row, None);
         checked += 1;
-        with_paths += usize::from(!paths.is_empty());
-        path_count += paths.len();
-        constrained += usize::from(!rules.is_empty());
-        collocated += usize::from(s.collocation && s.collocation_weight > 0.0);
+        with_paths += usize::from(paths > 0);
+        path_count += paths;
+        constrained += usize::from(has_constraint);
+        collocated += usize::from(has_collocation);
     }
     assert!(checked >= 150 && with_paths >= 140, "{checked} 个场景、{with_paths} 个有解");
-    eprintln!("词格解码：{checked} 个场景（有解 {with_paths}，共 {path_count} 条路径，带字约束 {constrained}，带搭配回调 {collocated}），句子、键、词序、输入域、分数与 C++ 一致");
+    eprintln!("词格解码（无模型）：{checked} 个场景（有解 {with_paths}，共 {path_count} 条路径，带字约束 {constrained}，带搭配回调 {collocated}），句子、键、词序、输入域、分数与 C++ 一致");
+}
+
+/// 带真实 kenlm 模型的解码：Rust 的 `KenLm` 与 C++ 的 `ngram::LanguageModel` 打同样的分，
+/// 词库平局项和读音先验也在这条路径上，所以这里一并核对。需要 `installer/app_data/sc.lm`（或 `MSIME_LM`）。
+#[test]
+fn decoded_n_best_with_the_real_language_model_equals_the_cpp_decoder() {
+    let path = std::env::var_os("MSIME_LM").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../installer/app_data/sc.lm"));
+    if !path.exists() {
+        eprintln!("跳过：没有 {}", path.display());
+        return;
+    }
+    let model = KenLm::open(&path).unwrap_or_else(|e| panic!("载入失败：{e}"));
+    let (mut checked, mut with_paths, mut path_count) = (0, 0, 0);
+    for (number, row) in scenarios("decode_lm").into_iter().enumerate() {
+        assert!(row["options"]["language_model"].as_bool().unwrap());
+        let (paths, _, _) = check_decode(number, &row, Some(&model));
+        checked += 1;
+        with_paths += usize::from(paths > 0);
+        path_count += paths;
+    }
+    assert!(checked >= 80 && with_paths >= 75, "{checked} 个场景、{with_paths} 个有解");
+    eprintln!("词格解码（真实 kenlm）：{checked} 个场景（有解 {with_paths}，共 {path_count} 条路径），句子、键、词序、分数与 C++ 一致");
 }
 
 fn source_of(name: &str) -> Source {

@@ -189,6 +189,10 @@ target_link_libraries(msime_helpshuang_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_lattice_probe EXCLUDE_FROM_ALL tools/lattice_probe.cpp)
 target_link_libraries(msime_lattice_probe PRIVATE MetasequoiaIme::Engine)
 
+# 语言模型探针：用真实的 kenlm 载入 sc.lm，导出词下标和逐词分数，当 Rust 读取器的规格。
+add_executable(msime_lm_probe EXCLUDE_FROM_ALL tools/lm_probe.cpp)
+target_link_libraries(msime_lm_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

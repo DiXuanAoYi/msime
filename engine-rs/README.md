@@ -16,11 +16,12 @@
 | 调频算法（选中项的目标名次、权重中点、整排重排、选中次数计数；只算该写的权重，不碰 SQLite） | `src/ranking.rs` | `tests/ranking_golden.rs`：`engine/contracts/golden/ranking_cases.tsv` 的 253 个用例（含权重相等、相邻、超上限、接近 i64 上限、混读音、显示顺序不等于权重顺序、连选触发次数），每行最终权重和真实 `adjust_candidate_ranking` 逐个相同；基线由 `msime_ranking_probe` 在合成词库上生成 |
 | 双拼：九套内置方案表、按键解码、贪心分段、转全拼、全码辅助判断 | `src/shuangpin.rs` | `tests/shuangpin_helpcode_golden.rs`：方案表原样相同；9 套方案 × 756 个码的解码相同；885 条随机串的分段、转全拼、全码辅助相同。方案表由脚本从 C++ 源码抽取，不是手抄 |
 | 辅助码：码表加载、取码、单码匹配与重排、双码匹配与筛选、大写结尾的模式判断 | `src/helpcode.rs` | 同上：6 套内置码表（共约 7.4 万行）、1621 个词的取码和匹配、重排与筛选逐项相同；基线由 `msime_helpshuang_probe` 导出 |
-| 整句词格：词图构建、Viterbi 束搜索、n-best 回溯去重、字约束、字级搭配回调、读音先验、与已有候选合并的全部来源规则（词格/搭配/两种神经重排/Unigram 共识） | `src/lattice.rs` | `tests/lattice_golden.rs`：150 个解码场景（484 条路径，句子、键、词序、输入域逐项相同，分数误差 1e-9 内）和 150 个合并场景逐项相同；基线由 `msime_lattice_probe` 导出，带着解码时实际查询到的词表回放。**打分模型走 kenlm 的分支没有对过**，见下 |
+| 整句词格：词图构建、Viterbi 束搜索、n-best 回溯去重、字约束、字级搭配回调、读音先验、与已有候选合并的全部来源规则（词格/搭配/两种神经重排/Unigram 共识） | `src/lattice.rs` | `tests/lattice_golden.rs`：150 个无模型解码场景（484 条路径，句子、键、词序、输入域逐项相同，分数误差 1e-9 内）、80 个带真实 `sc.lm` 的解码场景（257 条路径，含词库平局项与读音先验）和 150 个合并场景逐项相同；基线由 `msime_lattice_probe` 导出，带着解码时实际查询到的词表回放 |
+| kenlm 二进制语言模型读取器（`sc.lm`，`-q 4 -a 22` 的量化 trie：词表哈希、量化表、Bhiksha 指针压缩、位压缩 n-gram、回退） | `src/kenlm.rs` | `tests/kenlm_golden.rs`：3000+ 个词的下标和单词分数、700 句（含 300 条沿真实二元/三元组走的贪心链）逐词累计分数与 C++ **逐位相同**；`KenLm` 实现 `lattice::LanguageModel`，上一行的带模型词格场景就是用它回放的。基线由 `msime_lm_probe` 导出；没有 `sc.lm`（`installer/app_data/sc.lm` 或 `MSIME_LM`）时这两组测试跳过 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
-1. 整句词格剩下的：kenlm 二进制模型的读取与打分（`sc.lm`）、octagram `.gram` 搭配模型、Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及词典层把词库查询接成词格 `lookup` 的那段胶水（`quanpin_dictionary.cpp` 的 `lattice_lookup`）
+1. 整句词格剩下的：octagram `.gram` 搭配模型、Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及词典层把词库查询接成词格 `lookup` 的那段胶水（`quanpin_dictionary.cpp` 的 `lattice_lookup`）
 2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
 3. 五笔、日语；双拼里的用户自定义方案（`BuildCustomShuangpinProfile`）和双拼词库查询（`shuangpin_query.cpp`、`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
 4. 英文与本地模式
@@ -36,11 +37,9 @@ Rust 只有“静态错拼表 + k-best 切分”。下面这些仍是 C++ 的行
 
 ### 整句词格里没有对过的部分
 
-黄金样本里的 C++ 不带语言模型：`ngram::LanguageModel` 是 pimpl 的具体类，不能被替换，Rust 这边也还没有 kenlm 二进制（`-q 4 -a 22` 的量化 trie）的读取器。所以：
-
-- 对过的：无模型时的启发式打分、惩罚分、字级搭配回调、字约束、束宽、n-best 去重、合并规则；
-- **没对过**的：带模型的分支。Rust 把模型做成 `LanguageModel` trait，用玩具模型测了结构（模型认得的搭配能压过字频、读音先验只在有模型时生效），但模型给出的真实分数、`reading_prior` 对真实词库的行为都没有和 C++ 逐项核对。要补这一块，先得有 `sc.lm` 的读取器，再用同一份词库跑 C++ 带模型的基线；
-- 平局：C++ 用 `std::sort` / `partial_sort`，平局次序是实现定义的，Rust 用稳定排序。基线场景里的音节不重复、权重与汉字互不相同，避开了平局；真实输入里的平局（同音节重复出现）两边可能排得不同，但这类句子总分相等，选哪个都对。
+- 对过的：无模型时的启发式打分、惩罚分、字级搭配回调、字约束、束宽、n-best 去重、合并规则；带真实 kenlm 模型时的逐词打分、词库平局项（`dictionary_tiebreak`）和读音先验（`reading_prior*`）；
+- 没对过的：octagram `.gram` 搭配模型、神经重排（合并时只对过“有重排器”这一层的来源规则，重排器本身用桩函数）、词典层把词库查询接成 `lookup` 的胶水；
+- 平局：C++ 用 `std::sort` / `partial_sort`，平局次序是实现定义的，Rust 用稳定排序。无模型基线的场景里音节不重复、权重与汉字互不相同，避开了平局；带模型的基线里，未登录词罚分相同，分数完全相等的路径很容易出现，探针会多解 4 条 n-best 来检测，**只要平局落在前 n 条里或恰好卡在 n-best 边界，这个场景就不进基线**。真实输入里的平局两边可能排得不同，但这类句子总分相等，选哪个都对；基线没法为此作证。
 
 ### 发现的疑似缺陷（C++）
 
@@ -69,8 +68,6 @@ cargo test
 python engine/tools/gen_ranking_cases.py engine/contracts/golden/ranking_cases.tsv
 cmake --build server/build-release/engine --config Release --target msime_ranking_probe
 server\build-release\engine\Release\msime_ranking_probe.exe engine\contracts\golden\ranking_cases.tsv $env:TEMP\ranking-scratch engine\contracts\golden\expected_ranking.jsonl
-anking_cases.tsv $env:TEMP
-anking-scratch engine\contracts\golden\expected_ranking.jsonl
 ```
 
 基线变了要在提交说明里写清为什么变。
@@ -88,5 +85,16 @@ server\build-release\engine\Release\msime_helpshuang_probe.exe engine\helpcode e
 
 ```powershell
 cmake --build server/build-release/engine --config Release --target msime_lattice_probe
-server\build-release\engine\Release\msime_lattice_probe.exe engine\contracts\golden\expected_lattice.jsonl
+server\build-release\engine\Release\msime_lattice_probe.exe engine\contracts\golden\expected_lattice.jsonl installer\app_data\sc.lm engine\contracts\golden\lm_words.txt engine\contracts\golden\expected_lattice_lm.jsonl
 ```
+
+后三个参数可省；省略时只重新生成无模型的 `expected_lattice.jsonl`。带模型的基线必须用随包的 `sc.lm`（摘要见 `language-model/lock.json`）。
+
+## 重新生成 kenlm 基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_lm_probe
+server\build-release\engine\Release\msime_lm_probe.exe installer\app_data\sc.lm engine\contracts\golden\lm_words.txt engine\contracts\golden\expected_lm.jsonl
+```
+
+`lm_words.txt` 是词表（每行一个词，常用词在前、夹未登录词），换了模型要重新挑。

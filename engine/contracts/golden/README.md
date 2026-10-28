@@ -11,6 +11,8 @@
 | `../../capi/msime_capi.h` | 其他语言前端认的唯一接口 |
 | `ranking_cases.tsv`、`expected_ranking.jsonl` | 调频黄金用例及真实 `adjust_candidate_ranking` 的输出，探针是 `../../tools/ranking_probe.cpp`，用例由 `../../tools/gen_ranking_cases.py` 生成 |
 | `expected_lattice.jsonl` | 词格解码与合并的随机场景（带解码时实际查询到的词表）及真实 `decode_word_lattice` / `merge_lattice_candidates` 的输出，探针是 `../../tools/lattice_probe.cpp`；不含语言模型 |
+| `expected_lattice_lm.jsonl` | 同一个探针带真实 `sc.lm` 跑出的解码场景（含词库平局项、读音先验）；平局会让 `partial_sort` 的次序不确定，这类场景探针不收 |
+| `lm_words.txt`、`expected_lm.jsonl` | kenlm 读取器的词表，以及真实 `ngram::LanguageModel` 对其中词的下标、单词分数和 700 个句子的逐词分数，探针是 `../../tools/lm_probe.cpp`；要用随包的 `installer/app_data/sc.lm` |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对

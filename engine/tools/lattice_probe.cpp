@@ -1,7 +1,8 @@
 // 词格探针：对真实的 quanpin::decode_word_lattice 和 merge_lattice_candidates 跑一批随机场景，
 // 把输入（含解码过程中实际被查询到的词表）和输出一起写成 JSONL，当 Rust 实现的行为规格。
 //
-// 用法：msime_lattice_probe [输出文件]
+// 用法：msime_lattice_probe <输出文件> [<sc.lm> <词表文件> <带模型的输出文件>]
+// 给了后三个参数时，另外导出带真实 kenlm 模型的解码场景（kind 为 decode_lm）。
 //
 // 场景由固定种子的线性同余生成，重复运行逐字节相同。不加载语言模型：C++ 的 LanguageModel 不能被替换，
 // 所以这里核对的是无模型时的启发式打分、惩罚分、字级搭配回调、字约束、束宽与 n-best 去重，以及合并进候选列表的全部规则。
@@ -12,11 +13,13 @@
 //            "constrained":{跨度:[行…]},"paths":[…]}
 //   merge   {"kind":"merge","syllables":[…],"typed":…,"options":{…},"lexicon":{…},"candidates":[…],
 //            "rerankers":[{"source":…,"mode":…}…],"result":[…]}
+#include "ngram/language_model.h"
 #include "quanpin/word_lattice.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -148,6 +151,8 @@ struct Lexicon
     std::uint32_t next_codepoint = 0x4E00;
     std::uint32_t counter = 0;
     bool zero_weight_used = false;
+    // 非空时词条的值取自真词（按字数分组），语言模型才有东西可打分。
+    const std::vector<std::vector<std::string>> *pool = nullptr;
     std::map<std::string, std::vector<quanpin::LatticeLexeme>> rows;
 
     // 一个场景里所有行的汉字、权重都不重复。
@@ -165,8 +170,14 @@ struct Lexicon
             std::size_t chars = span.size();
             if (wrong_length_allowed && rng.below(8) == 0)
                 chars = chars + 1;
-            for (std::size_t c = 0; c < chars; ++c)
-                row.value += utf8(next_codepoint++);
+            if (pool && chars < pool->size() && !(*pool)[chars].empty())
+                row.value = (*pool)[chars][rng.below(static_cast<std::uint32_t>((*pool)[chars].size()))];
+            else if (pool && !(*pool)[1].empty())
+                for (std::size_t c = 0; c < chars; ++c)
+                    row.value += (*pool)[1][rng.below(static_cast<std::uint32_t>((*pool)[1].size()))];
+            else
+                for (std::size_t c = 0; c < chars; ++c)
+                    row.value += utf8(next_codepoint++);
             row.weight = static_cast<std::int64_t>(1 + rng.below(1u << 20)) * 1024 + (counter++ & 1023);
             if (!zero_weight_used && rng.below(40) == 0)
             {
@@ -279,7 +290,11 @@ std::string options_json(const quanpin::WordLatticeOptions &o, bool collocation_
            ",\"collocation_weight\":" + number(o.collocation_weight) +
            ",\"include_lattice_best\":" + (o.include_lattice_best ? "true" : "false") +
            ",\"include_collocation_best\":" + (o.include_collocation_best ? "true" : "false") +
-           ",\"show_next_on_duplicate\":" + (o.show_next_on_duplicate ? "true" : "false") + "}";
+           ",\"show_next_on_duplicate\":" + (o.show_next_on_duplicate ? "true" : "false") +
+           ",\"language_model\":" + (o.language_model ? "true" : "false") +
+           ",\"dictionary_tiebreak\":" + number(o.dictionary_tiebreak) + ",\"reading_prior\":" + number(o.reading_prior) +
+           ",\"reading_prior_share\":" + number(o.reading_prior_share) +
+           ",\"reading_prior_floor\":" + number(o.reading_prior_floor) + "}";
 }
 
 quanpin::WordLatticeOptions random_options(Lcg &rng, bool &collocation_on)
@@ -301,21 +316,26 @@ quanpin::WordLatticeOptions random_options(Lcg &rng, bool &collocation_on)
     }
     return o;
 }
-} // namespace
-
-int main(int argc, char **argv)
+void emit_decode_scenarios(std::ostream &out, const char *kind, std::uint64_t seed_base, int count,
+                          const ngram::LanguageModel *model, const std::vector<std::vector<std::string>> *pool)
 {
-    std::ofstream file;
-    if (argc > 1)
-        file.open(argv[1], std::ios::binary);
-    std::ostream &out = argc > 1 ? static_cast<std::ostream &>(file) : std::cout;
-
-    // 解码场景
-    for (int scenario = 0; scenario < 150; ++scenario)
+    // 带模型时未登录词的罚分相同，容易出现分数完全相等的路径；C++ 的 partial_sort 对平局的次序没有规定，
+    // 所以这类场景（含平局恰好卡在 n-best 边界的）不进基线，序号顺延到凑够 count 个。
+    for (int scenario = 0, emitted = 0; emitted < count; ++scenario)
     {
-        Lcg rng{0xd3c0de00ULL + static_cast<std::uint64_t>(scenario)};
+        Lcg rng{seed_base + static_cast<std::uint64_t>(scenario)};
         bool collocation_on = false;
         auto options = random_options(rng, collocation_on);
+        if (model)
+        {
+            // 带模型的场景：另用一条随机序列调读音先验等参数，免得动老场景的序列。
+            Lcg extra{seed_base * 3 + static_cast<std::uint64_t>(scenario)};
+            options.language_model = model;
+            options.dictionary_tiebreak = extra.below(4) == 0 ? 0.0 : 0.002 * (1 + extra.below(20));
+            options.reading_prior = extra.below(4) == 0 ? 0.0 : 0.5 + extra.below(10) / 4.0;
+            options.reading_prior_share = extra.below(5) == 0 ? 0.0 : 0.001 * (1 + extra.below(100));
+            options.reading_prior_floor = extra.below(5) == 0 ? 0.0 : 1.0 + extra.below(60) / 10.0;
+        }
         const auto syllables = random_syllables(rng, 1, 8);
 
         std::vector<Constraint> constraints;
@@ -342,8 +362,10 @@ int main(int argc, char **argv)
         const bool separate_constrained_lookup = !constraints.empty() && rng.below(2) == 0;
 
         Lexicon lexicon{Lcg{rng.next() + 1ULL}};
+        lexicon.pool = pool;
         Lexicon constrained_lexicon{Lcg{rng.next() + 2ULL}};
         constrained_lexicon.next_codepoint = 0x6000;
+        constrained_lexicon.pool = pool;
         const auto lookup = [&](const quanpin::Segments &span) {
             std::string key;
             for (std::size_t i = 0; i < span.size(); ++i)
@@ -367,6 +389,23 @@ int main(int argc, char **argv)
         }
 
         const auto paths = quanpin::decode_word_lattice(syllables, lookup, options);
+        if (model)
+        {
+            auto wider = options;
+            wider.nbest = options.nbest + 4;
+            const auto more = quanpin::decode_word_lattice(syllables, lookup, wider);
+            bool ambiguous = more.size() < paths.size();
+            for (std::size_t i = 0; !ambiguous && i < more.size() && i <= paths.size(); ++i)
+            {
+                if (i < paths.size() && more[i].sentence != paths[i].sentence)
+                    ambiguous = true;
+                if (i > 0 && more[i].log_prob == more[i - 1].log_prob)
+                    ambiguous = true;
+            }
+            if (ambiguous)
+                continue;
+        }
+        ++emitted;
 
         std::string constraint_json = "[";
         for (std::size_t i = 0; i < constraints.size(); ++i)
@@ -374,12 +413,24 @@ int main(int argc, char **argv)
                                ",\"modulus\":" + std::to_string(constraints[i].modulus) +
                                ",\"reject\":" + std::to_string(constraints[i].reject) + "}";
         constraint_json += "]";
-        out << "{\"kind\":\"decode\",\"syllables\":" << strings(syllables)
+        out << "{\"kind\":\"" << kind << "\",\"syllables\":" << strings(syllables)
             << ",\"options\":" << options_json(options, collocation_on) << ",\"constraints\":" << constraint_json
             << ",\"separate_constrained_lookup\":" << (separate_constrained_lookup ? "true" : "false")
             << ",\"lexicon\":" << rows_json(lexicon.rows) << ",\"constrained\":" << rows_json(constrained_lexicon.rows)
             << ",\"paths\":" << paths_json(paths) << "}\n";
     }
+}
+} // namespace
+
+// 用法：msime_lattice_probe <输出> [<sc.lm> <词表文件> <带模型的输出>]
+int main(int argc, char **argv)
+{
+    std::ofstream file;
+    if (argc > 1)
+        file.open(argv[1], std::ios::binary);
+    std::ostream &out = argc > 1 ? static_cast<std::ostream &>(file) : std::cout;
+
+    emit_decode_scenarios(out, "decode", 0xd3c0de00ULL, 150, nullptr, nullptr);
 
     // 合并场景
     const CandidateSource candidate_sources[] = {CandidateSource::Database, CandidateSource::UserDatabase,
@@ -485,6 +536,30 @@ int main(int argc, char **argv)
             << ",\"options\":" << options_json(options, collocation_on) << ",\"lexicon\":" << rows_json(lexicon.rows)
             << ",\"candidates\":" << items_json(before) << ",\"rerankers\":" << specs_json
             << ",\"result\":" << items_json(result) << "}\n";
+    }
+
+    // 带真实语言模型的解码场景：词条取自词表里的真词，打分走 kenlm。
+    if (argc > 4)
+    {
+        const ngram::LanguageModel &model = ngram::shared_language_model(std::filesystem::path(argv[2]));
+        if (!model.valid())
+        {
+            std::cerr << "语言模型载入失败：" << model.error() << "\n";
+            return 1;
+        }
+        std::vector<std::vector<std::string>> pool(8);
+        std::ifstream words(argv[3]);
+        std::string line;
+        while (std::getline(words, line))
+        {
+            if (!line.empty() && line.back() == '\r')
+                line.pop_back();
+            const std::size_t length = count_codepoints(line);
+            if (length >= 1 && length <= 4 && pool[length].size() < 400)
+                pool[length].push_back(line);
+        }
+        std::ofstream model_file(argv[4], std::ios::binary);
+        emit_decode_scenarios(model_file, "decode_lm", 0x1a9e0000ULL, 80, &model, &pool);
     }
     return 0;
 }
