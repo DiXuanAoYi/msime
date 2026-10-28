@@ -32,7 +32,7 @@
 
 ## 还在 C++ 里的块（按建议顺序）
 
-1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及词典层把词库查询接成词格 `lookup` 的那段胶水（`quanpin_dictionary.cpp` 的 `lattice_lookup`）
+1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排；以及全拼/双拼词典层（`quanpin_dictionary.cpp`、`shuangpin_dictionary.cpp`）把各路来源编排成候选列表的那段（词格的词库查询 `make_lattice_db_lookup`、直接辅助码解码与解析器已移植）
 2. 用户词库的存取：操作日志与重放、固定位置、新词学习、快捷短语/英文/日期时间的槽位（调频的权重算法已移植，剩下的都绑着 SQLite 事务）
 3. 五笔和日语里绑着用户词库的部分（调频、删词、造词写 SQLite）；双拼词库查询（`shuangpin_dictionary.cpp`）；辅助码在候选窗里的实际接线
 4. 英文词典与本地模式里要写库的部分：`EnglishDictionary::ensure_schema` / `upsert_gloss`（建表、升级旧库、写入释义）、`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
