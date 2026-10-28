@@ -396,3 +396,7 @@ target_link_libraries(msime_dictionary_state_probe PRIVATE MetasequoiaIme::Engin
 # 神经重排探针：真实的 neural::SentenceModel / rerank_order，当 Rust 实现的规格。
 add_executable(msime_neural_probe EXCLUDE_FROM_ALL tools/neural_probe.cpp)
 target_link_libraries(msime_neural_probe PRIVATE MetasequoiaIme::Engine)
+
+# Google 拼音解码器探针：真实的 PinyinDecoder::sentence 与运行库 qsort，当 Rust 实现的规格。
+add_executable(msime_google_pinyin_probe EXCLUDE_FROM_ALL tools/google_pinyin_probe.cpp)
+target_link_libraries(msime_google_pinyin_probe PRIVATE MetasequoiaIme::Engine)
