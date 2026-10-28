@@ -7,11 +7,16 @@
 //  write  —— 在一份合成小词库上跑 create_word / create_word_from_quanpin / update_weight_by_pinyin_and_word /
 //            delete_by_pinyin_and_word，每步记返回值和词库、日志的逐表转储哈希（不含 updated_at）。
 //
+//  sources —— 整句来源：Google 解码器（兜底整句、独立整句行，句中辅助码随解码约束）、快速档/高精度档神经重排、
+//            万象语法搭配的随机组合。神经重排在后台线程里算：第一次查询按词格的静态顺序出，每收到一次“算完了”
+//            的回调就重查一次，直到不再有回调（最多等 0.4 秒），两次的结果都记（没有后台任务时 second 为 null）。
+//
 // 用法：msime_shuangpin_dictionary_probe <资源目录> <工作目录> <输出文件>
 //   资源目录要有 msime.db、sc.lm、dict_pinyin.dat、helpcodes/（即 installer/app_data）。
 //   工作目录里会写 shuangpin_dictionary_initial.db（合成小词库，随基线一并提交）。
 #include "core/runtime_paths.h"
 #include "core/syllable_helpcode.h"
+#include "neural/rescore_worker.h"
 #include "shuangpin/shuangpin_dictionary.h"
 #include "shuangpin/shuangpin_profile.h"
 #include "quanpin/quanpin_query.h"
@@ -21,12 +26,16 @@
 #include <sqlite3.h>
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -800,6 +809,140 @@ void write_cases(std::ostream &out, const fs::path &resources, const fs::path &w
     fs::remove_all(work / "scenario");
     std::cerr << "写库场景 " << ops_total << " 步，成功 " << ops_ok << "\n";
 }
+
+// ---------------------------------------------------------------------------------------------
+// sources
+// ---------------------------------------------------------------------------------------------
+
+void source_cases(std::ostream &out, const fs::path &resources, const std::vector<ProfileInfo> &profiles, const fs::path &golden)
+{
+    const metasequoia::RuntimePaths paths{resources, fs::temp_directory_path() / "msime_shuangpin_probe_sources_user", fs::temp_directory_path() / "msime_shuangpin_probe_sources_cache",
+                                          resources};
+    fs::create_directories(paths.user_data);
+    Lcg rng{0x6e3f21a9ULL};
+    const std::vector<std::string> contexts = {"", "", "今天天气很好", "我们明天一起去", "他说", "请问", "公司的", "我想", "这本书讲的是"};
+    const std::string keyboard_model = metasequoia::path_to_utf8(paths.resource(metasequoia::assets::neural_model_keyboard));
+    const std::string gram_path = metasequoia::path_to_utf8(golden / "synthetic.gram");
+    auto &worker = neural::RescoreWorker::instance();
+    int cases = 0, nonempty = 0, with_google = 0, with_neural = 0, reordered = 0, timed_out = 0, with_constraints = 0, google_rows = 0;
+    for (const auto &info : profiles)
+    {
+        ShuangpinDictionary dictionary(*info.profile, paths);
+        dictionary.set_helpcode_keymap(HelpcodeUtils::load_helpcode_keymap(resources, "xiaohe"));
+        for (int scenario = 0; scenario < 50; ++scenario)
+        {
+            const std::string seq = random_sequence(rng, info);
+            if (seq.size() < 2)
+                continue;
+            const std::string seg = ShuangpinUtil::pinyin_segmentation(seq, *info.profile);
+            const std::uint32_t fuzzy = rng.below(8) == 0 ? rng.below(1u << 11) : 0;
+            SyllableHelpcodes constraints;
+            if (rng.below(4) == 0)
+            {
+                const std::uint32_t count = 1 + rng.below(2);
+                for (std::uint32_t i = 0; i < count; ++i)
+                {
+                    SyllableHelpcode helpcode;
+                    helpcode.syllable = rng.below(4);
+                    helpcode.first = static_cast<char>('a' + rng.below(26));
+                    helpcode.second = rng.below(2) ? static_cast<char>('a' + rng.below(26)) : 0;
+                    constraints.push_back(helpcode);
+                }
+            }
+            SentenceAssociationOptions options;
+            options.word_lattice = rng.below(3) != 0;
+            options.google = rng.below(2) == 0;
+            options.neural_keyboard = rng.below(3) == 0;
+            options.neural_desktop = rng.below(5) == 0;
+            options.show_next_on_duplicate = rng.below(3) == 0;
+            std::string desktop_tag = "none";
+            if (options.neural_desktop)
+            {
+                if (rng.below(4) == 0)
+                {
+                    options.neural_desktop_model = "";
+                    desktop_tag = "default";
+                }
+                else
+                {
+                    options.neural_desktop_model = keyboard_model;
+                    desktop_tag = "same";
+                }
+            }
+            const double weights[] = {0.0, 0.3, 1.0, 2.0};
+            double weight = 0.0;
+            if (rng.below(3) == 0)
+            {
+                options.collocation_model = gram_path;
+                weight = weights[rng.below(4)];
+                options.collocation_weight = weight;
+                options.collocation_rerank = rng.below(2) == 0;
+            }
+            const std::string &context = contexts[rng.below(static_cast<std::uint32_t>(contexts.size()))];
+
+            dictionary.set_sentence_association(options);
+            dictionary.set_rescoring_context(context);
+            dictionary.set_fuzzy_pinyin(metasequoia::FuzzyPinyinOptions{fuzzy});
+            dictionary.set_syllable_helpcodes(constraints);
+            dictionary.reset_cache();
+            worker.clear();
+            struct Signal
+            {
+                std::mutex mutex;
+                std::condition_variable wake;
+                int ready = 0;
+            };
+            const auto signal = std::make_shared<Signal>();
+            worker.set_ready_callback([signal] {
+                {
+                    std::lock_guard<std::mutex> lock(signal->mutex);
+                    ++signal->ready;
+                }
+                signal->wake.notify_all();
+            });
+
+            const auto first = dictionary.generateSeries(seq, seg);
+            std::string second = "null";
+            if (options.neural_keyboard || options.neural_desktop)
+            {
+                std::unique_lock<std::mutex> lock(signal->mutex);
+                int seen = 0;
+                std::vector<WordItem> latest;
+                while (signal->wake.wait_for(lock, std::chrono::milliseconds(400), [&] { return signal->ready > seen; }))
+                {
+                    seen = signal->ready;
+                    lock.unlock();
+                    dictionary.reset_cache();
+                    latest = dictionary.generateSeries(seq, seg);
+                    lock.lock();
+                }
+                if (seen > 0)
+                {
+                    second = list_json(latest);
+                    ++with_neural;
+                    reordered += list_json(latest) != list_json(first);
+                }
+                else
+                    ++timed_out;
+            }
+            worker.set_ready_callback(nullptr);
+
+            ++cases;
+            nonempty += !first.empty();
+            with_google += options.google;
+            with_constraints += !constraints.empty();
+            for (const auto &item : first)
+                google_rows += item.source == CandidateSource::Fallback && item.sentence_association;
+            out << "{\"kind\":\"sources\",\"profile\":\"" << info.name << "\",\"case\":" << cases << ",\"seq\":" << quote(seq) << ",\"seg\":" << quote(seg) << ",\"fuzzy\":" << fuzzy
+                << ",\"constraints\":" << constraints_json(constraints) << ",\"context\":" << quote(context) << ",\"lat\":" << (options.word_lattice ? 1 : 0) << ",\"google\":" << (options.google ? 1 : 0)
+                << ",\"nk\":" << (options.neural_keyboard ? 1 : 0) << ",\"nd\":" << (options.neural_desktop ? 1 : 0) << ",\"ndm\":\"" << desktop_tag << "\",\"next\":" << (options.show_next_on_duplicate ? 1 : 0)
+                << ",\"col\":" << (options.collocation_model.empty() ? 0 : 1) << ",\"colw\":" << weight << ",\"colr\":" << (options.collocation_rerank ? 1 : 0) << ",\"first\":" << list_json(first)
+                << ",\"second\":" << second << "}\n";
+        }
+    }
+    std::cerr << "整句来源场景 " << cases << " 个，非空 " << nonempty << "，开 Google " << with_google << "，带句中辅助码 " << with_constraints << "，神经重排重查 " << with_neural << "（改变次序 " << reordered
+              << "，超时 " << timed_out << "），Google 整句行 " << google_rows << "\n";
+}
 } // namespace
 
 int main(int argc, char **argv)
@@ -818,5 +961,6 @@ int main(int argc, char **argv)
     cut_cases(out);
     read_cases(out, resources, profiles);
     write_cases(out, resources, work, profiles);
+    source_cases(out, resources, profiles, fs::absolute(argv[3]).parent_path());
     return 0;
 }

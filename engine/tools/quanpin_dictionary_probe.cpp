@@ -7,12 +7,18 @@
 //  write  —— 在一份合成小词库上跑 create_word / create_word_from_canonical_pinyin / update_weight_by_pinyin_and_word /
 //            update_weight_by_word / delete_by_pinyin_and_word，夹着查询，每步记返回值和词库、日志的逐表转储哈希（不含 updated_at）。
 //
-// 纠错（autocorrect_types != 0）这一层还没移植，探针不开；Google 解码器、神经重排、万象语法、领域词库都没开。
+//  sources —— 整句来源：Google 解码器（兜底整句、独立整句行）、快速档/高精度档神经重排、万象语法搭配的随机组合，
+//            夹着纠错、模糊音、随机前文。神经重排在后台线程里算：第一次查询按词格的静态顺序出，等线程算完
+//            （收到“算完了”的回调，最多等 0.4 秒）再重查一次，两次的结果都记（没有后台任务时 second 为 null）。
+//            高精度档用的是同一份模型文件（随包只有快速档），或者一个不存在的路径（模型缺失，来源静默退回）。
+//
+// 前四类场景用的 SentenceAssociationOptions 只开词格；领域词库见各自场景。
 //
 // 用法：msime_quanpin_dictionary_probe <资源目录> <工作目录> <输出文件>
 //   资源目录要有 msime.db、sc.lm、dict_pinyin.dat（即 installer/app_data）。
 //   工作目录里会写 quanpin_dictionary_initial.db（合成小词库，随基线一并提交）。
 #include "core/runtime_paths.h"
+#include "neural/rescore_worker.h"
 #include "quanpin/quanpin_dictionary.h"
 #include "quanpin/quanpin_query.h"
 #include "quanpin/quanpin_utils.h"
@@ -21,12 +27,15 @@
 #include <sqlite3.h>
 
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -731,6 +740,138 @@ void write_cases(std::ostream &out, const fs::path &resources, const fs::path &w
     fs::remove_all(work / "scenario");
     std::cerr << "写库场景 " << ops_total << " 步，成功 " << ops_ok << "\n";
 }
+
+// ---------------------------------------------------------------------------------------------
+// sources
+// ---------------------------------------------------------------------------------------------
+
+void source_cases(std::ostream &out, const fs::path &resources, const fs::path &golden)
+{
+    const fs::path user_dir = fs::temp_directory_path() / "msime_quanpin_probe_sources";
+    fs::remove_all(user_dir);
+    fs::create_directories(user_dir);
+    const metasequoia::RuntimePaths paths{resources, user_dir, fs::temp_directory_path() / "msime_quanpin_probe_sources_cache", resources};
+    Lcg rng{0x50c3e5a1ULL};
+    const auto keys = sample_keys(resources / "msime.db", rng);
+    const std::vector<std::string> ambiguous = {"yi", "ba", "nan", "zhao", "ban", "an", "xi", "an", "fang", "gan", "fan", "ni", "hao", "ge", "e", "ang", "ai", "ao", "er", "ou", "ji", "ni", "ta", "shi", "xian", "lu", "e", "jin", "tian", "biang", "gei", "yo", "dia", "shuang", "zhuang", "chuang", "guang", "qiong", "xiang", "nv", "lve"};
+    const std::vector<std::string> contexts = {"", "", "今天天气很好", "我们明天一起去", "他说", "请问", "公司的", "我想", "这本书讲的是"};
+    const std::vector<unsigned> masks = {0xf, 0xf, 0x1, 0x2, 0x4, 0x8, 0x5, 0xb};
+    const std::string keyboard_model = metasequoia::path_to_utf8(paths.resource(metasequoia::assets::neural_model_keyboard));
+    const std::string gram_path = metasequoia::path_to_utf8(golden / "synthetic.gram");
+
+    QuanpinDictionary dictionary((resources / "msime.db").string(), paths);
+    auto &worker = neural::RescoreWorker::instance();
+    int cases = 0, nonempty = 0, with_google = 0, with_neural = 0, reordered = 0, timed_out = 0, with_collocation = 0, fallback_rows = 0;
+    for (int scenario = 0; scenario < 900; ++scenario)
+    {
+        ReadInput input = make_input(rng, keys, ambiguous);
+        if (input.raw.empty())
+            continue;
+        if (rng.below(4) == 0 && input.raw.size() > 2)
+        {
+            const std::uint32_t at = rng.below(static_cast<std::uint32_t>(input.raw.size() - 1));
+            if (rng.below(2))
+                std::swap(input.raw[at], input.raw[at + 1]);
+            else
+                input.raw.erase(at, 1);
+            input.segmentation.clear();
+        }
+        SentenceAssociationOptions options;
+        options.word_lattice = rng.below(3) != 0;
+        options.google = rng.below(2) == 0;
+        options.neural_keyboard = rng.below(3) == 0;
+        options.neural_desktop = rng.below(5) == 0;
+        options.show_next_on_duplicate = rng.below(3) == 0;
+        std::string desktop_tag = "none";
+        if (options.neural_desktop)
+        {
+            if (rng.below(4) == 0)
+            {
+                options.neural_desktop_model = ""; // 资源目录里没有高精度档：来源静默退回
+                desktop_tag = "default";
+            }
+            else
+            {
+                options.neural_desktop_model = keyboard_model;
+                desktop_tag = "same";
+            }
+        }
+        const double weights[] = {0.0, 0.3, 1.0, 2.0};
+        double weight = 0.0;
+        if (rng.below(3) == 0)
+        {
+            options.collocation_model = gram_path;
+            weight = weights[rng.below(4)];
+            options.collocation_weight = weight;
+            options.collocation_rerank = rng.below(2) == 0;
+        }
+        const unsigned autocorrect = rng.below(4) == 0 ? masks[rng.below(static_cast<std::uint32_t>(masks.size()))] : 0;
+        const std::uint32_t fuzzy = rng.below(8) == 0 ? 1 + rng.below((1u << 11) - 1) : 0;
+        const std::string &context = contexts[rng.below(static_cast<std::uint32_t>(contexts.size()))];
+
+        dictionary.set_sentence_association(options);
+        dictionary.set_rescoring_context(context);
+        dictionary.reset_cache();
+        worker.clear();
+        struct Signal
+        {
+            std::mutex mutex;
+            std::condition_variable wake;
+            int ready = 0;
+        };
+        const auto signal = std::make_shared<Signal>();
+        worker.set_ready_callback([signal] {
+            {
+                std::lock_guard<std::mutex> lock(signal->mutex);
+                ++signal->ready;
+            }
+            signal->wake.notify_all();
+        });
+
+        const auto first = dictionary.query(input.raw, input.segmentation, autocorrect, metasequoia::FuzzyPinyinOptions{fuzzy});
+        std::string second = "null";
+        const bool neural = options.neural_keyboard || options.neural_desktop;
+        if (neural)
+        {
+            // 每收到一次“算完了”就重查一次（真实的会话就是这么做的）。一次查询可能排了不止一批候选（主切分和字面切分各一批，
+            // 每个模型只有一个待办位，后一批要等前一批算完），所以重查到再没有回调为止，取最后一次的结果。
+            std::unique_lock<std::mutex> lock(signal->mutex);
+            int seen = 0;
+            std::vector<WordItem> latest;
+            while (signal->wake.wait_for(lock, std::chrono::milliseconds(400), [&] { return signal->ready > seen; }))
+            {
+                seen = signal->ready;
+                lock.unlock();
+                dictionary.reset_cache();
+                latest = dictionary.query(input.raw, input.segmentation, autocorrect, metasequoia::FuzzyPinyinOptions{fuzzy});
+                lock.lock();
+            }
+            if (seen > 0)
+            {
+                second = list_json(latest);
+                ++with_neural;
+                reordered += list_json(latest) != list_json(first);
+            }
+            else
+                ++timed_out;
+        }
+        worker.set_ready_callback(nullptr);
+
+        ++cases;
+        nonempty += !first.empty();
+        with_google += options.google;
+        with_collocation += !options.collocation_model.empty() && weight != 0.0;
+        for (const auto &item : first)
+            fallback_rows += item.source == CandidateSource::Fallback && item.sentence_association;
+        out << "{\"kind\":\"sources\",\"case\":" << cases << ",\"raw\":" << quote(input.raw) << ",\"seg\":" << quote(input.segmentation) << ",\"ac\":" << autocorrect << ",\"fuzzy\":" << fuzzy
+            << ",\"context\":" << quote(context) << ",\"lat\":" << (options.word_lattice ? 1 : 0) << ",\"google\":" << (options.google ? 1 : 0) << ",\"nk\":" << (options.neural_keyboard ? 1 : 0)
+            << ",\"nd\":" << (options.neural_desktop ? 1 : 0) << ",\"ndm\":\"" << desktop_tag << "\",\"next\":" << (options.show_next_on_duplicate ? 1 : 0) << ",\"col\":" << (options.collocation_model.empty() ? 0 : 1)
+            << ",\"colw\":" << weight << ",\"colr\":" << (options.collocation_rerank ? 1 : 0) << ",\"first\":" << list_json(first) << ",\"second\":" << second << "}\n";
+    }
+    dictionary.set_sentence_association(SentenceAssociationOptions{});
+    std::cerr << "整句来源场景 " << cases << " 个，非空 " << nonempty << "，开 Google " << with_google << "，神经重排重查 " << with_neural << "（改变次序 " << reordered << "，超时 " << timed_out
+              << "），万象 " << with_collocation << "，兜底/Google 整句行 " << fallback_rows << "\n";
+}
 } // namespace
 
 int main(int argc, char **argv)
@@ -746,5 +887,6 @@ int main(int argc, char **argv)
     std::ofstream out(argv[3], std::ios::binary);
     read_cases(out, resources);
     write_cases(out, resources, work);
+    source_cases(out, resources, fs::absolute(argv[3]).parent_path());
     return 0;
 }
