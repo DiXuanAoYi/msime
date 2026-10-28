@@ -19,6 +19,7 @@
 | `expected_custom_shuangpin.jsonl` | 双拼用户自定义方案的规格：探针 `../../tools/custom_shuangpin_probe.cpp` 对内置方案随机改动 1200 次，记录布局、`BuildCustomShuangpinProfile` 的错误信息和成功时的方案表 |
 | `expected_shuangpin_query.jsonl` | 双拼输入串处理的规格：探针 `../../tools/shuangpin_query_probe.cpp` 对九套内置方案跑随机输入串，记录分段、转全拼、分隔符处理、全码辅助长度、句中辅助码解析和各光标位置的接受判断 |
 | `expected_lattice_lookup.jsonl` | 词格词库查询的规格：探针 `../../tools/lattice_lookup_probe.cpp` 在随包 `msime.db` 上用真实 `make_lattice_db_lookup` 查随机跨度和全部单音节键，记录条数、内容哈希和前 12 项；要用随包的 `msime.db` |
+| `expected_spelling_graph.jsonl` | 直接辅助码拼写图的规格：探针 `../../tools/spelling_graph_probe.cpp` 对九套内置方案跑随机输入串，辅码谓词用确定的哈希函数代替辅码表，记录边、分隔符、下一出字位置和唯一路径 |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对

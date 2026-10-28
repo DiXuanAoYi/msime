@@ -27,6 +27,7 @@ pub mod romaji;
 mod romaji_table;
 pub mod shuangpin;
 pub mod shuangpin_query;
+pub mod spelling_graph;
 pub mod segment;
 pub mod syllables;
 pub mod table;

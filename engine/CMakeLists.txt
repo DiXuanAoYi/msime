@@ -217,6 +217,10 @@ target_link_libraries(msime_shuangpin_query_probe PRIVATE MetasequoiaIme::Engine
 add_executable(msime_lattice_lookup_probe EXCLUDE_FROM_ALL tools/lattice_lookup_probe.cpp)
 target_link_libraries(msime_lattice_lookup_probe PRIVATE MetasequoiaIme::Engine)
 
+# 直接辅助码拼写图探针：真实的 build_spelling_graph / single_path 跑随机输入串（辅码谓词用确定的哈希代替辅码表）。
+add_executable(msime_spelling_graph_probe EXCLUDE_FROM_ALL tools/spelling_graph_probe.cpp)
+target_link_libraries(msime_spelling_graph_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)
