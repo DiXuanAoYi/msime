@@ -25,6 +25,7 @@ pub mod lattice;
 pub mod local;
 mod lunar_table;
 pub mod msvc_sort;
+pub mod neural;
 pub mod mid_sentence;
 pub mod ranking;
 pub mod romaji;

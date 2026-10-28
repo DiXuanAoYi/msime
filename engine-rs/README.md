@@ -34,10 +34,11 @@
 | 全拼词库（按切分查词库：整串、前缀子串、稀疏拼音回退；等音节数切分的备选并入；词格整句并入；字面混合简拼/整词领衔；合法输入上等音节数切分的整句仲裁；模糊音并入；单字母 24 条与扩展；造词/调频/删词）和纠错层（k-best 纠错切分、合法输入上的手误读法与仲裁、读音对回敲的字母、上下文消解、纠错标记） | `src/quanpin_dictionary.rs`、`src/quanpin_utils.rs`（音节图、完整/最少音节切分、别名归一）、`src/autocorrect.rs`（`autocorrect_cut_kbest`、`legal_input_correction_cuts`、`correction_cut_for_reading` 等）、`src/lattice.rs`（`Item` 多了 `fuzzy`、`corrected_from`） | `tests/quanpin_dictionary_golden.rs`：随包 `msime.db` 上 3100 个输入（取自词库真键的整串、前缀、简拼、混拼、没打完的尾音节、ü 别名、手动分隔符、最少音节数打平的歧义串、手误输入 × 16 种纠错掩码、开了领域词库的输入）的 `query` / `fuzzy_candidates` / `expand_initial_candidates` / `find_candidate`，随机整句开关、模糊音、显式切分和用户调频日志；合成小词库上 60 个场景 719 步的造词/调频/删词，返回值和逐表转储的哈希一致。`tests/quanpin_autocorrect_golden.rs`：k-best 3000、k=1 的细节 600、合法输入 2500、读音对回敲的字母 2500、简拼形状 1500。变异检查（约 140 处变异，分页/比例/路径上限/稳定排序/各个门槛）：能被测出的都补了数据；测不出的是等价变异或浮点边界平局（浮点打分恰好相等的分支、n-best 条数 12→11 需要 12 条以上路径、`reopen` 在 Rust 里没有对应的缓存可失效）。没搬的：Google 解码器整句、神经重排、万象语法搭配、`handleVkCode`、`insert_word_to_series_cache`、各种结果缓存。基线由 `msime_quanpin_dictionary_probe`、`msime_quanpin_autocorrect_probe` 导出，合成小词库一并提交 |
 | 领域词库（随包 `domain-input.db`，按词包过滤的 TEMP 视图，只读、失败即整库关闭；`query`/`exact`/`lattice` 带输入域；`merge`）；已接进全拼和双拼词库（`set_enabled_domain_dictionaries`，并入查询、备选切分、模糊候选、词格跨度和合法输入仲裁） | `src/domain_dictionary.rs`、`src/dict.rs`（`Dictionary::from_connection`） | `tests/domain_dictionary_golden.rs`：200 次切换启用集合 × 14 步（`query` 1097 条非空 237、`exact` 577 条非空 151、`lattice` 552 条非空 119、`merge` 574 条非空 219）与 300 条启用串归一，条数、哈希、前 8 项（含输入域）一致。全拼/双拼的基线里另有开了领域词库的读场景（全拼 700 个输入、双拼 9 套方案 × 120 个，带输入域的候选行 1357 / 1456 条）。C++ 的 `membership` 结果缓存没搬（只影响速度）。已知差异：`merge_alternative_segmentations` 在词库没有备选整词、只有领域词库有时，C++ 对空向量取 `front()`（未定义行为），Rust 当作没有保护位 |
 | 运行时目录与词库代际（`prepare_runtime_paths`：三个根目录互不重叠、SQLite 备份接口拷词库、重放日志、`.ready` 标记、整体改名、切回已就绪代际时再重放一遍；`stage_dictionary_state`：在新建的代际目录里按记录流重建日志——词条、固定位置、选择计数，越界/重复/超限整体失败并删掉本次目录） | `src/runtime_paths.rs`（`rusqlite` 开了 `backup` 特性） | `tests/dictionary_state_golden.rs`：260 个暂存场景（成功 106，失败 154：空键、超长、权重/位置/计数越界、身份重复、位置冲突、记录上限、目标目录已存在或落在资源目录里、非法内容 ID）比成败、目录是否留下、暂存出的日志与词库转储哈希、再导出的状态；80 个 `prepare` 场景（新建、重复、日志里多了改动后再准备、换内容 ID、根目录重叠、缺文件的旧代、已有 `.incoming`、非法 ID）比每次调用的成败和结果转储哈希。基线由 `msime_dictionary_state_probe` 导出，初始库用用户词库探针的两份。C++ 里 `std::filesystem::permissions(owner_all)` 在 Windows 上没有效果，没搬 |
+| 神经重排（`sentence-model.safetensors`：字符级 decoder-only Pre-LN Transformer，F32/F16/I8 张量，int8 按输出行对称量化；`score_sentences` 给一批成型句子在前文之后打 `log P`，前文 K/V 缓存、整批一次跑；`rerank_order` 把词格路径静态分和神经分按 `静态 + λ·(神经 − 静态)` 插值后稳定重排；`last_characters`） | `src/neural.rs`（`serde_json` 解析 safetensors 头；x86_64 上 int8 矩阵走 `std::arch` 的 AVX2+FMA 8 路累加，和 C++ 的 `linear_int8_avx2` 同序，其他平台走 4 路标量累加） | `tests/neural_golden.rs`：随包模型上的载入成败（整份、12 个截断长度、5 处改字节）、署名/许可/窗口长度/若干字符的 token id、40 段文本的 `next_log_probabilities`（前 5 名 id 逐项相同，值与分布和相对差 3e-9）、约 200 批共 1162 个 `score_sentences`（含空句、超长句、前文超过窗口、同前文第二批命中缓存；与 C++ 的最大相对差 2e-16，即在 AVX2 机器上逐位一致，容差放在 2e-3）、120 个 `rerank_order`（77 个改变了次序，次序逐项相同）、60 个 `last_characters`。没搬的：`RescoreWorker`（异步重排的线程池，是调度不是算法）、`shared_sentence_model` 的进程级缓存。基线由 `msime_neural_probe` 导出 |
 
 ## 还在 C++ 里的块（按建议顺序）
 
-1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）、神经重排。全拼词典层（`quanpin_dictionary.cpp`）和纠错层、领域词库已移植，没搬的是按键状态机 `handleVkCode`、`insert_word_to_series_cache` 和各种结果缓存（只影响速度）。双拼词典层（`shuangpin_dictionary.cpp`）的数据部分已移植，没搬的是它的按键状态机 `handleVkCode`、`resolve_direct_helpcode`（直接辅助码解析器的接线）、`query_single_char_rows`，以及各种结果缓存
+1. 整句词格剩下的：Google 拼音解码器（`matrixsearch` + `dict_pinyin.dat`）。神经重排的模型已移植（词格里用它做重排的接线随词格一起对）。全拼词典层（`quanpin_dictionary.cpp`）和纠错层、领域词库已移植，没搬的是按键状态机 `handleVkCode`、`insert_word_to_series_cache` 和各种结果缓存（只影响速度）。双拼词典层（`shuangpin_dictionary.cpp`）的数据部分已移植，没搬的是它的按键状态机 `handleVkCode`、`resolve_direct_helpcode`（直接辅助码解析器的接线）、`query_single_char_rows`，以及各种结果缓存
 2. 用户词库里没搬的一处：按默认路径缓存连接（只是性能手段，Rust 每次打开新连接）。`stage_dictionary_state` 和 `prepare_runtime_paths` 已移植
 3. 五笔和日语里调用用户词库的接线（用户词库本身已移植）；辅助码在候选窗里的实际接线
 4. 本地模式：`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）、`current_local_date_time`（读系统时钟，Rust 的日期时间函数都接受调用方给的“此刻”）
@@ -49,7 +50,7 @@
 ### 整句词格里没有对过的部分
 
 - 对过的：无模型时的启发式打分、惩罚分、字级搭配回调、字约束、束宽、n-best 去重、合并规则；带真实 kenlm 模型时的逐词打分、词库平局项（`dictionary_tiebreak`）和读音先验（`reading_prior*`）；
-- 没对过的：octagram 的接线（`.gram` 读取器本身已对过，词格里用它做重排的那层只对过“有重排器”这一层）、神经重排（合并时只对过“有重排器”这一层的来源规则，重排器本身用桩函数）、词典层把词库查询接成 `lookup` 的胶水；
+- 没对过的：octagram 的接线（`.gram` 读取器本身已对过，词格里用它做重排的那层只对过“有重排器”这一层）、神经重排（合并时只对过“有重排器”这一层的来源规则，重排器本身用桩函数；模型本身已单独对过）、词典层把词库查询接成 `lookup` 的胶水；
 - 平局：C++ 用 `std::sort` / `partial_sort`，平局次序是实现定义的，Rust 用稳定排序。无模型基线的场景里音节不重复、权重与汉字互不相同，避开了平局；带模型的基线里，未登录词罚分相同，分数完全相等的路径很容易出现，探针会多解 4 条 n-best 来检测，**只要平局落在前 n 条里或恰好卡在 n-best 边界，这个场景就不进基线**。真实输入里的平局两边可能排得不同，但这类句子总分相等，选哪个都对；基线没法为此作证。
 
 ### 五笔与日语里没有对过、或要留意的部分
@@ -223,4 +224,11 @@ server\build-release\engine\Release\msime_domain_dictionary_probe.exe installer\
 cmake --build server/build-release/engine --config Release --target msime_dictionary_state_probe
 $work = Join-Path $env:TEMP 'dsprobe'
 server\build-release\engine\Release\msime_dictionary_state_probe.exe engine\contracts\golden\user_dictionary_initial_main.db engine\contracts\golden\user_dictionary_initial_english.db $work engine\contracts\golden\expected_dictionary_state.jsonl
+```
+
+## 重新生成神经重排基线
+
+```powershell
+cmake --build server/build-release/engine --config Release --target msime_neural_probe
+server\build-release\engine\Release\msime_neural_probe.exe installer\app_data\sentence-model.safetensors engine\contracts\golden\expected_neural.jsonl
 ```
