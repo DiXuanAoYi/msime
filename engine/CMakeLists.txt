@@ -209,6 +209,10 @@ target_link_libraries(msime_gram_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_custom_shuangpin_probe EXCLUDE_FROM_ALL tools/custom_shuangpin_probe.cpp)
 target_link_libraries(msime_custom_shuangpin_probe PRIVATE MetasequoiaIme::Engine)
 
+# 双拼输入串处理探针：分段、转全拼、分隔符、全码辅助长度、句中辅助码解析，对九套内置方案跑随机输入串。
+add_executable(msime_shuangpin_query_probe EXCLUDE_FROM_ALL tools/shuangpin_query_probe.cpp)
+target_link_libraries(msime_shuangpin_query_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)

@@ -138,8 +138,8 @@ pub fn segmented_to_pinyin(segmented: &str, profile: &Profile) -> String {
     out.join("'")
 }
 
-/// 前面的部分每个单元都是完整的两个字符（分段里没有单字符单元）。
-fn all_units_complete(pure: &str, segmented: &str) -> bool {
+/// 前面的部分每个单元都是完整的两个字符（分段里没有单字符单元），即 C++ 的 `is_all_complete_pinyin`。
+pub fn all_units_complete(pure: &str, segmented: &str) -> bool {
     if pure.len() % 2 != 0 {
         return false;
     }

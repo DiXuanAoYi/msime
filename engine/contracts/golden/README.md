@@ -17,6 +17,7 @@
 | `expected_local_modes.jsonl`、`custom_translations_fixture.txt` | Unicode、V 模式、日期时间、表情、颜文字、超级简拼、快捷短语、英文词典的输出，探针是 `../../tools/local_modes_probe.cpp`；要用随包的 `msime.db`、`others.db`、`english.db`（以及同目录的清简词库和行业词包），自定义翻译用后者这份样例 |
 | `synthetic.gram`、`expected_gram.jsonl` | octagram 语法模型读取器的规格：探针 `../../tools/gram_probe.cpp` 现建的合成 `.gram`（真模型太大、另外下载），以及真实 `gram::GramDb` 在它上面的编码与查询输出 |
 | `expected_custom_shuangpin.jsonl` | 双拼用户自定义方案的规格：探针 `../../tools/custom_shuangpin_probe.cpp` 对内置方案随机改动 1200 次，记录布局、`BuildCustomShuangpinProfile` 的错误信息和成功时的方案表 |
+| `expected_shuangpin_query.jsonl` | 双拼输入串处理的规格：探针 `../../tools/shuangpin_query_probe.cpp` 对九套内置方案跑随机输入串，记录分段、转全拼、分隔符处理、全码辅助长度、句中辅助码解析和各光标位置的接受判断 |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 
 ## 重新生成或核对
