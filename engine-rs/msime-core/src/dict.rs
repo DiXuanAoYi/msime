@@ -40,6 +40,13 @@ fn canonical_syllable(syllable: &str) -> &str {
     }
 }
 
+/// 全拼和双拼共用同一套查询，只有简拼那几级认键的方式不同。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuerySource {
+    Quanpin,
+    Shuangpin,
+}
+
 pub struct Dictionary {
     connection: Connection,
 }
@@ -49,6 +56,11 @@ impl Dictionary {
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
         let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI)?;
         Ok(Self { connection })
+    }
+
+    /// 底层只读连接，给需要自己拼 SQL 的调用方。
+    pub fn connection(&self) -> &Connection {
+        &self.connection
     }
 
     fn keyed(&self, sql: &str, params: impl rusqlite::Params) -> rusqlite::Result<Vec<KeyedEntry>> {
@@ -82,6 +94,12 @@ impl Dictionary {
     /// 完整音节就先查精确键；再查键前缀（最后一段没打完）；再查混合简拼；纯简拼最后查。
     /// 哪一步有结果就用哪一步的，不合并。SQL 和 C++ 保持一致（不加 rowid 次序），权重相同时的先后跟着 SQLite 走。
     pub fn query(&self, segments: &[String], limit: usize) -> rusqlite::Result<Vec<KeyedEntry>> {
+        self.query_with_source(segments, limit, QuerySource::Quanpin)
+    }
+
+    /// 同 [`Dictionary::query`]，`source` 决定混合简拼那一级怎么认键：双拼里 `zh/ch/sh` 单独成段时也算简拼，
+    /// 并且要和词库键这一段的声母（`zh/ch/sh` 或首字母）严格相等。
+    pub fn query_with_source(&self, segments: &[String], limit: usize, source: QuerySource) -> rusqlite::Result<Vec<KeyedEntry>> {
         let Some(table) = table_name(segments) else { return Ok(Vec::new()) };
         let limit = limit as i64;
         let select = format!("SELECT \"key\", \"value\", \"weight\" FROM \"{table}\"");
@@ -107,12 +125,12 @@ impl Dictionary {
 
         let jianpin: String = segments.iter().filter_map(|s| s.chars().next()).collect();
         let by_jianpin = format!("{select} WHERE \"jp\" = ?1 ORDER BY \"weight\" DESC LIMIT ?2");
-        if needs_mixed_jianpin(segments) {
-            let scan = (limit * 16).max(128);
+        if needs_mixed_jianpin(segments, source) {
+            let scan = if limit > i64::from(i32::MAX) / 16 { i64::from(i32::MAX) } else { (limit * 16).max(128) };
             let rows: Vec<KeyedEntry> = self
                 .keyed(&by_jianpin, rusqlite::params![jianpin, scan])?
                 .into_iter()
-                .filter(|row| matches_mixed_segments(&row.key, segments))
+                .filter(|row| matches_mixed_segments(&row.key, segments, source))
                 .take(limit as usize)
                 .collect();
             if !rows.is_empty() {
@@ -128,6 +146,28 @@ impl Dictionary {
 }
 
 impl Dictionary {
+    /// 单个字母（声母）下的词，按权重从高到低，对应 C++ `quanpin::query_initial`：只查 `tbl_1_<字母>` 里键以 `prefix` 开头的行。
+    pub fn query_initial(&self, prefix: &str, limit: i64) -> rusqlite::Result<Vec<KeyedEntry>> {
+        let Some(first) = prefix.chars().next() else { return Ok(Vec::new()) };
+        if !first.is_ascii_lowercase() || limit <= 0 {
+            return Ok(Vec::new());
+        }
+        let sql = format!("SELECT \"key\", \"value\", \"weight\" FROM \"tbl_1_{first}\" WHERE \"key\" >= ?1 AND \"key\" < ?2 ORDER BY \"weight\" DESC LIMIT ?3");
+        self.keyed(&sql, rusqlite::params![prefix, format!("{prefix}{{"), limit])
+    }
+
+    /// 对应 C++ `query_segments_keyed_flat`：查一种切分，同词只留第一条，按权重从高到低排（`std::sort`，平局次序跟 MSVC 一致），
+    /// 截到 `limit`。
+    pub fn query_keyed_flat(&self, segments: &[String], limit: usize, source: QuerySource) -> rusqlite::Result<Vec<KeyedEntry>> {
+        if segments.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut rows = dedupe_by_text(self.query_with_source(segments, limit, source)?);
+        crate::msvc_sort::sort_by(&mut rows, |a, b| a.weight > b.weight);
+        rows.truncate(limit);
+        Ok(rows)
+    }
+
     /// 一批切分各自的精确键，按表分组一次查完，合起来按权重从高到低（稳定）排。
     /// 对应 C++ `query_exact_segmentations_keyed_flat`：含没打完音节的路径跳过，重复的键只查一次，
     /// 表按名字排序依次查，每张表最多取 `limit` 行。
@@ -271,8 +311,21 @@ fn can_match_exact_key(segments: &[String]) -> bool {
 }
 
 /// 前面的段里有单字母，才需要走混合简拼（最后一段本来就按前缀匹配）。
-fn needs_mixed_jianpin(segments: &[String]) -> bool {
-    segments.len() > 1 && segments[..segments.len() - 1].iter().any(|s| s.len() == 1)
+fn needs_mixed_jianpin(segments: &[String], source: QuerySource) -> bool {
+    segments.len() > 1
+        && segments[..segments.len() - 1].iter().any(|s| s.len() == 1 || (source == QuerySource::Shuangpin && is_shuangpin_initial_token(s)))
+}
+
+fn is_shuangpin_initial_token(segment: &str) -> bool {
+    matches!(segment, "zh" | "ch" | "sh")
+}
+
+/// 词库键这一段的声母：`zh/ch/sh` 或第一个字母。
+fn extract_initial_token(segment: &str) -> &str {
+    if segment.len() >= 2 && is_shuangpin_initial_token(&segment[..2]) {
+        return &segment[..2];
+    }
+    segment.get(..1).unwrap_or("")
 }
 
 /// 词库键的范围查询下界：除最后一段外，单字母段也带 `%`，最后一段总是带；去掉末尾的 `%`。
@@ -291,17 +344,22 @@ fn key_prefix(segments: &[String]) -> String {
 }
 
 /// 键的每一段要么和输入完全相同，要么（输入是单字母时）以这个字母开头。
-fn matches_mixed_segments(key: &str, segments: &[String]) -> bool {
+fn matches_mixed_segments(key: &str, segments: &[String], source: QuerySource) -> bool {
     let parts: Vec<&str> = key.split('\'').collect();
     parts.len() == segments.len()
         && segments.iter().zip(&parts).all(|(expected, actual)| {
             if expected.is_empty() || actual.is_empty() {
-                false
-            } else if expected.len() == 1 {
-                actual.as_bytes()[0] == expected.as_bytes()[0]
-            } else {
-                actual == expected
+                return false;
             }
+            let strict_initial = source == QuerySource::Shuangpin && is_shuangpin_initial_token(expected);
+            if expected.len() == 1 || strict_initial {
+                return if source == QuerySource::Shuangpin {
+                    extract_initial_token(actual) == expected
+                } else {
+                    actual.as_bytes()[0] == expected.as_bytes()[0]
+                };
+            }
+            actual == expected
         })
 }
 
@@ -331,17 +389,17 @@ mod tests {
 
     #[test]
     fn mixed_matching_checks_each_segment() {
-        assert!(matches_mixed_segments("ni'hao", &seg(&["ni", "h"])));
-        assert!(matches_mixed_segments("nin'hao", &seg(&["n", "h"])));
-        assert!(!matches_mixed_segments("ni'hao", &seg(&["ni", "z"])));
-        assert!(!matches_mixed_segments("ni'hao'a", &seg(&["ni", "h"])));
+        assert!(matches_mixed_segments("ni'hao", &seg(&["ni", "h"]), QuerySource::Quanpin));
+        assert!(matches_mixed_segments("nin'hao", &seg(&["n", "h"]), QuerySource::Quanpin));
+        assert!(!matches_mixed_segments("ni'hao", &seg(&["ni", "z"]), QuerySource::Quanpin));
+        assert!(!matches_mixed_segments("ni'hao'a", &seg(&["ni", "h"]), QuerySource::Quanpin));
     }
 
     #[test]
     fn only_a_leading_single_letter_needs_the_mixed_query() {
-        assert!(needs_mixed_jianpin(&seg(&["n", "h"])));
-        assert!(needs_mixed_jianpin(&seg(&["n", "hao"])));
-        assert!(!needs_mixed_jianpin(&seg(&["ni", "h"])));
-        assert!(!needs_mixed_jianpin(&seg(&["n"])));
+        assert!(needs_mixed_jianpin(&seg(&["n", "h"]), QuerySource::Quanpin));
+        assert!(needs_mixed_jianpin(&seg(&["n", "hao"]), QuerySource::Quanpin));
+        assert!(!needs_mixed_jianpin(&seg(&["ni", "h"]), QuerySource::Quanpin));
+        assert!(!needs_mixed_jianpin(&seg(&["n"]), QuerySource::Quanpin));
     }
 }
