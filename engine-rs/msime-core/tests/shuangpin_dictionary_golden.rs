@@ -12,6 +12,7 @@ use msime_core::helpcode;
 use msime_core::kenlm::KenLm;
 use msime_core::lattice::{Item, Source};
 use msime_core::msvc_sort;
+use msime_core::sentence_sources::SentenceSources;
 use msime_core::shuangpin::profile;
 use msime_core::shuangpin_dictionary::{SentenceAssociation, ShuangpinDictionary};
 use msime_core::shuangpin_query::SyllableHelpcode;
@@ -174,7 +175,7 @@ fn read_queries_match_cpp() {
         let name = record["profile"].as_str().unwrap().to_string();
         let dictionary = dictionaries.entry(name.clone()).or_insert_with(|| ShuangpinDictionary::open(profile(&name), &db, &journal.to_string_lossy(), keymap.clone(), Some(&model)));
         let association = record["assoc"].as_u64().unwrap();
-        dictionary.set_sentence_association(SentenceAssociation { word_lattice: association >= 1, show_next_on_duplicate: association == 2 });
+        dictionary.set_sentence_association(SentenceAssociation { word_lattice: association >= 1, show_next_on_duplicate: association == 2, ..Default::default() });
         dictionary.set_fuzzy_pinyin(record["fuzzy"].as_u64().unwrap() as u32);
         dictionary.set_syllable_helpcodes(constraints_of(&record["constraints"]));
         dictionary.set_enabled_domain_dictionaries(record["dom"].as_str().unwrap_or(""));
@@ -207,6 +208,88 @@ fn read_queries_match_cpp() {
     }
     eprintln!("双拼词库读：{counts:?}，非空 {nonempty}");
     assert!(counts.values().sum::<usize>() > 2000);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 整句来源
+// ---------------------------------------------------------------------------------------------
+
+/// 后台重排线程算完。
+fn wait_for_worker(sources: &SentenceSources) {
+    for _ in 0..2000 {
+        if sources.worker.is_idle() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    panic!("神经重排线程十秒内没停");
+}
+
+#[test]
+fn sentence_sources_match_cpp() {
+    let Some((db, model, keymap)) = load_environment() else { return };
+    let data = app_data();
+    let (dict, network) = (data.join("dict_pinyin.dat"), data.join("sentence-model.safetensors"));
+    if !dict.exists() || !network.exists() {
+        eprintln!("跳过：{} 下缺 dict_pinyin.dat / sentence-model.safetensors", data.display());
+        return;
+    }
+    let journal = std::env::temp_dir().join("msime_shuangpin_golden_sources_journal.db");
+    let sources = SentenceSources::new(&data);
+    let gram = golden_dir().join("synthetic.gram").to_string_lossy().into_owned();
+    let mut dictionaries: HashMap<String, ShuangpinDictionary> = HashMap::new();
+    let (mut cases, mut google_rows, mut reranked, mut waited, mut constrained) = (0, 0, 0, 0, 0);
+    for record in records().iter().filter(|r| r["kind"] == "sources") {
+        let name = record["profile"].as_str().unwrap().to_string();
+        let dictionary = dictionaries
+            .entry(name.clone())
+            .or_insert_with(|| ShuangpinDictionary::open(profile(&name), &db, &journal.to_string_lossy(), keymap.clone(), Some(&model)).with_sentence_sources(sources.clone()));
+        let flag = |key: &str| record[key].as_u64().unwrap() == 1;
+        dictionary.set_sentence_association(SentenceAssociation {
+            word_lattice: flag("lat"),
+            google: flag("google"),
+            neural_keyboard: flag("nk"),
+            neural_desktop: flag("nd"),
+            show_next_on_duplicate: flag("next"),
+            neural_desktop_model: if record["ndm"] == "same" { network.to_string_lossy().into_owned() } else { String::new() },
+            collocation_model: if flag("col") { gram.clone() } else { String::new() },
+            collocation_weight: record["colw"].as_f64().unwrap(),
+            collocation_rerank: flag("colr"),
+            ..Default::default()
+        });
+        dictionary.set_rescoring_context(record["context"].as_str().unwrap());
+        dictionary.set_fuzzy_pinyin(record["fuzzy"].as_u64().unwrap() as u32);
+        let helpcodes = constraints_of(&record["constraints"]);
+        constrained += usize::from(!helpcodes.is_empty());
+        dictionary.set_syllable_helpcodes(helpcodes);
+        sources.worker.clear();
+        let (seq, seg) = (record["seq"].as_str().unwrap(), record["seg"].as_str().unwrap());
+        let label = format!("{name} seq={seq:?} seg={seg:?} fuzzy={} constraints={} context={} {record}", record["fuzzy"], record["constraints"], record["context"]);
+        let first = dictionary.generate_series(seq, seg);
+        assert_eq!(list_json(&first), record["first"], "第一次 {label}");
+        google_rows += first.iter().filter(|i| i.source == Source::Fallback && i.sentence_association).count();
+        // 一次查询可能排了不止一批：算完就重查，直到结果不再变。
+        let second = loop {
+            wait_for_worker(&sources);
+            let again = dictionary.generate_series(seq, seg);
+            wait_for_worker(&sources);
+            let settled = dictionary.generate_series(seq, seg);
+            if list_json(&settled) == list_json(&again) {
+                break settled;
+            }
+        };
+        if record["second"].is_null() {
+            assert_eq!(list_json(&second), record["first"], "没有后台任务时重查应当不变 {label}");
+        } else {
+            assert_eq!(list_json(&second), record["second"], "重排后 {label}");
+            waited += 1;
+            reranked += usize::from(list_json(&second) != list_json(&first));
+        }
+        cases += 1;
+    }
+    let _ = fs::remove_file(&journal);
+    eprintln!("双拼整句来源：{cases} 个，Google 整句行 {google_rows}，带句中辅助码 {constrained}，神经重排重查 {waited}（改变次序 {reranked}）");
+    assert!(cases >= 300 && google_rows > 50 && waited > 30 && constrained > 30);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -293,7 +376,7 @@ fn write_scenarios_match_cpp() {
                 keymap.clone(),
                 Some(&model),
             );
-            opened.set_sentence_association(SentenceAssociation { word_lattice: true, show_next_on_duplicate: false });
+            opened.set_sentence_association(SentenceAssociation { word_lattice: true, ..Default::default() });
             dictionary = Some(opened);
             continue;
         }

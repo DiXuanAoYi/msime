@@ -4,10 +4,10 @@
 //! 词格整句并入、字面混合简拼/整词领衔、合法输入上等音节数切分的整句仲裁、模糊音并入、别名改写的纠错标记、
 //! 单字母候选扩到全部，以及造词/调频/删词。
 //!
+//! 整句来源：词格、Google 解码器（兜底整句与独立整句行）、两个神经模型的重排（后台线程，见 `sentence_sources`）、
+//! 万象语法搭配，由 `SentenceAssociation` 开关、`with_sentence_sources` 提供模型和解码器。
+//!
 //! 没搬的：
-//! - 纠错（`autocorrect_types != 0`）：k-best 纠错切分、合法输入上的纠错仲裁、上下文消解。`query` 不收纠错参数，
-//!   相当于 C++ 里 `autocorrect_types = 0`；
-//! - Google 解码器整句、神经重排、万象语法搭配——`SentenceAssociation` 里只有词格两个开关；
 //! - 按键状态机 `handleVkCode`、`insert_word_to_series_cache`；
 //! - 各种结果缓存（只影响速度；写库后 C++ 会清缓存，这里每次都重新查）。`expand_initial_candidates` 在 C++ 里
 //!   还会把扩展后的列表写回缓存，这里不模拟。
@@ -23,8 +23,9 @@ use crate::quanpin_query::{
 };
 use crate::quanpin_utils::{
     build_syllable_graph, enumerate_complete_segmentations, enumerate_min_segmentations, fold_letters, literal_jianpin_pinyin_match,
-    literal_mixed_pinyin_match, normalize_umlaut_aliases, sparse_pinyin_fallback_segments,
+    literal_mixed_pinyin_match, normalize_umlaut_aliases, sparse_pinyin_fallback_segments, to_google_spelling,
 };
+use crate::sentence_sources::{neural_reranker, SentenceSources};
 pub use crate::shuangpin_dictionary::{SentenceAssociation, ERROR_CODE, OK};
 use crate::syllables::{is_intact, is_prefix};
 use crate::table::table_name;
@@ -32,7 +33,13 @@ use crate::user_dictionary::{self, DictionaryKind};
 use rusqlite::{Connection, OpenFlags};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
+
+/// 万象语法的 `query()` 是自然对数域，乘它换到词格的 log10 域。
+pub(crate) const LN_TO_LOG10: f64 = 0.4342944819032518;
+/// 神经重排最多重打分的路径数，也是开了重排时词格要解出的 n-best 条数（`RerankOptions::default().max_paths`）。
+const NEURAL_NBEST: i32 = 12;
 
 const SPARSE_PINYIN_FALLBACK_THRESHOLD: usize = 8;
 const SYLLABLE_GRAPH_PATH_LIMIT: usize = 32;
@@ -294,6 +301,10 @@ pub struct QuanpinDictionary<'a> {
     dictionary: Option<Dictionary>,
     language_model: Option<&'a dyn LanguageModel>,
     association: SentenceAssociation,
+    /// Google 解码器、神经模型、万象语法库和重排线程；没给就没有这些来源。
+    sources: Option<Arc<SentenceSources>>,
+    /// 上屏的前文，神经重排给模型看的条件前缀。
+    rescoring_context: String,
     fuzzy_rules: u32,
     pinyin_sequence: String,
     pinyin_segmentation: String,
@@ -311,6 +322,8 @@ impl<'a> QuanpinDictionary<'a> {
             dictionary: None,
             language_model,
             association: SentenceAssociation::default(),
+            sources: None,
+            rescoring_context: String::new(),
             fuzzy_rules: 0,
             pinyin_sequence: String::new(),
             pinyin_segmentation: String::new(),
@@ -343,6 +356,17 @@ impl<'a> QuanpinDictionary<'a> {
         self.association = association;
     }
 
+    /// 接上整句来源的共享资源（全拼、双拼词库可以共用同一份）。
+    pub fn with_sentence_sources(mut self, sources: Arc<SentenceSources>) -> Self {
+        self.sources = Some(sources);
+        self
+    }
+
+    /// 上屏的前文；只有神经重排会读它。
+    pub fn set_rescoring_context(&mut self, context: &str) {
+        self.rescoring_context = context.to_string();
+    }
+
     /// 最近一次 `query` 的输入串。
     pub fn pinyin_sequence(&self) -> &str {
         &self.pinyin_sequence
@@ -353,9 +377,14 @@ impl<'a> QuanpinDictionary<'a> {
         &self.pinyin_segmentation
     }
 
-    /// 任一整句来源开着。这一层只有词格。
+    /// 任一整句来源开着。
     fn any_sentence_source(&self) -> bool {
-        self.association.word_lattice
+        self.association.any_sentence_source()
+    }
+
+    /// Google 解码器的整句；没有解码器、词库缺失或解不出返回空串。
+    fn search_sentence_from_ime_engine(&self, user_pinyin: &str) -> String {
+        self.sources.as_ref().and_then(|sources| sources.google()).map(|decoder| decoder.sentence(user_pinyin, &[])).unwrap_or_default()
     }
 
     // ------------------------------------------------------------------------------------------
@@ -494,7 +523,7 @@ impl<'a> QuanpinDictionary<'a> {
 
         // 基准取正读整键命中的首位权重，没有整键行时取 0；不能取 result 的头部（可能是高权重前缀单字或生成的整句）。
         let primary_key = join_segments(&resolution.corrected_segments);
-        let primary_full = self.query_database(&resolution.corrected_segments, &primary_key);
+        let primary_full = self.query_single_path(raw_input, &primary_key, &resolution.corrected_segments);
         let primary_top_weight = primary_full.first().map_or(0, |candidate| candidate.weight);
         let alternative_items = dictionary.query_exact_paths(&resolution.alternative_corrected_cuts, ALTERNATIVE_SEGMENTATION_CANDIDATE_LIMIT).unwrap_or_default();
         // 每个备选切分的最佳词权重：行按权重降序返回，只留首行。
@@ -650,37 +679,111 @@ impl<'a> QuanpinDictionary<'a> {
 
     fn query_series(&self, raw_input: &str, segmentation: &str, segments: &[String]) -> Vec<Item> {
         if segments.is_empty() {
-            return self.query_database(segments, segmentation);
+            return self.query_single_path(raw_input, segmentation, segments);
         }
         let mut result: Vec<Item> = Vec::new();
         for count in (1..=segments.len()).rev() {
             let partial_segments = &segments[..count];
             let partial_segmentation = join_segments(partial_segments);
-            // Google 兜底整句没搬，完整输入和前缀走同一条查库路径。
-            result.extend(self.query_database(partial_segments, &partial_segmentation));
+            let partial_input = remove_delimiters(&partial_segmentation);
+            // 整句联想只对完整输入出一句：前缀只取词库里真有的词，查不到就交给更短的前缀。
+            if count < segments.len() {
+                result.extend(self.query_database(partial_segments, &partial_segmentation));
+            } else {
+                result.extend(self.query_single_path(&partial_input, &partial_segmentation, partial_segments));
+            }
         }
 
         if segments.len() >= 2 && has_only_complete_pinyin_segments(segments) {
-            // 没有神经重排，只有开了“显示下一条”才需要完整候选池；词格 n-best 的上限与 C++ 的 `RerankOptions::max_paths` 一致。
-            let needs_alternatives = self.association.word_lattice && self.association.show_next_on_duplicate;
-            let options = lattice::Options {
-                nbest: if needs_alternatives { 12 } else { 1 },
+            let typed = if segmentation.is_empty() { raw_input } else { segmentation };
+            // Google 整句（Fallback）：词格在前、Google 在后，都插在“整串精确命中词库”的候选之后。
+            // 手打了分隔符时原样传下去（撇号是解码器认的音节分隔符），否则喂裸串，让它自己重新切分；
+            // 送进去之前 ü 的写法要换成它认的。
+            if self.association.google {
+                let google_input = if raw_input.contains('\'') { to_google_spelling(raw_input) } else { remove_delimiters(&to_google_spelling(typed)) };
+                let google_sentence = self.search_sentence_from_ime_engine(&google_input);
+                if !google_sentence.is_empty() && !result.iter().any(|candidate| candidate.word == google_sentence) {
+                    // 整句 fallback 要带 canonical 读音，否则以它结尾的造词无法落库。
+                    let insert_at = lattice::generated_sentence_insert_position(&result, segments);
+                    let mut sentence = item(typed, &google_sentence, 1, Source::Fallback, segmentation);
+                    sentence.sentence_association = true;
+                    result.insert(insert_at, sentence);
+                }
+            }
+
+            // 词格给 Trigram 候选和神经模型共用：只开神经时仍在内部解出 n-best 供它重排，但不显示词格自己的首选。
+            let sources = self.sources.as_deref();
+            let keyboard_model = sources.filter(|_| self.association.neural_keyboard).and_then(|s| s.keyboard_model());
+            let desktop_model = sources.filter(|_| self.association.neural_desktop).and_then(|s| s.desktop_model(&self.association.neural_desktop_model));
+            let keyboard_reranker = match (sources, &keyboard_model) {
+                (Some(sources), Some(model)) => Some(neural_reranker(sources, model, &self.rescoring_context)),
+                _ => None,
+            };
+            let desktop_reranker = match (sources, &desktop_model) {
+                (Some(sources), Some(model)) => Some(neural_reranker(sources, model, &self.rescoring_context)),
+                _ => None,
+            };
+            let mut rerankers: Vec<lattice::SourcedReranker> = Vec::new();
+            if let Some(rerank) = &keyboard_reranker {
+                rerankers.push(lattice::SourcedReranker { rerank, source: Source::NeuralKeyboard });
+            }
+            if let Some(rerank) = &desktop_reranker {
+                rerankers.push(lattice::SourcedReranker { rerank, source: Source::NeuralDesktop });
+            }
+
+            // 万象语法：搭配分在解码期逐边叠加一次，〔万象〕行就是解码最优路径。
+            let collocation = sources.and_then(|s| s.gram(&self.association.collocation_model));
+            let has_collocation = collocation.is_some() && self.association.collocation_weight != 0.0;
+            let grammar = self.association.collocation_grammar;
+            let collocation_score = |tail: &str, word: &str, is_rear: bool| -> f64 {
+                collocation.as_ref().map_or(0.0, |db| db.query(tail, word, is_rear, &grammar, None) * LN_TO_LOG10)
+            };
+
+            // 神经模型和去重补位都需要完整候选池；否则只解最优的一条。
+            let needs_alternatives = !rerankers.is_empty() || (self.association.word_lattice && self.association.show_next_on_duplicate);
+            let mut options = lattice::Options {
+                nbest: if needs_alternatives { NEURAL_NBEST } else { 1 },
                 include_lattice_best: self.association.word_lattice,
-                include_collocation_best: false,
+                include_collocation_best: self.association.collocation_rerank && has_collocation,
                 show_next_on_duplicate: self.association.show_next_on_duplicate,
                 language_model: self.language_model,
                 ..lattice::Options::default()
             };
-            if self.association.word_lattice {
+            if has_collocation {
+                options.collocation_scorer = Some(&collocation_score);
+                options.collocation_weight = self.association.collocation_weight;
+            }
+            if self.association.word_lattice || !rerankers.is_empty() || options.include_collocation_best {
                 let plain = |span: &[String]| self.lattice_lookup(span, options.span_limit, true);
-                let typed = if segmentation.is_empty() { raw_input } else { segmentation };
-                lattice::merge_lattice_candidates(&mut result, segments, &plain, typed, &options, &[]);
+                lattice::merge_lattice_candidates(&mut result, segments, &plain, typed, &options, &rerankers);
             }
         }
 
         if result.len() < SPARSE_PINYIN_FALLBACK_THRESHOLD {
             result = self.append_sparse_pinyin_fallbacks(segments, result);
         }
+        result
+    }
+
+    /// 查库，词库一行都没有时补一条 Google 兜底整句（随“Google 整句联想”开关一起关闭）。
+    fn query_single_path(&self, raw_input: &str, segmentation: &str, segments: &[String]) -> Vec<Item> {
+        let result = self.query_database(segments, segmentation);
+        self.append_ime_fallback(raw_input, segmentation, result)
+    }
+
+    fn append_ime_fallback(&self, raw_input: &str, segmentation: &str, mut result: Vec<Item>) -> Vec<Item> {
+        if !result.is_empty() || !self.association.google {
+            return result;
+        }
+        let typed = if segmentation.is_empty() { raw_input } else { segmentation };
+        let sentence = self.search_sentence_from_ime_engine(&remove_delimiters(typed));
+        if sentence.is_empty() {
+            return result;
+        }
+        // 同上，整句 fallback 需要 canonical 读音才能参与造词落库。
+        let mut fallback = item(typed, &sentence, 1, Source::Fallback, segmentation);
+        fallback.sentence_association = true;
+        result.push(fallback);
         result
     }
 
@@ -822,7 +925,8 @@ impl<'a> QuanpinDictionary<'a> {
                 continue;
             }
             let fallback_segmentation = join_segments(&fallback_segments);
-            let fallback_result = self.query_database(&fallback_segments, &fallback_segmentation);
+            let fallback_input = remove_delimiters(&fallback_segmentation);
+            let fallback_result = self.query_single_path(&fallback_input, &fallback_segmentation, &fallback_segments);
             append_unique_words(&mut result, &fallback_result);
         }
         result
@@ -846,8 +950,7 @@ impl<'a> QuanpinDictionary<'a> {
         if alternative_items.is_empty() && domain_alternatives.is_empty() {
             return result;
         }
-        let _ = raw_input;
-        let primary_full = self.query_database(primary_segments, primary_segmentation);
+        let primary_full = self.query_single_path(raw_input, primary_segmentation, primary_segments);
         let mut alternative_full: Vec<Item> = alternative_items.iter().map(|row| item(&row.key, &row.text, row.weight, Source::Database, &row.key)).collect();
         domain_dictionary::merge(&mut alternative_full, domain_alternatives);
 
@@ -929,12 +1032,19 @@ impl<'a> QuanpinDictionary<'a> {
             if gap > LEGAL_INPUT_RUNNER_UP_GAP_LOG {
                 return unchanged(result);
             }
-            // 第 2 位只要一句：词格开着时直接用打分时解出的那条最优路径。
-            // （C++ 另有“词格关着、其他整句来源开着”时重新查一遍的分支，这一层没有其他整句来源，走不到。）
-            let Some(path) = self.lattice_best_path(best_cut) else { return unchanged(result) };
-            let mut runner = item(&best_key, &path.sentence, (path.log_prob * 1000.0) as i64, Source::Generated, &path.key);
-            runner.sentence_association = true;
-            runner.input_domains = path.input_domains.clone();
+            // 第 2 位只要一句。词格开着时直接用打分时解出的那条最优路径；只开其他来源时词格行不显示，
+            // 照常查一遍，取它的整键块首行。
+            let runner = if self.association.word_lattice {
+                self.lattice_best_path(best_cut).map(|path| {
+                    let mut runner = item(&best_key, &path.sentence, (path.log_prob * 1000.0) as i64, Source::Generated, &path.key);
+                    runner.sentence_association = true;
+                    runner.input_domains = path.input_domains.clone();
+                    runner
+                })
+            } else {
+                self.query_series(raw_input, &best_key, best_cut).into_iter().find(|candidate| reads_full_key(candidate, &best_key))
+            };
+            let Some(runner) = runner else { return unchanged(result) };
             let mut merged = vec![result[0].clone()];
             append_unique_words(&mut merged, &[runner]);
             append_unique_words(&mut merged, &result);

@@ -12,6 +12,7 @@ use msime_core::kenlm::KenLm;
 use msime_core::user_dictionary::{self, DictionaryKind};
 use msime_core::lattice::{Item, Source};
 use msime_core::quanpin_dictionary::{QuanpinDictionary, SentenceAssociation};
+use msime_core::sentence_sources::SentenceSources;
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OpenFlags};
 use serde_json::Value;
@@ -121,7 +122,7 @@ fn read_queries_match_cpp() {
     let (mut nonempty, mut generated, mut fuzzy_rows, mut marked, mut preferred, mut sentence_first, mut corrected_queries, mut tagged) = (0, 0, 0, 0, 0, 0, 0, 0);
     for record in records().iter().filter(|r| r["kind"] == "read") {
         let association = record["assoc"].as_u64().unwrap();
-        dictionary.set_sentence_association(SentenceAssociation { word_lattice: association >= 1, show_next_on_duplicate: association == 2 });
+        dictionary.set_sentence_association(SentenceAssociation { word_lattice: association >= 1, show_next_on_duplicate: association == 2, ..Default::default() });
         let fuzzy = record["fuzzy"].as_u64().unwrap() as u32;
         let autocorrect = record["ac"].as_u64().unwrap_or(0) as u32;
         let (raw, seg) = (record["raw"].as_str().unwrap(), record["seg"].as_str().unwrap());
@@ -167,6 +168,85 @@ fn read_queries_match_cpp() {
     eprintln!("全拼词库读：{counts:?}，查询非空 {nonempty}，词格整句行 {generated}，模糊行 {fuzzy_rows}，纠错标记行 {marked}，带纠错且出标记的查询 {corrected_queries}，调频日志 {preferred} 条，首位是整句 {sentence_first}，带输入域的行 {tagged}");
     assert!(counts.values().sum::<usize>() > 2000);
     assert!(generated > 100 && fuzzy_rows > 100 && marked > 20 && preferred > 100 && corrected_queries > 200 && tagged > 500);
+}
+
+// ---------------------------------------------------------------------------------------------
+// 整句来源
+// ---------------------------------------------------------------------------------------------
+
+/// 后台重排线程算完。
+fn wait_for_worker(sources: &SentenceSources) {
+    for _ in 0..2000 {
+        if sources.worker.is_idle() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    panic!("神经重排线程十秒内没停");
+}
+
+#[test]
+fn sentence_sources_match_cpp() {
+    let Some((db, model)) = load_environment() else { return };
+    let data = app_data();
+    let (dict, network) = (data.join("dict_pinyin.dat"), data.join("sentence-model.safetensors"));
+    if !dict.exists() || !network.exists() {
+        eprintln!("跳过：{} 下缺 dict_pinyin.dat / sentence-model.safetensors", data.display());
+        return;
+    }
+    let journal = std::env::temp_dir().join(format!("msime_quanpin_golden_sources_{}.db", std::process::id()));
+    let _ = fs::remove_file(&journal);
+    let sources = SentenceSources::new(&data);
+    let mut dictionary = QuanpinDictionary::open(&db, &journal.to_string_lossy(), Some(&model)).with_sentence_sources(sources.clone());
+    let gram = golden_dir().join("synthetic.gram").to_string_lossy().into_owned();
+    let (mut cases, mut google_rows, mut reranked, mut waited, mut collocation_rows) = (0, 0, 0, 0, 0);
+    for record in records().iter().filter(|r| r["kind"] == "sources") {
+        let flag = |name: &str| record[name].as_u64().unwrap() == 1;
+        let association = SentenceAssociation {
+            word_lattice: flag("lat"),
+            google: flag("google"),
+            neural_keyboard: flag("nk"),
+            neural_desktop: flag("nd"),
+            show_next_on_duplicate: flag("next"),
+            neural_desktop_model: if record["ndm"] == "same" { network.to_string_lossy().into_owned() } else { String::new() },
+            collocation_model: if flag("col") { gram.clone() } else { String::new() },
+            collocation_weight: record["colw"].as_f64().unwrap(),
+            collocation_rerank: flag("colr"),
+            ..Default::default()
+        };
+        dictionary.set_sentence_association(association);
+        dictionary.set_rescoring_context(record["context"].as_str().unwrap());
+        sources.worker.clear();
+        let (raw, seg) = (record["raw"].as_str().unwrap(), record["seg"].as_str().unwrap());
+        let (autocorrect, fuzzy) = (record["ac"].as_u64().unwrap() as u32, record["fuzzy"].as_u64().unwrap() as u32);
+        let label = format!("raw={raw:?} seg={seg:?} ac={autocorrect} fuzzy={fuzzy} context={:?} {record}", record["context"]);
+        let first = dictionary.query(raw, seg, autocorrect, fuzzy);
+        assert_eq!(list_json(&first), record["first"], "第一次 {label}");
+        google_rows += first.iter().filter(|i| i.source == Source::Fallback && i.sentence_association).count();
+        collocation_rows += first.iter().filter(|i| i.source == Source::Collocation).count();
+        // 神经重排在后台算：等线程停了再重查；C++ 那边等不到回调（没有排上任务）时 second 是 null，两次应当相同。
+        // 一次查询可能排了不止一批（主切分、字面切分各一批，同一模型一次只算一批）：算完就重查，直到结果不再变。
+        let second = loop {
+            wait_for_worker(&sources);
+            let again = dictionary.query(raw, seg, autocorrect, fuzzy);
+            wait_for_worker(&sources);
+            let settled = dictionary.query(raw, seg, autocorrect, fuzzy);
+            if list_json(&settled) == list_json(&again) {
+                break settled;
+            }
+        };
+        if record["second"].is_null() {
+            assert_eq!(list_json(&second), record["first"], "没有后台任务时重查应当不变 {label}");
+        } else {
+            assert_eq!(list_json(&second), record["second"], "重排后 {label}");
+            waited += 1;
+            reranked += usize::from(list_json(&second) != list_json(&first));
+        }
+        cases += 1;
+    }
+    let _ = fs::remove_file(&journal);
+    eprintln!("全拼整句来源：{cases} 个，Google 整句行 {google_rows}，万象行 {collocation_rows}，神经重排重查 {waited}（改变次序 {reranked}）");
+    assert!(cases >= 800 && google_rows > 100 && waited > 100 && reranked > 50 && collocation_rows > 10);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -246,7 +326,7 @@ fn write_scenarios_match_cpp() {
             fs::copy(golden_dir().join("quanpin_dictionary_initial.db"), dir.join("dictionaries").join("msime.db")).unwrap();
             let journal = dir.join("user").join("msime_user.db");
             let mut opened = QuanpinDictionary::open(&dir.join("dictionaries").join("msime.db"), &journal.to_string_lossy(), Some(&model));
-            opened.set_sentence_association(SentenceAssociation { word_lattice: record["assoc"].as_u64().unwrap() == 1, show_next_on_duplicate: false });
+            opened.set_sentence_association(SentenceAssociation { word_lattice: record["assoc"].as_u64().unwrap() == 1, ..Default::default() });
             dictionary = Some(opened);
             continue;
         }

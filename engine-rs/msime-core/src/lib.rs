@@ -36,6 +36,7 @@ pub mod shuangpin_dictionary;
 pub mod shuangpin_query;
 pub mod spelling_graph;
 pub mod segment;
+pub mod sentence_sources;
 pub mod syllables;
 pub mod table;
 pub mod quanpin_dictionary;
