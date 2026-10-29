@@ -93,7 +93,13 @@ impl<'a> InputSession<'a> {
         // 向下取整到光标处或之前的最后一个完整单元：末尾不完整的单元属于待处理后缀。boundaries 总含 0，所以前一个必存在。
         let caret = self.caret_position();
         let upper = boundaries.partition_point(|boundary| *boundary <= caret);
-        boundaries[upper - 1]
+        let floored = boundaries[upper - 1];
+        // 向下取整得 0 而光标不在串首，说明光标落在首单元内部：改取首单元末尾（只有一个单元时是整串）。
+        // prefix_end == 0 只留给 caret == 0，宿主把它当空前缀并收起候选窗。
+        if floored == 0 && caret > 0 {
+            return boundaries.get(upper).copied().unwrap_or(raw_length);
+        }
+        floored
     }
 
     pub fn prefix_end(&self) -> usize {

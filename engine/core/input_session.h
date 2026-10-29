@@ -171,9 +171,10 @@ class InputSession
     // recompute_candidates() or key handling.
     void set_caret(std::optional<std::size_t> caret);
     // Raw length consumed by the current decode: the caret moved onto the last complete
-    // syllable-unit boundary at or before it (floor). The caret being unset, or a scheme
-    // without the unit model (segment_raw_boundaries() empty), decodes the whole string and
-    // this equals the raw length.
+    // syllable-unit boundary at or before it (floor). A caret inside the first unit rounds up to
+    // the end of that unit instead, so prefix_end() == 0 means caret == 0. The caret being
+    // unset, or a scheme without the unit model (segment_raw_boundaries() empty), decodes the
+    // whole string and this equals the raw length.
     std::size_t prefix_end() const;
     // raw[prefix_end, size) with its original casing: the pending input this decode did not
     // consume. Empty unless the caret prefix is strictly shorter than the raw string.
@@ -311,7 +312,8 @@ class InputSession
     KeyResult replace_editing_text(std::string text, std::size_t caret);
     std::optional<std::size_t> caret_;
     // Last complete unit boundary at or before the caret; only consumes segment_raw_boundaries()
-    // (segmentation contract #187). caret unset or no unit model yields the full raw length.
+    // (segmentation contract #187). A caret inside the first unit rounds up to that unit's end,
+    // so only caret == 0 yields 0. Caret unset or no unit model yields the full raw length.
     std::size_t quantized_prefix_end() const;
     // Decodes the quantized caret prefix into prefix_candidates_ when it is strictly shorter
     // than the raw string, caching by prefix so unchanged keystrokes skip the extra query.

@@ -76,33 +76,46 @@ fn query_emoticon(code: &str, shuangpin_scheme: bool, database_path: &Path, limi
     let Some(database) = open(database_path) else { return failure(&unavailable) };
 
     let lower = code.to_ascii_lowercase();
-    let mut prefixes = vec![lower.clone()];
+    // 每个查找码带一个"精确命中是否提级"的开关：双拼下原始码只按目录顺序参与前缀命中，精确命中只认展开后的全拼
+    // （原始码恰好等于某个简拼或英文键时，不能压过用户想打的全拼）。
+    let mut lookups: Vec<(String, bool)> = vec![(lower.clone(), true)];
     if shuangpin_scheme {
         let quanpin = shuangpin_to_quanpin(&lower, profile);
         if !quanpin.is_empty() && quanpin != lower {
-            prefixes.push(quanpin);
+            lookups[0].1 = false;
+            lookups.push((quanpin, true));
         }
     }
 
-    let mut entries: Vec<(String, i64)> = Vec::new();
-    let mut seen = HashSet::new();
-    for prefix in &prefixes {
-        let Ok(mut statement) = database.prepare(sql) else { return failure(&broken) };
+    // SQL 只准备一次，对每个查找码重新绑定；返回 (文字, 目录序, 是否精确)，精确行在前，免得每个查找的 LIMIT 截掉精确命中。
+    let Ok(mut statement) = database.prepare(sql) else { return failure(&broken) };
+    let mut entries: Vec<(String, i64, i64)> = Vec::new(); // (文字, 档位, 目录序)
+    for (prefix, exact_ranks) in &lookups {
         let upper_bound = format!("{prefix}\u{7f}");
-        let Ok(rows) = statement.query_map(rusqlite::params![prefix, upper_bound, limit], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))) else {
+        let Ok(rows) = statement.query_map(rusqlite::params![prefix, upper_bound, limit], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?))) else {
             return failure(&broken);
         };
         for row in rows {
-            let Ok((text, order)) = row else { return failure(&broken) };
-            if seen.insert(text.clone()) {
-                entries.push((text, order));
-            }
+            let Ok((text, order, exact)) = row else { return failure(&broken) };
+            let tier = if *exact_ranks && exact != 0 { 0 } else { 1 };
+            entries.push((text, tier, order));
         }
     }
-    entries.sort_by_key(|(_, order)| *order);
-    let count = entries.len().min(limit as usize);
+    // 先排序再去重：同一文字被多个查找或多个键命中时保留最好的名次。
+    entries.sort_by_key(|(_, tier, order)| (*tier, *order));
+    let mut seen = HashSet::new();
+    let mut texts: Vec<String> = Vec::new();
+    for (text, _, _) in entries {
+        if texts.len() >= limit as usize {
+            break;
+        }
+        if seen.insert(text.clone()) {
+            texts.push(text);
+        }
+    }
+    let count = texts.len();
     QueryResult {
-        items: entries.into_iter().take(count).enumerate().map(|(index, (text, _))| Item::new(&lower, &text, (count - index) as i64, source)).collect(),
+        items: texts.into_iter().enumerate().map(|(index, text)| Item::new(&lower, &text, (count - index) as i64, source)).collect(),
         diagnostic: None,
     }
 }
@@ -114,7 +127,7 @@ pub fn query_emoji(code: &str, shuangpin_scheme: bool, database_path: &Path, lim
         database_path,
         limit,
         profile,
-        "SELECT emoji,sort_order FROM emoji_pinyin WHERE key>=?1 AND key<?2 ORDER BY sort_order LIMIT ?3",
+        "SELECT emoji,sort_order,key IS ?1 FROM emoji_pinyin WHERE key>=?1 AND key<?2 ORDER BY key IS NOT ?1,sort_order LIMIT ?3",
         Source::Emoji,
         "Emoji",
     )
@@ -127,7 +140,7 @@ pub fn query_kaomoji(code: &str, shuangpin_scheme: bool, database_path: &Path, l
         database_path,
         limit,
         profile,
-        "SELECT kaomoji,sort_order FROM kaomoji WHERE (pinyin>=?1 AND pinyin<?2) OR (jianpin>=?1 AND jianpin<?2) ORDER BY sort_order LIMIT ?3",
+        "SELECT kaomoji,sort_order,pinyin IS ?1 FROM kaomoji WHERE (pinyin>=?1 AND pinyin<?2) OR (jianpin>=?1 AND jianpin<?2) ORDER BY pinyin IS NOT ?1,sort_order LIMIT ?3",
         Source::Kaomoji,
         "Kaomoji",
     )
