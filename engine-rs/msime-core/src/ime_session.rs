@@ -3,8 +3,7 @@
 //! 会话持有方案和提供者登记处，把会话级开关写进每次请求，查询后维护当前的预编辑、请求和候选；
 //! 五笔拼音混输时把同一串字母同时交给码表和全拼，合并两边的候选。
 //!
-//! 没搬的：双拼直接辅助码的解析器接线——`set_direct_helpcode_enabled(true)` 会让方案收 `/`、请求带上直接辅助码
-//! 标记，但请求不会被改写成句中辅助码的形状（`resolve_direct_helpcode` 在 Rust 里还是空操作）。
+//! 双拼直接辅助码开着时，请求在查询前由词典层的解析器改写成句中辅助码的形状。
 
 use crate::domain_dictionary::normalize_enabled;
 use crate::lattice::{Item, Source};
@@ -355,6 +354,7 @@ impl<'a> ImeSession<'a> {
         let mut request = query_scheme.inner().build_request();
         self.apply_request_options(&mut request);
         apply_shuangpin_helpcode_segmentation(&mut request, self.profile);
+        self.resolve_direct_helpcode(&mut request);
         if !request.valid {
             return Vec::new();
         }
@@ -397,11 +397,18 @@ impl<'a> ImeSession<'a> {
         request.rescoring_context = self.rescoring_context.clone();
     }
 
+    fn resolve_direct_helpcode(&mut self, request: &mut QueryRequest) {
+        if self.enable_direct_helpcode && request.valid && request.scheme == SchemeType::Shuangpin {
+            self.registry.pinyin.resolve_direct_helpcode(request);
+        }
+    }
+
     fn refresh_candidates(&mut self) {
         self.state.preedit = self.scheme.inner().preedit();
         let mut request = self.scheme.inner().build_request();
         self.apply_request_options(&mut request);
         apply_shuangpin_helpcode_segmentation(&mut request, self.profile);
+        self.resolve_direct_helpcode(&mut request);
         self.state.request = request;
 
         if !self.state.request.valid {

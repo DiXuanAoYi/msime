@@ -2,7 +2,7 @@
 //! 全拼、双拼、五笔（含拼音混输与通配）、日语各 120 个序列，每个序列随机一组会话开关（辅助码、句中辅助码与大写触发、
 //! 纠错、模糊音、词格整句、五笔混输/通配、前文），再跑随机操作：按键、整串替换、重置、清缓存、动态候选、单字母展开、
 //! 方案切换、光标前缀查询、不带句中辅助码的再查；每步比较预编辑、请求的主要字段和候选列表。
-//! 直接辅助码不开（解析器的接线还没搬）。要 `installer/app_data/` 下的词库、语言模型、辅助码表和日语词典，缺了就跳过。
+//! 后 240 个序列从双拼开始并打开直接辅助码（斜杠、大写两种终止标记随机），请求在查询前由解析器改写。要 `installer/app_data/` 下的词库、语言模型、辅助码表和日语词典，缺了就跳过。
 
 use msime_core::helpcode;
 use msime_core::ime_session::{ImeSession, WubiInputOptions};
@@ -122,7 +122,7 @@ fn session_matches_cpp() {
     let journal = std::env::temp_dir().join(format!("msime_ime_session_journal_{}.db", std::process::id()));
 
     let text = fs::read_to_string(golden_dir().join("expected_ime_session.jsonl")).unwrap();
-    let (mut sequences, mut steps, mut nonempty, mut mixed, mut dynamic, mut raw_queries, mut switches) = (0, 0, 0, 0, 0, 0, 0);
+    let (mut sequences, mut steps, mut nonempty, mut mixed, mut dynamic, mut raw_queries, mut switches, mut rewritten) = (0, 0, 0, 0, 0, 0, 0, 0);
     for line in text.lines() {
         let record: Value = serde_json::from_str(line).unwrap();
         let _ = fs::remove_file(&journal);
@@ -142,6 +142,11 @@ fn session_matches_cpp() {
         let wubi_mixed = flag("mixed");
         // 探针里前文只在设置后读一次请求（此时请求还空）：这里按基线里记下的前文设置。
         session.set_rescoring_context(record["ctx"].as_str().unwrap());
+        let direct = record.get("direct").is_some_and(|v| v.as_u64() == Some(1));
+        if direct {
+            session.set_direct_helpcode_enabled(true);
+            session.set_direct_helpcode_markers(record["slash"].as_u64().unwrap() == 1, record["upm"].as_u64().unwrap() == 1);
+        }
 
         let mut trail: Vec<String> = Vec::new();
         for (index, step) in record["ops"].as_array().unwrap().iter().enumerate() {
@@ -177,11 +182,12 @@ fn session_matches_cpp() {
             assert_eq!(state_value(&session), step["state"], "状态 {label}");
             steps += 1;
             nonempty += usize::from(!session.candidates().is_empty());
+            rewritten += usize::from(direct && session.request().has_syllable_helpcode_layout);
             mixed += usize::from(session.current_scheme_type() == SchemeType::Wubi && wubi_mixed && !session.candidates().is_empty());
         }
         sequences += 1;
     }
     let _ = fs::remove_file(&journal);
-    eprintln!("会话：{sequences} 个序列 {steps} 步，候选非空 {nonempty}，五笔混输非空 {mixed}，动态候选 {dynamic}，前缀查询 {raw_queries}，切方案 {switches}");
-    assert!(sequences >= 480 && steps > 4000 && nonempty > 2500 && mixed > 300 && dynamic > 250 && raw_queries > 50 && switches > 50);
+    eprintln!("会话：{sequences} 个序列 {steps} 步，候选非空 {nonempty}，五笔混输非空 {mixed}，动态候选 {dynamic}，前缀查询 {raw_queries}，切方案 {switches}，直接辅助码改写 {rewritten}");
+    assert!(sequences >= 720 && steps > 6000 && nonempty > 4000 && mixed > 300 && dynamic > 400 && raw_queries > 50 && switches > 100 && rewritten > 100);
 }

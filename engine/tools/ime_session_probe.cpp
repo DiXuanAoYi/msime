@@ -155,12 +155,16 @@ int main(int argc, char **argv)
     fs::create_directories(work);
     std::ofstream out(argv[3], std::ios::binary);
     Lcg rng{0x2d9b47e1ULL};
+    Lcg direct_rng{0x51c8a3f7ULL};
 
     int sequences = 0, steps = 0, nonempty = 0, mixed = 0, dynamic = 0, switched = 0;
     const SchemeType schemes[] = {SchemeType::Quanpin, SchemeType::Shuangpin, SchemeType::Wubi, SchemeType::JapaneseRomaji};
-    for (int round = 0; round < 480; ++round)
+    for (int round = 0; round < 720; ++round)
     {
-        const SchemeType start = schemes[round % 4];
+        // 后 240 个序列从双拼开始并打开直接辅助码，用独立的随机流，前面的序列保持不变。
+        const bool direct = round >= 480;
+        Lcg &r = direct ? direct_rng : rng;
+        const SchemeType start = direct ? SchemeType::Shuangpin : schemes[round % 4];
         const fs::path user = work / ("user_" + std::to_string(round % 4));
         fs::remove_all(user);
         fs::create_directories(user);
@@ -168,17 +172,17 @@ int main(int argc, char **argv)
         ImeSession session(start, GetXiaoheShuangpinProfile(), paths);
         session.set_helpcode_keymap(HelpcodeUtils::load_helpcode_keymap(resources, "xiaohe"));
 
-        const bool shuangpin_helpcode = rng.below(2) == 0;
-        const bool mid = rng.below(2) == 0;
-        const bool upper = rng.below(2) == 0;
-        const bool quanpin_helpcode = rng.below(2) == 0;
-        const unsigned autocorrect = rng.below(3) == 0 ? 3u : 0u;
-        const std::uint32_t fuzzy = rng.below(5) == 0 ? rng.below(1u << 11) : 0;
+        const bool shuangpin_helpcode = r.below(2) == 0;
+        const bool mid = r.below(2) == 0;
+        const bool upper = r.below(2) == 0;
+        const bool quanpin_helpcode = r.below(2) == 0;
+        const unsigned autocorrect = r.below(3) == 0 ? 3u : 0u;
+        const std::uint32_t fuzzy = r.below(5) == 0 ? r.below(1u << 11) : 0;
         metasequoia::WubiInputOptions wubi;
-        wubi.mixed_pinyin = rng.below(2) == 0;
-        wubi.z_wildcard = rng.below(2) == 0;
+        wubi.mixed_pinyin = r.below(2) == 0;
+        wubi.z_wildcard = r.below(2) == 0;
         SentenceAssociationOptions association;
-        association.word_lattice = rng.below(3) != 0;
+        association.word_lattice = r.below(3) != 0;
         session.set_shuangpin_helpcode_enabled(shuangpin_helpcode);
         session.set_mid_sentence_helpcode_enabled(mid);
         session.set_mid_sentence_uppercase_trigger_enabled(upper);
@@ -187,29 +191,37 @@ int main(int argc, char **argv)
         session.set_fuzzy_pinyin_options(metasequoia::FuzzyPinyinOptions{fuzzy});
         session.set_sentence_association(association);
         session.set_wubi_input_options(wubi);
-        session.set_rescoring_context(rng.below(2) ? "今天" : "");
+        session.set_rescoring_context(r.below(2) ? "今天" : "");
+        bool slash = true, uppercase_marker = false;
+        if (direct)
+        {
+            slash = r.below(3) != 0;
+            uppercase_marker = r.below(2) == 0;
+            session.set_direct_helpcode_enabled(true);
+            session.set_direct_helpcode_markers(slash, uppercase_marker);
+        }
 
         out << "{\"round\":" << round << ",\"start\":" << static_cast<int>(start) << ",\"sh\":" << shuangpin_helpcode << ",\"mid\":" << mid << ",\"upper\":" << upper << ",\"qh\":" << quanpin_helpcode
             << ",\"ac\":" << autocorrect << ",\"fuzzy\":" << fuzzy << ",\"mixed\":" << wubi.mixed_pinyin << ",\"wildcard\":" << wubi.z_wildcard << ",\"lat\":" << association.word_lattice
-            << ",\"ctx\":" << quote(session.get_request().rescoring_context) << ",\"ops\":[";
-        const std::uint32_t length = 3 + rng.below(12);
+            << ",\"direct\":" << direct << ",\"slash\":" << slash << ",\"upm\":" << uppercase_marker << ",\"ctx\":" << quote(session.get_request().rescoring_context) << ",\"ops\":[";
+        const std::uint32_t length = 3 + r.below(12);
         for (std::uint32_t i = 0; i < length; ++i)
         {
             if (i)
                 out << ",";
-            const std::uint32_t pick = rng.below(40);
+            const std::uint32_t pick = r.below(40);
             std::string extra = "null";
             if (pick < 28)
             {
-                const Key key = random_key(rng);
+                const Key key = random_key(r);
                 session.handle_key(key.vk, 0, key.wch);
                 out << "{\"op\":\"key\",\"a\":" << key.vk << ",\"b\":" << static_cast<unsigned>(key.wch);
             }
             else if (pick < 31)
             {
                 static const char *raws[] = {"nihao", "ni", "zhongguo", "NiH", "a", "wo'men", "ggll", "vf", "u`ab", "kyouto", "ni'hao"};
-                const std::string raw = raws[rng.below(11)];
-                const std::string cases = rng.below(2) ? raw : std::string{};
+                const std::string raw = raws[r.below(11)];
+                const std::string cases = r.below(2) ? raw : std::string{};
                 session.replace_active_raw_input(raw, cases);
                 out << "{\"op\":\"replace\",\"s\":" << quote(raw) << ",\"c\":" << quote(cases);
             }
@@ -225,8 +237,8 @@ int main(int argc, char **argv)
             }
             else if (pick < 37)
             {
-                const bool cloud = rng.below(2) == 0;
-                const std::string word = std::string("动态") + std::to_string(rng.below(2));
+                const bool cloud = r.below(2) == 0;
+                const std::string word = std::string("动态") + std::to_string(r.below(2));
                 const int rc = session.apply_dynamic_candidate(word, cloud ? CandidateSource::CloudSuggestion : CandidateSource::AiSuggestion);
                 extra = std::to_string(rc);
                 out << "{\"op\":\"dynamic\",\"cloud\":" << cloud << ",\"w\":" << quote(word);
@@ -240,7 +252,7 @@ int main(int argc, char **argv)
             }
             else if (pick < 39)
             {
-                const SchemeType next = schemes[rng.below(4)];
+                const SchemeType next = schemes[r.below(4)];
                 session.switch_scheme(next);
                 out << "{\"op\":\"switch\",\"to\":" << static_cast<int>(next);
                 ++switched;
@@ -248,7 +260,7 @@ int main(int argc, char **argv)
             else
             {
                 const std::string preedit = session.get_preedit();
-                const std::string prefix = preedit.substr(0, preedit.size() / 2 + rng.below(2));
+                const std::string prefix = preedit.substr(0, preedit.size() / 2 + r.below(2));
                 out << "{\"op\":\"raw_query\",\"s\":" << quote(prefix);
                 extra = list_json(session.query_raw_candidates(prefix, prefix));
                 extra = "{\"raw\":" + extra + ",\"plain\":" + list_json(session.query_without_syllable_helpcodes()) + "}";

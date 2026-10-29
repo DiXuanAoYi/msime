@@ -2,7 +2,6 @@
 //! `engine/providers/pinyin_candidate_provider.cpp`。
 //!
 //! 引擎层把请求里的开关下发给词典层，处理末尾辅助码（全拼大写字母、双拼单码/双码），再把候选标上产出它的方案。
-//! 没搬的：双拼直接辅助码的解析器接线（`resolve_direct_helpcode`）。
 
 use crate::helpcode::{self, Keymap};
 use crate::lattice::{Item, LanguageModel, Source};
@@ -212,6 +211,18 @@ impl<'a> PinyinProvider<'a> {
             _ => fuzzy,
         };
         merge_fuzzy_items_by(exact, fuzzy, |item| item.pinyin.len())
+    }
+
+    /// 双拼直接辅助码：在查询之前把请求改写成句中辅助码的形状。改写了返回 true。
+    pub fn resolve_direct_helpcode(&mut self, request: &mut QueryRequest) -> bool {
+        if !request.valid || request.scheme != SchemeType::Shuangpin {
+            return false;
+        }
+        // 解码要用的搭配模型跟着整句选项走，先下发，和 query 的顺序一致。
+        self.shuangpin.set_sentence_association(request.sentence_association.clone());
+        self.shuangpin.set_enabled_domain_dictionaries(&request.enabled_domain_dictionaries);
+        self.shuangpin.set_fuzzy_pinyin(request.fuzzy_pinyin);
+        self.shuangpin.resolve_direct_helpcode(request)
     }
 
     // ------------------------------------------------------------------------------------------

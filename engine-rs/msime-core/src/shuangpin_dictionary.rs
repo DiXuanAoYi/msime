@@ -12,6 +12,10 @@
 
 use crate::cache::{insert_dynamic_candidate, Cache};
 use crate::dict::{Dictionary, KeyedEntry, QuerySource};
+use crate::direct_lattice::DecodeOptions;
+use crate::direct_resolver::{ResolveContext, Resolver};
+use crate::request::QueryRequest;
+use crate::spelling_graph::SpellingOptions;
 use crate::domain_dictionary::{self, DomainDictionary};
 use crate::gram::GrammarConfig;
 use crate::helpcode::{self, Keymap, SingleMatch};
@@ -119,6 +123,8 @@ pub struct ShuangpinDictionary<'a> {
     double_helpcode_cache: RefCell<Cache<Vec<Item>>>,
     /// 词库上一次见到的 `PRAGMA data_version`，别的连接改过库就清缓存。
     data_version: Cell<i64>,
+    /// 直接辅助码的解析器；第一次用到才建。
+    direct_resolver: RefCell<Option<Resolver>>,
 }
 
 fn double_helpcode_cache_key(pinyin: &str, help_codes: &str) -> String {
@@ -172,6 +178,7 @@ impl<'a> ShuangpinDictionary<'a> {
             single_helpcode_reversed_cache: RefCell::new(Cache::new(128)),
             double_helpcode_cache: RefCell::new(Cache::new(128)),
             data_version: Cell::new(-1),
+            direct_resolver: RefCell::new(None),
         };
         dictionary.reopen();
         dictionary
@@ -200,6 +207,9 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 清掉所有结果缓存（写库、换开关时）。
     pub fn reset_cache(&self) {
+        if let Some(resolver) = self.direct_resolver.borrow_mut().as_mut() {
+            resolver.reset_cache();
+        }
         self.series_cache.borrow_mut().clear();
         self.single_helpcode_cache.borrow_mut().clear();
         self.single_helpcode_reversed_cache.borrow_mut().clear();
@@ -282,6 +292,9 @@ impl<'a> ShuangpinDictionary<'a> {
     }
 
     pub fn set_helpcode_keymap(&mut self, keymap: Keymap) {
+        if let Some(resolver) = self.direct_resolver.borrow_mut().as_mut() {
+            resolver.reset_keymap();
+        }
         self.keymap = keymap;
     }
 
@@ -429,6 +442,59 @@ impl<'a> ShuangpinDictionary<'a> {
             return String::new();
         }
         sentence
+    }
+
+    /// 直接辅助码：整句解码选出切分，把请求改写成句中辅助码的形状。改写了返回 true。
+    pub fn resolve_direct_helpcode(&self, request: &mut QueryRequest) -> bool {
+        self.reset_cache_if_database_changed();
+        let mut resolver = self.direct_resolver.borrow_mut().take().unwrap_or_else(|| Resolver::new(self.profile));
+        // 与 generate_series 的词格同一套查询：普通跨度在 SQL 里截到 32 行，带辅码约束的跨度不截，筛完约束再截。
+        let lookup = |span: &[String], constrained: bool| self.lattice_lookup(span, if constrained { 4096 } else { 32 });
+        let single_rows = || self.query_single_char_rows();
+        let collocation = self.sources.as_deref().and_then(|s| s.gram(&self.association.collocation_model));
+        let grammar = self.association.collocation_grammar;
+        let collocation_score = |tail: &str, word: &str, is_rear: bool| -> f64 { collocation.as_ref().map_or(0.0, |db| db.query(tail, word, is_rear, &grammar, None) * LN_TO_LOG10) };
+        let mut options = DecodeOptions { language_model: self.language_model, ..DecodeOptions::default() };
+        if collocation.is_some() && self.association.collocation_weight != 0.0 {
+            options.collocation_scorer = Some(&collocation_score);
+            options.collocation_weight = self.association.collocation_weight;
+        }
+        let context = ResolveContext { lookup: Some(&lookup), single_char_rows: Some(&single_rows), keymap: Some(&self.keymap), options };
+        let typed = if request.raw_input_with_cases.is_empty() { request.raw_input.clone() } else { request.raw_input_with_cases.clone() };
+        let spelling_options = SpellingOptions { slash_marker: request.direct_helpcode_slash_marker, uppercase_marker: request.direct_helpcode_uppercase_marker };
+        let resolved = resolver.resolve(&typed, &spelling_options, &context);
+        *self.direct_resolver.borrow_mut() = Some(resolver);
+        let Some(rewrite) = resolved.rewrite else { return false };
+        request.raw_input_with_syllable_helpcodes = rewrite.raw_input_with_syllable_helpcodes;
+        request.raw_input = rewrite.raw_input.clone();
+        request.raw_input_with_cases = rewrite.raw_input;
+        request.syllable_helpcodes = rewrite.syllable_helpcodes;
+        request.enable_mid_sentence_helpcode = true;
+        request.enable_shuangpin_helpcode = false;
+        request.has_syllable_helpcode_layout = true;
+        request.syllable_helpcode_source_index = rewrite.source_index;
+        request.syllable_helpcode_decorations = rewrite.decorations;
+        request.valid = rewrite.valid;
+        if request.valid {
+            request.raw_segmentation = rewrite.raw_segmentation;
+            request.normalized_segmentation = rewrite.normalized_segmentation.clone();
+            request.segmentation = rewrite.normalized_segmentation;
+            request.normalized_input = rewrite.normalized_input;
+        }
+        true
+    }
+
+    /// 词库里全部单字行（全拼读音，字）；单字都在 `tbl_1_<首字母>` 里。
+    fn query_single_char_rows(&self) -> Vec<(String, String)> {
+        let mut rows = Vec::new();
+        let Some(dictionary) = &self.dictionary else { return rows };
+        for letter in b'a'..=b'z' {
+            let Some(table) = table_name(&[(letter as char).to_string()]) else { continue };
+            let Ok(mut statement) = dictionary.connection().prepare(&format!("SELECT key, value FROM \"{table}\"")) else { continue };
+            let Ok(found) = statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))) else { continue };
+            rows.extend(found.filter_map(Result::ok));
+        }
+        rows
     }
 
     /// 双拼串对应的所有候选：整串精确命中的词在前，再是各个前缀子串的词，最后并进词格整句。
