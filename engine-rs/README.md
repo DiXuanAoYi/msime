@@ -48,6 +48,10 @@
 | Google 拼音解码器（`dict_pinyin.dat` 的拼写 Trie、词典列表与 Trie、n-gram 码本；`MatrixSearch` 的拼音解析、候选扩展与剪枝、句子回溯；句中辅助码约束；`qsort` 平局次序） | `src/google_pinyin.rs`、`src/msvc_sort.rs`（`qsort_by`） | `tests/google_pinyin_golden.rs`：拼写解析、整句解码（含带约束的）逐项与真实解码器一致，一次打一个键的增量打字（497 条记录）与整串重新解码一致；`qsort` 的平局次序与 MSVC 运行库一致。剪枝分数按 double 比较、第一行上限这类边界在测试数据里测不出，等价变异保留。基线由 `msime_google_pinyin_probe` 导出 |
 | 整句来源的接线（全拼、双拼词库共用的 `SentenceSources`：Google 解码器、快速档/高精度档神经模型、万象 `.gram` 的按路径缓存；`RescoreWorker` 后台重排线程——第一次查询按静态顺序，算完回调后重查；整句兜底行与独立 Google 整句行、句中辅助码随解码、神经 n-best 重打分、万象搭配逐边叠加、重排前文） | `src/sentence_sources.rs`、`src/quanpin_dictionary.rs`、`src/shuangpin_dictionary.rs`、`src/quanpin_utils.rs`（`to_google_spelling`） | `tests/quanpin_dictionary_golden.rs`、`tests/shuangpin_dictionary_golden.rs` 各自的 `sentence_sources_match_cpp`：全拼 900 个、双拼 443 个随机组合（词格/Google/两个神经模型/万象权重与重排/显示下一条/前文/模糊音/句中辅助码），第一次查询和后台重排算完后的结果逐项相同；C++ 探针每收到一次回调就重查到不再有回调，Rust 测试等线程停了重查到结果不变。没搬的：双拼的 `direct_sentence_` 预计算路径；Rust 的查询没有按串缓存，查询慢到后台已经算完时“第一次”会看到重排后的次序（测试里不会发生） |
 
+## 平台
+
+`cargo test --release --workspace` 在 Windows（MSVC）和 Linux（WSL Ubuntu，gcc）上都全绿，两边对的是同一份 C++（MSVC 版）导出的基线，包括依赖 MSVC `std::sort` 次序的块（`msvc_sort.rs` 照搬）。
+
 ## 前端
 
 - `fcitx5/`：Linux fcitx5 引擎插件，经 C 接口调用 `msime-capi`。核心（快照解析、按键映射、会话封装）不依赖 fcitx5，在 WSL 里对真实 capi 通过测试；插件在真实 fcitx5 `Instance` 里（testfrontend）通过集成测试，桌面会话里的手动试用还没做。见 [fcitx5/README.md](fcitx5/README.md)。
