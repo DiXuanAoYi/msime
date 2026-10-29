@@ -76,7 +76,7 @@ fn convert(item: local::Item) -> Item {
     }
 }
 
-fn convert_all(items: Vec<local::Item>) -> Vec<Item> {
+pub(crate) fn convert_all(items: Vec<local::Item>) -> Vec<Item> {
     items.into_iter().map(convert).collect()
 }
 

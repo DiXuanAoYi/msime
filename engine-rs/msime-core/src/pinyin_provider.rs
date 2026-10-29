@@ -291,6 +291,11 @@ impl<'a> PinyinProvider<'a> {
         }
     }
 
+    /// 音节边界由调用方（canonical 全拼键）给定，不再过当前方案的转换或重切。
+    pub fn create_word_from_canonical_pinyin(&mut self, pinyin: &str, word: &str) -> i32 {
+        self.quanpin.create_word_from_canonical_pinyin(pinyin, word)
+    }
+
     pub fn update_weight_by_pinyin_and_word(&mut self, scheme: SchemeType, pinyin: &str, word: &str) -> i32 {
         if scheme == SchemeType::Shuangpin {
             self.shuangpin.update_weight_by_pinyin_and_word(pinyin, word)

@@ -333,6 +333,16 @@ pub fn strip_active_helpcodes(raw_input: &str, raw_input_with_cases: &str) -> St
     prefix_bytes(raw_input, raw_input.len() - length).to_string()
 }
 
+/// 去掉末尾的辅助码，保留原来的大小写；带大小写的串为空时用 `raw_input`。
+pub fn strip_active_helpcodes_with_cases(raw_input: &str, raw_input_with_cases: &str) -> String {
+    let input_with_cases = if raw_input_with_cases.is_empty() { raw_input } else { raw_input_with_cases };
+    let length = detect_active_helpcode_length(raw_input, raw_input_with_cases);
+    if length == 0 || input_with_cases.len() < length {
+        return input_with_cases.to_string();
+    }
+    prefix_bytes(input_with_cases, input_with_cases.len() - length).to_string()
+}
+
 /// C++ `substr(0, n)` 按字节；输入是 ASCII，万一混进多字节就退到前一个字符边界，而不是 panic。
 fn prefix_bytes(text: &str, length: usize) -> &str {
     let mut end = length.min(text.len());

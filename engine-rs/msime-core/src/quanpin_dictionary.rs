@@ -377,6 +377,8 @@ impl<'a> QuanpinDictionary<'a> {
             domain: DomainDictionary::new(&db_path.with_file_name("domain-input.db")),
         };
         dictionary.reopen();
+        // C++ 的构造函数在打开词库后立刻记下 data_version；之后别的连接再写库，第一次缓存命中就会清缓存。
+        dictionary.reset_cache_if_database_changed();
         dictionary
     }
 

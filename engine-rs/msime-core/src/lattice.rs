@@ -396,6 +396,29 @@ pub struct Item {
     pub fixed_position: i32,
 }
 
+/// 摆固定位置、排快捷短语要读写的几个字段；会话候选、本地模式候选、调频候选都实现它。
+pub trait Positioned {
+    fn word(&self) -> &str;
+    fn source(&self) -> Source;
+    fn fixed_position(&self) -> i32;
+    fn set_fixed_position(&mut self, position: i32);
+}
+
+impl Positioned for Item {
+    fn word(&self) -> &str {
+        &self.word
+    }
+    fn source(&self) -> Source {
+        self.source
+    }
+    fn fixed_position(&self) -> i32 {
+        self.fixed_position
+    }
+    fn set_fixed_position(&mut self, position: i32) {
+        self.fixed_position = position;
+    }
+}
+
 /// 对 n-best 的第二意见：只能重排，不许增删改。返回 false 表示弃权。
 pub struct SourcedReranker<'a> {
     pub rerank: &'a dyn Fn(&mut Vec<Path>) -> bool,

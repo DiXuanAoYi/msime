@@ -413,16 +413,31 @@ pub fn is_fixed(user_db_path: &str, context_key: &str, entry_key: &str, value: &
         .is_ok()
 }
 
-pub type FindCandidate<'a> = &'a dyn Fn(&str, &str) -> Option<WordItem>;
+impl crate::lattice::Positioned for WordItem {
+    fn word(&self) -> &str {
+        &self.word
+    }
+    fn source(&self) -> Source {
+        self.source
+    }
+    fn fixed_position(&self) -> i32 {
+        self.fixed_position
+    }
+    fn set_fixed_position(&mut self, position: i32) {
+        self.fixed_position = position;
+    }
+}
+
+pub type FindCandidate<'a, T = WordItem> = &'a dyn Fn(&str, &str) -> Option<T>;
 
 /// 把用户固定的候选摆回它们的位置。云和 AI 候选平时先拿出来，摆完再放回第 1、2 位；
 /// 调用方已经定好它们的位置时（比如辅助码筛过之后）用 `keep_dynamic_candidate_positions`。
-pub fn apply_fixed_positions(
+pub fn apply_fixed_positions<T: crate::lattice::Positioned + Clone>(
     user_db_path: &str,
     context_key: &str,
-    candidates: &mut Vec<WordItem>,
+    candidates: &mut Vec<T>,
     include_missing: bool,
-    find_candidate: Option<FindCandidate>,
+    find_candidate: Option<FindCandidate<T>>,
     keep_dynamic_candidate_positions: bool,
 ) {
     if context_key.is_empty() || candidates.is_empty() {
@@ -437,10 +452,10 @@ pub fn apply_fixed_positions(
     };
     let fixed_rows: Vec<(String, String, i32)> = fixed_rows.filter_map(Result::ok).collect();
 
-    let mut dynamic_candidates: Vec<WordItem> = Vec::new();
+    let mut dynamic_candidates: Vec<T> = Vec::new();
     if !keep_dynamic_candidate_positions {
         candidates.retain(|item| {
-            if item.source != Source::CloudSuggestion && item.source != Source::AiSuggestion {
+            if item.source() != Source::CloudSuggestion && item.source() != Source::AiSuggestion {
                 return true;
             }
             dynamic_candidates.push(item.clone());
@@ -448,28 +463,28 @@ pub fn apply_fixed_positions(
         });
     }
 
-    let mut rows: Vec<(WordItem, i32)> = Vec::new();
+    let mut rows: Vec<(T, i32)> = Vec::new();
     for (key, value, position) in fixed_rows {
-        if let Some(existing) = candidates.iter().find(|item| item.word == value) {
+        if let Some(existing) = candidates.iter().find(|item| item.word() == value) {
             let mut item = existing.clone();
-            item.fixed_position = position;
+            item.set_fixed_position(position);
             rows.push((item, position));
         } else if include_missing {
             if let Some(mut item) = find_candidate.and_then(|f| f(&key, &value)) {
-                item.fixed_position = position;
+                item.set_fixed_position(position);
                 rows.push((item, position));
             }
         }
     }
     for (row, _) in &rows {
-        candidates.retain(|item| item.word != row.word);
+        candidates.retain(|item| item.word() != row.word());
     }
     for (row, position) in rows {
         let index = ((position - 1) as usize).min(candidates.len());
         candidates.insert(index, row);
     }
     for item in dynamic_candidates {
-        let preferred = if item.source == Source::CloudSuggestion { 1 } else { 2 };
+        let preferred = if item.source() == Source::CloudSuggestion { 1 } else { 2 };
         let index = preferred.min(candidates.len());
         candidates.insert(index, item);
     }

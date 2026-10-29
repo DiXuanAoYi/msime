@@ -3,7 +3,7 @@
 //!
 //! 库一律只读打开。C++ 里为出货词库做的共享连接缓存（`local_database.cpp`）只是性能手段，这里每次查询打开一个连接。
 
-use crate::lattice::Source;
+use crate::lattice::{Positioned, Source};
 use crate::shuangpin::{self, Profile};
 use rusqlite::{Connection, OpenFlags};
 use std::collections::HashSet;
@@ -23,6 +23,21 @@ pub struct Item {
 impl Item {
     pub fn new(pinyin: &str, word: &str, weight: i64, source: Source) -> Self {
         Self { pinyin: pinyin.to_string(), canonical_pinyin: String::new(), word: word.to_string(), weight, source, fixed_position: 0 }
+    }
+}
+
+impl Positioned for Item {
+    fn word(&self) -> &str {
+        &self.word
+    }
+    fn source(&self) -> Source {
+        self.source
+    }
+    fn fixed_position(&self) -> i32 {
+        self.fixed_position
+    }
+    fn set_fixed_position(&mut self, position: i32) {
+        self.fixed_position = position;
     }
 }
 
@@ -244,27 +259,27 @@ pub fn query_quick_phrases_by_code(code: &str, database_path: &Path, limit: i32)
 
 /// 快捷短语组的槽位只数这些候选：词库、用户词库和整句。云/AI/英文/表情/颜文字按各自的异步槽位插队，
 /// 固定位置的候选按自己的位置放，都不参与计数。
-pub fn counts_toward_quick_phrase_slot(item: &Item) -> bool {
-    if item.fixed_position > 0 {
+pub fn counts_toward_quick_phrase_slot<T: Positioned>(item: &T) -> bool {
+    if item.fixed_position() > 0 {
         return false;
     }
     !matches!(
-        item.source,
+        item.source(),
         Source::QuickPhrase | Source::CloudSuggestion | Source::AiSuggestion | Source::EnglishDictionary | Source::Emoji | Source::Kaomoji | Source::DateTime
     )
 }
 
 /// 把同码快捷短语整组插到第 `slot` 个普通候选之前（0 即首位，固定位置候选仍在它们自己的位置上）。
 /// 与快捷短语同文字的其他候选会被去掉，只留快捷短语那份；列表里已有的快捷短语先整体移除，重复调用结果不变。
-pub fn place_quick_phrases(candidates: &mut Vec<Item>, phrases: Vec<Item>, slot: usize) {
-    candidates.retain(|item| item.source != Source::QuickPhrase && !phrases.iter().any(|p| p.word == item.word));
+pub fn place_quick_phrases<T: Positioned>(candidates: &mut Vec<T>, phrases: Vec<T>, slot: usize) {
+    candidates.retain(|item| item.source() != Source::QuickPhrase && !phrases.iter().any(|p| p.word() == item.word()));
     if phrases.is_empty() {
         return;
     }
-    let mut fixed: Vec<Item> = Vec::new();
+    let mut fixed: Vec<T> = Vec::new();
     let mut remaining = Vec::with_capacity(candidates.len());
     for item in candidates.drain(..) {
-        if item.fixed_position > 0 { fixed.push(item) } else { remaining.push(item) }
+        if item.fixed_position() > 0 { fixed.push(item) } else { remaining.push(item) }
     }
     *candidates = remaining;
 
@@ -278,9 +293,9 @@ pub fn place_quick_phrases(candidates: &mut Vec<Item>, phrases: Vec<Item>, slot:
     }
     candidates.splice(index..index, phrases);
 
-    fixed.sort_by_key(|item| item.fixed_position);
+    fixed.sort_by_key(|item| item.fixed_position());
     for item in fixed {
-        let position = ((item.fixed_position - 1) as usize).min(candidates.len());
+        let position = ((item.fixed_position() - 1) as usize).min(candidates.len());
         candidates.insert(position, item);
     }
 }
