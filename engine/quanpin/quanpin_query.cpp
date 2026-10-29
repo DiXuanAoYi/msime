@@ -41,6 +41,21 @@ constexpr size_t kCorrectionPathLimit = 32;
 
 using CorrectionAliases = std::unordered_map<std::string, std::vector<std::string>>;
 
+// 非纠错的拼写归一：ü 归一（jv -> ju）。它不属于手误纠正，永远生效——关掉纠错开关
+// 也要把 jv 当 ju 查库（jv 本身不是合法音节，靠这条归一才能切出来）。n/l 系的
+// nue/lue -> nve/lve 由 normalize_umlaut_aliases 在段级完成，不进这张表。
+const CorrectionAliases &pinyin_normalization_aliases()
+{
+    static const CorrectionAliases kAliases = [] {
+        CorrectionAliases aliases;
+        aliases["jv"].push_back("ju");
+        return aliases;
+    }();
+    return kAliases;
+}
+
+// 手误别名：换位形状（aing/uang/ian/uan/iao/agn/egn/on）、多一个 h、漏一个 g，外加
+// 上面那条 ü 归一。属纠错，按掩码门控（开关关掉时不参与切分）。
 const CorrectionAliases &pinyin_correction_aliases()
 {
     static const CorrectionAliases kAliases = [] {
@@ -77,6 +92,7 @@ const CorrectionAliases &pinyin_correction_aliases()
         add_suffix_aliases("ang", "agn");
         add_suffix_aliases("eng", "egn");
         add_alias("egn", "eng");
+        // ü 归一也留在这张表里，纠错开着时一张表就够；关掉时只查 pinyin_normalization_aliases。
         add_alias("jv", "ju");
         // Missing final g before the next syllable: zhonguo -> zhong guo.
         add_suffix_aliases("ong", "on");
@@ -95,7 +111,7 @@ const CorrectionAliases &pinyin_correction_aliases()
     return kAliases;
 }
 
-std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin)
+std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin, bool include_correction_aliases)
 {
     struct RankedPath
     {
@@ -105,7 +121,9 @@ std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin)
     };
 
     const auto &valid_pinyin = intact_pinyin_set();
-    const auto &aliases = pinyin_correction_aliases();
+    // include=false keeps only the ü normalization (jv -> ju); the hand-mistake
+    // aliases are part of autocorrection and follow its switch.
+    const auto &aliases = include_correction_aliases ? pinyin_correction_aliases() : pinyin_normalization_aliases();
     std::unordered_map<size_t, std::vector<RankedPath>> memo;
 
     const auto solve = [&](auto &&self, size_t index) -> std::vector<RankedPath> {
@@ -200,12 +218,12 @@ std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin)
     return paths;
 }
 
-std::vector<Segments> cut_pinyin_with_corrections(const std::string &pinyin)
+std::vector<Segments> cut_pinyin_with_corrections(const std::string &pinyin, bool include_correction_aliases)
 {
     std::vector<Segments> merged_paths = {Segments{}};
     for (const auto &part : split(pinyin, '\''))
     {
-        const auto part_paths = cut_one_piece_with_corrections(part);
+        const auto part_paths = cut_one_piece_with_corrections(part, include_correction_aliases);
         if (part_paths.empty())
         {
             return {};
@@ -942,7 +960,8 @@ Segments cut_pinyin_greedy(const std::string &pinyin, bool intact_only)
     return merged;
 }
 
-std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::string &mode)
+std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::string &mode,
+                                         bool include_correction_aliases)
 {
     if (mode != "greedy" && mode != "correction")
     {
@@ -959,7 +978,7 @@ std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::s
         return {};
     }
 
-    const auto corrected_paths = cut_pinyin_with_corrections(pinyin);
+    const auto corrected_paths = cut_pinyin_with_corrections(pinyin, include_correction_aliases);
     if (!corrected_paths.empty())
     {
         return corrected_paths;
@@ -1063,7 +1082,8 @@ std::vector<KeyedQueryItem> query_initial(sqlite3 *db, const std::string &prefix
 
 QueryResult query_words(const std::string &pinyin, const std::string &db_path, const std::string &mode, int limit)
 {
-    const auto cuts = cut_pinyin_by_mode(pinyin, mode);
+    // 离线查询工具，不挂在任何会话的纠错开关上。
+    const auto cuts = cut_pinyin_by_mode(pinyin, mode, true);
     QueryResult result{pinyin, mode, {}};
     if (cuts.empty())
     {
@@ -1279,6 +1299,53 @@ const std::string &canonical_syllable(const std::string &syllable)
     };
     const auto found = kSpellings.find(syllable);
     return found == kSpellings.end() ? syllable : found->second;
+}
+
+std::vector<KeyedQueryItem> query_key_range_keyed(sqlite3 *db,
+                                                  std::unordered_map<std::string, sqlite3_stmt *> &statement_cache,
+                                                  const std::string &table, const std::string &lower,
+                                                  const std::string &upper, const int limit)
+{
+    if (db == nullptr || table.empty() || lower.empty() || lower >= upper || limit <= 0)
+    {
+        return {};
+    }
+    const std::string sql = "SELECT \"key\", \"value\", \"weight\" FROM \"" + table +
+                            "\" WHERE \"key\" >= ?1 AND \"key\" < ?2 ORDER BY \"weight\" DESC LIMIT ?3";
+    sqlite3_stmt *stmt = nullptr;
+    const auto found = statement_cache.find(sql);
+    if (found != statement_cache.end())
+    {
+        stmt = found->second;
+        sqlite3_reset(stmt);
+        sqlite3_clear_bindings(stmt);
+    }
+    else
+    {
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+        {
+            return {};
+        }
+        statement_cache.emplace(sql, stmt);
+    }
+    sqlite3_bind_text(stmt, 1, lower.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, upper.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 3, limit);
+
+    std::vector<KeyedQueryItem> rows;
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        const unsigned char *key = sqlite3_column_text(stmt, 0);
+        const unsigned char *value_text = sqlite3_column_text(stmt, 1);
+        rows.push_back(KeyedQueryItem{
+            key == nullptr ? "" : reinterpret_cast<const char *>(key),
+            value_text == nullptr ? "" : reinterpret_cast<const char *>(value_text),
+            sqlite3_column_int64(stmt, 2),
+        });
+    }
+    sqlite3_reset(stmt);
+    sqlite3_clear_bindings(stmt);
+    return rows;
 }
 
 std::shared_ptr<const CharReadingTotals> load_char_reading_totals(sqlite3 *db)

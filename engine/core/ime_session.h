@@ -99,6 +99,11 @@ class ImeSession
     }
     const std::vector<WordItem> &get_candidates() const;
     bool expand_initial_candidates();
+    // 容错仲裁选中读音后的分段显示（大小写原样）；空表示当前串没有容错布局。
+    const std::string &fault_segmentation_with_cases() const
+    {
+        return provider_registry_.fault_segmentation_with_cases();
+    }
 
     void set_helpcode_keymap(HelpcodeUtils::SharedKeymap table)
     {
@@ -117,6 +122,11 @@ class ImeSession
     void bind_shuangpin_scheme();
     // 把会话的直接辅助码、大写触发设置下发给双拼方案（非双拼方案什么也不做）。
     void configure_shuangpin_scheme(IInputScheme *scheme) const;
+    // 把会话的纠错掩码下发给全拼方案（非全拼方案什么也不做）。要在 build_request 之前调，
+    // 掩码决定切分要不要跑手误别名层。
+    void configure_quanpin_scheme(IInputScheme *scheme) const;
+    // 换方案或改纠错开关时把掩码绑到当前方案上，和 bind_shuangpin_scheme 同一模式。
+    void bind_quanpin_scheme();
     std::unique_ptr<IInputScheme> create_scheme(SchemeType scheme_type) const;
 
   private:

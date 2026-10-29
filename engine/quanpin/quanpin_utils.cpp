@@ -4,7 +4,7 @@
 #include "autocorrect_table.h"
 #include "../common/helpcode_utils.h"
 #include <algorithm>
-#include <array>
+#include <cctype>
 #include <limits>
 #include <string_view>
 #include <unordered_map>
@@ -520,6 +520,25 @@ bool is_complete_pinyin_input(const std::string &pinyin)
     return true;
 }
 
+bool is_jqxy_v_alias(const std::string &syllable)
+{
+    return syllable.size() >= 2 && syllable[1] == 'v' &&
+           (syllable[0] == 'j' || syllable[0] == 'q' || syllable[0] == 'x' || syllable[0] == 'y');
+}
+
+std::string canonical_umlaut_spelling(std::string syllable)
+{
+    if (is_jqxy_v_alias(syllable))
+    {
+        syllable[1] = 'u';
+    }
+    else if (syllable == "nue" || syllable == "lue")
+    {
+        syllable[1] = 'v';
+    }
+    return syllable;
+}
+
 std::string to_google_spelling(const std::string &segmentation)
 {
     // quanpin_query.cpp 的 canonical_syllable 把 ü 的两种写法归到词库存的那一种
@@ -645,9 +664,9 @@ struct CorrectionTarget
     // pair. The tie-break weight is derived from the ENABLED subset at query
     // time (see min_enabled_correction_weight), never from a switched-off table.
     unsigned type_bit = 0;
-    // Out-of-table generated pair (non-neighbor substitution / arbitrary-letter
-    // insertion): flat expensive-tier weight (kAutocorrectGeneratedShapeWeight)
-    // instead of the per-bit derivation; switch gating still uses type_bit.
+    // Out-of-table generated pair (non-neighbor substitution): flat expensive-tier
+    // weight (kAutocorrectGeneratedShapeWeight) instead of the per-bit derivation;
+    // switch gating still uses type_bit.
     bool generated = false;
 };
 
@@ -688,135 +707,20 @@ int min_enabled_correction_weight(const unsigned enabled_bits)
     return best;
 }
 
-// QWERTY letter-key neighbors (finger-movement range, letter keys only), the
-// same adjacency as server/scripts/generate_quanpin_autocorrect.py:42-69.
-// Indexed by letter - 'a' (a..z order -- NOT keyboard order). Drift is
-// self-healing only in one direction: a pair misclassified as "non-neighbor"
-// that actually collides with the static table falls back to the cheaper
-// static weight, but a neighbor misclassified as "far" simply skips
-// generation -- so keep this table byte-identical to the generator's.
-constexpr std::array<std::string_view, 26> kQwertyNeighbors = {
-    "qwsz",   // a
-    "vghn",   // b
-    "xdfv",   // c
-    "serfcx", // d
-    "wrsd",   // e
-    "drtgvc", // f
-    "ftyhbv", // g
-    "gyujbn", // h
-    "uojk",   // i
-    "huikmn", // j
-    "jiolm",  // k
-    "kop",    // l
-    "njk",    // m
-    "bhjm",   // n
-    "ipkl",   // o
-    "ol",     // p
-    "wa",     // q
-    "etdf",   // r
-    "awdexz", // s
-    "ryfg",   // t
-    "yihj",   // u
-    "cfgb",   // v
-    "qeas",   // w
-    "zsdc",   // x
-    "tugh",   // y
-    "asx",    // z
-};
-
-constexpr bool is_qwerty_neighbor(char key, char of_letter)
-{
-    const unsigned row = static_cast<unsigned>(of_letter - 'a');
-    return row < kQwertyNeighbors.size() && kQwertyNeighbors[row].find(key) != std::string_view::npos;
-}
-
-// One out-of-table generated pair: wrong-form string plus the legal syllable it
-// stands for. wrong is owned by the generated store (static lifetime) because
-// the correction index refers to it through string_views.
-struct GeneratedPair
-{
-    std::string wrong;
-    std::string_view syllable;
-    unsigned type_bit;
-};
-
-// Enumerate the out-of-table shapes over every legal syllable: non-neighbor
-// substitutions and arbitrary-letter insertions. Transpositions and deletions
-// are exhaustive in the static tables -- nothing to add. Wrong forms must be
-// non-legal, at least three letters (shorter strings belong to the jianpin
-// space) and at most six (the k-best piece scan never looks at longer pieces) --
-// the same window as the static tables and the evaluation filter.
-std::vector<GeneratedPair> build_generated_pairs()
-{
-    const auto &legal = intact_pinyin_set();
-    std::vector<GeneratedPair> pairs;
-    for (const std::string &syllable : intact_pinyin_list())
-    {
-        if (syllable.size() < 3)
-        {
-            continue; // same-length substitutions would violate the 3-letter floor
-        }
-        // 非相邻键替换：换上的字母既不是原字母也不是它的 QWERTY 邻键。
-        for (size_t i = 0; i < syllable.size(); ++i)
-        {
-            for (char key = 'a'; key <= 'z'; ++key)
-            {
-                if (key == syllable[i] || is_qwerty_neighbor(key, syllable[i]))
-                {
-                    continue;
-                }
-                std::string wrong = syllable;
-                wrong[i] = key;
-                if (legal.find(wrong) != legal.end())
-                {
-                    continue;
-                }
-                pairs.push_back({std::move(wrong), syllable, kAutocorrectNeighbor});
-            }
-        }
-        // 任意字母插入：插入字母不属于静态覆盖集（该位相邻字母及其邻键）。
-        for (size_t i = 0; i <= syllable.size(); ++i)
-        {
-            const char left = i > 0 ? syllable[i - 1] : '\0';
-            const char right = i < syllable.size() ? syllable[i] : '\0';
-            for (char key = 'a'; key <= 'z'; ++key)
-            {
-                const bool statically_covered = key == left || key == right ||
-                                                (left != '\0' && is_qwerty_neighbor(key, left)) ||
-                                                (right != '\0' && is_qwerty_neighbor(key, right));
-                if (statically_covered)
-                {
-                    continue;
-                }
-                std::string wrong = syllable;
-                wrong.insert(i, 1, key);
-                if (wrong.size() > 6 || legal.find(wrong) != legal.end())
-                {
-                    continue; // 7 letters sit outside the k-best piece scan window
-                }
-                pairs.push_back({std::move(wrong), syllable, kAutocorrectInsertion});
-            }
-        }
-    }
-    return pairs;
-}
-
-// Static lifetime: the correction index refers to `wrong` through string_views.
-const std::vector<GeneratedPair> &generated_pairs()
-{
-    static const std::vector<GeneratedPair> pairs = build_generated_pairs();
-    return pairs;
-}
+// 表外“生成式”形状（非邻键替换）已由生成器静态化进
+// autocorrect_table.h 的 kGeneratedShapeEntries，运行期不再枚举：这里原来那份
+// kQwertyNeighbors + is_qwerty_neighbor + build_generated_pairs 与生成器的邻键表
+// 是两份必须逐字节一致的数据，静态化后一并删除，漂移面随之消失。
 
 const std::unordered_map<std::string_view, std::vector<CorrectionTarget>> &correction_index()
 {
     static const std::unordered_map<std::string_view, std::vector<CorrectionTarget>> kIndex = [] {
         std::unordered_map<std::string_view, std::vector<CorrectionTarget>> index;
         index.reserve((autocorrect::kTranspositionCount + autocorrect::kNeighborCount + autocorrect::kDeletionCount +
-                       autocorrect::kInsertionCount) *
+                       autocorrect::kInsertionCount + autocorrect::kGeneratedShapeCount) *
                       4 / 3);
-        const auto add_table = [&](const autocorrect::Entry *entries, const std::size_t count,
-                                   const unsigned type_bit) {
+        const auto add_table = [&](const autocorrect::Entry *entries, const std::size_t count, const unsigned type_bit,
+                                   const bool generated = false) {
             for (std::size_t i = 0; i < count; ++i)
             {
                 const std::string_view correct = autocorrect::kCorrectSyllables[entries[i].correct];
@@ -835,29 +739,19 @@ const std::unordered_map<std::string_view, std::vector<CorrectionTarget>> &corre
                 }
                 else
                 {
-                    targets.push_back(CorrectionTarget{correct, type_bit});
+                    targets.push_back(CorrectionTarget{correct, type_bit, generated});
                 }
             }
         };
+        // 静态表按权重升序合并（换位、漏字、多字、邻键），目标列表因此天然
+        // 权重有序，同权重由数组序打破平局——这就是排序键里的 "table order"。
         add_table(autocorrect::kTranspositionEntries, autocorrect::kTranspositionCount, kAutocorrectTransposition);
         add_table(autocorrect::kDeletionEntries, autocorrect::kDeletionCount, kAutocorrectDeletion);
         add_table(autocorrect::kInsertionEntries, autocorrect::kInsertionCount, kAutocorrectInsertion);
         add_table(autocorrect::kNeighborEntries, autocorrect::kNeighborCount, kAutocorrectNeighbor);
-        // Out-of-table generated shapes: appended AFTER the static tables so a
-        // shared wrong key keeps its cheaper static targets first. A generated
-        // pair colliding with a static pair is dropped -- the static table's
-        // cheaper weight already covers it (self-heals engine/generator drift).
-        for (const auto &pair : generated_pairs())
-        {
-            auto &targets = index[pair.wrong];
-            const auto duplicate = std::find_if(targets.begin(), targets.end(), [&](const CorrectionTarget &target) {
-                return target.syllable == pair.syllable;
-            });
-            if (duplicate == targets.end())
-            {
-                targets.push_back(CorrectionTarget{pair.syllable, pair.type_bit, true});
-            }
-        }
+        // 生成式（非邻键替换）在生成期就已剔除与静态表重复的 (wrong, correct) 对，
+        // 这里只需追加：共享的原串仍然保留静态表的便宜目标在前。
+        add_table(autocorrect::kGeneratedShapeEntries, autocorrect::kGeneratedShapeCount, kAutocorrectNeighbor, true);
         return index;
     }();
     return kIndex;
@@ -867,14 +761,14 @@ const std::unordered_map<std::string_view, std::vector<CorrectionTarget>> &corre
 // input letters consumed: equal to syllable.size() for legal syllables and
 // same-length corrections (transposition / neighbor), one less for deletion
 // corrections ("zhng" -> zhang), one more for insertion corrections
-// ("shangg" -> shang).
+// ("sghang" -> shang).
 struct AutocorrectEdge
 {
     size_t raw_length = 0;
     std::string_view syllable;
     bool corrected = false;
-    // Out-of-table generated pair (non-neighbor substitution / arbitrary-letter
-    // insertion). Generated-containing hypotheses rank behind ALL static
+    // Out-of-table generated pair (non-neighbor substitution). Generated-
+    // containing hypotheses rank behind ALL static
     // hypotheses (see the finalize comparator) so in-table inputs keep their
     // baseline cut set.
     bool generated = false;
@@ -1026,7 +920,7 @@ std::vector<AutocorrectCut> autocorrect_cut_kbest(const std::string &pinyin, con
             continue;
         }
         const size_t remaining = length - start;
-        const size_t max_len = std::min<size_t>(remaining, 6);
+        const size_t max_len = std::min(remaining, kAutocorrectMaxKeyLength);
         for (size_t len = max_len; len >= 1; --len)
         {
             const std::string_view piece(pinyin.data() + start, len);
@@ -1110,6 +1004,137 @@ std::vector<AutocorrectCut> autocorrect_cut_kbest(const std::string &pinyin, con
     return results;
 }
 
+// ---- 长句容错槽位模型 ----
+
+namespace
+{
+// 按切段文本分类槽位：intact 集合内为 Determining，单字母为 SingleInitial，其余 Fault。
+FaultSlotKind fault_slot_kind(const std::string &piece)
+{
+    if (intact_pinyin_set().count(piece) != 0)
+    {
+        return FaultSlotKind::Determining;
+    }
+    return piece.size() == 1 ? FaultSlotKind::SingleInitial : FaultSlotKind::Fault;
+}
+} // namespace
+
+std::vector<FaultSlot> build_fault_slots(const std::string &pinyin)
+{
+    if (pinyin.empty() || pinyin.find('\'') != std::string::npos)
+    {
+        return {};
+    }
+    // 输入可能带大小写（大写段是触发键的一部分）：切分与槽位分类都按小写字母走，
+    // 与 autocorrect_cut_kbest 对 fold 后字母工作同一个约定。
+    std::string letters;
+    letters.reserve(pinyin.size());
+    for (const char ch : pinyin)
+    {
+        letters.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(ch))));
+        if (letters.back() < 'a' || letters.back() > 'z')
+        {
+            return {};
+        }
+    }
+    // 与查询层同一个切分器：残余字母按简拼尾解释，任何字母串都切得出。用前缀集
+    // （intact_only=false）切，r、c 这类单字母声母才能成段；槽位分类再按 intact 集
+    // 区分合法音节与简拼/非法段。
+    const Segments segments = cut_one_piece_min_segments(letters, false);
+    // 切分必须逐字母盖住输入（该切分器保证），用拼接而非 join_segments 比较：
+    // 后者插入分隔符，对多段输入恒不等。
+    std::string joined;
+    for (const auto &segment : segments)
+    {
+        joined += segment;
+    }
+    if (segments.empty() || joined != letters)
+    {
+        return {};
+    }
+    std::vector<FaultSlot> slots;
+    slots.reserve(segments.size());
+    for (const auto &segment : segments)
+    {
+        FaultSlot slot;
+        slot.raw_text = segment;
+        slot.base_syllable = segment;
+        slot.kind = fault_slot_kind(segment);
+        // Fault 槽没有基础读法：多字母非法串不能当简拼查词。
+        if (slot.kind == FaultSlotKind::Fault)
+        {
+            slot.base_syllable.clear();
+        }
+        slots.push_back(std::move(slot));
+    }
+    return slots;
+}
+
+std::vector<std::pair<std::string, int>> fault_slot_correction_targets(const std::string &raw_text,
+                                                                       const unsigned autocorrect_types)
+{
+    if (autocorrect_types == 0 || raw_text.empty() || intact_pinyin_set().count(raw_text) != 0)
+    {
+        return {};
+    }
+    std::vector<std::pair<std::string, int>> targets;
+    const auto found = correction_index().find(raw_text);
+    if (found == correction_index().end())
+    {
+        return targets;
+    }
+    for (const auto &target : found->second)
+    {
+        // 掩码门控与 autocorrect_cut_kbest 同一条规则；权重按启用位折算（同
+        // min_enabled_correction_weight），生成式目标走昂贵档常数。
+        const unsigned enabled_bits = autocorrect_types & target.type_bit;
+        if (enabled_bits == 0)
+        {
+            continue;
+        }
+        const int weight =
+            target.generated ? kAutocorrectGeneratedShapeWeight : min_enabled_correction_weight(enabled_bits);
+        const auto duplicate = std::find_if(targets.begin(), targets.end(),
+                                            [&](const auto &entry) { return entry.first == target.syllable; });
+        if (duplicate == targets.end())
+        {
+            targets.emplace_back(std::string(target.syllable), weight);
+        }
+        else if (weight < duplicate->second)
+        {
+            duplicate->second = weight;
+        }
+    }
+    return targets;
+}
+
+bool fault_slots_eligible(const std::vector<FaultSlot> &slots, const unsigned autocorrect_types)
+{
+    if (autocorrect_types == 0 || slots.empty() || slots.size() > kMaxFaultSlotCount)
+    {
+        return false;
+    }
+    std::size_t non_determining = 0;
+    std::size_t single_initial = 0;
+    for (const auto &slot : slots)
+    {
+        if (slot.kind == FaultSlotKind::SingleInitial)
+        {
+            ++single_initial;
+        }
+        if (slot.kind != FaultSlotKind::Determining)
+        {
+            ++non_determining;
+        }
+    }
+    // 必须有至少两个单字母槽：这是长句里有意混入的简拼（shuishanshurFayonghu... 的
+    // r、c、l），k-best 的 3 边预算装不下它们，才轮到容错仲裁。只有一个单字母槽的串
+    // （tiananmenguangchang 的后两个字母被抓成单字母槽）是字面仲裁的势力范围，拉进容错
+    // 搜索只会让 kenlm 在展开读法里挑一个分数更高的错切分（天安门广场 -> 天南门广场）。
+    // 短串同样走旧 autocorrect_cut_kbest 快速路径，行为零变。
+    return single_initial >= 2 && non_determining > 0 && slots.size() > kMaxShortAutocorrectSyllables;
+}
+
 namespace
 {
 // 罕见合法音节 -> 它的换位常用音节。人工收录、不由生成器派生：两侧都常用的换位对
@@ -1178,13 +1203,13 @@ std::vector<AutocorrectCut> legal_input_correction_cuts(const std::string &pinyi
     // （zi'a、ji'o'a、ni'a），多打一个元音（jiu'zhe'e'yang），漏打声母（jiu'zhe'ang）。
     // 纠正的那段必须盖住这样一个音节：不然 k-best 会跨音节边界重切任何普通输入，
     // 道路 dao'lu 读成 da + olu->lou「大楼」、会的 hui'de 读成 hu + ide->die「蝴蝶」——
-    // 词库扫描里第 2 位的噪声几乎全是这种。生成式空间（静态表之外的远键替换、任意字母
-    // 插入）也不认：它是给切不成合法音节的输入兜底的，放到合法输入上只会拼出巧合。
+    // 词库扫描里第 2 位的噪声几乎全是这种。生成式空间（静态表之外的远键替换）
+    // 也不认：它是给切不成合法音节的输入兜底的，放到合法输入上只会拼出巧合。
     // 先多搜几条再过滤：长句里前几名常被别处更便宜、却不盖零声母音节的纠正占满
     // （jintianjiuzheeyangba 取 3 条时一条都留不下）。与查询层同一个 k。
-    constexpr std::size_t kSearchKBest = 9;
-    for (auto &cut : zero_initial_spans.empty() ? std::vector<AutocorrectCut>{}
-                                                : autocorrect_cut_kbest(pinyin, types, std::max(k, kSearchKBest)))
+    for (auto &cut : zero_initial_spans.empty()
+                         ? std::vector<AutocorrectCut>{}
+                         : autocorrect_cut_kbest(pinyin, types, std::max(k, kAutocorrectAlignKBest)))
     {
         const bool covers_zero_initial =
             std::any_of(cut.segments.begin(), cut.segments.end(), [&](const AutocorrectCutSegment &segment) {
@@ -1248,8 +1273,7 @@ std::optional<AutocorrectCut> correction_cut_for_reading(const std::string &raw_
         return std::nullopt;
     }
     // 与查询层同一个 k：读音可能来自主切之外的备选切分。
-    constexpr std::size_t kAlignmentKBest = 9;
-    for (auto &cut : autocorrect_cut_kbest(raw_letters, autocorrect_types, kAlignmentKBest))
+    for (auto &cut : autocorrect_cut_kbest(raw_letters, autocorrect_types, kAutocorrectAlignKBest))
     {
         if (cut.segments.size() >= reading.size() &&
             std::equal(reading.begin(), reading.end(), cut.segments.begin(),
@@ -1287,6 +1311,78 @@ std::optional<size_t> corrected_reading_raw_length(const std::string &raw_letter
     }
     const auto &last = cut->segments[reading.size() - 1];
     return last.start + last.raw_text.size();
+}
+
+bool is_deletion_variant(const std::string &raw_text, const std::string &reading)
+{
+    if (reading.size() + 1 != raw_text.size())
+    {
+        return false;
+    }
+    size_t r = 0;
+    size_t skipped = 0;
+    for (const char ch : raw_text)
+    {
+        if (skipped == 0 && (r >= reading.size() || ch != reading[r]))
+        {
+            skipped = 1;
+            continue;
+        }
+        if (r < reading.size() && reading[r] == ch)
+        {
+            ++r;
+            continue;
+        }
+        return false;
+    }
+    return skipped == 1 && r == reading.size();
+}
+
+std::optional<size_t> fault_reading_raw_length(const std::string &raw_letters, const Segments &reading)
+{
+    const auto slots = build_fault_slots(raw_letters);
+    if (slots.empty() || reading.size() > slots.size() || reading.empty())
+    {
+        return std::nullopt;
+    }
+    const auto &intact = intact_pinyin_set();
+    size_t consumed = 0;
+    for (size_t i = 0; i < reading.size(); ++i)
+    {
+        const auto &slot = slots[i];
+        const auto &syllable = reading[i];
+        // 槽盖住的原始字母必须被读音逐字母消耗（允许 ü 归一）。
+        const bool matches_slot = syllable == slot.base_syllable ||
+                                  (syllable.size() == slot.raw_text.size() &&
+                                   canonical_umlaut_spelling(slot.raw_text) == canonical_umlaut_spelling(syllable));
+        switch (slot.kind)
+        {
+        case FaultSlotKind::Determining:
+            // loose scan 产出的漏字变体（yang -> yan）也是这个槽的合法读法，与
+            // arbitrate_fault_slots / QuanpinDisplayAtWinningSlots 同一条形态判定。
+            if (!matches_slot && !is_deletion_variant(slot.raw_text, syllable))
+            {
+                return std::nullopt;
+            }
+            break;
+        case FaultSlotKind::SingleInitial:
+            // 简拼读法（r）或同首字母的展开音节（ru）都消耗这个槽；别的音节对不上。
+            if (!matches_slot && (syllable.empty() || syllable.front() != slot.raw_text.front()))
+            {
+                return std::nullopt;
+            }
+            break;
+        case FaultSlotKind::Fault:
+            // Fault 槽只能读成合法音节；任意音节都消耗这段字母。
+            if (syllable.empty() || intact.count(syllable) == 0)
+            {
+                return std::nullopt;
+            }
+            break;
+        }
+        consumed += slot.raw_text.size();
+    }
+    return consumed;
 }
 
 AutocorrectCut autocorrect_cut_detail(const std::string &pinyin, const unsigned autocorrect_types)

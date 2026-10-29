@@ -47,7 +47,14 @@ struct QueryResult
 };
 
 Segments cut_pinyin_greedy(const std::string &pinyin, bool intact_only = false);
-std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::string &mode = "greedy");
+// include_correction_aliases gates the hand-mistake alias layer (transposition
+// shapes, extra/missing letters) on the autocorrect switch; false keeps only the
+// ü normalization (jv -> ju). It is deliberately required: every caller must
+// decide whether its cut follows the switch (quanpin callers derive it with
+// correction_aliases_enabled), otherwise its keys drift from the query's cut.
+// Greedy mode ignores it.
+std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::string &mode,
+                                         bool include_correction_aliases);
 Segments split_segments(const std::string &segmentation);
 std::string join_segments(const Segments &segments, const std::string &delimiter = "'");
 std::string build_table_name(const Segments &segments);
@@ -78,6 +85,14 @@ std::vector<KeyedQueryItem> query_segments_keyed_flat(const Segments &segments, 
 std::vector<KeyedQueryItem> query_exact_segmentations_keyed_flat(
     const std::vector<Segments> &segmentations, sqlite3 *db,
     std::unordered_map<std::string, sqlite3_stmt *> &statement_cache, int limit = 128);
+
+// 键区间扫描：返回 table 里 key ∈ [lower, upper) 的行（按权重降序，至多 limit 行）。
+// 容错词格用它现算简拼展开候选：行键在展开槽位上以某字母开头，展开出的全拼音节
+// 从行键解析——候选集合来自词库真实命中，天然有界（行数由 limit 截断）。
+std::vector<KeyedQueryItem> query_key_range_keyed(sqlite3 *db,
+                                                  std::unordered_map<std::string, sqlite3_stmt *> &statement_cache,
+                                                  const std::string &table, const std::string &lower,
+                                                  const std::string &upper, int limit);
 
 // 多音单字在各读音下的权重和（单字 → Σweight），只收词库里挂在两个以上读音下的字。
 // 词格用它算 P(读音|字)，见 make_lattice_db_lookup。
