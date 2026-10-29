@@ -189,17 +189,18 @@ std::string dump_state(const fs::path &dir)
         {
             sqlite3_stmt *statement = nullptr;
             text += "T:user_dictionary_operations\n";
-            sqlite3_prepare_v2(db, "SELECT dictionary,key,value,operation,weight,display,user_inserted FROM user_dictionary_operations ORDER BY 1,2,3", -1, &statement, nullptr);
+            sqlite3_prepare_v2(db, "SELECT dictionary,key,value,operation,weight,display,user_inserted,weight_edited FROM user_dictionary_operations ORDER BY 1,2,3", -1, &statement, nullptr);
             while (statement && sqlite3_step(statement) == SQLITE_ROW)
             {
-                for (int i = 0; i < 7; ++i)
+                for (int i = 0; i < 8; ++i)
                     text += std::string(i ? "|" : "") + reinterpret_cast<const char *>(sqlite3_column_text(statement, i));
                 text += "\n";
             }
             sqlite3_finalize(statement);
             sqlite3_close(db);
             text += dump_database(dir / "user" / "msime_user.db",
-                                  {{"personal_dictionary_receipts", "1"},
+                                  {{"dictionary_state", "1"},
+                                   {"personal_dictionary_receipts", "1"},
                                    {"candidate_selection_state", "1,2,3"},
                                    {"fixed_candidate_positions", "1,2,3"},
                                    {"quick_phrase_slots", "1"},
@@ -343,7 +344,7 @@ int main(int argc, char **argv)
 
     World world;
     int ops_total = 0, ops_true = 0;
-    for (int scenario = 0; scenario < 160; ++scenario)
+    for (int scenario = 0; scenario < 240; ++scenario)
     {
         Lcg rng{0x5e12d1c7ULL + static_cast<std::uint64_t>(scenario) * 7919};
         const fs::path dir = work / "scenario";
@@ -440,7 +441,78 @@ int main(int argc, char **argv)
                 return rng.pick(world.pinyin_values);
             };
             const std::vector<std::string> kinds = {"pinyin", "wubi", "quick", "english", "pinyin", "pinyin"};
-            if (pick < 3)
+            // 160 号起的场景专测出厂词库换过时的回放：数据目录里有（或没有、写坏）清单，日志里有自动调频、设置页改的权重、
+            // 手动加的词和日文残留。前 160 个场景的随机序列不受影响。
+            if (scenario >= 160)
+            {
+                // 多数场景一开始就放一份清单，回放才走得到「换过词库」的分支。
+                const std::uint32_t choice = (step == 0 && rng.below(4) != 0) ? 8 : rng.below(12);
+                const std::vector<long long> weights = {0, 5, 1000, 100000, 3000000, 50000000, 2000000000};
+                // 四分之三的行取自词库里真有的 (键, 词)，回放才会遇到出厂权重。
+                static const std::vector<std::pair<std::string, std::string>> shipped_rows = {
+                    {"ni", "你"}, {"ni", "泥"}, {"ni", "尼"}, {"na", "那"}, {"na", "拿"}, {"na", "哪"}, {"wo", "我"}, {"wo", "握"}, {"jian", "见"},
+                    {"jian", "间"}, {"jian", "建"}, {"jian", "键"}, {"ni'hao", "你好"}, {"ni'hao", "泥好"}, {"wq", "他"}, {"wq", "你"}, {"a", "工"}, {"a", "戈"}, {"gg", "王"}};
+                const auto &row = shipped_rows[rng.below(static_cast<std::uint32_t>(shipped_rows.size()))];
+                const bool from_shipped = rng.below(4) != 0;
+                const std::string kind = from_shipped ? (row.first == "wq" || row.first == "a" || row.first == "gg" ? "wubi" : "pinyin") : (rng.below(4) == 0 ? "wubi" : "pinyin");
+                const std::string key = from_shipped ? row.first : (kind == "wubi" ? rng.pick(world.wubi_keys) : rng.pick(std::vector<std::string>{"ni", "na", "wo", "jian", "ni'hao"}));
+                const std::string value = from_shipped ? row.second : (kind == "wubi" ? rng.pick(world.wubi_values) : rng.pick(world.pinyin_values));
+                const long long weight = rng.pick(weights);
+                if (choice <= 2)
+                {
+                    op << "\"op\":\"record_upsert\",\"kind\":\"" << kind << "\",\"key\":" << quote(key) << ",\"value\":" << quote(value) << ",\"weight\":" << weight << ",\"display\":\"\"";
+                    bool_ret(user_dictionary::record_upsert(journal, kind_of(kind), key, value, weight, ""));
+                }
+                else if (choice == 3)
+                {
+                    op << "\"op\":\"record_weight_edit\",\"kind\":\"" << kind << "\",\"key\":" << quote(key) << ",\"value\":" << quote(value) << ",\"weight\":" << weight << ",\"display\":\"\"";
+                    bool_ret(user_dictionary::record_weight_edit(journal, kind_of(kind), key, value, weight, ""));
+                }
+                else if (choice == 4 || choice == 6)
+                {
+                    const std::string kana = choice == 6 ? rng.pick(std::vector<std::string>{"かな", "ニカ", "ｦ"}) : value;
+                    op << "\"op\":\"record_user_insert\",\"kind\":\"" << kind << "\",\"key\":" << quote(key) << ",\"value\":" << quote(kana) << ",\"weight\":" << weight << ",\"display\":\"\"";
+                    bool_ret(user_dictionary::record_user_insert(journal, kind_of(kind), key, kana, weight, ""));
+                }
+                else if (choice == 5)
+                {
+                    const std::string kana = rng.pick(std::vector<std::string>{"かな", "ニカ", "ｦ", "你かな", "ㇰ"});
+                    op << "\"op\":\"record_upsert\",\"kind\":\"pinyin\",\"key\":\"ni\",\"value\":" << quote(kana) << ",\"weight\":100,\"display\":\"\"";
+                    bool_ret(user_dictionary::record_upsert(journal, DictionaryKind::Pinyin, "ni", kana, 100, ""));
+                }
+                else if (choice == 7)
+                {
+                    op << "\"op\":\"record_delete\",\"kind\":\"" << kind << "\",\"key\":" << quote(key) << ",\"value\":" << quote(value);
+                    bool_ret(user_dictionary::record_delete(journal, kind_of(kind), key, value));
+                }
+                else if (choice == 8 || choice == 9)
+                {
+                    const int mode = step == 0 ? static_cast<int>(rng.below(2)) : static_cast<int>(rng.below(6));
+                    const fs::path manifest = dir / "dictionaries" / "dictionary-manifest.json";
+                    const std::vector<std::string> bodies = {
+                        R"({"files":{"msime.db":{"sha256":"aaaa"}}})", R"({"files":{"msime.db":{"sha256":"bbbb"}}})", "", "not json",
+                        R"({"files":{"msime.db":{"sha256":""}}})", R"({"files":{}})"};
+                    if (mode == 2)
+                        fs::remove(manifest);
+                    else
+                        std::ofstream(manifest, std::ios::binary) << bodies[static_cast<std::size_t>(mode)];
+                    op << "\"op\":\"set_manifest\",\"mode\":" << mode;
+                    ret = "true";
+                }
+                else if (choice == 10)
+                {
+                    op << "\"op\":\"replay\"";
+                    const auto result = user_dictionary::replay(journal, main_db, english_db);
+                    ret = "[" + std::to_string(result.applied) + "," + std::to_string(result.skipped) + "," + std::to_string(result.failed) + "," + quote(result.error) + "," +
+                          std::to_string(result.rebased) + "]";
+                }
+                else
+                {
+                    op << "\"op\":\"ensure_user_database\"";
+                    bool_ret(user_dictionary::ensure_user_database(journal));
+                }
+            }
+            else if (pick < 3)
             {
                 const std::string kind = rng.pick(kinds), key = key_for(kind), value = value_for(kind), display = rng.below(2) ? value : "";
                 const long long weight = static_cast<long long>(rng.below(5) == 0 ? 0 : rng.below(300000));
@@ -732,7 +804,8 @@ int main(int argc, char **argv)
             {
                 op << "\"op\":\"replay\"";
                 const auto result = user_dictionary::replay(journal, main_db, english_db);
-                ret = "[" + std::to_string(result.applied) + "," + std::to_string(result.skipped) + "," + std::to_string(result.failed) + "," + quote(result.error) + "]";
+                ret = "[" + std::to_string(result.applied) + "," + std::to_string(result.skipped) + "," + std::to_string(result.failed) + "," + quote(result.error) + "," +
+                      std::to_string(result.rebased) + "]";
             }
             else if (pick >= 35 && pick <= 37)
             {

@@ -1,7 +1,7 @@
 //! 用户词库（日志、调频、固定位置、快捷短语/英文槽位、日期时间顺序、重放、个人词库编辑与分页、词库状态导出）
 //! 对着真实的 C++ `user_dictionary::*` / `metasequoia::*` 核对。
 //!
-//! 基线 `expected_user_dictionary.jsonl` 由 `msime_user_dictionary_probe` 导出：160 个场景，每个场景从同一份合成词库
+//! 基线 `expected_user_dictionary.jsonl` 由 `msime_user_dictionary_probe` 导出：240 个场景（后 80 个专测出厂词库换过时的回放），每个场景从同一份合成词库
 //! （`user_dictionary_initial_main.db`、`user_dictionary_initial_english.db`）和空日志出发，顺序执行 8 到 25 步随机操作，
 //! 每步记下参数、返回值，以及执行后三个库（日志、msime.db、english.db）逐表转储的哈希。
 //! 转储不含 `updated_at`（来自 `unixepoch()`），其余全部参与。
@@ -69,11 +69,11 @@ fn dump_state(dir: &Path) -> String {
         Ok(db) if journal.exists() => {
             text += "T:user_dictionary_operations\n";
             let mut statement = db
-                .prepare("SELECT dictionary,key,value,operation,weight,display,user_inserted FROM user_dictionary_operations ORDER BY 1,2,3")
+                .prepare("SELECT dictionary,key,value,operation,weight,display,user_inserted,weight_edited FROM user_dictionary_operations ORDER BY 1,2,3")
                 .unwrap();
             let mut rows = statement.query([]).unwrap();
             while let Some(row) = rows.next().unwrap() {
-                let cells: Vec<String> = (0..7).map(|i| cell(row.get_ref(i).unwrap())).collect();
+                let cells: Vec<String> = (0..8).map(|i| cell(row.get_ref(i).unwrap())).collect();
                 text += &cells.join("|");
                 text.push('\n');
             }
@@ -83,6 +83,7 @@ fn dump_state(dir: &Path) -> String {
             text += &dump_database(
                 &journal,
                 &[
+                    ("dictionary_state", "1"),
                     ("personal_dictionary_receipts", "1"),
                     ("candidate_selection_state", "1,2,3"),
                     ("fixed_candidate_positions", "1,2,3"),
@@ -237,6 +238,26 @@ fn run_op(op: &Value, dir: &Path) -> Value {
     match text(op, "op") {
         "record_upsert" => json!(record_upsert(&journal, kind_of(text(op, "kind")), text(op, "key"), text(op, "value"), int(op, "weight"), text(op, "display"))),
         "record_user_insert" => json!(record_user_insert(&journal, kind_of(text(op, "kind")), text(op, "key"), text(op, "value"), int(op, "weight"), text(op, "display"))),
+        "record_weight_edit" => json!(record_weight_edit(&journal, kind_of(text(op, "kind")), text(op, "key"), text(op, "value"), int(op, "weight"), text(op, "display"))),
+        "ensure_user_database" => json!(ensure_user_database(&journal)),
+        "set_manifest" => {
+            let manifest = dir.join("dictionaries").join("dictionary-manifest.json");
+            let bodies = [
+                r#"{"files":{"msime.db":{"sha256":"aaaa"}}}"#,
+                r#"{"files":{"msime.db":{"sha256":"bbbb"}}}"#,
+                "",
+                "not json",
+                r#"{"files":{"msime.db":{"sha256":""}}}"#,
+                r#"{"files":{}}"#,
+            ];
+            let mode = int(op, "mode") as usize;
+            if mode == 2 {
+                let _ = fs::remove_file(&manifest);
+            } else {
+                fs::write(&manifest, bodies[mode]).unwrap();
+            }
+            json!(true)
+        }
         "record_delete" => json!(record_delete(&journal, kind_of(text(op, "kind")), text(op, "key"), text(op, "value"))),
         "set_fixed_position" => json!(set_fixed_position(&journal, text(op, "context"), text(op, "key"), text(op, "value"), int(op, "position") as i32)),
         "clear_fixed_position" => json!(clear_fixed_position(&journal, text(op, "context"), text(op, "key"), text(op, "value"))),
@@ -363,7 +384,7 @@ fn run_op(op: &Value, dir: &Path) -> Value {
         }
         "replay" => {
             let result = replay(&journal, &main_db, &english_db);
-            json!([result.applied, result.skipped, result.failed, result.error])
+            json!([result.applied, result.skipped, result.failed, result.error, result.rebased])
         }
         "edit_personal_dictionary" => {
             let previous = personal_entry(&op["previous"]);

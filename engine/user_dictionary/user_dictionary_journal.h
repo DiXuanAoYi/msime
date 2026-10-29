@@ -22,6 +22,10 @@ void close_default_user_database();
 
 bool record_upsert(const std::string &user_db_path, DictionaryKind kind, const std::string &key,
                    const std::string &value, std::int64_t weight, const std::string &display = {});
+// 用户在设置页给词库里已有的词改了权重。和 record_upsert 一样写一条 upsert，但记下这是用户
+// 亲手定的值：出厂词库换过时回放照写这个权重，不像自动调频那样让位给新的出厂权重（见 replay）。
+bool record_weight_edit(const std::string &user_db_path, DictionaryKind kind, const std::string &key,
+                        const std::string &value, std::int64_t weight, const std::string &display = {});
 bool record_user_insert(const std::string &user_db_path, DictionaryKind kind, const std::string &key,
                         const std::string &value, std::int64_t weight, const std::string &display = {});
 bool record_delete(const std::string &user_db_path, DictionaryKind kind, const std::string &key,
@@ -102,6 +106,8 @@ struct ReplayResult
     int applied = 0;
     int skipped = 0;
     int failed = 0;
+    // 出厂词库换过时，日志里低于新出厂权重、因而保留新权重并改记进日志的自动调频行数。
+    int rebased = 0;
     std::string error;
 };
 

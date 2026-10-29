@@ -103,6 +103,7 @@ fn ensure_schema(db: &Connection) -> bool {
         weight INTEGER NOT NULL DEFAULT 0,\
         display TEXT NOT NULL DEFAULT '',\
         user_inserted INTEGER NOT NULL DEFAULT 0,\
+        weight_edited INTEGER NOT NULL DEFAULT 0,\
         updated_at INTEGER NOT NULL DEFAULT(unixepoch()),\
         PRIMARY KEY(dictionary,key,value));\
         CREATE TABLE IF NOT EXISTS personal_dictionary_receipts( request_id TEXT PRIMARY KEY, payload TEXT NOT NULL);\
@@ -120,11 +121,15 @@ fn ensure_schema(db: &Connection) -> bool {
         code TEXT PRIMARY KEY,slot INTEGER NOT NULL CHECK(slot>=0));\
         CREATE TABLE IF NOT EXISTS date_time_format_order(\
         category TEXT NOT NULL,format TEXT NOT NULL,position INTEGER NOT NULL CHECK(position>=0),\
-        PRIMARY KEY(category,format));";
+        PRIMARY KEY(category,format));\
+        CREATE TABLE IF NOT EXISTS dictionary_state(name TEXT PRIMARY KEY,value TEXT NOT NULL);";
     if !exec(db, sql) {
         return false;
     }
     if !has_column(db, "user_dictionary_operations", "user_inserted") && !exec(db, "ALTER TABLE user_dictionary_operations ADD COLUMN user_inserted INTEGER NOT NULL DEFAULT 0") {
+        return false;
+    }
+    if !has_column(db, "user_dictionary_operations", "weight_edited") && !exec(db, "ALTER TABLE user_dictionary_operations ADD COLUMN weight_edited INTEGER NOT NULL DEFAULT 0") {
         return false;
     }
     // 写 user_version 即使值相同也是一次写；已经是当前版本就跳过，打开连接就不会去等别的写者。
@@ -217,7 +222,7 @@ fn write_upsert_journal(journal: &Connection, kind: DictionaryKind, key: &str, v
         .execute(
             "INSERT INTO user_dictionary_operations(dictionary,key,value,operation,weight,display) VALUES(?1,?2,?3,'upsert',?4,?5)\
              ON CONFLICT(dictionary,key,value) DO UPDATE SET operation='upsert',weight=excluded.weight,\
-             display=excluded.display,updated_at=unixepoch()",
+             display=excluded.display,weight_edited=0,updated_at=unixepoch()",
             params![kind_name(kind), key, value, weight, display],
         )
         .is_ok()
@@ -333,6 +338,21 @@ fn apply_english(db: &Connection, key: &str, value: &str, operation: &str, weigh
 pub fn record_upsert(user_db_path: &str, kind: DictionaryKind, key: &str, value: &str, weight: i64, display: &str) -> bool {
     let Some(db) = UserDatabase::open(user_db_path) else { return false };
     write_upsert_journal(&db.db, kind, key, value, weight, display)
+}
+
+/// 用户在设置页给词库里已有的词改了权重。和 `record_upsert` 一样写一条 upsert，但记下这是用户亲手定的值：出厂词库换过时
+/// 回放照写这个权重，不像自动调频那样让位给新的出厂权重（见 `replay`）。
+pub fn record_weight_edit(user_db_path: &str, kind: DictionaryKind, key: &str, value: &str, weight: i64, display: &str) -> bool {
+    let Some(db) = UserDatabase::open(user_db_path) else { return false };
+    db.db
+        .execute(
+            "INSERT INTO user_dictionary_operations(dictionary,key,value,operation,weight,display,weight_edited)\
+             VALUES(?1,?2,?3,'upsert',?4,?5,1)\
+             ON CONFLICT(dictionary,key,value) DO UPDATE SET operation='upsert',weight=excluded.weight,\
+             display=excluded.display,weight_edited=1,updated_at=unixepoch()",
+            params![kind_name(kind), key, value, weight, display],
+        )
+        .is_ok()
 }
 
 pub fn record_user_insert(user_db_path: &str, kind: DictionaryKind, key: &str, value: &str, weight: i64, display: &str) -> bool {
@@ -1358,7 +1378,68 @@ pub struct ReplayResult {
     pub applied: i32,
     pub skipped: i32,
     pub failed: i32,
+    /// 出厂词库换过时，日志里低于新出厂权重、因而保留新权重并改记进日志的自动调频行数。
+    pub rebased: i32,
     pub error: String,
+}
+
+/// `dictionary_state` 里记「日志上次回放到的出厂词库」的那一行。
+const REPLAYED_DICTIONARY_STATE: &str = "replayed_dictionary_sha256";
+
+/// 出厂 msime.db 的身份：与它一起装进数据目录的 dictionary-manifest.json 记下的 SHA-256。msime.db 一经调频就不再等于
+/// 出厂字节，所以不能拿文件本身算；清单缺失或读不懂时返回空，回放按原样写回日志里的权重。
+fn shipped_dictionary_identity(main_db_path: &str) -> Option<String> {
+    let manifest_path = Path::new(main_db_path).parent()?.join("dictionary-manifest.json");
+    let text = std::fs::read(manifest_path).ok()?;
+    let manifest: serde_json::Value = serde_json::from_slice(&text).ok()?;
+    let sha256 = manifest.get("files")?.get("msime.db")?.get("sha256")?.as_str()?;
+    if sha256.is_empty() { None } else { Some(sha256.to_string()) }
+}
+
+fn replayed_dictionary_identity(journal: &Connection) -> Option<String> {
+    // 只读打开的旧日志可能还没有 dictionary_state 表，prepare 失败即视为没有记录。
+    journal.query_row("SELECT value FROM dictionary_state WHERE name=?1", params![REPLAYED_DICTIONARY_STATE], |row| row.get::<_, Option<String>>(0)).ok().flatten()
+}
+
+/// 回放开始前目标词库里这一行的权重，即新装出厂词库的权重；没有这一行时为空。
+fn shipped_weight(main_db: &Connection, kind: &str, key: &str, value: &str) -> Option<i64> {
+    let table = if kind == "wubi" { "wubi86".to_string() } else { pinyin_table(key) };
+    if table.is_empty() {
+        return None;
+    }
+    main_db.query_row(&format!("SELECT MAX(weight) FROM \"{table}\" WHERE key=?1 AND value=?2"), params![key, value], |row| row.get::<_, Option<i64>>(0)).ok().flatten()
+}
+
+/// 把改记到新词库上的调频写回日志，并记下这次回放到的词库。写不成只是下次回放再改记一遍，不影响已经提交的 msime.db，
+/// 所以不算回放失败。
+fn save_rebased_journal(user_db_path: &str, dictionary_identity: &str, rebased: &[(String, String, String, i64)]) -> bool {
+    let Some(user_db) = UserDatabase::open(user_db_path) else { return false };
+    if !exec(&user_db.db, "BEGIN IMMEDIATE") {
+        return false;
+    }
+    {
+        let Ok(mut update) = user_db.db.prepare(
+            "UPDATE user_dictionary_operations SET weight=?4 WHERE dictionary=?1 AND key=?2 AND value=?3 AND operation='upsert' AND user_inserted=0 AND weight_edited=0",
+        ) else {
+            return false;
+        };
+        for (kind, key, value, weight) in rebased {
+            if update.execute(params![kind, key, value, weight]).is_err() {
+                return false;
+            }
+        }
+    }
+    if user_db
+        .db
+        .execute(
+            "INSERT INTO dictionary_state(name,value) VALUES(?1,?2) ON CONFLICT(name) DO UPDATE SET value=excluded.value",
+            params![REPLAYED_DICTIONARY_STATE, dictionary_identity],
+        )
+        .is_err()
+    {
+        return false;
+    }
+    exec(&user_db.db, "COMMIT")
 }
 
 /// 把日志按 `updated_at, rowid` 的次序重放到（新的）词库上。全部成功才提交，否则整批回滚。
@@ -1385,7 +1466,19 @@ pub fn replay(user_db_path: &str, main_db_path: &str, english_db_path: &str) -> 
     }
     // 回放以只读方式打开日志，不做 schema 迁移；没有 user_inserted 列的旧日志里也不会有手动加的词。
     let learned_kana = if has_column(&journal, "user_dictionary_operations", "user_inserted") { format!("({LEARNED_KANA_PINYIN_CONDITION})") } else { "0".to_string() };
-    let Ok(mut rows) = journal.prepare(&format!("SELECT dictionary,key,value,operation,weight,display,{learned_kana} FROM user_dictionary_operations ORDER BY updated_at,rowid")) else {
+    // 旧日志没有 weight_edited 列，设置页改过的权重在那时与自动调频分不开，按自动调频对待。
+    let user_owned = format!(
+        "{}{}",
+        if has_column(&journal, "user_dictionary_operations", "user_inserted") { "user_inserted" } else { "0" },
+        if has_column(&journal, "user_dictionary_operations", "weight_edited") { " OR weight_edited" } else { "" }
+    );
+    // 日志记的是调频写下的绝对权重，按的是当时那份出厂词库的量级。出厂词库没变时原样写回；词库换过（或日志还没记过回放到
+    // 哪份词库）时，旧量级的权重会把新词库的词频压下去，这时自动调频的行只在高过新出厂权重时写回，其余保留新权重，并把
+    // 日志里的这一行改记成新权重，免得下次回放又写回旧值。用户手动加的词、在设置页亲手改的权重和删除照旧。
+    let dictionary_identity = shipped_dictionary_identity(main_db_path);
+    let rebase = dictionary_identity.is_some() && replayed_dictionary_identity(&journal) != dictionary_identity;
+    let mut rebased: Vec<(String, String, String, i64)> = Vec::new();
+    let Ok(mut rows) = journal.prepare(&format!("SELECT dictionary,key,value,operation,weight,display,{learned_kana},({user_owned}) FROM user_dictionary_operations ORDER BY updated_at,rowid")) else {
         result.error = "invalid user dictionary database".into();
         return result;
     };
@@ -1393,12 +1486,14 @@ pub fn replay(user_db_path: &str, main_db_path: &str, english_db_path: &str) -> 
         result.error = "cannot start replay transaction".into();
         return result;
     }
-    let read = rows.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, i64>(4)?, row.get::<_, String>(5)?, row.get::<_, i64>(6)? != 0))
-    });
-    let entries: Result<Vec<_>, _> = match read {
-        Ok(iter) => iter.collect(),
-        Err(e) => Err(e),
+    let entries: Result<Vec<_>, _> = {
+        let read = rows.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, i64>(4)?, row.get::<_, String>(5)?, row.get::<_, i64>(6)? != 0, row.get::<_, i64>(7)? != 0))
+        });
+        match read {
+            Ok(iter) => iter.collect(),
+            Err(e) => Err(e),
+        }
     };
     let Ok(entries) = entries else {
         result.error = if exec(&main_db, "ROLLBACK") {
@@ -1409,10 +1504,21 @@ pub fn replay(user_db_path: &str, main_db_path: &str, english_db_path: &str) -> 
         .into();
         return result;
     };
-    for (kind, key, value, operation, weight, display, learned_kana_pinyin) in entries {
+    for (kind, key, value, operation, weight, display, learned_kana_pinyin, user_owned_row) in entries {
         if (kind == "pinyin" && operation == "upsert" && weight < 1) || learned_kana_pinyin {
             result.skipped += 1;
             continue;
+        }
+        if rebase && operation == "upsert" && !user_owned_row && (kind == "pinyin" || kind == "wubi") {
+            if let Some(shipped) = shipped_weight(&main_db, &kind, &key, &value) {
+                if shipped >= weight {
+                    if shipped != weight {
+                        rebased.push((kind.clone(), key.clone(), value.clone(), shipped));
+                    }
+                    result.applied += 1;
+                    continue;
+                }
+            }
         }
         let ok = match kind.as_str() {
             "pinyin" => apply_pinyin(&main_db, &key, &value, &operation, weight),
@@ -1435,6 +1541,14 @@ pub fn replay(user_db_path: &str, main_db_path: &str, english_db_path: &str) -> 
                 "cannot commit or roll back replay transaction"
             }
             .into();
+        } else if rebase {
+            drop(rows);
+            drop(journal);
+            if let Some(identity) = &dictionary_identity {
+                if save_rebased_journal(user_db_path, identity, &rebased) {
+                    result.rebased = rebased.len() as i32;
+                }
+            }
         }
     } else {
         result.error = if exec(&main_db, "ROLLBACK") {
