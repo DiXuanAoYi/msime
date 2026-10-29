@@ -82,6 +82,18 @@ pub fn enable_write_ahead_log(db_path: &str) -> bool {
     open_database(db_path, read_write()).is_some_and(|db| use_write_ahead_log(&db))
 }
 
+/// 旧版日文模式的调频把罗马音当拼音键写进了拼音日志（#869），回放会把这些日文词插进拼音表。拼音的自动学习不会产生
+/// 带假名的词，带假名的非手动条目一律视为这类残留。SQLite 的 GLOB 字符类按码位比较 UTF-8：平假名、片假名、
+/// 片假名音标扩展、半角片假名。
+const LEARNED_KANA_PINYIN_CONDITION: &str = "dictionary='pinyin' AND operation='upsert' AND user_inserted=0 AND value GLOB '*[ぁ-ゖァ-ヺㇰ-ㇿｦ-ﾝ]*'";
+
+fn has_column(db: &Connection, table: &str, column: &str) -> bool {
+    let Ok(mut columns) = db.prepare(&format!("PRAGMA table_info(\"{table}\")")) else { return false };
+    let Ok(names) = columns.query_map([], |row| row.get::<_, String>(1)) else { return false };
+    let found = names.filter_map(Result::ok).any(|name| name == column);
+    found
+}
+
 fn ensure_schema(db: &Connection) -> bool {
     let sql = "CREATE TABLE IF NOT EXISTS user_dictionary_operations(\
         dictionary TEXT NOT NULL,\
@@ -112,13 +124,7 @@ fn ensure_schema(db: &Connection) -> bool {
     if !exec(db, sql) {
         return false;
     }
-    let Ok(mut columns) = db.prepare("PRAGMA table_info(user_dictionary_operations)") else { return false };
-    let names: Vec<String> = match columns.query_map([], |row| row.get::<_, String>(1)) {
-        Ok(rows) => rows.filter_map(Result::ok).collect(),
-        Err(_) => return false,
-    };
-    drop(columns);
-    if !names.iter().any(|n| n == "user_inserted") && !exec(db, "ALTER TABLE user_dictionary_operations ADD COLUMN user_inserted INTEGER NOT NULL DEFAULT 0") {
+    if !has_column(db, "user_dictionary_operations", "user_inserted") && !exec(db, "ALTER TABLE user_dictionary_operations ADD COLUMN user_inserted INTEGER NOT NULL DEFAULT 0") {
         return false;
     }
     // 写 user_version 即使值相同也是一次写；已经是当前版本就跳过，打开连接就不会去等别的写者。
@@ -156,6 +162,7 @@ pub fn ensure_user_database(user_db_path: &str) -> bool {
     let Some(db) = UserDatabase::open(user_db_path) else { return false };
     // 删掉旧阶梯重排留下的调频行，免得安装时重放把出厂词频压成负权重。
     let _ = db.db.execute_batch("DELETE FROM user_dictionary_operations WHERE dictionary='pinyin' AND operation='upsert' AND weight < 1");
+    let _ = db.db.execute_batch(&format!("DELETE FROM user_dictionary_operations WHERE {LEARNED_KANA_PINYIN_CONDITION}"));
     true
 }
 
@@ -222,8 +229,13 @@ fn update_pinyin_weight(main_db: &Connection, journal: &Connection, key: &str, v
     if table.is_empty() {
         return false;
     }
-    main_db.execute(&format!("UPDATE \"{table}\" SET weight=?1 WHERE key=?2 AND value=?3"), params![weight, key, value]).is_ok()
-        && write_upsert_journal(journal, DictionaryKind::Pinyin, key, value, weight, "")
+    let Ok(changes) = main_db.execute(&format!("UPDATE \"{table}\" SET weight=?1 WHERE key=?2 AND value=?3"), params![weight, key, value]) else { return false };
+    // 调频只改已有的行。没改到行时不能记日志：回放的 apply_pinyin 找不到行就插入，词库里本不存在的词（如日文候选，#869）
+    // 会在升级后凭空出现。
+    if changes == 0 {
+        return true;
+    }
+    write_upsert_journal(journal, DictionaryKind::Pinyin, key, value, weight, "")
 }
 
 fn update_wubi_weight(main_db: &Connection, journal: &Connection, key: &str, value: &str, weight: i64) -> bool {
@@ -1371,7 +1383,9 @@ pub fn replay(user_db_path: &str, main_db_path: &str, english_db_path: &str) -> 
         result.error = "cannot attach English dictionary database".into();
         return result;
     }
-    let Ok(mut rows) = journal.prepare("SELECT dictionary,key,value,operation,weight,display FROM user_dictionary_operations ORDER BY updated_at,rowid") else {
+    // 回放以只读方式打开日志，不做 schema 迁移；没有 user_inserted 列的旧日志里也不会有手动加的词。
+    let learned_kana = if has_column(&journal, "user_dictionary_operations", "user_inserted") { format!("({LEARNED_KANA_PINYIN_CONDITION})") } else { "0".to_string() };
+    let Ok(mut rows) = journal.prepare(&format!("SELECT dictionary,key,value,operation,weight,display,{learned_kana} FROM user_dictionary_operations ORDER BY updated_at,rowid")) else {
         result.error = "invalid user dictionary database".into();
         return result;
     };
@@ -1380,7 +1394,7 @@ pub fn replay(user_db_path: &str, main_db_path: &str, english_db_path: &str) -> 
         return result;
     }
     let read = rows.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, i64>(4)?, row.get::<_, String>(5)?))
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, i64>(4)?, row.get::<_, String>(5)?, row.get::<_, i64>(6)? != 0))
     });
     let entries: Result<Vec<_>, _> = match read {
         Ok(iter) => iter.collect(),
@@ -1395,8 +1409,8 @@ pub fn replay(user_db_path: &str, main_db_path: &str, english_db_path: &str) -> 
         .into();
         return result;
     };
-    for (kind, key, value, operation, weight, display) in entries {
-        if kind == "pinyin" && operation == "upsert" && weight < 1 {
+    for (kind, key, value, operation, weight, display, learned_kana_pinyin) in entries {
+        if (kind == "pinyin" && operation == "upsert" && weight < 1) || learned_kana_pinyin {
             result.skipped += 1;
             continue;
         }

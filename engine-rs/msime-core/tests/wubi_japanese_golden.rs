@@ -117,8 +117,8 @@ fn wubi_rows(items: &[wubi::Candidate]) -> Vec<Vec<Value>> {
 }
 
 fn japanese_rows(items: &[japanese::Candidate]) -> Vec<Vec<Value>> {
-    // 日语候选没有设 scheme，保持默认的 Quanpin（0）。
-    items.iter().map(|c| vec![json!(c.pinyin), json!(c.canonical_pinyin), json!(c.word), json!(c.weight), json!(c.source as i64), json!(0)]).collect()
+    // 日语候选标上自己的方案（JapaneseRomaji = 3），否则调频、置顶、造词会把罗马音当拼音键写进拼音日志（#869）。
+    items.iter().map(|c| vec![json!(c.pinyin), json!(c.canonical_pinyin), json!(c.word), json!(c.weight), json!(c.source as i64), json!(3)]).collect()
 }
 
 fn strings(value: &Value) -> Vec<String> {

@@ -93,7 +93,7 @@ impl<'a> ProviderRegistry<'a> {
             valid: request.valid,
         };
         let dynamic = self.japanese_dynamic.get(&request.raw_input).unwrap_or_default();
-        provider.query(&japanese_request, &dynamic).into_iter().map(|c| make_item(&c.pinyin, &c.canonical_pinyin, &c.word, c.weight, c.source, SchemeType::Quanpin)).collect()
+        provider.query(&japanese_request, &dynamic).into_iter().map(|c| make_item(&c.pinyin, &c.canonical_pinyin, &c.word, c.weight, c.source, SchemeType::JapaneseRomaji)).collect()
     }
 
     pub fn find_candidate(&self, scheme: SchemeType, key: &str, value: &str) -> Option<Item> {
@@ -101,7 +101,7 @@ impl<'a> ProviderRegistry<'a> {
             SchemeType::Quanpin | SchemeType::Shuangpin => self.pinyin.find_candidate(scheme, key, value),
             SchemeType::Wubi => None,
             SchemeType::JapaneseRomaji => {
-                self.japanese.as_ref()?.find_candidate(key, value).map(|c| make_item(&c.pinyin, &c.canonical_pinyin, &c.word, c.weight, c.source, SchemeType::Quanpin))
+                self.japanese.as_ref()?.find_candidate(key, value).map(|c| make_item(&c.pinyin, &c.canonical_pinyin, &c.word, c.weight, c.source, SchemeType::JapaneseRomaji))
             }
         }
     }
