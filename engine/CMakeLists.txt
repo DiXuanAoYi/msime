@@ -432,3 +432,7 @@ target_link_libraries(msime_neural_probe PRIVATE MetasequoiaIme::Engine)
 # Google 拼音解码器探针：真实的 PinyinDecoder::sentence 与运行库 qsort，当 Rust 实现的规格。
 add_executable(msime_google_pinyin_probe EXCLUDE_FROM_ALL tools/google_pinyin_probe.cpp)
 target_link_libraries(msime_google_pinyin_probe PRIVATE MetasequoiaIme::Engine)
+
+# C 接口探针：真实的 msime_capi 吃随机操作序列，每步导出返回值、上屏文字和快照 JSON。
+add_executable(msime_capi_probe EXCLUDE_FROM_ALL tools/capi_probe.cpp)
+target_link_libraries(msime_capi_probe PRIVATE MetasequoiaIme::Engine)

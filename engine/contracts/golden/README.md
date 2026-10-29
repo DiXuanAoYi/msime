@@ -34,6 +34,7 @@
 | `expected_punctuation.jsonl` | 中文标点翻译的规格：探针 `../../tools/punctuation_probe.cpp` 让真实的 `PunctuationPolicy` 吃 400 个随机字符序列，每个字符导出译文（不支持为 null）；不需要词库 |
 | `expected_input_session.jsonl` | 兼容会话 `InputSession` 的规格（约 19 MB）：探针 `../../tools/input_session_probe.cpp` 在固定词库与固定时钟下，把 700 个操作序列（前 400 个随机配置，后 300 个定向轮：学习、调频、辅助码、混输，偏向打词、选词、取消、云/AI 候选；字母、数字、标点、选词、光标、本地模式触发、固定位置）逐步喂给真实会话，导出每步的按键结果、预编辑、候选哈希、上屏与光标 |
 | `expected_session.jsonl` | 平台入口 `Session`（含九键）的规格（约 6.8 MB）：探针 `../../tools/session_probe.cpp` 在固定词库下把 420 个操作序列（前 300 个随机配置，后 120 个九键定向轮）逐步喂给真实 `Session`，导出每步的按键结果与快照；日期时间本地模式关掉 |
+| `expected_capi.jsonl` | C 接口的规格（约 370 KB）：探针 `../../tools/capi_probe.cpp` 通过 `capi/msime_capi.h` 驱动真实的 C++ 实现，200 个会话（四种方案各 50）的随机按键序列，每步导出返回值、上屏文字、快照 JSON 的长度与哈希 |
 | `expected_input_contracts.jsonl` | 输入形状契约的规格：探针 `../../tools/input_contracts_probe.cpp` 直接调 `contracts/date_time_input.h` 与 `contracts/direct_helpcode.h`，导出随机串 × 光标 × 字符的接受结果；不需要词库 |
 | `expected_candidate_queries.jsonl` | 候选查询的规格：探针 `../../tools/candidate_queries_probe.cpp` 让真实的 `CandidateQueries` 跑九种本地模式（固定时钟）和 1500 条英文/表情/颜文字混排，每条导出候选列表（条数、哈希、前 12 项）；要 `installer/app_data/` 下的 msime.db、others.db、english.db |
 | `expected_neural.jsonl` | 神经重排的规格：探针 `../../tools/neural_probe.cpp` 用真实 `neural::SentenceModel` / `rerank_order` 在随包 `sentence-model.safetensors` 上导出 `load`（整份、截断、改字节的成败，窗口长度、署名、许可、若干字符的 token id）、`next`（`next_log_probabilities` 前 5 名与分布和）、`score`（`score_sentences`，双精度 %.17g）、`rerank`（随机静态分、λ、路径上限、前文，导出次序）、`last`（`last_characters`）；要 `installer/app_data/sentence-model.safetensors` |
