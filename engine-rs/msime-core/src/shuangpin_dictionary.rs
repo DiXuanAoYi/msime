@@ -10,6 +10,7 @@
 //! - 按键状态机 `handleVkCode`、直接辅助码的 `resolve_direct_helpcode` 接线、`query_single_char_rows`；
 //! - 各种结果缓存（只影响速度；写库后 C++ 会清缓存，这里每次都重新查）。
 
+use crate::cache::{insert_dynamic_candidate, Cache};
 use crate::dict::{Dictionary, KeyedEntry, QuerySource};
 use crate::domain_dictionary::{self, DomainDictionary};
 use crate::gram::GrammarConfig;
@@ -27,6 +28,7 @@ use crate::shuangpin_query::{self, SyllableHelpcode};
 use crate::table::table_name;
 use crate::user_dictionary::{self, DictionaryKind};
 use rusqlite::{Connection, OpenFlags};
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -110,6 +112,18 @@ pub struct ShuangpinDictionary<'a> {
     fuzzy_rules: u32,
     syllable_helpcodes: Vec<SyllableHelpcode>,
     domain: DomainDictionary,
+    /// 整串结果缓存（C++ 的 `_cached_buffer_series`）和三个辅助码筛出来的缓存，容量各 128。
+    series_cache: RefCell<Cache<Vec<Item>>>,
+    single_helpcode_cache: RefCell<Cache<Vec<Item>>>,
+    single_helpcode_reversed_cache: RefCell<Cache<Vec<Item>>>,
+    double_helpcode_cache: RefCell<Cache<Vec<Item>>>,
+    /// 词库上一次见到的 `PRAGMA data_version`，别的连接改过库就清缓存。
+    data_version: Cell<i64>,
+}
+
+fn double_helpcode_cache_key(pinyin: &str, help_codes: &str) -> String {
+    // 同一串小写输入可以带正常或反向的辅助码。
+    format!("{pinyin}:{help_codes}")
 }
 
 fn remove_delimiters(segmented: &str) -> String {
@@ -153,6 +167,11 @@ impl<'a> ShuangpinDictionary<'a> {
             fuzzy_rules: 0,
             syllable_helpcodes: Vec::new(),
             domain: DomainDictionary::new(&db_path.with_file_name("domain-input.db")),
+            series_cache: RefCell::new(Cache::new(128)),
+            single_helpcode_cache: RefCell::new(Cache::new(128)),
+            single_helpcode_reversed_cache: RefCell::new(Cache::new(128)),
+            double_helpcode_cache: RefCell::new(Cache::new(128)),
+            data_version: Cell::new(-1),
         };
         dictionary.reopen();
         dictionary
@@ -165,7 +184,9 @@ impl<'a> ShuangpinDictionary<'a> {
     }
 
     pub fn set_enabled_domain_dictionaries(&mut self, csv: &str) {
-        self.domain.set_enabled(csv);
+        if self.domain.set_enabled(csv) {
+            self.reset_cache();
+        }
     }
 
     pub fn enabled_domain_dictionaries(&self) -> &str {
@@ -174,6 +195,38 @@ impl<'a> ShuangpinDictionary<'a> {
 
     fn reopen(&mut self) {
         self.dictionary = Dictionary::open(&self.db_path).ok();
+        self.reset_cache();
+    }
+
+    /// 清掉所有结果缓存（写库、换开关时）。
+    pub fn reset_cache(&self) {
+        self.series_cache.borrow_mut().clear();
+        self.single_helpcode_cache.borrow_mut().clear();
+        self.single_helpcode_reversed_cache.borrow_mut().clear();
+        self.double_helpcode_cache.borrow_mut().clear();
+    }
+
+    /// 只清含词格整句排序的缓存：辅助码的三个缓存是从整串结果里筛出来的，一起清。
+    pub fn reset_sentence_cache(&self) {
+        self.series_cache.borrow_mut().clear();
+        self.single_helpcode_cache.borrow_mut().clear();
+        self.single_helpcode_reversed_cache.borrow_mut().clear();
+        self.double_helpcode_cache.borrow_mut().clear();
+    }
+
+    /// 别的连接改过词库就清缓存。
+    fn reset_cache_if_database_changed(&self) {
+        let Some(dictionary) = &self.dictionary else { return };
+        let Ok(version) = dictionary.connection().query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0)) else { return };
+        if self.data_version.get() >= 0 && version != self.data_version.get() {
+            self.reset_cache();
+        }
+        self.data_version.set(version);
+    }
+
+    /// 句中辅助码约束改变整句来源的结果，签名必须进缓存键。
+    fn helpcodes_signature(&self) -> String {
+        shuangpin_query::syllable_helpcodes_signature(&self.syllable_helpcodes)
     }
 
     pub fn profile(&self) -> &'static Profile {
@@ -181,7 +234,12 @@ impl<'a> ShuangpinDictionary<'a> {
     }
 
     pub fn set_sentence_association(&mut self, association: SentenceAssociation) {
+        if self.association == association {
+            return;
+        }
         self.association = association;
+        // 开关变了就清缓存，否则打开/关闭要等缓存过期才见效。
+        self.reset_cache();
     }
 
     /// 接上整句来源的共享资源（全拼、双拼词库可以共用同一份）。
@@ -192,7 +250,18 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 上屏的前文；只有神经重排会读它。
     pub fn set_rescoring_context(&mut self, context: &str) {
+        if self.rescoring_context == context {
+            return;
+        }
         self.rescoring_context = context.to_string();
+        // 只有神经重排生效时上文才影响候选。
+        let rescoring_active = self.sources.as_deref().is_some_and(|sources| {
+            (self.association.neural_keyboard && sources.keyboard_model().is_some())
+                || (self.association.neural_desktop && sources.desktop_model(&self.association.neural_desktop_model).is_some())
+        });
+        if rescoring_active {
+            self.reset_sentence_cache();
+        }
     }
 
     /// 当前敲的双拼串（C++ 的 `_pinyin_sequence`）。
@@ -201,7 +270,11 @@ impl<'a> ShuangpinDictionary<'a> {
     }
 
     pub fn set_fuzzy_pinyin(&mut self, rules: u32) {
+        if self.fuzzy_rules == rules {
+            return;
+        }
         self.fuzzy_rules = rules;
+        self.reset_cache();
     }
 
     pub fn set_syllable_helpcodes(&mut self, helpcodes: Vec<SyllableHelpcode>) {
@@ -268,6 +341,11 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 单字母输入只取了 24 条时，把它们换成全部（并回原来的位置）。返回是否扩展了。
     pub fn expand_initial_candidates(&self, code: &str, candidates: &mut Vec<Item>) -> bool {
+        self.expand_initial_candidates_keyed(code, candidates, "")
+    }
+
+    /// 同上；`series_cache_key` 非空时把扩展后的列表写回整串结果缓存。
+    pub fn expand_initial_candidates_keyed(&self, code: &str, candidates: &mut Vec<Item>, series_cache_key: &str) -> bool {
         if code.len() != 1 {
             return false;
         }
@@ -293,6 +371,9 @@ impl<'a> ShuangpinDictionary<'a> {
             merged.push(candidate);
         }
         *candidates = merged;
+        if !series_cache_key.is_empty() {
+            self.series_cache.borrow_mut().insert(series_cache_key, candidates.clone());
+        }
         true
     }
 
@@ -352,6 +433,27 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 双拼串对应的所有候选：整串精确命中的词在前，再是各个前缀子串的词，最后并进词格整句。
     pub fn generate_series(&self, pinyin_sequence: &str, pinyin_segmentation: &str) -> Vec<Item> {
+        self.generate_series_keyed(pinyin_sequence, pinyin_segmentation, "")
+    }
+
+    /// 同上，缓存键用 `cache_key`（空则用输入串）；引擎层传带手动分隔符的原串。
+    pub fn generate_series_keyed(&self, pinyin_sequence: &str, pinyin_segmentation: &str, cache_key: &str) -> Vec<Item> {
+        if pinyin_sequence.len() < 2 {
+            return self.generate_series_uncached(pinyin_sequence, pinyin_segmentation);
+        }
+        let key = format!("{}{}", if cache_key.is_empty() { pinyin_sequence } else { cache_key }, self.helpcodes_signature());
+        if self.series_cache.borrow_mut().find(&key).is_some() {
+            self.reset_cache_if_database_changed();
+            if let Some(cached) = self.series_cache.borrow_mut().find(&key) {
+                return cached;
+            }
+        }
+        let candidates = self.generate_series_uncached(pinyin_sequence, pinyin_segmentation);
+        self.series_cache.borrow_mut().insert(&key, candidates.clone());
+        candidates
+    }
+
+    fn generate_series_uncached(&self, pinyin_sequence: &str, pinyin_segmentation: &str) -> Vec<Item> {
         let mut candidates: Vec<Item> = Vec::new();
         if pinyin_sequence.is_empty() {
             return candidates;
@@ -504,6 +606,24 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 辅助码筛选。`help_codes` 一位是单码（大写表示优先匹配末字），两位是双码。
     pub fn generate_with_helpcodes(&self, pure_pinyin: &str, pure_pinyin_segmentation: &str, pinyin_sequence: &str, help_codes: &str) -> Vec<Item> {
+        let reversed_single = help_codes.len() == 1 && help_codes.as_bytes()[0].is_ascii_uppercase();
+        let signature = self.helpcodes_signature();
+        let single_cache = if reversed_single { &self.single_helpcode_reversed_cache } else { &self.single_helpcode_cache };
+        let single_key = format!("{pinyin_sequence}{signature}");
+        let double_key = format!("{}{signature}", double_helpcode_cache_key(pinyin_sequence, help_codes));
+        let cache = match help_codes.len() {
+            1 => Some((single_cache, single_key.as_str())),
+            2 => Some((&self.double_helpcode_cache, double_key.as_str())),
+            _ => None,
+        };
+        if let Some((cache, key)) = cache {
+            if cache.borrow_mut().find(key).is_some() {
+                self.reset_cache_if_database_changed();
+                if let Some(cached) = cache.borrow_mut().find(key) {
+                    return cached;
+                }
+            }
+        }
         let candidates = self.generate_series(pure_pinyin, pure_pinyin_segmentation);
         let mut result = Vec::new();
         match help_codes.len() {
@@ -511,7 +631,47 @@ impl<'a> ShuangpinDictionary<'a> {
             2 => self.filter_with_double_helpcodes(&candidates, &mut result, help_codes),
             _ => {}
         }
+        if let Some((cache, key)) = cache {
+            cache.borrow_mut().insert(key, result.clone());
+        }
         result
+    }
+
+    /// 云/AI 候选插进整串结果缓存里这个双拼串对应的那份列表（键带上当前句中辅助码签名）。
+    pub fn insert_word_to_series_cache(&self, pinyin: &str, word: &str, source: Source) -> i32 {
+        if pinyin.is_empty() || word.is_empty() {
+            return -1;
+        }
+        let key = format!("{pinyin}{}", self.helpcodes_signature());
+        let mut cache = self.series_cache.borrow_mut();
+        let mut list = cache.get(&key).unwrap_or_default();
+        insert_dynamic_candidate(&mut list, pinyin, word, source, true);
+        cache.insert(&key, list);
+        0
+    }
+
+    /// 同上，插进辅助码筛出来的缓存：缓存里没有这一项就返回 -1，不新建。
+    pub fn insert_word_to_active_helpcode_cache(&self, pinyin: &str, word: &str, source: Source, double_helpcodes: &str) -> i32 {
+        let signature = self.helpcodes_signature();
+        let insert_into = |cache: &RefCell<Cache<Vec<Item>>>, key: &str| -> bool {
+            let mut cache = cache.borrow_mut();
+            let Some(mut list) = cache.get(key) else { return false };
+            insert_dynamic_candidate(&mut list, pinyin, word, source, false);
+            cache.insert(key, list);
+            true
+        };
+        if !double_helpcodes.is_empty() {
+            let key = format!("{}{signature}", double_helpcode_cache_key(pinyin, double_helpcodes));
+            return if insert_into(&self.double_helpcode_cache, &key) { 0 } else { -1 };
+        }
+        let key = format!("{pinyin}{signature}");
+        let updated_single = insert_into(&self.single_helpcode_cache, &key);
+        let updated_reversed = insert_into(&self.single_helpcode_reversed_cache, &key);
+        if updated_single || updated_reversed {
+            0
+        } else {
+            -1
+        }
     }
 
     fn satisfies_syllable_helpcodes(&self, word: &str) -> bool {

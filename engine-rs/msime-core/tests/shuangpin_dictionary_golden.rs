@@ -262,6 +262,7 @@ fn sentence_sources_match_cpp() {
         let helpcodes = constraints_of(&record["constraints"]);
         constrained += usize::from(!helpcodes.is_empty());
         dictionary.set_syllable_helpcodes(helpcodes);
+        dictionary.reset_cache();
         sources.worker.clear();
         let (seq, seg) = (record["seq"].as_str().unwrap(), record["seg"].as_str().unwrap());
         let label = format!("{name} seq={seq:?} seg={seg:?} fuzzy={} constraints={} context={} {record}", record["fuzzy"], record["constraints"], record["context"]);
@@ -271,8 +272,10 @@ fn sentence_sources_match_cpp() {
         // 一次查询可能排了不止一批：算完就重查，直到结果不再变。
         let second = loop {
             wait_for_worker(&sources);
+            dictionary.reset_cache();
             let again = dictionary.generate_series(seq, seg);
             wait_for_worker(&sources);
+            dictionary.reset_cache();
             let settled = dictionary.generate_series(seq, seg);
             if list_json(&settled) == list_json(&again) {
                 break settled;
