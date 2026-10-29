@@ -28,6 +28,8 @@
 | `expected_domain_dictionary.jsonl` | 领域词库的规格：探针 `../../tools/domain_dictionary_probe.cpp` 在随包 `domain-input.db` 上用真实 `domain_dictionary::Dictionary` 导出 `ids`、`normalize`（启用串归一）、`enable`（切换启用集合）、`query`、`exact`、`lattice`、`merge`，条数、哈希、前 8 项含输入域；要 `installer/app_data/domain-input.db` |
 | `expected_dictionary_state.jsonl` | 词库状态暂存与运行时目录的规格：探针 `../../tools/dictionary_state_probe.cpp` 用真实 `stage_dictionary_state` / `prepare_runtime_paths` 导出两类记录——`stage`（随机记录流，含越界/重复/超限等坏记录，新目录/已存在/落在资源目录里，合法与非法的内容 ID；记成败、目录是否留下、暂存出的日志与词库转储哈希、再导出的状态哈希）、`prepare`（新建、重复、日志里多了改动、根目录重叠、缺文件的旧代、已有 `.incoming`、非法 ID；记每次调用的成败和结果哈希）；初始库是 `user_dictionary_initial_main.db` / `user_dictionary_initial_english.db` |
 | `expected_google_pinyin.jsonl` | Google 拼音解码器的规格：探针 `../../tools/google_pinyin_probe.cpp` 用真实 `MatrixSearch` 导出——`qsort` 平局次序、拼写解析、整句解码（含句中辅助码约束）、一次打一个键的增量打字；要 `installer/app_data/dict_pinyin.dat` |
+| `expected_scheme.jsonl` | 输入方案的规格：探针 `../../tools/scheme_probe.cpp` 让真实的四个方案类吃随机按键序列，每步导出 `QueryRequest` 全部字段和预编辑；不需要词库 |
+| `expected_pinyin_provider.jsonl` | 拼音候选提供者的规格：探针 `../../tools/pinyin_provider_probe.cpp` 用真实 `PinyinCandidateProvider` 吃方案生成的请求，记首次查询、插入云/AI 候选后的再次查询、单字母展开；要 `installer/app_data/`（`msime.db`、`sc.lm`、`helpcodes/`） |
 | `expected_neural.jsonl` | 神经重排的规格：探针 `../../tools/neural_probe.cpp` 用真实 `neural::SentenceModel` / `rerank_order` 在随包 `sentence-model.safetensors` 上导出 `load`（整份、截断、改字节的成败，窗口长度、署名、许可、若干字符的 token id）、`next`（`next_log_probabilities` 前 5 名与分布和）、`score`（`score_sentences`，双精度 %.17g）、`rerank`（随机静态分、λ、路径上限、前文，导出次序）、`last`（`last_characters`）；要 `installer/app_data/sentence-model.safetensors` |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 

@@ -184,10 +184,15 @@ fn matched_letters(item: &Item) -> usize {
 
 /// 把模糊候选归并进精确候选，对应 C++ `quanpin::merge_fuzzy_candidates`（与 `fuzzy::merge_fuzzy_candidates` 同一规则，
 /// 只是操作整条候选）。
-fn merge_fuzzy_items(exact: Vec<Item>, mut fuzzy_items: Vec<Item>) -> Vec<Item> {
+fn merge_fuzzy_items(exact: Vec<Item>, fuzzy_items: Vec<Item>) -> Vec<Item> {
+    merge_fuzzy_items_by(exact, fuzzy_items, matched_letters)
+}
+
+/// 同上，`group` 是候选覆盖的输入长度（大的在前）；双拼引擎按读音串的字节数分组。
+pub(crate) fn merge_fuzzy_items_by(exact: Vec<Item>, mut fuzzy_items: Vec<Item>, group: impl Fn(&Item) -> usize) -> Vec<Item> {
     let mut seen: HashSet<String> = exact.iter().map(|c| c.word.clone()).collect();
     fuzzy_items.retain(|c| seen.insert(c.word.clone()));
-    fuzzy_items.sort_by(|a, b| matched_letters(b).cmp(&matched_letters(a)).then(b.weight.cmp(&a.weight)));
+    fuzzy_items.sort_by(|a, b| group(b).cmp(&group(a)).then(b.weight.cmp(&a.weight)));
     let ranked_by_weight = |c: &Item| !c.fuzzy && is_dictionary_row(c);
     let mut merged = Vec::with_capacity(exact.len() + fuzzy_items.len());
     let (mut exact, mut fuzzy_items) = (exact.into_iter().peekable(), fuzzy_items.into_iter().peekable());
@@ -197,7 +202,7 @@ fn merge_fuzzy_items(exact: Vec<Item>, mut fuzzy_items: Vec<Item>) -> Vec<Item> 
             (None, Some(_)) => true,
             (Some(_), None) => false,
             (Some(e), Some(f)) if ranked_by_weight(e) => {
-                let (ge, gf) = (matched_letters(e), matched_letters(f));
+                let (ge, gf) = (group(e), group(f));
                 if ge != gf {
                     gf > ge
                 } else {

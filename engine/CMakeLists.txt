@@ -217,6 +217,10 @@ target_link_libraries(msime_shuangpin_query_probe PRIVATE MetasequoiaIme::Engine
 add_executable(msime_scheme_probe EXCLUDE_FROM_ALL tools/scheme_probe.cpp)
 target_link_libraries(msime_scheme_probe PRIVATE MetasequoiaIme::Engine)
 
+# 拼音候选提供者探针：真实的 PinyinCandidateProvider 吃方案生成的请求，覆盖引擎层的辅助码、模糊音、动态候选缓存。
+add_executable(msime_pinyin_provider_probe EXCLUDE_FROM_ALL tools/pinyin_provider_probe.cpp)
+target_link_libraries(msime_pinyin_provider_probe PRIVATE MetasequoiaIme::Engine)
+
 # 词格词库查询探针：真实的 make_lattice_db_lookup 在随包 msime.db 上查跨度（拼写归一、模糊变体、扣分、排序截断）。
 add_executable(msime_lattice_lookup_probe EXCLUDE_FROM_ALL tools/lattice_lookup_probe.cpp)
 target_link_libraries(msime_lattice_lookup_probe PRIVATE MetasequoiaIme::Engine)
