@@ -277,8 +277,8 @@ void cut_cases(std::ostream &out)
             }
             return json + "]";
         };
-        out << "{\"kind\":\"cut\",\"id\":" << id++ << ",\"input\":" << quote(input) << ",\"greedy\":" << paths_json(quanpin::cut_pinyin_by_mode(input, "greedy"))
-            << ",\"correction\":" << paths_json(quanpin::cut_pinyin_by_mode(input, "correction")) << ",\"complete\":" << (quanpin::is_complete_pinyin_input(input) ? "true" : "false")
+        out << "{\"kind\":\"cut\",\"id\":" << id++ << ",\"input\":" << quote(input) << ",\"greedy\":" << paths_json(quanpin::cut_pinyin_by_mode(input, "greedy", true))
+            << ",\"correction\":" << paths_json(quanpin::cut_pinyin_by_mode(input, "correction", true)) << ",\"complete\":" << (quanpin::is_complete_pinyin_input(input) ? "true" : "false")
             << ",\"jianpin\":" << quote(quanpin::segments_to_jianpin(quanpin::split_segments(input))) << "}\n";
     }
 }

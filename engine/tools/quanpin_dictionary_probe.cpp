@@ -338,7 +338,7 @@ void read_cases(std::ostream &out, const fs::path &resources)
         std::string prefer;
         if (rng.below(7) == 0)
         {
-            const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction");
+            const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction", true);
             if (!cuts.empty())
             {
                 prefer = quanpin::join_segments(cuts.front());
@@ -356,7 +356,7 @@ void read_cases(std::ostream &out, const fs::path &resources)
 
         if (fuzzy != 0)
         {
-            const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction");
+            const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction", true);
             const std::string typed = input.segmentation.empty() ? (cuts.empty() ? std::string() : quanpin::join_segments(cuts.front())) : input.segmentation;
             out << head << ",\"op\":\"fuzzy\",\"typed\":" << quote(typed) << ",\"ret\":" << list_json(dictionary.fuzzy_candidates(typed, metasequoia::FuzzyPinyinOptions{fuzzy})) << "}\n";
         }
@@ -417,7 +417,7 @@ void read_cases(std::ostream &out, const fs::path &resources)
         std::string prefer;
         if (rng.below(8) == 0)
         {
-            const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction");
+            const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction", true);
             if (!cuts.empty())
             {
                 prefer = quanpin::join_segments(cuts.front());
@@ -475,7 +475,7 @@ void read_cases(std::ostream &out, const fs::path &resources)
                 << "}\n";
             if (fuzzy != 0)
             {
-                const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction");
+                const auto cuts = quanpin::cut_pinyin_by_mode(input.raw, "correction", true);
                 const std::string typed = input.segmentation.empty() ? (cuts.empty() ? std::string() : quanpin::join_segments(cuts.front())) : input.segmentation;
                 out << head << ",\"op\":\"fuzzy\",\"typed\":" << quote(typed) << ",\"ret\":" << list_json(dictionary.fuzzy_candidates(typed, metasequoia::FuzzyPinyinOptions{fuzzy})) << "}\n";
             }
@@ -488,6 +488,57 @@ void read_cases(std::ostream &out, const fs::path &resources)
         }
         dictionary.set_enabled_domain_dictionaries("");
         std::cerr << "领域读场景非空 " << domain_nonempty << "，带输入域的候选 " << domain_tagged << "\n";
+    }
+    // ---- 长句容错读场景：多个词库键拼成的长串，若干音节缩成声母（句中简拼），其余音节再来一两处手误 × 纠错掩码 ----
+    {
+        const std::vector<unsigned> fault_masks = {0xf, 0xf, 0xe, 0xd, 0x4, 0xc, 0x6, 0x2, 0x1, 0x9};
+        int fault_nonempty = 0;
+        for (int scenario = 0; scenario < 400; ++scenario)
+        {
+            std::vector<std::string> syllables;
+            const std::uint32_t pieces = 2 + rng.below(3);
+            for (std::uint32_t i = 0; i < pieces; ++i)
+            {
+                for (auto &syllable : quanpin::split_segments(rng.pick(keys)))
+                    syllables.push_back(syllable);
+            }
+            if (syllables.size() < 5 || syllables.size() > 14)
+                continue;
+            const std::uint32_t initials = 2 + rng.below(2);
+            for (std::uint32_t i = 0; i < initials; ++i)
+            {
+                auto &syllable = syllables[rng.below(static_cast<std::uint32_t>(syllables.size()))];
+                syllable.resize(1);
+            }
+            std::string raw;
+            for (const auto &syllable : syllables)
+                raw += syllable;
+            const std::uint32_t damages = rng.below(3);
+            for (std::uint32_t d = 0; d < damages && raw.size() > 4; ++d)
+            {
+                const std::uint32_t at = 1 + rng.below(static_cast<std::uint32_t>(raw.size() - 2));
+                switch (rng.below(3))
+                {
+                case 0: raw.erase(at, 1); break;
+                case 1: std::swap(raw[at], raw[at + 1]); break;
+                default: raw.insert(at, 1, static_cast<char>('a' + rng.below(26))); break;
+                }
+            }
+            const unsigned autocorrect = rng.pick(fault_masks);
+            SentenceAssociationOptions options;
+            options.word_lattice = rng.below(5) != 0;
+            options.show_next_on_duplicate = false;
+            dictionary.set_sentence_association(options);
+            dictionary.reset_cache();
+            const std::string head = "{\"kind\":\"read\",\"case\":" + std::to_string(cases++) + ",\"raw\":" + quote(raw) + ",\"seg\":\"\",\"assoc\":" + std::to_string(options.word_lattice ? 1 : 0) +
+                                     ",\"fuzzy\":0,\"prefer\":\"\",\"ac\":" + std::to_string(autocorrect) + ",\"fault\":1";
+            const auto result = dictionary.query(raw, "", autocorrect, metasequoia::FuzzyPinyinOptions{0});
+            nonempty += !result.empty();
+            fault_nonempty += !result.empty();
+            out << head << ",\"op\":\"query\",\"ret\":" << list_json(result) << ",\"seqs\":" << quote(dictionary.get_pinyin_sequence()) << ",\"segmentation\":" << quote(dictionary.get_pinyin_segmentation())
+                << ",\"fault_display\":" << quote(dictionary.fault_segmentation_with_cases()) << "}\n";
+        }
+        std::cerr << "长句容错读场景非空 " << fault_nonempty << "\n";
     }
     std::cerr << "读场景 " << cases << " 个，非空 " << nonempty << "\n";
 }

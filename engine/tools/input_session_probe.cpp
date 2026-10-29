@@ -209,17 +209,20 @@ int main(int argc, char **argv)
 
     int sequences = 0, steps = 0, with_composition = 0, committed = 0, local_steps = 0, caret_steps = 0, online_applied = 0;
     const SchemeType schemes[] = {SchemeType::Quanpin, SchemeType::Shuangpin, SchemeType::Wubi, SchemeType::JapaneseRomaji};
-    const int rounds = 700;
+    const int rounds = 760;
     for (int round = 0; round < rounds; ++round)
     {
         Lcg &r = rng;
         // 400 轮之后是定向轮：配置偏向学习、调频、辅助码、混输，操作偏向打词、选词、取消、在线候选，专打随机轮碰不到的分支。
         const bool directed = round >= 400;
-        const SchemeType start = schemes[round % 4];
+        // 700 轮之后是长句容错轮：全拼 + 全开纠错，打一串带句中简拼与手误的长句，专打容错仲裁的预编辑与选词消耗。
+        const bool fault_round = round >= 700;
+        const SchemeType start = fault_round ? SchemeType::Quanpin : schemes[round % 4];
         const fs::path user = work / "user";
         fs::remove_all(user);
         fs::create_directories(user);
-        const unsigned autocorrect = r.below(3) == 0 ? 3u : 0u;
+        const unsigned autocorrect_draw = r.below(3) == 0 ? 3u : 0u;
+        const unsigned autocorrect = fault_round ? (round % 3 == 0 ? 0xdu : 0xfu) : autocorrect_draw;
         const bool chinese_punctuation = r.below(7) != 0;
         const bool learning_draw = r.below(5) != 0;
         const bool learning = learning_draw || directed;
@@ -323,6 +326,14 @@ int main(int argc, char **argv)
                 out << ",";
             std::uint32_t pick = r.below(100);
             bool stale = false, force_cancel = false;
+            if (fault_round && i == 0)
+            {
+                static const char *fault_words[] = {"wozhidaonizaiwaimianduolmangr", "zhegeshurufahenhaoyongwomenyiqichifanb", "jintiantianqihenhaowomenyiqidjiaoxue",
+                                                    "shuishanshurfayonghuneicjiaoltiyangqun", "womenyiqikanwdianyingbazhenhaokan", "xianzaizhengzaikaihuiwoyihuirlaizhaoni",
+                                                    "tamendoushixuexiaodelaosg", "zhonguorenmindaxuedexueshengmenhenxihuandsh", "woaichizhongguocaidanshizhelichafagnbudui",
+                                                    "nihaozhongguoshijiedelaotianyekanbudaon"};
+                pending = fault_words[round % (sizeof(fault_words) / sizeof(fault_words[0]))];
+            }
             if (directed)
             {
                 static const char *words[] = {"nihao", "woshi", "zhongguo", "shurufa", "woaini", "jintiantianqihenhao", "womenyiqichifan", "woxihuanzhongguoderenmin", "niHao", "woAi", "hello", "world", "gggg", "wqvb", "trnt", "ydhy", "kuai", "xiexie", "womenjintianqichifanba", "zhegeshurufahenhaoyong"};
