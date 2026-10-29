@@ -30,6 +30,7 @@ pub mod msvc_sort;
 pub mod neural;
 pub mod mid_sentence;
 pub mod pinyin_provider;
+pub mod provider;
 pub mod ranking;
 pub mod request;
 pub mod romaji;

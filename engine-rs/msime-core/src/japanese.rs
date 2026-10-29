@@ -644,6 +644,17 @@ impl Provider {
         rows.filter_map(Result::ok).collect()
     }
 
+    /// 词库里这个键下这个词的行（权重取自词库）。
+    pub fn find_candidate(&self, key: &str, value: &str) -> Option<Candidate> {
+        self.lexicon_rows(key, key).into_iter().find(|(_, candidate, _)| candidate == value).map(|(code, candidate, weight)| Candidate {
+            pinyin: code.clone(),
+            canonical_pinyin: code,
+            word: candidate,
+            weight,
+            source: Source::Database,
+        })
+    }
+
     /// `dynamic` 是 C++ 提供者按 `raw_input` 取到的云候选缓存（没有就传空）。
     pub fn query(&self, request: &Request, dynamic: &[Candidate]) -> Vec<Candidate> {
         if !request.valid {
