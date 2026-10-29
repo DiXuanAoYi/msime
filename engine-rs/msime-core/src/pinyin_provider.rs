@@ -105,6 +105,12 @@ impl<'a> PinyinProvider<'a> {
         self
     }
 
+    /// 辅助码表：全拼的末尾辅助码和双拼的辅助码都读它。
+    pub fn set_helpcode_keymap(&mut self, keymap: Keymap) {
+        self.shuangpin.set_helpcode_keymap(keymap.clone());
+        self.keymap = keymap;
+    }
+
     pub fn query(&mut self, request: &QueryRequest) -> Vec<Item> {
         if !request.valid {
             return Vec::new();

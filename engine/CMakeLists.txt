@@ -221,6 +221,10 @@ target_link_libraries(msime_scheme_probe PRIVATE MetasequoiaIme::Engine)
 add_executable(msime_pinyin_provider_probe EXCLUDE_FROM_ALL tools/pinyin_provider_probe.cpp)
 target_link_libraries(msime_pinyin_provider_probe PRIVATE MetasequoiaIme::Engine)
 
+# 输入会话探针：真实的 ImeSession 吃随机操作序列（按键、整串替换、动态候选、方案切换、前缀查询），每步导出状态。
+add_executable(msime_ime_session_probe EXCLUDE_FROM_ALL tools/ime_session_probe.cpp)
+target_link_libraries(msime_ime_session_probe PRIVATE MetasequoiaIme::Engine)
+
 # 词格词库查询探针：真实的 make_lattice_db_lookup 在随包 msime.db 上查跨度（拼写归一、模糊变体、扣分、排序截断）。
 add_executable(msime_lattice_lookup_probe EXCLUDE_FROM_ALL tools/lattice_lookup_probe.cpp)
 target_link_libraries(msime_lattice_lookup_probe PRIVATE MetasequoiaIme::Engine)

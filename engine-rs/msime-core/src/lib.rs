@@ -20,6 +20,7 @@ pub mod english;
 pub mod fuzzy;
 pub mod gram;
 pub mod google_pinyin;
+pub mod ime_session;
 pub mod helpcode;
 pub mod japanese;
 pub mod kenlm;

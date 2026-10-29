@@ -345,6 +345,8 @@ pub struct QuanpinDictionary<'a> {
     fuzzy_rules: u32,
     /// 整串结果缓存（C++ 的 `series_cache_`，容量 128），键见 `series_cache_key` 与 `SeriesQueryResolution::cache_key`。
     series_cache: RefCell<Cache<Vec<Item>>>,
+    /// 逐路径的结果缓存（C++ 的 `cache_`，容量 128）：单字母展开会把展开后的列表写进来，之后含这个声母的前缀都读到展开版。
+    path_cache: RefCell<Cache<Vec<Item>>>,
     /// 词库上一次见到的 `PRAGMA data_version`，别的连接改过库就清缓存。
     data_version: Cell<i64>,
     pinyin_sequence: String,
@@ -367,6 +369,7 @@ impl<'a> QuanpinDictionary<'a> {
             rescoring_context: String::new(),
             fuzzy_rules: 0,
             series_cache: RefCell::new(Cache::new(128)),
+            path_cache: RefCell::new(Cache::new(128)),
             data_version: Cell::new(-1),
             pinyin_sequence: String::new(),
             pinyin_segmentation: String::new(),
@@ -400,6 +403,7 @@ impl<'a> QuanpinDictionary<'a> {
 
     /// 清掉所有结果缓存（写库、换开关时）。
     pub fn reset_cache(&self) {
+        self.path_cache.borrow_mut().clear();
         self.series_cache.borrow_mut().clear();
     }
 
@@ -783,7 +787,7 @@ impl<'a> QuanpinDictionary<'a> {
             let partial_input = remove_delimiters(&partial_segmentation);
             // 整句联想只对完整输入出一句：前缀只取词库里真有的词，查不到就交给更短的前缀。
             if count < segments.len() {
-                result.extend(self.query_database(partial_segments, &partial_segmentation));
+                result.extend(self.query_prefix_path(&partial_input, &partial_segmentation, partial_segments));
             } else {
                 result.extend(self.query_single_path(&partial_input, &partial_segmentation, partial_segments));
             }
@@ -862,8 +866,27 @@ impl<'a> QuanpinDictionary<'a> {
 
     /// 查库，词库一行都没有时补一条 Google 兜底整句（随“Google 整句联想”开关一起关闭）。
     fn query_single_path(&self, raw_input: &str, segmentation: &str, segments: &[String]) -> Vec<Item> {
+        let cache_key = if segmentation.is_empty() { raw_input } else { segmentation };
+        if let Some(cached) = self.path_cache.borrow_mut().find(cache_key) {
+            return cached;
+        }
         let result = self.query_database(segments, segmentation);
-        self.append_ime_fallback(raw_input, segmentation, result)
+        let result = self.append_ime_fallback(raw_input, segmentation, result);
+        self.path_cache.borrow_mut().insert(cache_key, result.clone());
+        result
+    }
+
+    /// 前缀只取词库里真有的词；查到才写缓存（兜底整句只在词库查不到时才补，所以这正是 `query_single_path` 会写入的值）。
+    fn query_prefix_path(&self, raw_input: &str, segmentation: &str, segments: &[String]) -> Vec<Item> {
+        let cache_key = if segmentation.is_empty() { raw_input } else { segmentation };
+        if let Some(cached) = self.path_cache.borrow_mut().find(cache_key) {
+            return cached;
+        }
+        let result = self.query_database(segments, segmentation);
+        if !result.is_empty() {
+            self.path_cache.borrow_mut().insert(cache_key, result.clone());
+        }
+        result
     }
 
     fn append_ime_fallback(&self, raw_input: &str, segmentation: &str, mut result: Vec<Item>) -> Vec<Item> {
@@ -927,6 +950,7 @@ impl<'a> QuanpinDictionary<'a> {
             merged.push(candidate);
         }
         *candidates = merged;
+        self.path_cache.borrow_mut().insert(code, expanded);
         self.series_cache.borrow_mut().insert(&series_cache_key(&self.pinyin_sequence, &self.pinyin_segmentation), candidates.clone());
         true
     }
