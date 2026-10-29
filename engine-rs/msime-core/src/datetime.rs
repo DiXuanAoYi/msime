@@ -17,6 +17,63 @@ pub struct DateTime {
     pub second: u32,
 }
 
+/// C 的 `struct tm`。unix 上 glibc 和 macOS 在九个 int 之后都多两个字段。
+#[repr(C)]
+struct Tm {
+    tm_sec: i32,
+    tm_min: i32,
+    tm_hour: i32,
+    tm_mday: i32,
+    tm_mon: i32,
+    tm_year: i32,
+    tm_wday: i32,
+    tm_yday: i32,
+    tm_isdst: i32,
+    #[cfg(unix)]
+    tm_gmtoff: i64,
+    #[cfg(unix)]
+    tm_zone: *const std::ffi::c_char,
+}
+
+#[cfg(windows)]
+extern "C" {
+    fn _localtime64_s(result: *mut Tm, time: *const i64) -> i32;
+}
+
+#[cfg(unix)]
+extern "C" {
+    fn localtime_r(time: *const i64, result: *mut Tm) -> *mut Tm;
+}
+
+/// 系统本地时间，对应 C++ 的 `current_local_date_time`；取不到就返回全零，和 C++ 一样。
+pub fn current_local_date_time() -> DateTime {
+    let Ok(elapsed) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) else { return DateTime::default() };
+    let seconds = elapsed.as_secs() as i64;
+    // SAFETY: `Tm` 与平台的 `struct tm` 布局一致；两个函数只写 `local`。
+    let local = unsafe {
+        let mut local: Tm = std::mem::zeroed();
+        #[cfg(windows)]
+        let failed = _localtime64_s(&mut local, &seconds) != 0;
+        #[cfg(unix)]
+        let failed = localtime_r(&seconds, &mut local).is_null();
+        #[cfg(not(any(windows, unix)))]
+        let failed = true;
+        if failed {
+            return DateTime::default();
+        }
+        local
+    };
+    DateTime {
+        year: (local.tm_year + 1900) as u32,
+        month: (local.tm_mon + 1) as u32,
+        day: local.tm_mday as u32,
+        weekday: local.tm_wday as u32,
+        hour: local.tm_hour as u32,
+        minute: local.tm_min as u32,
+        second: local.tm_sec as u32,
+    }
+}
+
 // ---------- 输入形状 ----------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -536,4 +593,15 @@ pub fn is_date_time_menu_item(item: &Item) -> bool {
 
 pub fn date_time_menu_keyword(item: &Item) -> String {
     if is_date_time_menu_item(item) { item.pinyin[MENU_PREFIX.len()..].to_string() } else { String::new() }
+}
+
+#[cfg(test)]
+mod local_clock_tests {
+    use super::current_local_date_time;
+
+    #[test]
+    fn local_clock_is_plausible() {
+        let now = current_local_date_time();
+        assert!(now.year >= 2024 && (1..=12).contains(&now.month) && (1..=31).contains(&now.day) && now.weekday < 7 && now.hour < 24 && now.minute < 60 && now.second < 62);
+    }
 }

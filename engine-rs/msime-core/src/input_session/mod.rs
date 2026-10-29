@@ -7,7 +7,7 @@
 //!
 //! 和 C++ 不同的几处：
 //! - 辅助码方案按名字找文件（`set_helpcode_schema`）由宿主做，这里直接收码表（`set_helpcode_keymap`）；
-//! - 没给时钟时 C++ 读系统本地时间，这里退回 UTC（宿主应当用 `set_local_date_time_provider` 给本地时间）；
+//! - 没给时钟时读系统本地时间，同 C++；宿主也可以用 `set_local_date_time_provider` 给时钟；
 //! - 构造时由调用方建好 `ImeSession`（词库路径、日志路径、语言模型都在那里）。
 
 mod candidates;
@@ -274,32 +274,6 @@ pub struct InputSession<'a> {
     online_requests: OnlineRequestGuard,
     /// 整句落库用的另一份全拼词库连接（C++ 的 `canonical_phrase_engine_`）：第一次用到才开，写库不动查询引擎的缓存。
     canonical_phrase_engine: Option<QuanpinDictionary<'a>>,
-}
-
-/// 协调线程：没人给时钟时退到 UTC（C++ 读系统本地时间，时区要宿主给）。
-fn utc_now() -> DateTime {
-    let seconds = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let days = (seconds / 86_400) as i64;
-    let second_of_day = seconds % 86_400;
-    // civil_from_days（Howard Hinnant）。
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let day_of_era = z.rem_euclid(146_097);
-    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_index = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
-    let month = if month_index < 10 { month_index + 3 } else { month_index - 9 };
-    let year = year_of_era + era * 400 + i64::from(month <= 2);
-    DateTime {
-        year: year as u32,
-        month: month as u32,
-        day: day as u32,
-        weekday: ((days + 4).rem_euclid(7)) as u32,
-        hour: (second_of_day / 3_600) as u32,
-        minute: (second_of_day % 3_600 / 60) as u32,
-        second: (second_of_day % 60) as u32,
-    }
 }
 
 impl<'a> InputSession<'a> {

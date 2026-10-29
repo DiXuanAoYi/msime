@@ -298,7 +298,7 @@ impl<'a> InputSession<'a> {
         let provider = &self.local_date_time_provider;
         let clock = || match provider {
             Some(provider) => provider(),
-            None => super::utc_now(),
+            None => crate::datetime::current_local_date_time(),
         };
         let result = self.candidate_queries.local(self.local_input_mode, &self.local_preedit, scheme, &clock, self.engine.candidates());
         let mut candidates = result.candidates;
