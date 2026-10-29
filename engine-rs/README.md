@@ -50,7 +50,7 @@
 
 ## 前端
 
-- `fcitx5/`：Linux fcitx5 引擎插件，经 C 接口调用 `msime-capi`。核心（快照解析、按键映射、会话封装）不依赖 fcitx5，在 WSL 里对真实 capi 通过测试；插件目标能编译，还没在真实 fcitx5 会话里验证。见 [fcitx5/README.md](fcitx5/README.md)。
+- `fcitx5/`：Linux fcitx5 引擎插件，经 C 接口调用 `msime-capi`。核心（快照解析、按键映射、会话封装）不依赖 fcitx5，在 WSL 里对真实 capi 通过测试；插件在真实 fcitx5 `Instance` 里（testfrontend）通过集成测试，桌面会话里的手动试用还没做。见 [fcitx5/README.md](fcitx5/README.md)。
 
 ## 还在 C++ 里的块（按建议顺序）
 

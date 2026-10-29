@@ -8,6 +8,7 @@
 #include <fcitx/text.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 
 namespace msime
@@ -63,9 +64,14 @@ void MsimeEngine::ensureDriver()
     if (driver_)
         return;
     Options options;
-    options.resourcesDir = *config_.resourcesDir;
-    options.userDataDir = subdirectory(fcitx::StandardPath::Type::Data);
-    options.cacheDir = subdirectory(fcitx::StandardPath::Type::Cache);
+    // 环境变量优先于配置：便携安装和自动测试用（测试环境里 fcitx5 的用户目录是故意不可写的）。
+    const auto fromEnvironment = [](const char *name, const std::string &fallback) {
+        const char *value = std::getenv(name);
+        return value && *value ? std::string(value) : fallback;
+    };
+    options.resourcesDir = fromEnvironment("MSIME_RESOURCES_DIR", *config_.resourcesDir);
+    options.userDataDir = fromEnvironment("MSIME_USER_DATA_DIR", subdirectory(fcitx::StandardPath::Type::Data));
+    options.cacheDir = fromEnvironment("MSIME_CACHE_DIR", subdirectory(fcitx::StandardPath::Type::Cache));
     options.scheme = *config_.scheme;
     options.helpcode = *config_.helpcode;
     options.learning = *config_.learning;

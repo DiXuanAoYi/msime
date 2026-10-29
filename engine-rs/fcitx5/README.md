@@ -31,4 +31,7 @@ MSIME_APP_DATA=<资源目录> ctest --test-dir build/fcitx5 --output-on-failure
 
 ## 状态
 
-核心与插件骨架已写；核心在 WSL 里对真实 capi 通过测试。插件目标需要 fcitx5 开发包（`libfcitx5core-dev`、`fcitx5-modules-dev`），尚未在真实 fcitx5 会话里手动验证，候选窗外观、状态栏图标、中英文切换都还没做。
+- 核心（快照解析、按键映射、会话封装）在 WSL 里对真实 capi 通过测试。
+- 插件在真实的 fcitx5 `Instance` 里通过集成测试（`tests/engine_test.cpp`，用 fcitx5 自带的 testfrontend 加载 `libmsime.so`、敲 `nihao`、空格上屏第一个候选、Backspace/Esc、Ctrl 组合放行）。需要 `libfcitx5core-dev`、`fcitx5-modules-dev`，资源目录同样取 `MSIME_APP_DATA`。
+- 引擎读取 `MSIME_RESOURCES_DIR`、`MSIME_USER_DATA_DIR`、`MSIME_CACHE_DIR`（优先于配置），便携安装和自动测试用。
+- 还没做：真实桌面会话里的手动试用、候选窗外观（走 fcitx5 的经典界面）、状态栏图标、中英文切换、设置页。
