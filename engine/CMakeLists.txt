@@ -225,6 +225,10 @@ target_link_libraries(msime_pinyin_provider_probe PRIVATE MetasequoiaIme::Engine
 add_executable(msime_punctuation_probe EXCLUDE_FROM_ALL tools/punctuation_probe.cpp)
 target_link_libraries(msime_punctuation_probe PRIVATE MetasequoiaIme::Engine)
 
+# 候选查询探针：真实的 CandidateQueries 跑九种本地模式和英文/表情/颜文字混排，每条导出候选列表。
+add_executable(msime_candidate_queries_probe EXCLUDE_FROM_ALL tools/candidate_queries_probe.cpp)
+target_link_libraries(msime_candidate_queries_probe PRIVATE MetasequoiaIme::Engine)
+
 # 输入会话探针：真实的 ImeSession 吃随机操作序列（按键、整串替换、动态候选、方案切换、前缀查询），每步导出状态。
 add_executable(msime_ime_session_probe EXCLUDE_FROM_ALL tools/ime_session_probe.cpp)
 target_link_libraries(msime_ime_session_probe PRIVATE MetasequoiaIme::Engine)

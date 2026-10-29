@@ -32,6 +32,7 @@
 | `expected_pinyin_provider.jsonl` | 拼音候选提供者的规格：探针 `../../tools/pinyin_provider_probe.cpp` 用真实 `PinyinCandidateProvider` 吃方案生成的请求，记首次查询、插入云/AI 候选后的再次查询、单字母展开；要 `installer/app_data/`（`msime.db`、`sc.lm`、`helpcodes/`） |
 | `expected_ime_session.jsonl` | 输入会话的规格：探针 `../../tools/ime_session_probe.cpp` 让真实的 `ImeSession` 吃随机操作序列（按键、整串替换、重置、清缓存、动态候选、单字母展开、方案切换、前缀查询），每步导出预编辑、请求主要字段、候选列表（后 240 个序列打开双拼直接辅助码）；要 `installer/app_data/`（词库、`sc.lm`、辅助码表、`dict_japanese.dat`） |
 | `expected_punctuation.jsonl` | 中文标点翻译的规格：探针 `../../tools/punctuation_probe.cpp` 让真实的 `PunctuationPolicy` 吃 400 个随机字符序列，每个字符导出译文（不支持为 null）；不需要词库 |
+| `expected_candidate_queries.jsonl` | 候选查询的规格：探针 `../../tools/candidate_queries_probe.cpp` 让真实的 `CandidateQueries` 跑九种本地模式（固定时钟）和 1500 条英文/表情/颜文字混排，每条导出候选列表（条数、哈希、前 12 项）；要 `installer/app_data/` 下的 msime.db、others.db、english.db |
 | `expected_neural.jsonl` | 神经重排的规格：探针 `../../tools/neural_probe.cpp` 用真实 `neural::SentenceModel` / `rerank_order` 在随包 `sentence-model.safetensors` 上导出 `load`（整份、截断、改字节的成败，窗口长度、署名、许可、若干字符的 token id）、`next`（`next_log_probabilities` 前 5 名与分布和）、`score`（`score_sentences`，双精度 %.17g）、`rerank`（随机静态分、λ、路径上限、前文，导出次序）、`last`（`last_characters`）；要 `installer/app_data/sentence-model.safetensors` |
 | `expected_helpshuang.jsonl` | 双拼方案表、解码、分段与六套辅助码表的取码和匹配，探针是 `../../tools/helpshuang_probe.cpp` |
 

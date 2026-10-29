@@ -11,6 +11,7 @@
 
 pub mod autocorrect;
 pub mod cache;
+pub mod candidate_queries;
 pub mod datetime;
 pub mod direct_lattice;
 pub mod direct_resolver;
