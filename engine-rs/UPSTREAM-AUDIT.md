@@ -61,4 +61,4 @@ U 模式部件反查（`d414268`）、S 模式符号输入（`3cd429b`）、五�
 | `89a2bea`、`f71ac56` | **新摘**：C++ 与 Rust 同改（`quanpin_dictionary`：字面整词要求匹配码覆盖完整输入；单字母输入不提升字面整词，打 `e` 首位不再是「饿」） |
 | `d912a92` | **新摘**，只改 C++（Rust 没有 `get_lpis`） |
 
-基线：capi、ime_session、pinyin_provider、input_session、session 五份按新 C++ 重导；`expected_quanpin_dictionary.jsonl` 只覆盖受影响的 9 行。该探针的 `sources` 记录（整句来源，含 Google/词格/神经）在今天重导时与旧基线有 61 行差异，而改动前的 C++ 同样产生这些差异，所以它们不是这次摘取引起的；Rust 仍与旧值一致。这块的来源未查明，疑似环境相关（神经重排超时），待单独追查，在此之前不要整份重导这个基线。
+基线：capi、ime_session、pinyin_provider、input_session、session 五份按新 C++ 重导；`expected_quanpin_dictionary.jsonl` 只覆盖受影响的 9 行。全拼/双拼词库探针的 `sources` 记录（整句来源）曾在重导时与旧基线差 61 行，原因已查明：探针从**输出文件所在目录**取合成语法模型 `synthetic.gram`，我把输出写到了临时目录，万象来源静默失效。输出写进 `engine/contracts/golden/` 重跑，与基线逐字节一致；因此 `expected_quanpin_dictionary.jsonl` 现在就是一次完整的正确重导（受这次摘取影响的是 9 行）。两个词库探针现在缺 `synthetic.gram` 会直接退出，README 也写了。

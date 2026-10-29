@@ -33,6 +33,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -758,6 +759,12 @@ void source_cases(std::ostream &out, const fs::path &resources, const fs::path &
     const std::vector<unsigned> masks = {0xf, 0xf, 0x1, 0x2, 0x4, 0x8, 0x5, 0xb};
     const std::string keyboard_model = metasequoia::path_to_utf8(paths.resource(metasequoia::assets::neural_model_keyboard));
     const std::string gram_path = metasequoia::path_to_utf8(golden / "synthetic.gram");
+    // 合成语法模型取自输出文件所在目录；输出写到别处时万象来源静默失效、整份 sources 记录漂移，所以缺了就停。
+    if (!fs::exists(golden / "synthetic.gram"))
+    {
+        std::cerr << "找不到 " << (golden / "synthetic.gram").string() << "：输出文件要写在 engine/contracts/golden/ 里\n";
+        std::exit(2);
+    }
 
     QuanpinDictionary dictionary((resources / "msime.db").string(), paths);
     auto &worker = neural::RescoreWorker::instance();
