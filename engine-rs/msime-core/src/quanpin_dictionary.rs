@@ -277,20 +277,32 @@ fn resolve_series_query(raw_input: &str, segments: &[String], autocorrect_types:
             populate_from_cuts(&mut result, &cuts, "");
         } else {
             // 纠正加简拼尾：k-best 只在每一段都是完整音节时才走到末尾，hauzh（hau 手误 + zh 简拼）会整体失败。
-            // 去掉末尾不完整音节再试一遍，最短的尾巴先试。邻键纠正不进头部（误报面最大），结构性手误才敢与简拼尾组合。
-            let head_types = autocorrect_types & !autocorrect::NEIGHBOR;
+            // 去掉末尾不完整音节再试一遍，最短的尾巴先试。head 用完整掩码（静态邻键进来：shabgz -> shang'z）。
+            // 邻键位同时带着生成式远键，这些读法不组合：head 最优切分带 has_generated 时拒（k-best 静态优先，等价于
+            // 没有静态读法能解释 head，挡 huanzg -> huang'g）。
+            // 自洽明文读法优先：只要有一条「合法简拼尾 + 形如简拼的 head」的切分（tail_len 1..2），输入本身就有一个不靠
+            // 猜测的明文读法，整个组合纠错让位（xish -> xia'h、xibd -> xin'd、huanzh -> huang'h 都因此不改写）。
+            let mut composable_tails: Vec<usize> = Vec::new();
             for tail_len in 1..=2 {
-                if head_types == 0 || tail_len >= raw_input.len() {
+                if tail_len >= raw_input.len() {
                     break;
                 }
-                let tail = &raw_input[raw_input.len() - tail_len..];
                 // 简拼尾是不完整音节：合法的拼音前缀、自己又不是完整音节（zh、z、h）。
+                let tail = &raw_input[raw_input.len() - tail_len..];
                 if !is_prefix(tail) || is_intact(tail) {
                     continue;
                 }
+                if looks_like_jianpin_spelling(&raw_input[..raw_input.len() - tail_len]) {
+                    composable_tails.clear();
+                    break;
+                }
+                composable_tails.push(tail_len);
+            }
+            for tail_len in composable_tails {
+                let tail = &raw_input[raw_input.len() - tail_len..];
                 let head = &raw_input[..raw_input.len() - tail_len];
-                let head_cuts = autocorrect::autocorrect_cut_kbest(head, head_types, AUTOCORRECT_CUT_KBEST);
-                if head_cuts.is_empty() {
+                let head_cuts = autocorrect::autocorrect_cut_kbest(head, autocorrect_types, AUTOCORRECT_CUT_KBEST);
+                if head_cuts.is_empty() || head_cuts[0].has_generated {
                     continue;
                 }
                 result.corrected_input = true;
