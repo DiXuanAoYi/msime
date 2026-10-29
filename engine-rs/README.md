@@ -52,7 +52,7 @@
 
 1. 会话层：已全部移植。`handleVkCode` 两个词库级按键状态机只有单元测试在用（生产路径走 `ImeSession` 的按键），不搬；`pinyin_decoder` 是 Google 解码器的进程级单例外壳，Rust 的解码器按实例持有，不需要
 2. 用户词库里没搬的一处：按默认路径缓存连接（只是性能手段，Rust 每次打开新连接）。`stage_dictionary_state` 和 `prepare_runtime_paths` 已移植
-3. 五笔和日语里调用用户词库的接线（用户词库本身已移植）；辅助码在候选窗里的实际接线
+3. 五笔和日语里调用用户词库的接线、辅助码在候选窗里的实际接线：已由提供者登记处和兼容会话接上，由 `input_session_golden`、`session_golden` 的五笔、日语序列对过
 4. 本地模式：`local_database.cpp` 的共享连接缓存（只是性能手段，Rust 每次查询开一个只读连接）
 
 ### 纠错
@@ -67,7 +67,7 @@
 
 ### 五笔与日语里没有对过、或要留意的部分
 
-- 没移植：云候选缓存本身（`JapaneseCandidateProvider::dynamic_candidates_`，一个 128 项的环形缓冲，Rust 的 `Provider::query` 只接受调用方传入的那一份）、五笔的调频/删词/造词（写用户词库的事务）、日语词库的 `short_prefix_index_` 缓存（Rust 每次直接扫描，结果相同，只是慢一点）；
+- 没移植：日语词库的 `short_prefix_index_` 缓存（Rust 每次直接扫描，结果相同，只是慢一点）；云候选缓存（`japanese_dynamic`，128 项）和五笔的调频/删词/造词已接在提供者登记处，由会话级基线对过；
 - **平局次序是实现定义的，Rust 照着 MSVC 的算法写**：句子解码和矩阵搜索用 `std::partial_sort` 截断，同代价的路径谁在前由堆算法决定。随机基线里真的撞上了（"いえが言えをします" 和 "言えがいえをします" 同为 18053），用稳定排序会排反，所以 `partial_sort_by_cost` 把 MSVC 的堆操作原样搬了过来，并用基线核对；换一个标准库实现，C++ 这一侧的次序可能不同。`std::sort` 在 ≤32 个元素时是插入排序（稳定），这里每处都在这个范围里，用稳定排序；
 - 同理，`HiraganaToRomaji` 里同一个假名有几种等长写法时（じ → ji/zi，ぇ → xe/le，ちゃ → cha/cya/tya……）C++ 取哪个取决于 `unordered_map` 的遍历次序，量到的结果（じ→zi、ふ→fu、ちゃ→cya 但 ちょ→cho……）固定在 `romaji.rs` 的 `TIE_CHOICE` 里，并由基线逐项核对。这个函数只用来做显示/提示，没有候选排序依赖它；
 - 日语搜索回退路径的疑似缺陷见下。
