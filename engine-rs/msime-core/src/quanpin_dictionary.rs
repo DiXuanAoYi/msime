@@ -349,6 +349,8 @@ pub struct QuanpinDictionary<'a> {
     path_cache: RefCell<Cache<Vec<Item>>>,
     /// 词库上一次见到的 `PRAGMA data_version`，别的连接改过库就清缓存。
     data_version: Cell<i64>,
+    /// 自己写库之前，别的连接已经改过词库；下一次缓存命中要清缓存。
+    external_changes: Cell<bool>,
     pinyin_sequence: String,
     pinyin_segmentation: String,
     /// 纠错的备选读法（同档与贵档），给纠错标记用。
@@ -371,6 +373,7 @@ impl<'a> QuanpinDictionary<'a> {
             series_cache: RefCell::new(Cache::new(128)),
             path_cache: RefCell::new(Cache::new(128)),
             data_version: Cell::new(-1),
+            external_changes: Cell::new(false),
             pinyin_sequence: String::new(),
             pinyin_segmentation: String::new(),
             pinyin_alternative_segmentations: Vec::new(),
@@ -416,12 +419,33 @@ impl<'a> QuanpinDictionary<'a> {
 
     /// 别的连接（设置页、另一个进程）改过词库就清缓存。
     fn reset_cache_if_database_changed(&self) {
-        let Some(dictionary) = &self.dictionary else { return };
-        let Ok(version) = dictionary.connection().query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0)) else { return };
-        if self.data_version.get() >= 0 && version != self.data_version.get() {
+        let Some(version) = self.current_data_version() else { return };
+        let pending = self.external_changes.replace(false);
+        if pending || (self.data_version.get() >= 0 && version != self.data_version.get()) {
             self.reset_cache();
         }
         self.data_version.set(version);
+    }
+
+    fn current_data_version(&self) -> Option<i64> {
+        let dictionary = self.dictionary.as_ref()?;
+        dictionary.connection().query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0)).ok()
+    }
+
+    /// 自己的写走另开的写连接，读连接会看到版本号变化；C++ 在自己的连接上写，不会。
+    /// 写之前别的连接已经改过的先记成待清，写完再把版本号对齐，把自己这一次吸收掉。
+    fn note_external_changes(&self) {
+        if let Some(version) = self.current_data_version() {
+            if self.data_version.get() >= 0 && version != self.data_version.get() {
+                self.external_changes.set(true);
+            }
+        }
+    }
+
+    fn absorb_own_write(&self) {
+        if let Some(version) = self.current_data_version() {
+            self.data_version.set(version);
+        }
     }
 
     pub fn set_sentence_association(&mut self, association: SentenceAssociation) {
@@ -1316,8 +1340,12 @@ impl<'a> QuanpinDictionary<'a> {
         if sql.is_empty() {
             return ERROR_CODE;
         }
+        self.note_external_changes();
         let Some(connection) = self.writable() else { return ERROR_CODE };
-        if connection.execute(sql, []).is_err() {
+        let written = connection.execute(sql, []).is_ok();
+        drop(connection);
+        self.absorb_own_write();
+        if !written {
             return ERROR_CODE;
         }
         OK
@@ -1337,7 +1365,7 @@ impl<'a> QuanpinDictionary<'a> {
             return ERROR_CODE;
         }
         let _ = user_dictionary::record_user_insert(&self.journal_path, DictionaryKind::Pinyin, pinyin, word, 10000, "");
-        self.reopen();
+        self.reset_cache();
         OK
     }
 
@@ -1415,7 +1443,7 @@ impl<'a> QuanpinDictionary<'a> {
             return ERROR_CODE;
         }
         let _ = user_dictionary::record_pinyin_upsert_from_database(&self.db_path.to_string_lossy(), &normalized, word, &self.journal_path);
-        self.reopen();
+        self.reset_cache();
         OK
     }
 
@@ -1427,7 +1455,7 @@ impl<'a> QuanpinDictionary<'a> {
         if !user_dictionary::delete_dictionary_candidate(&self.db_path.to_string_lossy(), &self.journal_path, DictionaryKind::Pinyin, &normalized, word) {
             return ERROR_CODE;
         }
-        self.reopen();
+        self.reset_cache();
         OK
     }
 }

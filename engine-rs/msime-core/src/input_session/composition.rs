@@ -4,6 +4,7 @@ use super::{CloudQueryState, CreatingWordProgress, InputSession, LocalInputMode,
 use crate::autocorrect::{self, Cut};
 use crate::helpcode;
 use crate::lattice::Item;
+use crate::quanpin_dictionary::{QuanpinDictionary, ERROR_CODE};
 use crate::quanpin_query::{self, join_segments, split_segments};
 use crate::quanpin_utils;
 use crate::request::{QueryRequest, SchemeType};
@@ -559,7 +560,11 @@ impl<'a> InputSession<'a> {
 
     pub fn store_user_phrase_from_canonical_pinyin(&mut self, pinyin: &str, word: &str) -> i32 {
         // 全拼和双拼最终共用同一份全拼词库：完整的全拼键不能再过一遍当前的双拼方案。
-        self.engine.registry_mut().pinyin.create_word_from_canonical_pinyin(pinyin, word)
+        if self.canonical_phrase_engine.is_none() {
+            let engine = QuanpinDictionary::open(std::path::Path::new(&self.main_dictionary_path()), &self.journal_path(), None);
+            self.canonical_phrase_engine = Some(engine);
+        }
+        self.canonical_phrase_engine.as_mut().map_or(ERROR_CODE, |engine| engine.create_word_from_canonical_pinyin(pinyin, word))
     }
 
     /// 混输组合里五笔与拼音候选共存，删除必须由调用方指明候选自己的方案，不能按会话方案。

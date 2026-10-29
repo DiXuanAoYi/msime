@@ -209,31 +209,38 @@ int main(int argc, char **argv)
 
     int sequences = 0, steps = 0, with_composition = 0, committed = 0, local_steps = 0, caret_steps = 0, online_applied = 0;
     const SchemeType schemes[] = {SchemeType::Quanpin, SchemeType::Shuangpin, SchemeType::Wubi, SchemeType::JapaneseRomaji};
-    const int rounds = 400;
+    const int rounds = 700;
     for (int round = 0; round < rounds; ++round)
     {
         Lcg &r = rng;
+        // 400 轮之后是定向轮：配置偏向学习、调频、辅助码、混输，操作偏向打词、选词、取消、在线候选，专打随机轮碰不到的分支。
+        const bool directed = round >= 400;
         const SchemeType start = schemes[round % 4];
         const fs::path user = work / "user";
         fs::remove_all(user);
         fs::create_directories(user);
         const unsigned autocorrect = r.below(3) == 0 ? 3u : 0u;
         const bool chinese_punctuation = r.below(7) != 0;
-        const bool learning = r.below(5) != 0;
+        const bool learning_draw = r.below(5) != 0;
+        const bool learning = learning_draw || directed;
         const RuntimePaths paths{resources, user, work / "cache", dictionaries};
         InputSession session(start, autocorrect, true, chinese_punctuation, learning, paths);
         session.set_helpcode_schema("xiaohe");
 
-        const bool shuangpin_helpcode = r.below(2) == 0;
-        const bool mid = r.below(2) == 0;
-        const bool upper = r.below(2) == 0;
-        const bool quanpin_helpcode = r.below(2) == 0;
+        const bool shuangpin_helpcode_draw = r.below(2) == 0;
+        const bool mid_draw = r.below(2) == 0;
+        const bool upper_draw = r.below(2) == 0;
+        const bool quanpin_helpcode_draw = r.below(2) == 0;
+        const bool shuangpin_helpcode = shuangpin_helpcode_draw || directed;
+        const bool mid = mid_draw || directed;
+        const bool upper = upper_draw || directed;
+        const bool quanpin_helpcode = quanpin_helpcode_draw || directed;
         const bool direct = start == SchemeType::Shuangpin && r.below(3) == 0;
         const bool slash = r.below(3) != 0;
         const bool uppercase_marker = r.below(2) == 0;
         const std::uint32_t fuzzy = r.below(5) == 0 ? r.below(1u << 11) : 0;
         metasequoia::WubiInputOptions wubi;
-        wubi.mixed_pinyin = r.below(2) == 0;
+        wubi.mixed_pinyin = r.below(2) == 0 || directed;
         wubi.z_wildcard = r.below(2) == 0;
         SentenceAssociationOptions association;
         association.word_lattice = r.below(3) != 0;
@@ -263,6 +270,12 @@ int main(int argc, char **argv)
             local.temporary_english = r.below(5) != 0;
             local.temporary_japanese = r.below(5) != 0;
         }
+        if (directed)
+        {
+            local.quick_phrase = true;
+            local.quick_phrase_candidates = true;
+            local.quick_phrase_frequency = true;
+        }
         session.set_local_mode_options(local);
         EnglishInputOptions english;
         english.mixed_candidates = r.below(3) == 0;
@@ -272,13 +285,19 @@ int main(int argc, char **argv)
         expressive.emoji_candidates = r.below(4) == 0;
         expressive.kaomoji_candidates = r.below(4) == 0;
         session.set_mixed_expressive_options(expressive);
-        const bool configured = r.below(5) < 3;
+        const bool configured_draw = r.below(5) < 3;
+        const bool configured = configured_draw || directed;
         FrequencyAdjustmentOptions frequency;
         if (configured)
         {
             frequency.mode = static_cast<FrequencyAdjustmentMode>(r.below(5));
             frequency.trigger_count = 1 + static_cast<int>(r.below(3));
             frequency.linear_step = 1 + static_cast<int>(r.below(3));
+            if (directed)
+            {
+                frequency.mode = static_cast<FrequencyAdjustmentMode>(1 + round % 4);
+                frequency.trigger_count = 1;
+            }
             session.set_frequency_adjustment(frequency);
         }
         const bool fixed = r.below(5) < 2;
@@ -296,25 +315,84 @@ int main(int argc, char **argv)
             << "],\"freq\":" << (configured ? "[" + std::to_string(static_cast<int>(frequency.mode)) + "," + std::to_string(frequency.trigger_count) + "," + std::to_string(frequency.linear_step) + "]" : "null")
             << ",\"fixed\":" << fixed << ",\"init\":" << state_json(session) << ",\"ops\":[";
 
-        const std::uint32_t length = 6 + r.below(26);
+        const std::uint32_t length = directed ? 30 + r.below(40) : 6 + r.below(26);
+        std::string pending;
         for (std::uint32_t i = 0; i < length; ++i)
         {
             if (i)
                 out << ",";
-            const std::uint32_t pick = r.below(100);
+            std::uint32_t pick = r.below(100);
+            bool stale = false, force_cancel = false;
+            if (directed)
+            {
+                static const char *words[] = {"nihao", "woshi", "zhongguo", "shurufa", "woaini", "jintiantianqihenhao", "womenyiqichifan", "woxihuanzhongguoderenmin", "niHao", "woAi", "hello", "world", "gggg", "wqvb", "trnt", "ydhy", "kuai", "xiexie", "womenjintianqichifanba", "zhegeshurufahenhaoyong"};
+                if (pending.empty())
+                {
+                    const std::uint32_t category = r.below(100);
+                    if (category < 38)
+                    {
+                        pending = words[r.below(sizeof(words) / sizeof(words[0]))];
+                        pick = 0;
+                    }
+                    else if (category < 56)
+                        pick = 62;
+                    else if (category < 62)
+                        pick = 55;
+                    else if (category < 66)
+                        pick = 44;
+                    else if (category < 70)
+                        pick = 92;
+                    else if (category < 76)
+                        stale = true;
+                    else if (category < 80)
+                        pick = 95;
+                    else if (category < 83)
+                        pick = 73;
+                    else if (category < 86)
+                        pick = 67;
+                    else if (category < 94)
+                    {
+                        pick = 44;
+                        force_cancel = true;
+                    }
+                }
+                else
+                    pick = 0;
+            }
             std::string result = "null";
             const std::size_t count = session.candidates().size();
-            const std::size_t index = count == 0 ? 0 : (r.below(5) == 0 ? r.below(static_cast<std::uint32_t>(count + 2)) : r.below(std::min<std::uint32_t>(static_cast<std::uint32_t>(count), 6)));
-            if (pick < 40)
+            std::size_t index = count == 0 ? 0 : (r.below(5) == 0 ? r.below(static_cast<std::uint32_t>(count + 2)) : r.below(std::min<std::uint32_t>(static_cast<std::uint32_t>(count), 6)));
+            if (directed && count > 0 && r.below(2) == 0)
+                index = 0;
+            if (stale)
+            {
+                // 同一串打字取消后重打，查询的各字段都相同，只有代际变了：旧查询不许再应用。
+                const std::string sequence = session.get_pinyin_sequence();
+                const auto query = session.online_query();
+                session.handle_command(Command::Cancel);
+                for (const char typed : sequence)
+                    session.handle_character(typed, false);
+                const bool applied = query && session.apply_online_candidate(*query, "云9", CandidateSource::CloudSuggestion);
+                result = applied ? "1" : "0";
+                out << "{\"op\":\"stale_online\",\"s\":" << quote(sequence) << ",\"q\":" << online_json(query);
+            }
+            else if (pick < 40)
             {
                 bool shift_only = false;
-                const char c = random_character(r, shift_only, !session.has_composition());
+                char c;
+                if (!pending.empty())
+                {
+                    c = pending.front();
+                    pending.erase(0, 1);
+                }
+                else
+                    c = random_character(r, shift_only, !session.has_composition());
                 result = key_result_json(session.handle_character(c, shift_only));
                 out << "{\"op\":\"char\",\"c\":" << static_cast<int>(c) << ",\"shift\":" << shift_only;
             }
             else if (pick < 52)
             {
-                const auto command = static_cast<Command>(r.below(9));
+                const auto command = force_cancel ? Command::Cancel : static_cast<Command>(r.below(9));
                 result = key_result_json(session.handle_command(command));
                 out << "{\"op\":\"command\",\"c\":" << static_cast<int>(command);
             }

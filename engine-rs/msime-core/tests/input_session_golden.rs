@@ -303,6 +303,16 @@ fn session_matches_cpp() {
                     online_applied += usize::from(applied);
                     result = json!(u32::from(applied));
                 }
+                "stale_online" => {
+                    let query = session.online_query();
+                    assert_eq!(online_json(&query), step["q"], "在线查询 {op} 第 {index} 步");
+                    session.handle_command(Command::Cancel);
+                    for typed in step["s"].as_str().unwrap().chars() {
+                        session.handle_character(typed, false);
+                    }
+                    let applied = query.as_ref().is_some_and(|query| session.apply_online_candidate(query, "云9", Source::CloudSuggestion));
+                    result = json!(u32::from(applied));
+                }
                 "cache_dynamic" => {
                     let source = if flag(step, "cloud") { Source::CloudSuggestion } else { Source::AiSuggestion };
                     let pinyin = session.get_pinyin_sequence().to_string();
@@ -350,7 +360,7 @@ C++ 状态 {}", state_value(&session)["candidates"], step["state"]["candidates"]
     }
     let _ = fs::remove_dir_all(&work);
     eprintln!("会话：{sequences} 个序列 {steps} 步，有组合 {with_composition}，本地模式 {local_steps}，有上屏 {committed}，光标 {caret_steps}，在线候选 {online_applied}");
-    assert!(sequences == 400 && steps > 7000 && with_composition > 3500 && local_steps > 500 && committed > 600 && caret_steps > 300 && online_applied > 20);
+    assert!(sequences == 700 && steps > 20000 && with_composition > 15000 && local_steps > 500 && committed > 1000 && caret_steps > 300 && online_applied > 50);
 }
 
 fn frequency_mode(number: u64) -> Option<FrequencyAdjustmentMode> {

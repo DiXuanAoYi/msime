@@ -118,11 +118,15 @@ pub struct ShuangpinDictionary<'a> {
     domain: DomainDictionary,
     /// 整串结果缓存（C++ 的 `_cached_buffer_series`）和三个辅助码筛出来的缓存，容量各 128。
     series_cache: RefCell<Cache<Vec<Item>>>,
+    /// 当前拼音的词库行（C++ 的 `_cached_buffer`），不含整句。命中时要对一次 `data_version`，所以不能省。
+    plain_cache: RefCell<Cache<Vec<Item>>>,
     single_helpcode_cache: RefCell<Cache<Vec<Item>>>,
     single_helpcode_reversed_cache: RefCell<Cache<Vec<Item>>>,
     double_helpcode_cache: RefCell<Cache<Vec<Item>>>,
     /// 词库上一次见到的 `PRAGMA data_version`，别的连接改过库就清缓存。
     data_version: Cell<i64>,
+    /// 自己写库之前，别的连接已经改过词库；下一次缓存命中要清缓存。
+    external_changes: Cell<bool>,
     /// 直接辅助码的解析器；第一次用到才建。
     direct_resolver: RefCell<Option<Resolver>>,
 }
@@ -174,10 +178,12 @@ impl<'a> ShuangpinDictionary<'a> {
             syllable_helpcodes: Vec::new(),
             domain: DomainDictionary::new(&db_path.with_file_name("domain-input.db")),
             series_cache: RefCell::new(Cache::new(128)),
+            plain_cache: RefCell::new(Cache::new(128)),
             single_helpcode_cache: RefCell::new(Cache::new(128)),
             single_helpcode_reversed_cache: RefCell::new(Cache::new(128)),
             double_helpcode_cache: RefCell::new(Cache::new(128)),
             data_version: Cell::new(-1),
+            external_changes: Cell::new(false),
             direct_resolver: RefCell::new(None),
         };
         dictionary.reopen();
@@ -212,6 +218,7 @@ impl<'a> ShuangpinDictionary<'a> {
         if let Some(resolver) = self.direct_resolver.borrow_mut().as_mut() {
             resolver.reset_cache();
         }
+        self.plain_cache.borrow_mut().clear();
         self.series_cache.borrow_mut().clear();
         self.single_helpcode_cache.borrow_mut().clear();
         self.single_helpcode_reversed_cache.borrow_mut().clear();
@@ -228,12 +235,33 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 别的连接改过词库就清缓存。
     fn reset_cache_if_database_changed(&self) {
-        let Some(dictionary) = &self.dictionary else { return };
-        let Ok(version) = dictionary.connection().query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0)) else { return };
-        if self.data_version.get() >= 0 && version != self.data_version.get() {
+        let Some(version) = self.current_data_version() else { return };
+        let pending = self.external_changes.replace(false);
+        if pending || (self.data_version.get() >= 0 && version != self.data_version.get()) {
             self.reset_cache();
         }
         self.data_version.set(version);
+    }
+
+    fn current_data_version(&self) -> Option<i64> {
+        let dictionary = self.dictionary.as_ref()?;
+        dictionary.connection().query_row("PRAGMA data_version", [], |row| row.get::<_, i64>(0)).ok()
+    }
+
+    /// 自己的写走另开的写连接，读连接会看到版本号变化；C++ 在自己的连接上写，不会。
+    /// 写之前别的连接已经改过的先记成待清，写完再把版本号对齐，把自己这一次吸收掉。
+    fn note_external_changes(&self) {
+        if let Some(version) = self.current_data_version() {
+            if self.data_version.get() >= 0 && version != self.data_version.get() {
+                self.external_changes.set(true);
+            }
+        }
+    }
+
+    fn absorb_own_write(&self) {
+        if let Some(version) = self.current_data_version() {
+            self.data_version.set(version);
+        }
     }
 
     /// 句中辅助码约束改变整句来源的结果，签名必须进缓存键。
@@ -336,13 +364,26 @@ impl<'a> ShuangpinDictionary<'a> {
     }
 
     pub fn generate(&self, pinyin_sequence: &str, pinyin_segmentation: &str) -> Vec<Item> {
+        self.generate_keyed(pinyin_sequence, pinyin_segmentation, "")
+    }
+
+    fn generate_keyed(&self, pinyin_sequence: &str, pinyin_segmentation: &str, cache_key: &str) -> Vec<Item> {
         if pinyin_sequence.is_empty() {
             return Vec::new();
         }
         if pinyin_sequence.len() == 1 {
             return self.query_initial_from_quanpin_database(pinyin_sequence, INITIAL_CANDIDATE_LIMIT as i64);
         }
-        self.query_from_quanpin_database(pinyin_sequence, pinyin_segmentation)
+        let key = if cache_key.is_empty() { pinyin_sequence } else { cache_key };
+        if self.plain_cache.borrow_mut().find(key).is_some() {
+            self.reset_cache_if_database_changed();
+            if let Some(cached) = self.plain_cache.borrow_mut().find(key) {
+                return cached;
+            }
+        }
+        let list = self.query_from_quanpin_database(pinyin_sequence, pinyin_segmentation);
+        self.plain_cache.borrow_mut().insert(key, list.clone());
+        list
     }
 
     /// 词库里这个键下这个词的权重。
@@ -507,7 +548,7 @@ impl<'a> ShuangpinDictionary<'a> {
     /// 同上，缓存键用 `cache_key`（空则用输入串）；引擎层传带手动分隔符的原串。
     pub fn generate_series_keyed(&self, pinyin_sequence: &str, pinyin_segmentation: &str, cache_key: &str) -> Vec<Item> {
         if pinyin_sequence.len() < 2 {
-            return self.generate_series_uncached(pinyin_sequence, pinyin_segmentation);
+            return self.generate_series_uncached(pinyin_sequence, pinyin_segmentation, cache_key);
         }
         let key = format!("{}{}", if cache_key.is_empty() { pinyin_sequence } else { cache_key }, self.helpcodes_signature());
         if self.series_cache.borrow_mut().find(&key).is_some() {
@@ -516,12 +557,12 @@ impl<'a> ShuangpinDictionary<'a> {
                 return cached;
             }
         }
-        let candidates = self.generate_series_uncached(pinyin_sequence, pinyin_segmentation);
+        let candidates = self.generate_series_uncached(pinyin_sequence, pinyin_segmentation, cache_key);
         self.series_cache.borrow_mut().insert(&key, candidates.clone());
         candidates
     }
 
-    fn generate_series_uncached(&self, pinyin_sequence: &str, pinyin_segmentation: &str) -> Vec<Item> {
+    fn generate_series_uncached(&self, pinyin_sequence: &str, pinyin_segmentation: &str, cache_key: &str) -> Vec<Item> {
         let mut candidates: Vec<Item> = Vec::new();
         if pinyin_sequence.is_empty() {
             return candidates;
@@ -531,7 +572,7 @@ impl<'a> ShuangpinDictionary<'a> {
         }
 
         // 严格对应当前拼音的数据；词库一行都没有时，Google 联想开着就补一条整句兜底。
-        let current = self.generate(pinyin_sequence, pinyin_segmentation);
+        let current = self.generate_keyed(pinyin_sequence, pinyin_segmentation, cache_key);
         if !current.is_empty() {
             candidates.extend(current);
         } else if self.association.google {
@@ -872,8 +913,12 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 执行一条（或空的）语句：空串什么也不做，和 `sqlite3_exec("")` 一样算成功。
     fn exec(&self, sql: &str) -> i32 {
+        self.note_external_changes();
         let Some(connection) = self.writable() else { return ERROR_CODE };
-        if connection.execute_batch(sql).is_err() {
+        let written = connection.execute_batch(sql).is_ok();
+        drop(connection);
+        self.absorb_own_write();
+        if !written {
             return ERROR_CODE;
         }
         OK
@@ -908,7 +953,7 @@ impl<'a> ShuangpinDictionary<'a> {
             return ERROR_CODE;
         }
         let _ = user_dictionary::record_user_insert(&self.journal_path, DictionaryKind::Pinyin, &pinyin, word, 10000, "");
-        self.reopen();
+        self.reset_cache();
         OK
     }
 
@@ -935,7 +980,7 @@ impl<'a> ShuangpinDictionary<'a> {
             return ERROR_CODE;
         }
         let _ = user_dictionary::record_pinyin_upsert_from_database(&self.db_path.to_string_lossy(), &normalized, word, &self.journal_path);
-        self.reopen();
+        self.reset_cache();
         OK
     }
 
@@ -959,7 +1004,7 @@ impl<'a> ShuangpinDictionary<'a> {
         if !user_dictionary::delete_dictionary_candidate(&self.db_path.to_string_lossy(), &self.journal_path, DictionaryKind::Pinyin, &normalized, word) {
             return ERROR_CODE;
         }
-        self.reopen();
+        self.reset_cache();
         OK
     }
 }

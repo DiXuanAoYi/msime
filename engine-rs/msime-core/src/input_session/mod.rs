@@ -21,7 +21,7 @@ use crate::datetime::DateTime;
 use crate::ime_session::{ImeSession, WubiInputOptions};
 use crate::lattice::{Item, Source};
 use crate::punctuation::PunctuationPolicy;
-use crate::quanpin_dictionary::SentenceAssociation;
+use crate::quanpin_dictionary::{QuanpinDictionary, SentenceAssociation};
 use crate::request::{QueryRequest, SchemeType};
 use crate::runtime_paths::RuntimeRoots;
 use crate::shuangpin::Profile;
@@ -272,6 +272,8 @@ pub struct InputSession<'a> {
     local_candidates: Vec<Item>,
     local_date_time_provider: Option<Box<dyn Fn() -> DateTime>>,
     online_requests: OnlineRequestGuard,
+    /// 整句落库用的另一份全拼词库连接（C++ 的 `canonical_phrase_engine_`）：第一次用到才开，写库不动查询引擎的缓存。
+    canonical_phrase_engine: Option<QuanpinDictionary<'a>>,
 }
 
 /// 协调线程：没人给时钟时退到 UTC（C++ 读系统本地时间，时区要宿主给）。
@@ -348,6 +350,7 @@ impl<'a> InputSession<'a> {
             local_candidates: Vec::new(),
             local_date_time_provider: None,
             online_requests: OnlineRequestGuard::new(),
+            canonical_phrase_engine: None,
         }
     }
 
@@ -726,6 +729,9 @@ impl<'a> InputSession<'a> {
 
     pub fn reset_cache(&mut self) {
         self.engine.reset_cache();
+        if let Some(engine) = &self.canonical_phrase_engine {
+            engine.reset_cache();
+        }
         // 前缀候选是按文本缓存的，不跟着引擎缓存失效：只清缓存键，让下一次
         // refresh_prefix_candidates 按新权重/选项重查；保留当前列表，避免 caret 激活期间出现空候选窗。
         self.prefix_query_input.clear();
@@ -734,6 +740,9 @@ impl<'a> InputSession<'a> {
     /// 神经重排结果回来后用：只失效整句排序，由调用方接着 `recompute_candidates`。
     pub fn reset_sentence_cache(&mut self) {
         self.engine.reset_sentence_cache();
+        if let Some(engine) = &self.canonical_phrase_engine {
+            engine.reset_sentence_cache();
+        }
         self.prefix_query_input.clear();
     }
 
