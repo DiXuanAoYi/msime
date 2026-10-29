@@ -120,6 +120,7 @@ fn read_queries_match_cpp() {
     let mut dictionary = QuanpinDictionary::open(&db, &journal_path, Some(&model));
     let mut counts: HashMap<String, usize> = HashMap::new();
     let (mut nonempty, mut generated, mut fuzzy_rows, mut marked, mut preferred, mut sentence_first, mut corrected_queries, mut tagged) = (0, 0, 0, 0, 0, 0, 0, 0);
+    let (mut fault_queries, mut fault_displayed) = (0, 0);
     for record in records().iter().filter(|r| r["kind"] == "read") {
         let association = record["assoc"].as_u64().unwrap();
         dictionary.set_sentence_association(SentenceAssociation { word_lattice: association >= 1, show_next_on_duplicate: association == 2, ..Default::default() });
@@ -147,6 +148,12 @@ fn read_queries_match_cpp() {
                 sentence_first += usize::from(items.first().is_some_and(|i| i.sentence_association));
                 assert_eq!(dictionary.pinyin_sequence(), record["seqs"].as_str().unwrap(), "输入串 {label}");
                 assert_eq!(dictionary.pinyin_segmentation(), record["segmentation"].as_str().unwrap(), "主切分 {label}");
+                // 长句容错场景：仲裁胜出时的分段显示也要一致（空 = 没有容错布局）。
+                if let Some(expected) = record.get("fault_display").and_then(|v| v.as_str()) {
+                    assert_eq!(dictionary.fault_segmentation_with_cases(), expected, "容错显示 {label}");
+                    fault_queries += 1;
+                    fault_displayed += usize::from(!expected.is_empty());
+                }
                 list_json(&items)
             }
             "fuzzy" => list_json(&dictionary.fuzzy_candidates(record["typed"].as_str().unwrap(), fuzzy)),
@@ -165,7 +172,8 @@ fn read_queries_match_cpp() {
         *counts.entry(op.to_string()).or_default() += 1;
     }
     let _ = fs::remove_file(&journal);
-    eprintln!("全拼词库读：{counts:?}，查询非空 {nonempty}，词格整句行 {generated}，模糊行 {fuzzy_rows}，纠错标记行 {marked}，带纠错且出标记的查询 {corrected_queries}，调频日志 {preferred} 条，首位是整句 {sentence_first}，带输入域的行 {tagged}");
+    eprintln!("全拼词库读：{counts:?}，查询非空 {nonempty}，词格整句行 {generated}，模糊行 {fuzzy_rows}，纠错标记行 {marked}，带纠错且出标记的查询 {corrected_queries}，调频日志 {preferred} 条，首位是整句 {sentence_first}，带输入域的行 {tagged}，长句容错查询 {fault_queries}（出分段显示 {fault_displayed}）");
+    assert!(fault_queries > 150 && fault_displayed > 40, "长句容错场景太少：{fault_queries} / {fault_displayed}");
     assert!(counts.values().sum::<usize>() > 2000);
     assert!(generated > 100 && fuzzy_rows > 100 && marked > 20 && preferred > 100 && corrected_queries > 200 && tagged > 500);
 }

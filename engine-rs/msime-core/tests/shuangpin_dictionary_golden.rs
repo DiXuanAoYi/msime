@@ -129,9 +129,9 @@ fn pinyin_cutting_matches_cpp() {
     let (mut checked, mut corrected, mut multi, mut incomplete) = (0, 0, 0, 0);
     for record in records().iter().filter(|r| r["kind"] == "cut") {
         let input = record["input"].as_str().unwrap();
-        assert_eq!(cut_pinyin_by_mode(input, CutMode::Greedy), paths_of(&record["greedy"]), "贪心 {input:?}");
+        assert_eq!(cut_pinyin_by_mode(input, CutMode::Greedy, true), paths_of(&record["greedy"]), "贪心 {input:?}");
         let want = paths_of(&record["correction"]);
-        assert_eq!(cut_pinyin_by_mode(input, CutMode::Correction), want, "纠错 {input:?}");
+        assert_eq!(cut_pinyin_by_mode(input, CutMode::Correction, true), want, "纠错 {input:?}");
         assert_eq!(is_complete_pinyin_input(input), record["complete"].as_bool().unwrap(), "完整 {input:?}");
         assert_eq!(segments_to_jianpin(&split_segments(input)), record["jianpin"].as_str().unwrap(), "简拼 {input:?}");
         checked += 1;

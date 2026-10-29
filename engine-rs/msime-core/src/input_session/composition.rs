@@ -165,15 +165,15 @@ fn resolve_quanpin_cloud_cache_key(request: &QueryRequest) -> String {
     quanpin_utils::strip_active_helpcodes(&request.raw_input, &request.raw_input_with_cases)
 }
 
-/// 请求里只带两个旧的布尔：任何一个开着都同时打开删字和插字，预编辑重建看到的纠错空间才与查询一致。
+/// 请求里每个用户可见的开关一个布尔，开关 → 掩码的规则在 `autocorrect::autocorrect_types_from_switches`，
+/// 预编辑重建因此和查询看到同一个纠错空间。
 pub(super) fn quanpin_autocorrect_types(request: &QueryRequest) -> u32 {
-    let legacy = (if request.enable_quanpin_autocorrect_transposition { autocorrect::TRANSPOSITION } else { 0 })
-        | (if request.enable_quanpin_autocorrect_neighbor { autocorrect::NEIGHBOR } else { 0 });
-    if legacy == 0 {
-        0
-    } else {
-        legacy | autocorrect::DELETION | autocorrect::INSERTION
-    }
+    autocorrect::autocorrect_types_from_switches(
+        request.enable_quanpin_autocorrect_transposition,
+        request.enable_quanpin_autocorrect_neighbor,
+        request.enable_quanpin_autocorrect_deletion,
+        request.enable_quanpin_autocorrect_insertion,
+    )
 }
 
 fn quanpin_letters_without_delimiters(text: &str) -> String {
@@ -429,6 +429,14 @@ impl<'a> InputSession<'a> {
             return preedit;
         }
         if self.current_scheme_type() == SchemeType::Quanpin {
+            // 容错仲裁选中的读音与敲的字母不逐音节相同，下面按首选重建显示的路径会比对失败、退回字面切分；
+            // 仲裁已经按原串大小写算好了分段显示，直接用。
+            if !self.is_shuangpin() {
+                let fault_display = self.engine.fault_segmentation_with_cases();
+                if !fault_display.is_empty() {
+                    return decorate(fault_display);
+                }
+            }
             if let Some(head_item) = self.candidates().first() {
                 if quanpin_utils::literal_mixed_pinyin_match(&request.raw_input, &head_item.pinyin, &head_item.canonical_pinyin) != 0 {
                     let mut boundaries = Vec::new();
@@ -684,6 +692,9 @@ impl<'a> InputSession<'a> {
         if autocorrect_types != 0 && !literal_mixed_prefix && !raw_input_without_helpcodes.contains('\'') {
             if let Some(aligned) = autocorrect::corrected_reading_raw_length(&raw_input_without_helpcodes, &split_segments(selected_pinyin), autocorrect_types) {
                 consumed_letters = aligned;
+            } else if let Some(fault_aligned) = autocorrect::fault_reading_raw_length(&raw_input_without_helpcodes, &split_segments(selected_pinyin)) {
+                // 长句容错仲裁的读音（句中简拼展开、槽内漏字变体）不在 k-best 切分里，按槽位模型对回原始字母。
+                consumed_letters = fault_aligned;
             }
         }
 

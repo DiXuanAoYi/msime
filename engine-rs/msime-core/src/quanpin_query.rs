@@ -78,6 +78,18 @@ pub fn cut_pinyin_greedy(pinyin: &str, intact_only: bool) -> Segments {
 
 type CorrectionAliases = HashMap<String, Vec<String>>;
 
+/// 非纠错的拼写归一：ü 归一（jv → ju）。它不属于手误纠正，永远生效——关掉纠错开关
+/// 也要把 jv 当 ju 查库。n/l 系的 nue/lue → nve/lve 由 `normalize_umlaut_aliases` 在段级完成，不进这张表。
+fn pinyin_normalization_aliases() -> &'static CorrectionAliases {
+    static ALIASES: OnceLock<CorrectionAliases> = OnceLock::new();
+    ALIASES.get_or_init(|| {
+        let mut aliases: CorrectionAliases = HashMap::new();
+        aliases.entry("jv".to_string()).or_default().push("ju".to_string());
+        aliases
+    })
+}
+
+/// 手误别名：换位形状、多一个 h、漏一个 g，外加上面那条 ü 归一。属纠错，按掩码门控。
 fn pinyin_correction_aliases() -> &'static CorrectionAliases {
     static ALIASES: OnceLock<CorrectionAliases> = OnceLock::new();
     ALIASES.get_or_init(|| {
@@ -126,14 +138,18 @@ struct RankedPath {
     correction_ranks: Vec<usize>,
 }
 
-fn solve_with_corrections(pinyin: &str, index: usize, memo: &mut HashMap<usize, Vec<RankedPath>>) -> Vec<RankedPath> {
+fn solve_with_corrections(
+    pinyin: &str,
+    index: usize,
+    aliases: &'static CorrectionAliases,
+    memo: &mut HashMap<usize, Vec<RankedPath>>,
+) -> Vec<RankedPath> {
     if index == pinyin.len() {
         return vec![RankedPath { segments: Vec::new(), typed_lengths: Vec::new(), correction_ranks: Vec::new() }];
     }
     if let Some(found) = memo.get(&index) {
         return found.clone();
     }
-    let aliases = pinyin_correction_aliases();
     let mut paths: Vec<RankedPath> = Vec::new();
     for end in (index + 1..=pinyin.len()).rev() {
         let Some(typed) = pinyin.get(index..end) else { continue };
@@ -144,7 +160,7 @@ fn solve_with_corrections(pinyin: &str, index: usize, memo: &mut HashMap<usize, 
         } else {
             continue;
         };
-        let suffix_paths = solve_with_corrections(pinyin, end, memo);
+        let suffix_paths = solve_with_corrections(pinyin, end, aliases, memo);
         for (canonical_index, canonical) in canonical_syllables.iter().enumerate() {
             for suffix in &suffix_paths {
                 let mut segments = Vec::with_capacity(1 + suffix.segments.len());
@@ -180,15 +196,17 @@ fn solve_with_corrections(pinyin: &str, index: usize, memo: &mut HashMap<usize, 
     paths
 }
 
-fn cut_one_piece_with_corrections(pinyin: &str) -> Vec<Segments> {
+fn cut_one_piece_with_corrections(pinyin: &str, include_correction_aliases: bool) -> Vec<Segments> {
+    // include=false 只留 ü 归一（jv → ju）；手误别名属于纠错，跟开关走。
+    let aliases = if include_correction_aliases { pinyin_correction_aliases() } else { pinyin_normalization_aliases() };
     let mut memo = HashMap::new();
-    solve_with_corrections(pinyin, 0, &mut memo).into_iter().map(|p| p.segments).collect()
+    solve_with_corrections(pinyin, 0, aliases, &mut memo).into_iter().map(|p| p.segments).collect()
 }
 
-fn cut_pinyin_with_corrections(pinyin: &str) -> Vec<Segments> {
+fn cut_pinyin_with_corrections(pinyin: &str, include_correction_aliases: bool) -> Vec<Segments> {
     let mut merged_paths: Vec<Segments> = vec![Vec::new()];
     for part in pinyin.split('\'') {
-        let part_paths = cut_one_piece_with_corrections(part);
+        let part_paths = cut_one_piece_with_corrections(part, include_correction_aliases);
         if part_paths.is_empty() {
             return Vec::new();
         }
@@ -215,9 +233,11 @@ pub enum CutMode {
 }
 
 /// 对应 C++ `cut_pinyin_by_mode`：贪心只出一条；纠错模式先出带纠错的若干条，没有再退回贪心。
-pub fn cut_pinyin_by_mode(pinyin: &str, mode: CutMode) -> Vec<Segments> {
+/// `include_correction_aliases` 决定手误别名层要不要参与（贪心模式不看它）；全拼调用方用
+/// `correction_aliases_enabled(掩码)` 得到它，双拼词典、离线工具传 true。
+pub fn cut_pinyin_by_mode(pinyin: &str, mode: CutMode, include_correction_aliases: bool) -> Vec<Segments> {
     if mode == CutMode::Correction {
-        let corrected = cut_pinyin_with_corrections(pinyin);
+        let corrected = cut_pinyin_with_corrections(pinyin, include_correction_aliases);
         if !corrected.is_empty() {
             return corrected;
         }
@@ -249,9 +269,9 @@ mod tests {
 
     #[test]
     fn correction_cut_repairs_typos_and_falls_back_to_greedy() {
-        assert_eq!(cut_pinyin_by_mode("zhonguo", CutMode::Correction)[0], seg(&["zhong", "guo"]));
-        assert_eq!(cut_pinyin_by_mode("nihao", CutMode::Correction)[0], seg(&["ni", "hao"]));
-        assert_eq!(cut_pinyin_by_mode("xx", CutMode::Correction), cut_pinyin_by_mode("xx", CutMode::Greedy));
+        assert_eq!(cut_pinyin_by_mode("zhonguo", CutMode::Correction, true)[0], seg(&["zhong", "guo"]));
+        assert_eq!(cut_pinyin_by_mode("nihao", CutMode::Correction, true)[0], seg(&["ni", "hao"]));
+        assert_eq!(cut_pinyin_by_mode("xx", CutMode::Correction, true), cut_pinyin_by_mode("xx", CutMode::Greedy, true));
     }
 
     #[test]

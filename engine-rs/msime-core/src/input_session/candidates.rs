@@ -156,7 +156,10 @@ impl<'a> InputSession<'a> {
             return context;
         }
         let plain: String = context.chars().filter(|c| *c != '\'').collect();
-        let cuts = quanpin_query::cut_pinyin_by_mode(&plain, CutMode::Correction);
+        // 全拼的上下文 key 跟查询走同一个纠错开关：关掉纠错时 laing 的候选按字面 lai'ng 出，key 若仍被别名层切成 liang，
+        // 两组固定位置会互相串。双拼词典不受全拼开关管，保持原样。
+        let correction_aliases = self.scheme() == SchemeType::Shuangpin || crate::autocorrect::correction_aliases_enabled(self.quanpin_autocorrect_types);
+        let cuts = quanpin_query::cut_pinyin_by_mode(&plain, CutMode::Correction, correction_aliases);
         match cuts.first() {
             Some(first) => join_segments(first),
             None => context,

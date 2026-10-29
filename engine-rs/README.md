@@ -12,7 +12,7 @@
 | 词库精确查询 | `src/dict.rs` | `tests/golden.rs`：44 条输入、475 个词，相对顺序和 C++ 一致 |
 | 简拼、没打完的音节（精确键 → 键前缀 → 混合简拼 → 纯简拼的查询顺序，按词去重） | `src/segment.rs`、`src/dict.rs` | `tests/golden.rs`：`n`、`nh`、`zg`、`srf`、`zgr`、`wm`、`jt`、`mt`、`bj`、`sh` 等输入的相对顺序和 C++ 一致 |
 | 模糊音（十一条规则、近音路径、与精确候选按权重混排） | `src/fuzzy.rs`、`src/dict.rs` | `tests/golden.rs`：34 条输入、1012 个词，其中 2581 个模糊词，相对顺序和 C++ 一致 |
-| 纠错：错拼表（换位、邻键、漏键、多键）和静态表上的 k-best 切分 | `src/autocorrect.rs` | `tests/autocorrect_table_matches_cpp.rs`：四张表（806 / 3728 / 194 / 11044 个错拼键）和 `engine/quanpin/autocorrect_table.h` 逐项相同；`tests/golden.rs`：7 条输入、210 个词，首选词和相对顺序一致 |
+| 纠错：错拼表（换位、邻键、漏键、多键，外加生成式的远键替换）、静态表上的 k-best 切分和长句容错槽位模型 | `src/autocorrect.rs` | `tests/autocorrect_table_matches_cpp.rs`：五张表（换位 798 / 邻键 3686 / 漏键 194 / 多键 9757 / 生成式远键替换 12390 个错拼键）和 `engine/quanpin/autocorrect_table.h` 逐项相同；`tests/golden.rs`：7 条输入、210 个词，首选词和相对顺序一致 |
 | 调频算法（选中项的目标名次、权重中点、整排重排、选中次数计数；只算该写的权重，不碰 SQLite） | `src/ranking.rs` | `tests/ranking_golden.rs`：`engine/contracts/golden/ranking_cases.tsv` 的 253 个用例（含权重相等、相邻、超上限、接近 i64 上限、混读音、显示顺序不等于权重顺序、连选触发次数），每行最终权重和真实 `adjust_candidate_ranking` 逐个相同；基线由 `msime_ranking_probe` 在合成词库上生成 |
 | 双拼：九套内置方案表、按键解码、贪心分段、转全拼、全码辅助判断 | `src/shuangpin.rs` | `tests/shuangpin_helpcode_golden.rs`：方案表原样相同；9 套方案 × 756 个码的解码相同；885 条随机串的分段、转全拼、全码辅助相同。方案表由脚本从 C++ 源码抽取，不是手抄 |
 | 辅助码：码表加载、取码、单码匹配与重排、双码匹配与筛选、大写结尾的模式判断 | `src/helpcode.rs` | 同上：6 套内置码表（共约 7.4 万行）、1621 个词的取码和匹配、重排与筛选逐项相同；基线由 `msime_helpshuang_probe` 导出 |
@@ -65,7 +65,7 @@
 
 ### 纠错
 
-错拼表、k-best 切分和全拼词典层上的纠错（简拼形状闸、合法输入闸、表外生成读法、头部纠错 + 简拼尾、纠错读法与字面整词的混排仲裁、上下文消解）都已移植，由 `tests/quanpin_autocorrect_golden.rs` 和 `tests/quanpin_dictionary_golden.rs` 对照真实 C++。`tests/golden.rs` 里的 `AUTOCORRECT_CPP_ONLY` 是更早只有静态表时留下的清单，这些输入现在由词典层的黄金样本覆盖。
+错拼表、k-best 切分和全拼词典层上的纠错（简拼形状闸、合法输入闸、表外生成读法、头部纠错 + 简拼尾、纠错读法与字面整词的混排仲裁、上下文消解、长句容错槽位词格仲裁；四个纠错开关各管一位、互不联动；关掉换位和邻键后手误别名层不再改写切分）都已移植，由 `tests/quanpin_autocorrect_golden.rs` 和 `tests/quanpin_dictionary_golden.rs` 对照真实 C++。`tests/golden.rs` 里的 `AUTOCORRECT_CPP_ONLY` 是更早只有静态表时留下的清单，这些输入现在由词典层的黄金样本覆盖。
 
 ### 整句词格里没有对过的部分
 
@@ -82,7 +82,7 @@
 
 ### 发现的疑似缺陷（C++）
 
-`niihao` 只开“多键”（`autocorrect=8`）时候选为空；`nihaoo`、`shangg` 同样只开多键是正常的，`niihao` 开邻键或全开也正常。黄金样本 `expected_options.jsonl` 已把这个行为记成基线，修之前先确认是不是有意为之。
+多键纠错（`60c2b26`）收窄成“误插相邻键的 QWERTY 邻键”，连击（`niihao`、`shangg`）不再算多键：`niihao` 只开多键（`autocorrect=8`）时候选为空是预期，全开时按邻键读成 `niu'hao`（牛）。黄金样本 `expected_options.jsonl` 记着这个基线。
 
 `JapaneseSentenceDecoder::PrefixLemmasContinuing` 一遇到读音不比前缀长的词条就 `break`，而词库按读音排序，读音恰好等于前缀的词条排在最前面——只要词库里有读音等于已打读音的词条，这个函数就一个也不返回。后果是矩阵搜索在“有没打完的罗马字”时，补不上“已打读音 + 下一个假名”开头的更长词条（候选提供者另外调了 `PrefixLemmas`，所以用户多半还是能看到联想）。Rust 保留了这个行为，`tests/wubi_japanese_golden.rs` 把它记成基线；修之前先确认是不是有意为之。
 

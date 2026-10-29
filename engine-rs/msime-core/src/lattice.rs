@@ -351,6 +351,110 @@ pub fn decode_word_lattice(syllables: &[String], lookup: Lookup, options: &Optio
     paths
 }
 
+/// 容错槽位词格的一条边：覆盖槽区间 `[start, end)`，读音与词条由调用方查好。`key` 是覆盖区间的完整合法读音
+/// （可展开槽已代入具体音节），`penalty` 是该读音相对字面槽的手误代价（log10）。
+#[derive(Debug, Clone, Default)]
+pub struct FaultEdge {
+    pub start: usize,
+    pub end: usize,
+    pub word: String,
+    pub key: String,
+    pub weight: i64,
+    pub penalty: f64,
+}
+
+/// 容错槽位词格解码，对应 C++ `decode_fault_lattice`：与 [`decode_word_lattice`] 同一套 Viterbi
+/// （语言模型打分、beam、n-best 去重），但边由调用方按容错槽位预先查出，手误代价已折进边分。
+/// 刻意不装配搭配 scorer，裁决只看语言模型；没有模型时退回启发式。
+pub fn decode_fault_lattice(slot_count: usize, edges_by_start: &[Vec<FaultEdge>], options: &Options) -> Vec<Path> {
+    if slot_count == 0 {
+        return Vec::new();
+    }
+    let model = active_model(options);
+    let mut columns: Vec<Vec<Hyp>> = (0..=slot_count).map(|_| Vec::new()).collect();
+    columns[0].push(Hyp {
+        score: 0.0,
+        prev: None,
+        word: String::new(),
+        key: String::new(),
+        input_domains: Vec::new(),
+        state: model.map(|m| m.null_state()).unwrap_or_default(),
+        collocation_tail: String::new(),
+    });
+
+    for pos in 0..slot_count {
+        keep_beam(&mut columns[pos], options.beam);
+        if columns[pos].is_empty() || pos >= edges_by_start.len() {
+            continue;
+        }
+        for hi in 0..columns[pos].len() {
+            for edge in &edges_by_start[pos] {
+                if edge.start != pos || edge.end <= pos || edge.end > slot_count {
+                    continue;
+                }
+                let hyp = &columns[pos][hi];
+                // penalty 是手误代价（正数，log10），从路径分里扣。
+                let mut score = hyp.score - edge.penalty;
+                let mut state = ModelState::new();
+                if let Some(model) = model {
+                    score += dictionary_tiebreak(edge.weight, options);
+                    let (model_score, next_state) = model.score(&hyp.state, model.index(&edge.word));
+                    score += f64::from(model_score);
+                    state = next_state;
+                } else {
+                    // 无模型时按覆盖槽位数近似短语长度；手误代价已经扣过。
+                    let weight = if edge.weight > 0 { edge.weight as f64 } else { 1.0 };
+                    score += weight.ln() + options.phrase_length_bonus * (edge.end - pos) as f64;
+                }
+                columns[edge.end].push(Hyp {
+                    score,
+                    prev: Some((pos, hi)),
+                    word: edge.word.clone(),
+                    key: edge.key.clone(),
+                    input_domains: Vec::new(),
+                    state,
+                    collocation_tail: String::new(),
+                });
+            }
+        }
+    }
+
+    if columns[slot_count].is_empty() {
+        return Vec::new();
+    }
+    columns[slot_count].sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    let take = options.nbest.max(0).min(columns[slot_count].len() as i32) as usize;
+
+    let mut paths: Vec<Path> = Vec::with_capacity(take);
+    let mut seen: HashSet<String> = HashSet::new();
+    for i in 0..columns[slot_count].len() {
+        if paths.len() >= take {
+            break;
+        }
+        let mut path = Path { sentence: String::new(), key: String::new(), log_prob: columns[slot_count][i].score, words: Vec::new(), input_domains: Vec::new() };
+        let mut keys: Vec<&str> = Vec::new();
+        let mut cursor = Some((slot_count, i));
+        while let Some((pos, idx)) = cursor {
+            if pos == 0 {
+                break;
+            }
+            let hyp = &columns[pos][idx];
+            path.words.push(hyp.word.clone());
+            keys.push(&hyp.key);
+            cursor = hyp.prev;
+        }
+        path.words.reverse();
+        keys.reverse();
+        path.sentence = path.words.concat();
+        path.key = keys.join("'");
+        if path.sentence.is_empty() || !seen.insert(path.sentence.clone()) {
+            continue;
+        }
+        paths.push(path);
+    }
+    paths
+}
+
 // -------------------------------------------------------------------------------------------------
 // 并进候选列表
 // -------------------------------------------------------------------------------------------------

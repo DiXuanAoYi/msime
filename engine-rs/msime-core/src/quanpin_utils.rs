@@ -241,6 +241,24 @@ pub fn normalize_umlaut_aliases(mut segments: Segments) -> Segments {
     segments
 }
 
+/// j/q/x/y 后面的 `v` 只是 `u` 的别名（jv、jve、xvan……）：这几个声母没有保留鱼眼的合法音节。
+pub fn is_jqxy_v_alias(syllable: &str) -> bool {
+    let bytes = syllable.as_bytes();
+    bytes.len() >= 2 && bytes[1] == b'v' && matches!(bytes[0], b'j' | b'q' | b'x' | b'y')
+}
+
+/// ü 的两种写法归到词库存的那一种：j/q/x/y 系写 u（xvan → xuan），l/n 系的 nue/lue 写 v（→ nve/lve），
+/// 其余原样返回。对应 C++ `canonical_umlaut_spelling`。
+pub fn canonical_umlaut_spelling(syllable: &str) -> String {
+    let mut out = syllable.to_string();
+    if is_jqxy_v_alias(syllable) {
+        out.replace_range(1..2, "u");
+    } else if syllable == "nue" || syllable == "lue" {
+        out.replace_range(1..2, "v");
+    }
+    out
+}
+
 /// 纠错比较用的字母：去掉手动分隔符、转小写。`v` 和 `u` 当作不同的字母（别名改写正是纠错标记的来源之一）。
 pub fn fold_letters(text: &str) -> String {
     text.chars().filter(|c| *c != '\'').map(|c| c.to_ascii_lowercase()).collect()

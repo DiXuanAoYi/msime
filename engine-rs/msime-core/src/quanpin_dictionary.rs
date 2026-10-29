@@ -15,17 +15,17 @@
 
 use crate::dict::{Dictionary, KeyedEntry, QuerySource};
 use crate::domain_dictionary::{self, DomainDictionary};
-use crate::autocorrect::{self, looks_like_jianpin_spelling, Cut};
+use crate::autocorrect::{self, correction_aliases_enabled, looks_like_jianpin_spelling, Cut, FaultSlotKind};
 use crate::cache::Cache;
 use crate::fuzzy;
 use crate::helpcode;
-use crate::lattice::{self, Item, LanguageModel, Lexeme, Path as LatticePath, Source};
+use crate::lattice::{self, FaultEdge, Item, LanguageModel, Lexeme, Path as LatticePath, Source};
 use crate::quanpin_query::{
     cut_pinyin_by_mode, has_only_complete_pinyin_segments, is_complete_pinyin_input, join_segments, segments_to_jianpin, split_segments, CutMode, Segments,
 };
 use crate::quanpin_utils::{
     build_syllable_graph, enumerate_complete_segmentations, enumerate_min_segmentations, fold_letters, literal_jianpin_pinyin_match,
-    literal_mixed_pinyin_match, normalize_umlaut_aliases, sparse_pinyin_fallback_segments, to_google_spelling,
+    literal_mixed_pinyin_match, canonical_umlaut_spelling, normalize_umlaut_aliases, sparse_pinyin_fallback_segments, to_google_spelling,
 };
 use crate::sentence_sources::{neural_reranker, SentenceSources};
 pub use crate::shuangpin_dictionary::{SentenceAssociation, ERROR_CODE, OK};
@@ -79,6 +79,9 @@ const COSTLIER_CONTEXT_DECODE_LIMIT: usize = 2;
 const AUTOCORRECT_WEIGHT_TO_LOG: f64 = 0.2;
 /// 接管边际，以打分器自身的对数单位计（词格 LM 打分是 log10，1.0 ≈ 10 倍句概率）。
 const AUTOCORRECT_CONTEXT_MARGIN_LOG: f64 = 1.0;
+/// 简拼展开边的惩罚折算（容错仲裁）。展开是用户意图（r 就是想打某个 r 开头的全拼）不是手误：系数刻意远小于
+/// `AUTOCORRECT_WEIGHT_TO_LOG`，让语言模型在展开候选之间做全局裁决，只留一个平局序数。
+const JIANPIN_EXPAND_PENALTY_LOG: f64 = 0.1;
 
 fn remove_delimiters(segmented: &str) -> String {
     segmented.replace('\'', "")
@@ -344,6 +347,72 @@ fn series_cache_key(raw_input: &str, segmentation: &str) -> String {
     format!("{prefix}{}", if segmentation.is_empty() { raw_input } else { segmentation })
 }
 
+/// 容错读音的分段预编辑：读音与原始字母按槽对齐（与 `fault_reading_raw_length` 同一套槽模型），逐槽把读音音节拼回原字母，
+/// 只在槽界插入分隔符。只有逐字母等长的槽才做对应，否则返回空串（调用方保持原切分）。单字母槽展开后会吃掉多个读音音节
+/// （c -> ce、l -> liu），所以按槽跨度消费读音，而不是逐下标一一对应。
+fn display_at_winning_slots(raw_input: &str, reading: &[String]) -> String {
+    let slots = autocorrect::build_fault_slots(raw_input);
+    if slots.is_empty() || reading.is_empty() {
+        return String::new();
+    }
+    let cased: String = raw_input.chars().filter(|&c| c != '\'').collect();
+    let mut display = String::with_capacity(cased.len() + slots.len());
+    let mut consumed = 0;
+    let mut read_index = 0;
+    for (i, slot) in slots.iter().enumerate() {
+        let letters = slot.raw_text.len();
+        if consumed + letters > cased.len() || read_index >= reading.len() {
+            return String::new();
+        }
+        match slot.kind {
+            FaultSlotKind::Determining => {
+                let syllable = &reading[read_index];
+                // 字面读法直接过；漏字变体（loose scan 允许 yang 读 yan）按同一条形态约束放行。
+                let literal = *syllable == slot.base_syllable || (syllable.len() == letters && canonical_umlaut_spelling(syllable) == canonical_umlaut_spelling(&slot.raw_text));
+                if !literal && !autocorrect::is_deletion_variant(&slot.raw_text, syllable) {
+                    return String::new();
+                }
+                read_index += 1;
+            }
+            _ if letters == 1 => {
+                // 展开/纠错只改槽内读音：单字母槽显示用户敲的那个字母。展开后的音节全是该字母开头的全拼；至少消费一个。
+                let initial = slot.raw_text.as_bytes()[0];
+                loop {
+                    if reading[read_index].as_bytes().first() != Some(&initial) {
+                        return String::new();
+                    }
+                    read_index += 1;
+                    let continues = read_index < reading.len()
+                        && reading[read_index].as_bytes().first() == Some(&initial)
+                        && reading[read_index].len() > 1
+                        && i + 1 < slots.len()
+                        && slots[i + 1].kind != FaultSlotKind::Determining
+                        && slots[i + 1].raw_text.as_bytes()[0] == initial;
+                    if !continues {
+                        break;
+                    }
+                }
+            }
+            _ => {
+                // 多字母非法槽：读音与原字母差一个字（漏/多字纠正）就对不上了。
+                if letters != reading[read_index].len() {
+                    return String::new();
+                }
+                read_index += 1;
+            }
+        }
+        if i > 0 {
+            display.push('\'');
+        }
+        display.push_str(&cased[consumed..consumed + letters]);
+        consumed += letters;
+    }
+    if consumed != cased.len() || read_index != reading.len() || display.is_empty() {
+        return String::new();
+    }
+    display
+}
+
 pub struct QuanpinDictionary<'a> {
     db_path: PathBuf,
     journal_path: String,
@@ -369,6 +438,10 @@ pub struct QuanpinDictionary<'a> {
     pinyin_segmentation: String,
     /// 纠错的备选读法（同档与贵档），给纠错标记用。
     pinyin_alternative_segmentations: Vec<String>,
+    /// 手误别名层是否参与切分，由 `query` 按请求的纠错掩码更新，写回路径据此重切（见 `cut_for_write`）。还没查询过时保持历史行为（开）。
+    correction_aliases_enabled: bool,
+    /// 容错仲裁选中读音后的分段显示（原串大小写、含分隔符）。空表示当前串没有容错布局。
+    fault_preedit_with_cases: String,
     domain: DomainDictionary,
 }
 
@@ -392,6 +465,8 @@ impl<'a> QuanpinDictionary<'a> {
             pinyin_sequence: String::new(),
             pinyin_segmentation: String::new(),
             pinyin_alternative_segmentations: Vec::new(),
+            correction_aliases_enabled: true,
+            fault_preedit_with_cases: String::new(),
             domain: DomainDictionary::new(&db_path.with_file_name("domain-input.db")),
         };
         dictionary.reopen();
@@ -500,6 +575,11 @@ impl<'a> QuanpinDictionary<'a> {
     }
 
     /// 最近一次 `query` 定下的主切分（音节用 `'` 隔开）。
+    /// 容错仲裁选中读音后的分段显示（大小写原样）。空表示没有容错布局，调用方照旧重建。
+    pub fn fault_segmentation_with_cases(&self) -> &str {
+        &self.fault_preedit_with_cases
+    }
+
     pub fn pinyin_segmentation(&self) -> &str {
         &self.pinyin_segmentation
     }
@@ -525,9 +605,11 @@ impl<'a> QuanpinDictionary<'a> {
             self.reset_cache();
         }
         self.fuzzy_rules = fuzzy_rules;
+        // 写回路径随后按这次查询的切分重切（cut_for_write），状态要和查询一致。
+        self.correction_aliases_enabled = correction_aliases_enabled(autocorrect_types);
         let mut result = self.query_exact(raw_input, segmentation, autocorrect_types);
         if fuzzy_rules != 0 && !raw_input.is_empty() {
-            let typed = if segmentation.is_empty() { join_segments(&self.resolve_segments(raw_input, segmentation)) } else { segmentation.to_string() };
+            let typed = if segmentation.is_empty() { join_segments(&self.resolve_segments(raw_input, segmentation, self.correction_aliases_enabled)) } else { segmentation.to_string() };
             let fuzzy_items = self.fuzzy_candidates(&typed, fuzzy_rules);
             result = merge_fuzzy_items(result, fuzzy_items);
         }
@@ -540,10 +622,16 @@ impl<'a> QuanpinDictionary<'a> {
 
     fn query_exact(&mut self, raw_input: &str, segmentation: &str, autocorrect_types: u32) -> Vec<Item> {
         if raw_input.is_empty() {
+            self.fault_preedit_with_cases.clear();
             return Vec::new();
         }
+        // 每次查询先清掉上一次的容错布局：它只对当前这串有效。同一串的重复查询（整串缓存命中，仲裁不会重跑）不清。
+        if self.pinyin_sequence != raw_input {
+            self.fault_preedit_with_cases.clear();
+        }
         self.pinyin_sequence = raw_input.to_string();
-        let segments = self.resolve_segments(raw_input, segmentation);
+        let aliases = correction_aliases_enabled(autocorrect_types);
+        let segments = self.resolve_segments(raw_input, segmentation, aliases);
         let resolution = resolve_series_query(raw_input, &segments, autocorrect_types);
         self.pinyin_segmentation = resolution.segmentation.clone();
         let primary_segmentation = self.pinyin_segmentation.clone();
@@ -582,7 +670,7 @@ impl<'a> QuanpinDictionary<'a> {
             for candidate in &resolution.alternative_corrected_cuts {
                 append_alternative(candidate, &mut alternative_segmentations);
             }
-            for candidate in &cut_pinyin_by_mode(raw_input, CutMode::Correction) {
+            for candidate in &cut_pinyin_by_mode(raw_input, CutMode::Correction, aliases) {
                 append_alternative(candidate, &mut alternative_segmentations);
             }
         }
@@ -634,6 +722,17 @@ impl<'a> QuanpinDictionary<'a> {
             }
             if promotes_literal_whole_word {
                 keep_literal_whole_word_first(&mut result, raw_input);
+            }
+        }
+        // k-best 空手而归或预算饱和的非法长句：容错槽位词格是唯一能长出正确切分的通道。短串（不超过 4 槽）不进。
+        let correction_budget_saturated = resolution.corrected_input && resolution.corrected_segments.len() > autocorrect::MAX_SHORT_AUTOCORRECT_SYLLABLES;
+        if !resolution.corrected_input || correction_budget_saturated {
+            let (arbitrated, winning_segments, winning_display) = self.arbitrate_fault_slots(raw_input, autocorrect_types, result);
+            result = arbitrated;
+            // 预编辑必须跟着胜出读音走：展开读法永远过不了逐音节对回的比对，显示串在这里一并交出去。
+            if !winning_segments.is_empty() && !winning_display.is_empty() {
+                self.pinyin_segmentation = join_segments(&winning_segments);
+                self.fault_preedit_with_cases = winning_display;
             }
         }
         if !literal_mixed.is_empty() {
@@ -814,9 +913,9 @@ impl<'a> QuanpinDictionary<'a> {
         merged
     }
 
-    fn resolve_segments(&self, raw_input: &str, segmentation: &str) -> Segments {
+    fn resolve_segments(&self, raw_input: &str, segmentation: &str, include_correction_aliases: bool) -> Segments {
         let segments = if segmentation.is_empty() {
-            cut_pinyin_by_mode(raw_input, CutMode::Correction).into_iter().next().unwrap_or_default()
+            cut_pinyin_by_mode(raw_input, CutMode::Correction, include_correction_aliases).into_iter().next().unwrap_or_default()
         } else {
             split_segments(segmentation)
         };
@@ -1074,6 +1173,269 @@ impl<'a> QuanpinDictionary<'a> {
         rows
     }
 
+    /// 长句容错仲裁。字面贪心切分对带错的长句切出 shu'r'fa / c / l 这类「每段都有解释」的槽位，k-best 纠错被 3 边预算卡死返回空。
+    /// 这里把槽位图交给词格：合法槽固定读音（走普通跨度查询），单字母槽由词库区间扫描现算简拼展开候选，Fault 槽用纠错表目标作前缀扫描。
+    /// 裁决只看语言模型，路径分扣手误代价——纠错表目标按 `AUTOCORRECT_WEIGHT_TO_LOG`、简拼展开按 `JIANPIN_EXPAND_PENALTY_LOG` 折算。
+    /// 返回（候选，胜出读音，胜出读音的分段显示）；不接管或词格解不出路径时原样返回候选、后两者为空。
+    fn arbitrate_fault_slots(&self, raw_input: &str, autocorrect_types: u32, result: Vec<Item>) -> (Vec<Item>, Segments, String) {
+        let slots = autocorrect::build_fault_slots(raw_input);
+        if !autocorrect::fault_slots_eligible(&slots, autocorrect_types) {
+            return (result, Vec::new(), String::new());
+        }
+        let Some(dictionary) = &self.dictionary else { return (result, Vec::new(), String::new()) };
+
+        // 与 lattice_best_path 同参：不带模糊音，裁决只认敲定的读音。跨度行数与 n-best 收窄：这条解码只为选出胜出读音。
+        let options = lattice::Options { language_model: self.language_model, span_limit: 16, nbest: 3, ..lattice::Options::default() };
+        let lookup = |span: &[String]| self.lattice_lookup(span, options.span_limit, false);
+
+        let slot_count = slots.len();
+        const MAX_FAULT_SPAN_SLOTS: usize = 5;
+        // 一个跨度至多盖住两个可展开槽：更多的组合面指数涨，有界放弃。
+        const MAX_EXPANDABLE_SLOTS_PER_SPAN: usize = 2;
+        const MAX_FAULT_TARGET_SCANS: usize = 4;
+        // 字面槽变体扫描（漏字母：ti'yang -> ti'yan）每跨度至多几个。
+        const MAX_LOOSE_DETERMINING_SCANS: usize = 2;
+        let span_pieces = |start: usize, end: usize| -> Segments { (start..end).map(|i| slots[i].raw_text.clone()).collect() };
+        // 末字母 +1 作开区间上界；前缀末位必是字母。
+        let upper_bound = |prefix: &str| -> String {
+            let mut upper = prefix.to_string();
+            let last = upper.pop().unwrap_or('a');
+            upper.push((last as u8 + 1) as char);
+            upper
+        };
+        // 同一词条只留罚得最少的那份。
+        let better = |candidate: &FaultEdge, current: &FaultEdge| -> bool {
+            current.word.is_empty() || candidate.weight as f64 * 10f64.powf(-candidate.penalty) > current.weight as f64 * 10f64.powf(-current.penalty)
+        };
+
+        let mut edges: Vec<Vec<FaultEdge>> = (0..slot_count).map(|_| Vec::new()).collect();
+        for start in 0..slot_count {
+            let max_end = slot_count.min(start + MAX_FAULT_SPAN_SLOTS);
+            for end in start + 1..=max_end {
+                let mut first_expandable = end;
+                let mut expandable = 0;
+                for i in start..end {
+                    if slots[i].kind != FaultSlotKind::Determining {
+                        if first_expandable == end {
+                            first_expandable = i;
+                        }
+                        expandable += 1;
+                    }
+                }
+                if expandable > MAX_EXPANDABLE_SLOTS_PER_SPAN {
+                    continue;
+                }
+
+                let raw_key = (start..end).map(|i| slots[i].raw_text.as_str()).collect::<Vec<_>>().join("'");
+                // 表按跨度槽数 + 首槽首字母选。
+                let table = table_name(&span_pieces(start, end)).unwrap_or_default();
+
+                let mut best_edges: Vec<FaultEdge> = Vec::new();
+                let mut best_index: HashMap<String, usize> = HashMap::new();
+                if expandable == 0 {
+                    // 全 Determining：无展开读音，走普通精确跨度查询。ü 归一后的键可能与字面差一个别名写法，那正是词库存的写法。
+                    for row in lookup(&span_pieces(start, end)) {
+                        let edge = FaultEdge {
+                            start,
+                            end,
+                            word: row.value.clone(),
+                            key: if row.key.is_empty() { raw_key.clone() } else { row.key.clone() },
+                            weight: row.weight,
+                            penalty: row.penalty,
+                        };
+                        match best_index.get(&row.value) {
+                            Some(&at) => best_edges[at] = edge,
+                            None => {
+                                best_index.insert(row.value.clone(), best_edges.len());
+                                best_edges.push(edge);
+                            }
+                        }
+                    }
+                } else {
+                    // 扫描前缀集合：SingleInitial 槽一个前缀（槽首字母），Fault 槽每个纠错目标一个（各有界）。
+                    let mut head = (start..first_expandable).map(|i| slots[i].raw_text.as_str()).collect::<Vec<_>>().join("'");
+                    if first_expandable > start {
+                        head.push('\'');
+                    }
+                    let mut scan_prefixes: Vec<String> = Vec::new();
+                    let first = &slots[first_expandable];
+                    if first.kind == FaultSlotKind::SingleInitial {
+                        scan_prefixes.push(format!("{head}{}", &first.raw_text[..1]));
+                    } else {
+                        for target in autocorrect::fault_slot_correction_targets(&first.raw_text, autocorrect_types) {
+                            scan_prefixes.push(format!("{head}{}", target.0));
+                            if scan_prefixes.len() >= MAX_FAULT_TARGET_SCANS {
+                                break;
+                            }
+                        }
+                    }
+
+                    for scan_prefix in &scan_prefixes {
+                        let upper = upper_bound(scan_prefix);
+                        let keyed = dictionary.query_key_range_keyed(&table, scan_prefix, &upper, options.span_limit).unwrap_or_default();
+                        for row in &keyed {
+                            let syllables = split_segments(&row.key);
+                            if syllables.len() != end - start {
+                                continue;
+                            }
+                            let mut penalty = 0.0;
+                            let mut valid = true;
+                            for i in start..end {
+                                if !valid {
+                                    break;
+                                }
+                                let slot = &slots[i];
+                                let reading = &syllables[i - start];
+                                match slot.kind {
+                                    // 前面槽的展开会移动该槽的键位置，只有逐槽等于字面（ü 归一后）才不是跨边界重切。
+                                    FaultSlotKind::Determining => {
+                                        if canonical_umlaut_spelling(reading) != canonical_umlaut_spelling(&slot.base_syllable) {
+                                            valid = false;
+                                        }
+                                    }
+                                    FaultSlotKind::SingleInitial => {
+                                        if *reading != slot.raw_text {
+                                            penalty += JIANPIN_EXPAND_PENALTY_LOG;
+                                        }
+                                    }
+                                    FaultSlotKind::Fault => {
+                                        let targets = autocorrect::fault_slot_correction_targets(&slot.raw_text, autocorrect_types);
+                                        match targets.iter().find(|entry| entry.0 == *reading) {
+                                            None => valid = false,
+                                            Some(found) => penalty += f64::from(found.1) * AUTOCORRECT_WEIGHT_TO_LOG,
+                                        }
+                                    }
+                                }
+                            }
+                            if !valid {
+                                continue;
+                            }
+                            let candidate = FaultEdge { start, end, word: row.text.clone(), key: row.key.clone(), weight: row.weight, penalty };
+                            let at = *best_index.entry(row.text.clone()).or_insert_with(|| {
+                                best_edges.push(FaultEdge::default());
+                                best_edges.len() - 1
+                            });
+                            if better(&candidate, &best_edges[at]) {
+                                best_edges[at] = candidate;
+                            }
+                        }
+                    }
+                }
+                edges[start].append(&mut best_edges);
+                best_index.clear();
+
+                // 字面槽的容错变体扫描：跨度内某个 Determining 槽读成同首字母的别的合法音节（ti'yang 的 yang 漏了 g -> ti'yan 体验）。
+                // 扫描前缀 = 前面全部字面槽 + 该槽首字母，只有前面槽全部 Determining 时才定得下来；每跨度至多两个。
+                let mut loose_scans = 0;
+                let mut i = start + 1;
+                while i < end && loose_scans < MAX_LOOSE_DETERMINING_SCANS {
+                    let at_i = i;
+                    i += 1;
+                    if slots[at_i].kind != FaultSlotKind::Determining {
+                        continue;
+                    }
+                    if !(start..at_i).all(|j| slots[j].kind == FaultSlotKind::Determining) {
+                        continue;
+                    }
+                    let mut loose_prefix = (start..at_i).map(|j| slots[j].raw_text.as_str()).collect::<Vec<_>>().join("'");
+                    // 循环从 start + 1 起，前面至少有一个字面槽，分隔符恒要补。
+                    loose_prefix.push('\'');
+                    loose_prefix.push_str(&slots[at_i].raw_text[..1]);
+                    let loose_upper = upper_bound(&loose_prefix);
+                    loose_scans += 1;
+                    let keyed = dictionary.query_key_range_keyed(&table, &loose_prefix, &loose_upper, options.span_limit).unwrap_or_default();
+                    for row in &keyed {
+                        let syllables = split_segments(&row.key);
+                        if syllables.len() != end - start {
+                            continue;
+                        }
+                        let mut penalty = 0.0;
+                        let mut valid = true;
+                        for j in start..end {
+                            if !valid {
+                                break;
+                            }
+                            let slot = &slots[j];
+                            let reading = &syllables[j - start];
+                            if j == at_i {
+                                // 漏字变体形态约束：字面读法不罚；变体必须能从槽原文删一个字母得到（shu -> sh/su、yang -> yan/yag）。
+                                if *reading == canonical_umlaut_spelling(&slot.base_syllable) {
+                                    continue;
+                                }
+                                if !autocorrect::is_deletion_variant(&slot.raw_text, reading) {
+                                    valid = false;
+                                    break;
+                                }
+                                penalty += f64::from(autocorrect::WEIGHT_DELETION) * AUTOCORRECT_WEIGHT_TO_LOG;
+                                continue;
+                            }
+                            if canonical_umlaut_spelling(reading) != canonical_umlaut_spelling(&slot.base_syllable) {
+                                valid = false;
+                            }
+                        }
+                        if !valid {
+                            continue;
+                        }
+                        let candidate = FaultEdge { start, end, word: row.text.clone(), key: row.key.clone(), weight: row.weight, penalty };
+                        let at = *best_index.entry(row.text.clone()).or_insert_with(|| {
+                            best_edges.push(FaultEdge::default());
+                            best_edges.len() - 1
+                        });
+                        if better(&candidate, &best_edges[at]) {
+                            best_edges[at] = candidate;
+                        }
+                    }
+                }
+                edges[start].append(&mut best_edges);
+            }
+        }
+
+        let paths = lattice::decode_fault_lattice(slot_count, &edges, &options);
+        let Some(top) = paths.first() else { return (result, Vec::new(), String::new()) };
+        // 路径已按「路径分 - 手误代价」排好；胜出读音的键就是实际读法（含展开与纠错目标）。
+        let winner_segments = split_segments(&top.key);
+        if winner_segments.is_empty() || !has_only_complete_pinyin_segments(&winner_segments) {
+            return (result, Vec::new(), String::new());
+        }
+        let winner_key = join_segments(&winner_segments);
+        let mut corrected = self.query_series(raw_input, &winner_key, &winner_segments);
+        if corrected.is_empty() {
+            return (result, Vec::new(), String::new());
+        }
+        // 与 arbitrate_legal_corrections 同判据打纠错标：读音字母不同于敲的字母才标。
+        let typed_letters = fold_letters(raw_input);
+        let corrected_letters = fold_letters(&winner_key);
+        if corrected_letters != typed_letters {
+            for candidate in &mut corrected {
+                if candidate.corrected_from.is_empty() && fold_letters(&candidate.pinyin) == corrected_letters {
+                    candidate.corrected_from = typed_letters.clone();
+                }
+            }
+        }
+
+        let winning_display = display_at_winning_slots(raw_input, &winner_segments);
+        // 胜出读音的整键块领衔，原字面候选紧随其后（纠错可能误判，原候选留在手边）。
+        let (mut winner_full, mut winner_prefix): (Vec<Item>, Vec<Item>) = (Vec::new(), Vec::new());
+        for candidate in corrected {
+            if reads_full_key(&candidate, &winner_key) {
+                winner_full.push(candidate);
+            } else {
+                winner_prefix.push(candidate);
+            }
+        }
+        if winner_full.is_empty() {
+            std::mem::swap(&mut winner_full, &mut winner_prefix);
+        }
+        let mut merged: Vec<Item> = Vec::new();
+        if let Some(first) = winner_full.first() {
+            merged.push(first.clone());
+        }
+        append_unique_words(&mut merged, &winner_full);
+        append_unique_words(&mut merged, &result);
+        append_unique_words(&mut merged, &winner_prefix);
+        (merged, winner_segments, winning_display)
+    }
+
     /// 词格最佳路径：只用语言模型、不带模糊音，给切分裁决打分。
     fn lattice_best_path(&self, cut: &[String]) -> Option<LatticePath> {
         if cut.is_empty() || !has_only_complete_pinyin_segments(cut) {
@@ -1298,15 +1660,21 @@ impl<'a> QuanpinDictionary<'a> {
     // 造词、调频、删词
     // ------------------------------------------------------------------------------------------
 
+    /// 写回路径（调频、造词、删词、写整句缓存、建 SQL、校验）去掉分隔符后的重切：按最近一次 `query` 的纠错状态切，
+    /// 写回才会落在查询出的同一个键上。
+    fn cut_for_write(&self, pinyin: &str) -> Vec<Segments> {
+        cut_pinyin_by_mode(pinyin, CutMode::Correction, self.correction_aliases_enabled)
+    }
+
     fn build_sql_for_checking_word(&self, key: &str, value: &str) -> String {
-        let cuts = cut_pinyin_by_mode(key, CutMode::Correction);
+        let cuts = self.cut_for_write(key);
         let Some(cut) = cuts.first() else { return String::new() };
         let table = table_name(cut).unwrap_or_default();
         format!("select 1 from {table} where key = '{}' and value = '{}';", escape_sql_text(key), escape_sql_text(value))
     }
 
     fn build_sql_for_inserting_word(&self, key: &str, jp: &str, value: &str) -> String {
-        let cuts = cut_pinyin_by_mode(key, CutMode::Correction);
+        let cuts = self.cut_for_write(key);
         let Some(cut) = cuts.first() else { return String::new() };
         let table = table_name(cut).unwrap_or_default();
         format!(
@@ -1319,7 +1687,7 @@ impl<'a> QuanpinDictionary<'a> {
     }
 
     fn build_sql_for_updating_word(&self, pinyin: &str, word: &str) -> String {
-        let cuts = cut_pinyin_by_mode(&remove_delimiters(pinyin), CutMode::Correction);
+        let cuts = self.cut_for_write(&remove_delimiters(pinyin));
         let Some(cut) = cuts.first() else { return String::new() };
         let han_count = helpcode::count_han_chars(word);
         let mut segments: Segments = cut.clone();
@@ -1348,7 +1716,7 @@ impl<'a> QuanpinDictionary<'a> {
         if jp.len() != han_count {
             return false;
         }
-        cut_pinyin_by_mode(&pure_key, CutMode::Correction).first().is_some_and(|cut| cut.len() == han_count)
+        self.cut_for_write(&pure_key).first().is_some_and(|cut| cut.len() == han_count)
     }
 
     fn writable(&self) -> Option<Connection> {
@@ -1396,7 +1764,7 @@ impl<'a> QuanpinDictionary<'a> {
         if pinyin.is_empty() || word.is_empty() {
             return ERROR_CODE;
         }
-        let cuts = cut_pinyin_by_mode(pinyin, CutMode::Correction);
+        let cuts = self.cut_for_write(pinyin);
         let segmentation = cuts.first().map_or_else(|| pinyin.to_string(), |cut| join_segments(cut));
         self.insert_word_to_series_cache_key(&series_cache_key(pinyin, &segmentation), pinyin, word, source)
     }
@@ -1406,7 +1774,7 @@ impl<'a> QuanpinDictionary<'a> {
         if raw_input.is_empty() || word.is_empty() {
             return ERROR_CODE;
         }
-        let segments = self.resolve_segments(raw_input, segmentation);
+        let segments = self.resolve_segments(raw_input, segmentation, correction_aliases_enabled(autocorrect_types));
         let resolution = resolve_series_query(raw_input, &segments, autocorrect_types);
         self.insert_word_to_series_cache_key(&resolution.cache_key, raw_input, word, source)
     }
@@ -1421,7 +1789,7 @@ impl<'a> QuanpinDictionary<'a> {
 
     pub fn create_word(&mut self, pinyin: &str, word: &str) -> i32 {
         let pinyin = remove_delimiters(pinyin);
-        let cuts = cut_pinyin_by_mode(&pinyin, CutMode::Correction);
+        let cuts = self.cut_for_write(&pinyin);
         let Some(cut) = cuts.first() else { return ERROR_CODE };
         let pinyin = join_segments(cut);
         let jp = segments_to_jianpin(cut);
@@ -1452,7 +1820,7 @@ impl<'a> QuanpinDictionary<'a> {
     /// 把词的权重提到这个读音下的最高 + 1。
     pub fn update_weight_by_pinyin_and_word(&mut self, pinyin: &str, word: &str) -> i32 {
         let pinyin = remove_delimiters(pinyin);
-        let cuts = cut_pinyin_by_mode(&pinyin, CutMode::Correction);
+        let cuts = self.cut_for_write(&pinyin);
         let Some(cut) = cuts.first() else { return ERROR_CODE };
         // 别名拼写（nue/lue 等词库不存在的键）不得承载用户调频数据：改写为标准键。
         let mut segments = normalize_umlaut_aliases(cut.clone());
@@ -1471,7 +1839,7 @@ impl<'a> QuanpinDictionary<'a> {
 
     pub fn delete_by_pinyin_and_word(&mut self, pinyin: &str, word: &str) -> i32 {
         let pinyin = remove_delimiters(pinyin);
-        let cuts = cut_pinyin_by_mode(&pinyin, CutMode::Correction);
+        let cuts = self.cut_for_write(&pinyin);
         let Some(cut) = cuts.first() else { return ERROR_CODE };
         let normalized = join_segments(cut);
         if !user_dictionary::delete_dictionary_candidate(&self.db_path.to_string_lossy(), &self.journal_path, DictionaryKind::Pinyin, &normalized, word) {

@@ -5,11 +5,15 @@
 //!   纠正边数、权重和、是否带生成式边；
 //! - `legal`：合法输入上的手误读法（含零声母音节、罕见合法音节 lia/dia、与切分不一致的输入）；
 //! - `reading`：读音对回敲的字母（`correction_cut_for_reading`、`corrected_reading_raw_length`）；
-//! - `jianpin`：`looks_like_jianpin_spelling`。
+//! - `jianpin`：`looks_like_jianpin_spelling`；
+//! - `fault`：长句容错槽位模型（`build_fault_slots`、各槽的纠错目标、是否接管、读音对回原始字母）；
+//!   `delvar`：`is_deletion_variant`；`umlaut`：`canonical_umlaut_spelling` 与 `is_jqxy_v_alias`。
 
 use msime_core::autocorrect::{
-    autocorrect_cut_detail, corrected_reading_raw_length, correction_cut_for_reading, legal_input_correction_cuts, looks_like_jianpin_spelling, tables, Cut,
+    autocorrect_cut_detail, build_fault_slots, corrected_reading_raw_length, correction_cut_for_reading, fault_reading_raw_length, fault_slot_correction_targets,
+    fault_slots_eligible, is_deletion_variant, legal_input_correction_cuts, looks_like_jianpin_spelling, tables, Cut, FaultSlotKind,
 };
+use msime_core::quanpin_utils::{canonical_umlaut_spelling, is_jqxy_v_alias};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -107,4 +111,47 @@ fn jianpin_shapes_match_cpp() {
     }
     eprintln!("简拼形状：{checked} 条，判为简拼 {yes}");
     assert!(checked >= 1500 && yes > 300 && yes < checked - 300);
+}
+
+#[test]
+fn fault_slot_model_matches_cpp() {
+    let (mut eligible, mut aligned, mut with_targets, mut total) = (0, 0, 0, 0);
+    for record in records().iter().filter(|r| r["kind"] == "fault") {
+        let input = record["input"].as_str().unwrap();
+        let mask = record["mask"].as_u64().unwrap() as u32;
+        let slots = build_fault_slots(input);
+        let kind = |k: FaultSlotKind| match k {
+            FaultSlotKind::Determining => 0,
+            FaultSlotKind::SingleInitial => 1,
+            FaultSlotKind::Fault => 2,
+        };
+        let got_slots = Value::Array(slots.iter().map(|s| serde_json::json!([s.raw_text, s.base_syllable, kind(s.kind)])).collect());
+        assert_eq!(got_slots, record["slots"], "slots {input:?}");
+        let got_targets = Value::Array(
+            slots
+                .iter()
+                .map(|s| Value::Array(fault_slot_correction_targets(&s.raw_text, mask).into_iter().map(|(syllable, weight)| serde_json::json!([syllable, weight])).collect()))
+                .collect(),
+        );
+        assert_eq!(got_targets, record["targets"], "targets {input:?} mask={mask}");
+        assert_eq!(fault_slots_eligible(&slots, mask), record["eligible"].as_bool().unwrap(), "eligible {input:?} mask={mask}");
+        let reading = strings(&record["reading"]);
+        let raw_length = fault_reading_raw_length(input, &reading);
+        assert_eq!(raw_length.map_or(Value::Null, |n| serde_json::json!(n)), record["raw_length"], "raw_length {input:?} {reading:?}");
+        total += 1;
+        eligible += usize::from(fault_slots_eligible(&slots, mask));
+        aligned += usize::from(raw_length.is_some());
+        with_targets += usize::from(got_targets.as_array().unwrap().iter().any(|t| !t.as_array().unwrap().is_empty()));
+    }
+    for record in records().iter().filter(|r| r["kind"] == "delvar") {
+        let (raw, reading) = (record["raw"].as_str().unwrap(), record["reading"].as_str().unwrap());
+        assert_eq!(is_deletion_variant(raw, reading), record["ret"].as_bool().unwrap(), "delvar {raw:?} {reading:?}");
+    }
+    for record in records().iter().filter(|r| r["kind"] == "umlaut") {
+        let syllable = record["syllable"].as_str().unwrap();
+        assert_eq!(canonical_umlaut_spelling(syllable), record["ret"].as_str().unwrap(), "umlaut {syllable:?}");
+        assert_eq!(is_jqxy_v_alias(syllable), record["alias"].as_bool().unwrap(), "alias {syllable:?}");
+    }
+    eprintln!("容错槽位：{total} 条，接管 {eligible}，读音对回 {aligned}，带纠错目标 {with_targets}");
+    assert!(total >= 2500 && eligible > 300 && aligned > 300 && with_targets > 50);
 }

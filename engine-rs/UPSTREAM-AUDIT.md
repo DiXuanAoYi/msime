@@ -35,7 +35,7 @@
 
 ### 三档：大块且互相依赖的纠错/词格改写
 
-`60c2b26`（多字纠错收窄，3591 行含表）、`e38626d`（长句手误走容错槽位词格仲裁，1048）、`7d45c51`、`5092125`（漏字/多字纠错独立开关）、`2f63067`（纠错生成表改编译期常量，3675）、`cf07b77`（等音节数字面切分按整句打分裁决，367）、`b434240`（模糊读音按词频混排，218）、`d495ea2`（octagram 加成收敛，217）、`36ab259`（原样混拼优先级，110）。它们改的是同一批函数（`quanpin_dictionary`、`quanpin_utils`、`word_lattice`），要按序整体摘，不能挑着取。工作量相当于重新移植一次拼音候选主干，需要重导 InputSession/Session 两份约 26 MB 基线。
+`60c2b26`（多字纠错收窄，3591 行含表）、`e38626d`（长句手误走容错槽位词格仲裁，1048）、`7d45c51`、`5092125`（漏字/多字纠错独立开关）、`2f63067`（纠错生成表改编译期常量，3675）、`cf07b77`（等音节数字面切分按整句打分裁决，367）、`b434240`（模糊读音按词频混排，218）、`d495ea2`（octagram 加成收敛，217）、`36ab259`（原样混拼优先级，110）。它们改的是同一批函数（`quanpin_dictionary`、`quanpin_utils`、`word_lattice`），要按序整体摘，不能挑着取；纠错改写链五个提交后来已整体摘取，见「摘取结果·三档」。
 
 ### 四档：Windows/产品功能，暂不跟
 
@@ -81,7 +81,12 @@ U 模式部件反查（`d414268`）、S 模式符号输入（`3cd429b`）、五�
 ### 三档
 
 - `b434240`、`d495ea2`、`36ab259`、`cf07b77`：逐块核对大部分已在树里（`9eaffd6` 带进来的是演进过的同类实现），没有新摘。
-- `60c2b26`、`e38626d`、`7d45c51`、`5092125`、`2f63067`（纠错改写链）**没摘**。试套这五个提交的引擎部分，`quanpin_utils.h`、`quanpin_dictionary.cpp`、`quanpin_query.cpp`、`input_session*.{h,cpp}`、`engine.cpp` 等都冲突；`e38626d` 单独就在拼音词库里新增约 550 行、词格 100 行、纠错工具 200 行（长句手误超预算时的容错槽位词格仲裁），`60c2b26` 还重写了 1500 多行生成表。这相当于把全拼纠错层整体重做一遍（C++ 合并加 Rust 重移植加 `autocorrect_table` 与基线重导），收益是长句手误的召回，风险集中在最核心的拼音主干。留作单独立项。
+- `60c2b26`、`e38626d`、`7d45c51`、`5092125`、`2f63067`（纠错改写链）**已按序整体摘取**（C++ 合并 + Rust 重移植 + 基线重导）：
+  - `60c2b26`：多字纠错只收相邻键的 QWERTY 邻键（连击、任意字母插入不再算）；`cut_pinyin_by_mode` 的 `include_correction_aliases` 必填，关掉换位和邻键后手误别名层不再改写切分（ü 归一仍常开），方案、词典、辅助码、排序上下文键共用 `correction_aliases_enabled`，写回路径走 `cut_for_write`；
+  - `e38626d`：长句手误超出纠错预算时走容错槽位词格仲裁（`build_fault_slots`、`fault_slot_correction_targets`、`decode_fault_lattice`、`arbitrate_fault_slots`，预编辑与选词消耗跟着胜出读音走）；
+  - `5092125`：漏字、多字各一个独立开关，四位互不联动；`2f63067`：生成式远键替换改成生成器输出的 `kGeneratedShapeEntries`。
+  - 没摘的前置 `1671c3a`（完整 ü 别名音节 `jvan` 等、九键删除）：`e38626d` 用到的 `canonical_umlaut_spelling` / `is_jqxy_v_alias` 单独补进了 `quanpin_utils`，生成器换成上游版本后对本地音节表重新生成 `autocorrect_table.h`（上游音节表多了 `jvan`/`jvn` 之类，本地没有，所以表不与上游逐字节相同）。
+  - 基线重导：`quanpin_autocorrect`、`quanpin_dictionary`、`pinyin_provider`、`ime_session`、`input_session`、`session`、`capi`、`expected_options`；探针新增长句容错读场景、槽位模型记录和 60 轮长句容错会话，Rust 全部逐位一致。
 
 ### 四档
 

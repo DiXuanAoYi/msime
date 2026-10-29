@@ -6,10 +6,11 @@
 //! 规则一旦和 C++ 对不上就红。
 //!
 //! 四种手误各自可以单独开关，位值和 `quanpin_utils.h` 的 `kAutocorrect*` 一致：
-//! 换位（sahng → shang）、邻键（shabg → shang）、漏键（shng → shang）、多键（shangg、sjhang → shang）。
+//! 换位（sahng → shang）、邻键（shabg → shang）、漏键（shng → shang）、多键（sjhang → shang，插入的是相邻键的 QWERTY 邻键）。
 //! 一个错拼可以对应多个正确音节（漏键的 `shng` → `shang`、`sheng`），全部保留，由后面的切分和词频裁决。
 //! 长度不足 3 的串不收：两个字母是简拼的地盘，`wj` 只能是 w+j，不能被改成 `wu`。
 
+use crate::quanpin_utils::{canonical_umlaut_spelling, is_jqxy_v_alias};
 use crate::syllables::INTACT;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -26,6 +27,21 @@ pub struct Tables {
     pub neighbor: Table,
     pub deletion: Table,
     pub insertion: Table,
+    /// 表外“生成式”形状（远键替换，zher → zhe、shatg → shang）：已剔除和前四张表重复的对。
+    pub generated: Table,
+}
+
+/// 开关 → 掩码的唯一实现，对应 C++ `autocorrect_types_from_switches`：四个开关一一映射到各自的位，互不联动。
+pub fn autocorrect_types_from_switches(transposition: bool, neighbor: bool, deletion: bool, insertion: bool) -> u32 {
+    (if transposition { TRANSPOSITION } else { 0 })
+        | (if neighbor { NEIGHBOR } else { 0 })
+        | (if deletion { DELETION } else { 0 })
+        | (if insertion { INSERTION } else { 0 })
+}
+
+/// 掩码下手误别名层（切分里的 aing → iang 之类）是否生效，对应 C++ `correction_aliases_enabled`：只看换位、邻键两位。
+pub fn correction_aliases_enabled(autocorrect_types: u32) -> bool {
+    autocorrect_types & (TRANSPOSITION | NEIGHBOR) != 0
 }
 
 /// QWERTY 字母键的邻键（手指够得着的范围）。
@@ -96,21 +112,17 @@ fn deletion_variants(syllable: &str) -> Vec<String> {
         .collect()
 }
 
-/// 插入一个字母：必须像真的手滑，也就是相邻键的重复（连击）或相邻键的邻键。
+/// 插入一个字母：必须像真的手滑，也就是相邻键的 QWERTY 邻键。连击（重复相邻键）不收。
 fn insertion_variants(syllable: &str) -> Vec<String> {
     let chars: Vec<char> = syllable.chars().collect();
     let mut out = Vec::new();
     for position in 0..=chars.len() {
         let mut letters: BTreeSet<char> = BTreeSet::new();
         if position > 0 {
-            let left = chars[position - 1];
-            letters.insert(left);
-            letters.extend(neighbors(left));
+            letters.extend(neighbors(chars[position - 1]));
         }
         if position < chars.len() {
-            let right = chars[position];
-            letters.insert(right);
-            letters.extend(neighbors(right));
+            letters.extend(neighbors(chars[position]));
         }
         for letter in letters {
             let mut inserted = chars.clone();
@@ -121,10 +133,28 @@ fn insertion_variants(syllable: &str) -> Vec<String> {
     out
 }
 
+/// 远键替换：换上的字母既不是原字母也不是它的 QWERTY 邻键。
+fn far_substitution_variants(syllable: &str) -> Vec<String> {
+    let chars: Vec<char> = syllable.chars().collect();
+    let mut out = Vec::new();
+    for (i, ch) in chars.iter().enumerate() {
+        for key in 'a'..='z' {
+            if key == *ch || neighbors(*ch).contains(&key) {
+                continue;
+            }
+            let mut replaced = chars.clone();
+            replaced[i] = key;
+            out.push(replaced.into_iter().collect());
+        }
+    }
+    out
+}
+
 fn build(make_variants: fn(&str) -> Vec<String>) -> Table {
     let mut table = Table::new();
     for syllable in INTACT {
-        if syllable.len() < 2 {
+        // j/q/x/y 后面的 v 只是 u 的别名，不从它们派生纠错键。
+        if syllable.len() < 2 || is_jqxy_v_alias(syllable) {
             continue;
         }
         for variant in make_variants(syllable) {
@@ -139,12 +169,21 @@ fn build(make_variants: fn(&str) -> Vec<String>) -> Table {
 }
 
 pub fn tables() -> Tables {
-    Tables {
-        transposition: build(transposition_variants),
-        neighbor: build(neighbor_variants),
-        deletion: build(deletion_variants),
-        insertion: build(insertion_variants),
+    let transposition = build(transposition_variants);
+    let neighbor = build(neighbor_variants);
+    let deletion = build(deletion_variants);
+    let insertion = build(insertion_variants);
+    // 生成式形状剔除和静态表重复的 (错拼, 音节) 对，剔空的键也不留。
+    let mut generated = build(far_substitution_variants);
+    for (wrong, corrects) in generated.iter_mut() {
+        for table in [&transposition, &neighbor, &deletion, &insertion] {
+            if let Some(static_corrects) = table.get(wrong) {
+                corrects.retain(|correct| !static_corrects.contains(correct));
+            }
+        }
     }
+    generated.retain(|_, corrects| !corrects.is_empty());
+    Tables { transposition, neighbor, deletion, insertion, generated }
 }
 
 /// 单个纠错边的代价，和 `quanpin_utils.h` 的 `kAutocorrect*Weight` 一致：换位最便宜，邻键最贵。
@@ -165,7 +204,7 @@ pub const WEIGHT_GENERATED: i32 = 15;
 pub struct Target {
     pub syllable: String,
     pub types: u32,
-    /// 表外生成的一对（远键替换、任意字母插入）：代价固定为 [`WEIGHT_GENERATED`]，开关仍按 `types` 判。
+    /// 表外生成的一对（远键替换）：代价固定为 [`WEIGHT_GENERATED`]，开关仍按 `types` 判。
     pub generated: bool,
 }
 
@@ -228,61 +267,10 @@ struct Hypothesis {
     sequence: Vec<String>,
 }
 
-fn is_neighbor_key(key: char, of_letter: char) -> bool {
-    neighbors(of_letter).contains(&key)
-}
-
-/// 表外生成的纠正对：对每个合法音节（至少三个字母），远键替换和静态表覆盖不到的任意字母插入。
-/// 变形后必须不是合法音节、长度在三到六个字母之间。
-fn generated_pairs() -> Vec<(String, &'static str, u32)> {
-    let mut pairs = Vec::new();
-    for syllable in INTACT {
-        if syllable.len() < 3 {
-            continue;
-        }
-        let chars: Vec<char> = syllable.chars().collect();
-        for i in 0..chars.len() {
-            for key in 'a'..='z' {
-                if key == chars[i] || is_neighbor_key(key, chars[i]) {
-                    continue;
-                }
-                let mut wrong = chars.clone();
-                wrong[i] = key;
-                let wrong: String = wrong.into_iter().collect();
-                if INTACT.contains(&wrong.as_str()) {
-                    continue;
-                }
-                pairs.push((wrong, *syllable, NEIGHBOR));
-            }
-        }
-        for i in 0..=chars.len() {
-            let left = if i > 0 { Some(chars[i - 1]) } else { None };
-            let right = chars.get(i).copied();
-            for key in 'a'..='z' {
-                let covered = Some(key) == left
-                    || Some(key) == right
-                    || left.is_some_and(|l| is_neighbor_key(key, l))
-                    || right.is_some_and(|r| is_neighbor_key(key, r));
-                if covered {
-                    continue;
-                }
-                let mut wrong = chars.clone();
-                wrong.insert(i, key);
-                let wrong: String = wrong.into_iter().collect();
-                if wrong.len() > 6 || INTACT.contains(&wrong.as_str()) {
-                    continue;
-                }
-                pairs.push((wrong, *syllable, INSERTION));
-            }
-        }
-    }
-    pairs
-}
-
 type Index = std::collections::HashMap<String, Vec<Target>>;
 
 /// 错拼 → 目标音节：先是四张静态表（换位、漏键、多键、邻键，同表内按字母序，这是 C++ 并列时的“表序”），
-/// 再是生成式的对；生成式的对若和静态的撞了就丢掉，静态表更便宜的代价已经覆盖它。
+/// 再是生成式的对（生成期已经剔除了和静态表重复的，这里只追加）。
 fn build_index(tables: &Tables) -> Index {
     let mut index: Index = std::collections::HashMap::new();
     for (bit, table) in [
@@ -301,10 +289,12 @@ fn build_index(tables: &Tables) -> Index {
             }
         }
     }
-    for (wrong, syllable, bit) in generated_pairs() {
-        let targets = index.entry(wrong).or_default();
-        if !targets.iter().any(|t| t.syllable == syllable) {
-            targets.push(Target { syllable: syllable.to_string(), types: bit, generated: true });
+    for (wrong, corrects) in &tables.generated {
+        let targets = index.entry(wrong.clone()).or_default();
+        for correct in corrects {
+            if !targets.iter().any(|t| &t.syllable == correct) {
+                targets.push(Target { syllable: correct.clone(), types: NEIGHBOR, generated: true });
+            }
         }
     }
     index
@@ -586,6 +576,158 @@ impl Tables {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// 长句容错槽位模型
+// -------------------------------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FaultSlotKind {
+    /// 合法音节：读音固定。
+    Determining,
+    /// 单个字母：简拼，可展开成任一以它开头的音节。
+    SingleInitial,
+    /// 多个字母的非法串：只能经纠错表读成合法音节。
+    Fault,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FaultSlot {
+    pub raw_text: String,
+    pub base_syllable: String,
+    pub kind: FaultSlotKind,
+}
+
+/// 短串（槽数不超过它）归 k-best 的既有势力范围。
+pub const MAX_SHORT_AUTOCORRECT_SYLLABLES: usize = 4;
+pub const MAX_FAULT_SLOT_COUNT: usize = 20;
+
+fn fault_slot_kind(piece: &str) -> FaultSlotKind {
+    if INTACT.contains(&piece) {
+        FaultSlotKind::Determining
+    } else if piece.len() == 1 {
+        FaultSlotKind::SingleInitial
+    } else {
+        FaultSlotKind::Fault
+    }
+}
+
+/// 把敲出的字母切成容错槽位：切分与查询层同一个切分器（残余按简拼尾解释），再按 intact 集分类。
+/// 带分隔符、含非字母的串没有槽位。对应 C++ `build_fault_slots`。
+pub fn build_fault_slots(pinyin: &str) -> Vec<FaultSlot> {
+    if pinyin.is_empty() || pinyin.contains('\'') {
+        return Vec::new();
+    }
+    let mut letters = String::with_capacity(pinyin.len());
+    for byte in pinyin.bytes() {
+        let lower = byte.to_ascii_lowercase();
+        if !lower.is_ascii_lowercase() {
+            return Vec::new();
+        }
+        letters.push(lower as char);
+    }
+    let Some(segments) = crate::segment::cut_min_segments_prefix(&letters) else { return Vec::new() };
+    if segments.is_empty() || segments.concat() != letters {
+        return Vec::new();
+    }
+    segments
+        .into_iter()
+        .map(|segment| {
+            let kind = fault_slot_kind(&segment);
+            // Fault 槽没有基础读法：多字母非法串不能当简拼查词。
+            let base_syllable = if kind == FaultSlotKind::Fault { String::new() } else { segment.clone() };
+            FaultSlot { raw_text: segment, base_syllable, kind }
+        })
+        .collect()
+}
+
+/// 一个槽的纠错表目标（音节, 权重），按启用的类型位过滤；已是合法音节的串没有目标。
+/// 权重按启用位折算，生成式目标走昂贵档常数。对应 C++ `fault_slot_correction_targets`。
+pub fn fault_slot_correction_targets(raw_text: &str, autocorrect_types: u32) -> Vec<(String, i32)> {
+    if autocorrect_types == 0 || raw_text.is_empty() || INTACT.contains(&raw_text) {
+        return Vec::new();
+    }
+    let Some(found) = shared_index().get(raw_text) else { return Vec::new() };
+    let mut targets: Vec<(String, i32)> = Vec::new();
+    for target in found {
+        let enabled = autocorrect_types & target.types;
+        if enabled == 0 {
+            continue;
+        }
+        let weight = if target.generated { WEIGHT_GENERATED } else { cheapest_weight(enabled) };
+        match targets.iter_mut().find(|entry| entry.0 == target.syllable) {
+            None => targets.push((target.syllable.clone(), weight)),
+            Some(existing) if weight < existing.1 => existing.1 = weight,
+            Some(_) => {}
+        }
+    }
+    targets
+}
+
+/// 容错仲裁是否接管：至少两个单字母槽、有非 Determining 槽，且槽数超过短串上限（不超过 20）。
+pub fn fault_slots_eligible(slots: &[FaultSlot], autocorrect_types: u32) -> bool {
+    if autocorrect_types == 0 || slots.is_empty() || slots.len() > MAX_FAULT_SLOT_COUNT {
+        return false;
+    }
+    let single_initial = slots.iter().filter(|slot| slot.kind == FaultSlotKind::SingleInitial).count();
+    let non_determining = slots.iter().filter(|slot| slot.kind != FaultSlotKind::Determining).count();
+    single_initial >= 2 && non_determining > 0 && slots.len() > MAX_SHORT_AUTOCORRECT_SYLLABLES
+}
+
+/// 读音是槽原文删掉恰好一个字母得到的（yang → yan/yag）。
+pub fn is_deletion_variant(raw_text: &str, reading: &str) -> bool {
+    let (raw, reading) = (raw_text.as_bytes(), reading.as_bytes());
+    if reading.len() + 1 != raw.len() {
+        return false;
+    }
+    let mut r = 0;
+    let mut skipped = 0;
+    for &ch in raw {
+        if skipped == 0 && (r >= reading.len() || ch != reading[r]) {
+            skipped = 1;
+            continue;
+        }
+        if r < reading.len() && reading[r] == ch {
+            r += 1;
+            continue;
+        }
+        return false;
+    }
+    skipped == 1 && r == reading.len()
+}
+
+/// 容错仲裁的读音对回敲的字母：按槽位模型逐槽核对，返回读音盖住的字母数。对应 C++ `fault_reading_raw_length`。
+pub fn fault_reading_raw_length(raw_letters: &str, reading: &[String]) -> Option<usize> {
+    let slots = build_fault_slots(raw_letters);
+    if slots.is_empty() || reading.len() > slots.len() || reading.is_empty() {
+        return None;
+    }
+    let mut consumed = 0;
+    for (slot, syllable) in slots.iter().zip(reading) {
+        // 槽盖住的原始字母必须被读音逐字母消耗（允许 ü 归一）。
+        let matches_slot = *syllable == slot.base_syllable
+            || (syllable.len() == slot.raw_text.len() && canonical_umlaut_spelling(&slot.raw_text) == canonical_umlaut_spelling(syllable));
+        match slot.kind {
+            FaultSlotKind::Determining => {
+                if !matches_slot && !is_deletion_variant(&slot.raw_text, syllable) {
+                    return None;
+                }
+            }
+            FaultSlotKind::SingleInitial => {
+                if !matches_slot && (syllable.is_empty() || syllable.as_bytes()[0] != slot.raw_text.as_bytes()[0]) {
+                    return None;
+                }
+            }
+            FaultSlotKind::Fault => {
+                if syllable.is_empty() || !INTACT.contains(&syllable.as_str()) {
+                    return None;
+                }
+            }
+        }
+        consumed += slot.raw_text.len();
+    }
+    Some(consumed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -596,7 +738,8 @@ mod tests {
         assert_eq!(t.corrections("sahng", TRANSPOSITION), ["shang"]);
         assert_eq!(t.corrections("shabg", NEIGHBOR), ["shang"]);
         assert!(t.corrections("shng", DELETION).contains(&"shang".to_string()));
-        assert!(t.corrections("shangg", INSERTION).contains(&"shang".to_string()));
+        // 连击不是多字纠错：只收相邻键的 QWERTY 邻键。
+        assert!(!t.corrections("shangg", INSERTION).contains(&"shang".to_string()));
         assert!(t.corrections("sjhang", INSERTION).contains(&"shang".to_string()));
     }
 
@@ -655,13 +798,12 @@ mod tests {
         let gai = gau.iter().find(|c| reading(c) == "gai").expect("gau 要保留邻键读法 gai");
         assert!(gau[0].weight < gai.weight);
 
-        assert_eq!(reading(&t.cut_kbest("shangg", INSERTION, 9)[0]), "shang");
-        assert!(t.cut_kbest("shangg", TRANSPOSITION, 9).is_empty());
-        assert!(t.cut_kbest("shangg", DELETION, 9).is_empty());
-        assert!(t.cut_kbest("shangg", NEIGHBOR, 9).is_empty());
+        assert!(t.cut_kbest("shangg", INSERTION, 9).is_empty());
         assert_eq!(reading(&t.cut_kbest("sjhang", INSERTION, 9)[0]), "shang");
+        assert!(t.cut_kbest("sjhang", TRANSPOSITION, 9).is_empty());
+        assert!(t.cut_kbest("sjhang", DELETION, 9).is_empty());
         assert!(t.cut_kbest("sjhang", NEIGHBOR, 9).is_empty());
-        assert_eq!(reading(&t.cut_kbest("shanggzhi", all_four, 9)[0]), "shang'zhi");
+        assert_eq!(reading(&t.cut_kbest("sjhangzhi", all_four, 9)[0]), "shang'zhi");
     }
 
     #[test]
@@ -681,9 +823,9 @@ mod tests {
     #[test]
     fn kbest_keeps_the_raw_letters_each_segment_consumed() {
         let t = tables();
-        let cut = &t.cut_kbest("shangg", INSERTION, 1)[0];
+        let cut = &t.cut_kbest("sjhang", INSERTION, 1)[0];
         assert_eq!(cut.segments.len(), 1);
-        assert_eq!((cut.segments[0].raw.as_str(), cut.segments[0].syllable.as_str()), ("shangg", "shang"));
+        assert_eq!((cut.segments[0].raw.as_str(), cut.segments[0].syllable.as_str()), ("sjhang", "shang"));
         assert_eq!((cut.edges, cut.weight), (1, WEIGHT_INSERTION));
     }
 }

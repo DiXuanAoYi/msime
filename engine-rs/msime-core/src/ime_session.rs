@@ -120,6 +120,7 @@ impl<'a> ImeSession<'a> {
         session.scheme = session.create_scheme(scheme_type);
         session.bind_wubi_scheme();
         session.bind_shuangpin_scheme();
+        session.bind_quanpin_scheme();
         session
     }
 
@@ -147,6 +148,20 @@ impl<'a> ImeSession<'a> {
     fn bind_shuangpin_scheme(&mut self) {
         let mut scheme = std::mem::replace(&mut self.scheme, Scheme::Quanpin(QuanpinScheme::default()));
         self.configure_shuangpin_scheme(&mut scheme);
+        self.scheme = scheme;
+    }
+
+    /// 把会话的纠错掩码下发给全拼方案（别的方案什么也不做）。要在 build_request 之前调，掩码决定切分要不要跑手误别名层。
+    fn configure_quanpin_scheme(&self, scheme: &mut Scheme) {
+        if let Scheme::Quanpin(quanpin) = scheme {
+            quanpin.set_autocorrect_types(self.quanpin_autocorrect_types);
+        }
+    }
+
+    /// 换方案或改纠错开关时把掩码绑到当前方案上。
+    fn bind_quanpin_scheme(&mut self) {
+        let mut scheme = std::mem::replace(&mut self.scheme, Scheme::Quanpin(QuanpinScheme::default()));
+        self.configure_quanpin_scheme(&mut scheme);
         self.scheme = scheme;
     }
 
@@ -196,6 +211,7 @@ impl<'a> ImeSession<'a> {
 
     pub fn set_quanpin_autocorrect_types(&mut self, types: u32) {
         self.quanpin_autocorrect_types = types;
+        self.bind_quanpin_scheme();
     }
 
     pub fn set_fuzzy_pinyin_options(&mut self, rules: u32) {
@@ -232,6 +248,7 @@ impl<'a> ImeSession<'a> {
         self.scheme = self.create_scheme(scheme_type);
         self.bind_wubi_scheme();
         self.bind_shuangpin_scheme();
+        self.bind_quanpin_scheme();
         self.state = CompositionState::default();
     }
 
@@ -320,6 +337,11 @@ impl<'a> ImeSession<'a> {
         self.registry.find_candidate(scheme, key, value)
     }
 
+    /// 容错仲裁选中读音后的分段显示（大小写原样）；空表示当前串没有容错布局。
+    pub fn fault_segmentation_with_cases(&self) -> &str {
+        self.registry.fault_segmentation_with_cases()
+    }
+
     pub fn expand_initial_candidates(&mut self) -> bool {
         let request = self.state.request.clone();
         self.registry.expand_initial_candidates(&request, &mut self.state.candidates)
@@ -350,6 +372,7 @@ impl<'a> ImeSession<'a> {
         // 临时方案要按同样的触发规则解析原串（大写段），否则前缀查询与正式查询切得不一样。
         let mut query_scheme = self.create_scheme(self.current_scheme_type());
         self.configure_shuangpin_scheme(&mut query_scheme);
+        self.configure_quanpin_scheme(&mut query_scheme);
         query_scheme.inner_mut().set_raw_input(raw_input, raw_input_with_cases);
         let mut request = query_scheme.inner().build_request();
         self.apply_request_options(&mut request);
@@ -377,7 +400,7 @@ impl<'a> ImeSession<'a> {
     // ------------------------------------------------------------------------------------------
 
     fn apply_request_options(&self, request: &mut QueryRequest) {
-        use crate::autocorrect::{NEIGHBOR, TRANSPOSITION};
+        use crate::autocorrect::{DELETION, INSERTION, NEIGHBOR, TRANSPOSITION};
         request.enable_shuangpin_helpcode = self.enable_shuangpin_helpcode;
         request.enable_mid_sentence_helpcode = self.enable_mid_sentence_helpcode;
         if self.enable_direct_helpcode && request.scheme == SchemeType::Shuangpin {
@@ -391,6 +414,8 @@ impl<'a> ImeSession<'a> {
         request.enable_quanpin_helpcode = self.enable_quanpin_helpcode;
         request.enable_quanpin_autocorrect_transposition = self.quanpin_autocorrect_types & TRANSPOSITION != 0;
         request.enable_quanpin_autocorrect_neighbor = self.quanpin_autocorrect_types & NEIGHBOR != 0;
+        request.enable_quanpin_autocorrect_deletion = self.quanpin_autocorrect_types & DELETION != 0;
+        request.enable_quanpin_autocorrect_insertion = self.quanpin_autocorrect_types & INSERTION != 0;
         request.fuzzy_pinyin = self.fuzzy_pinyin;
         request.sentence_association = self.sentence_association.clone();
         request.enabled_domain_dictionaries = self.enabled_domain_dictionaries.clone();
@@ -435,6 +460,7 @@ impl<'a> ImeSession<'a> {
 
         // 五笔拼音混输：同一串字母同时交给五笔码表和全拼，五笔候选在前、拼音候选追加在后，两个表都答得出的词只留五笔那份。
         let mut pinyin = QuanpinScheme::default();
+        pinyin.set_autocorrect_types(self.quanpin_autocorrect_types);
         pinyin.set_raw_input(&request.raw_input, &request.raw_input_with_cases);
         let mut pinyin_request = pinyin.build_request();
         self.apply_request_options(&mut pinyin_request);

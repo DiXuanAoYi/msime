@@ -50,6 +50,7 @@ fn rust_tables_equal_the_generated_cpp_header() {
         ("邻键", "kNeighborEntries", &ours.neighbor),
         ("漏键", "kDeletionEntries", &ours.deletion),
         ("多键", "kInsertionEntries", &ours.insertion),
+        ("生成式", "kGeneratedShapeEntries", &ours.generated),
     ] {
         let theirs = entries(section(&text, name), &syllables);
         assert!(theirs.len() > 100, "{label}：C++ 表只读到 {} 个键", theirs.len());

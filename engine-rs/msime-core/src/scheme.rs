@@ -2,6 +2,7 @@
 //!
 //! 方案只管“键 → 串 → 请求”，不碰词库；开关（直接辅助码、大写触发、五笔的扩展长度/混输/通配）由会话设。
 
+use crate::autocorrect::correction_aliases_enabled;
 use crate::mid_sentence;
 use crate::quanpin_query::{cut_pinyin_by_mode, join_segments, CutMode};
 use crate::quanpin_utils::{detect_active_helpcode_length, strip_active_helpcodes};
@@ -57,6 +58,15 @@ fn letter_from(vk: u32, wch: u16) -> char {
 pub struct QuanpinScheme {
     raw_input: String,
     key_strokes: Vec<KeyStroke>,
+    /// 手误别名层要不要参与切分（由会话的纠错掩码决定，默认关）：关掉纠错就不再通过别名改写切分。
+    include_correction_aliases: bool,
+}
+
+impl QuanpinScheme {
+    /// 纠错掩码由会话层在绑定方案时下发，方案只关心手误别名层开不开。
+    pub fn set_autocorrect_types(&mut self, autocorrect_types: u32) {
+        self.include_correction_aliases = correction_aliases_enabled(autocorrect_types);
+    }
 }
 
 impl InputScheme for QuanpinScheme {
@@ -99,7 +109,7 @@ impl InputScheme for QuanpinScheme {
         let normalized_source = strip_active_helpcodes(&request.raw_input, &request.raw_input_with_cases);
         request.normalized_input = normalized_source.chars().filter(|&c| c != '\'').collect();
         if !request.normalized_input.is_empty() {
-            if let Some(first) = cut_pinyin_by_mode(&normalized_source, CutMode::Correction).first() {
+            if let Some(first) = cut_pinyin_by_mode(&normalized_source, CutMode::Correction, self.include_correction_aliases).first() {
                 request.normalized_segmentation = join_segments(first);
             }
         }

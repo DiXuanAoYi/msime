@@ -360,7 +360,7 @@ C++ 状态 {}", state_value(&session)["candidates"], step["state"]["candidates"]
     }
     let _ = fs::remove_dir_all(&work);
     eprintln!("会话：{sequences} 个序列 {steps} 步，有组合 {with_composition}，本地模式 {local_steps}，有上屏 {committed}，光标 {caret_steps}，在线候选 {online_applied}");
-    assert!(sequences == 700 && steps > 20000 && with_composition > 15000 && local_steps > 500 && committed > 1000 && caret_steps > 300 && online_applied > 50);
+    assert!(sequences == 760 && steps > 20000 && with_composition > 15000 && local_steps > 500 && committed > 1000 && caret_steps > 300 && online_applied > 50);
 }
 
 fn frequency_mode(number: u64) -> Option<FrequencyAdjustmentMode> {

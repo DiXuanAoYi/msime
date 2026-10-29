@@ -828,7 +828,7 @@ impl<'a> ShuangpinDictionary<'a> {
     /// 造词时按双拼串取已有的词：每个前缀各查一次，长的在前。
     pub fn build_quanpin_sql_for_creating_word(&self, pinyin: &str) -> String {
         let normalized = self.normalize_shuangpin_to_quanpin_input(pinyin);
-        let cuts = cut_pinyin_by_mode(&normalized, CutMode::Correction);
+        let cuts = cut_pinyin_by_mode(&normalized, CutMode::Correction, true);
         let Some(cut) = cuts.first() else { return String::new() };
         let mut sql = String::new();
         for i in 1..=cut.len() {
@@ -852,14 +852,14 @@ impl<'a> ShuangpinDictionary<'a> {
     }
 
     fn build_quanpin_sql_for_checking_word(&self, key: &str, value: &str) -> String {
-        let cuts = cut_pinyin_by_mode(key, CutMode::Correction);
+        let cuts = cut_pinyin_by_mode(key, CutMode::Correction, true);
         let Some(cut) = cuts.first() else { return String::new() };
         let table = table_name(cut).unwrap_or_default();
         format!("select 1 from {table} where key = '{}' and value = '{}';", escape_sql_text(key), escape_sql_text(value))
     }
 
     fn build_quanpin_sql_for_inserting_word(&self, key: &str, jp: &str, value: &str) -> String {
-        let cuts = cut_pinyin_by_mode(key, CutMode::Correction);
+        let cuts = cut_pinyin_by_mode(key, CutMode::Correction, true);
         let Some(cut) = cuts.first() else { return String::new() };
         let table = table_name(cut).unwrap_or_default();
         format!(
@@ -873,7 +873,7 @@ impl<'a> ShuangpinDictionary<'a> {
 
     /// 调用方约定传入 canonical 全拼；这里不能再当双拼归一化。
     pub fn build_quanpin_sql_for_updating_word(&self, pinyin: &str, word: &str) -> String {
-        let cuts = cut_pinyin_by_mode(&remove_delimiters(pinyin), CutMode::Correction);
+        let cuts = cut_pinyin_by_mode(&remove_delimiters(pinyin), CutMode::Correction, true);
         let Some(cut) = cuts.first() else { return String::new() };
         let han_count = helpcode::count_han_chars(word);
         let mut segments: Segments = cut.clone();
@@ -902,7 +902,7 @@ impl<'a> ShuangpinDictionary<'a> {
         if jp.len() != han_count {
             return false;
         }
-        let cuts = cut_pinyin_by_mode(&pure_key, CutMode::Correction);
+        let cuts = cut_pinyin_by_mode(&pure_key, CutMode::Correction, true);
         if let Some(cut) = cuts.first() {
             return cut.len() == han_count;
         }
@@ -964,7 +964,7 @@ impl<'a> ShuangpinDictionary<'a> {
     /// 把词的权重提到这个读音下的最高 + 1。`pinyin` 可以是双拼原串，也可以是全拼。
     pub fn update_weight_by_pinyin_and_word(&mut self, pinyin: &str, word: &str) -> i32 {
         let mut pinyin = pinyin.to_string();
-        let direct_cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction);
+        let direct_cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction, true);
         // 只有“完整合法拼读”的直切才可信，否则当双拼原串归一化。
         if direct_cuts.is_empty()
             || !has_only_complete_pinyin_segments(&direct_cuts[0])
@@ -972,7 +972,7 @@ impl<'a> ShuangpinDictionary<'a> {
         {
             pinyin = self.normalize_shuangpin_to_quanpin_input(&pinyin);
         }
-        let cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction);
+        let cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction, true);
         let Some(cut) = cuts.first() else { return ERROR_CODE };
         let mut segments = cut.clone();
         let han_count = helpcode::count_han_chars(word);
@@ -990,9 +990,9 @@ impl<'a> ShuangpinDictionary<'a> {
 
     pub fn delete_by_pinyin_and_word(&mut self, pinyin: &str, word: &str) -> i32 {
         let mut pinyin = pinyin.to_string();
-        let direct_cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction);
+        let direct_cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction, true);
         let normalized_shuangpin = self.normalize_shuangpin_to_quanpin_input(&pinyin);
-        let shuangpin_cuts = cut_pinyin_by_mode(&normalized_shuangpin, CutMode::Correction);
+        let shuangpin_cuts = cut_pinyin_by_mode(&normalized_shuangpin, CutMode::Correction, true);
         let han_count = helpcode::count_han_chars(word);
         let direct_key_matches_word = direct_cuts.first().is_some_and(|cut| cut.len() == han_count);
         let shuangpin_key_matches_word = shuangpin_cuts.first().is_some_and(|cut| cut.len() == han_count);
@@ -1002,7 +1002,7 @@ impl<'a> ShuangpinDictionary<'a> {
         {
             pinyin = normalized_shuangpin;
         }
-        let cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction);
+        let cuts = cut_pinyin_by_mode(&remove_delimiters(&pinyin), CutMode::Correction, true);
         let Some(cut) = cuts.first() else { return ERROR_CODE };
         let normalized = join_segments(cut);
         if !user_dictionary::delete_dictionary_candidate(&self.db_path.to_string_lossy(), &self.journal_path, DictionaryKind::Pinyin, &normalized, word) {

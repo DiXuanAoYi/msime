@@ -119,6 +119,11 @@ impl<'a> ProviderRegistry<'a> {
         }
     }
 
+    /// 容错仲裁选中读音后的分段显示（大小写原样）；空表示当前串没有容错布局。
+    pub fn fault_segmentation_with_cases(&self) -> &str {
+        self.pinyin.fault_segmentation_with_cases()
+    }
+
     /// 整句（词格 + 神经重排）只出在拼音提供者上，五笔混输查的也是它。
     pub fn reset_sentence_cache(&self) {
         self.pinyin.reset_sentence_cache();

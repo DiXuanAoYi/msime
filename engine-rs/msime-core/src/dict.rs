@@ -177,6 +177,16 @@ impl Dictionary {
 }
 
 impl Dictionary {
+    /// 键区间扫描，对应 C++ `quanpin::query_key_range_keyed`：`table` 里 `key ∈ [lower, upper)` 的行，按权重从高到低，至多 `limit` 行。
+    /// 容错词格用它现算简拼展开候选；表不存在当作没有结果。
+    pub fn query_key_range_keyed(&self, table: &str, lower: &str, upper: &str, limit: i32) -> rusqlite::Result<Vec<KeyedEntry>> {
+        if table.is_empty() || lower.is_empty() || lower >= upper || limit <= 0 {
+            return Ok(Vec::new());
+        }
+        let sql = format!("SELECT \"key\", \"value\", \"weight\" FROM \"{table}\" WHERE \"key\" >= ?1 AND \"key\" < ?2 ORDER BY \"weight\" DESC LIMIT ?3");
+        self.keyed(&sql, rusqlite::params![lower, upper, limit])
+    }
+
     /// 单个字母（声母）下的词，按权重从高到低，对应 C++ `quanpin::query_initial`：只查 `tbl_1_<字母>` 里键以 `prefix` 开头的行。
     pub fn query_initial(&self, prefix: &str, limit: i64) -> rusqlite::Result<Vec<KeyedEntry>> {
         let Some(first) = prefix.chars().next() else { return Ok(Vec::new()) };

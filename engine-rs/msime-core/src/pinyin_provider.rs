@@ -16,16 +16,14 @@ use crate::shuangpin_query as sq;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// 请求里每种纠错一个开关，词典层用一个类型掩码。任一开关开着就连带打开删除位和插入位：
-/// 用户想让手误被纠正，漏敲和多敲也在其中；都关着就是 0。
+/// 请求里每种纠错一个开关，词典层用一个类型掩码：四个开关一一映射到各自的位，互不联动。
 fn autocorrect_types_from_request(request: &QueryRequest) -> u32 {
-    use crate::autocorrect::{DELETION, INSERTION, NEIGHBOR, TRANSPOSITION};
-    let legacy = (if request.enable_quanpin_autocorrect_transposition { TRANSPOSITION } else { 0 }) | (if request.enable_quanpin_autocorrect_neighbor { NEIGHBOR } else { 0 });
-    if legacy == 0 {
-        0
-    } else {
-        legacy | DELETION | INSERTION
-    }
+    crate::autocorrect::autocorrect_types_from_switches(
+        request.enable_quanpin_autocorrect_transposition,
+        request.enable_quanpin_autocorrect_neighbor,
+        request.enable_quanpin_autocorrect_deletion,
+        request.enable_quanpin_autocorrect_insertion,
+    )
 }
 
 struct HelpcodeQuery {
@@ -139,7 +137,9 @@ impl<'a> PinyinProvider<'a> {
         let helpcode_length = if request.enable_quanpin_helpcode { detect_active_helpcode_length(&request.raw_input, &request.raw_input_with_cases) } else { 0 };
         if helpcode_length == 1 || helpcode_length == 2 {
             let base_raw_input = strip_active_helpcodes(&request.raw_input, &request.raw_input_with_cases);
-            let base_segmentation = cut_pinyin_by_mode(&base_raw_input, CutMode::Correction).first().map(|cut| join_segments(cut)).unwrap_or_default();
+            // 辅助码路径自己切底串，词典不会再按掩码重切：和方案的 build_request 走同一个开关。
+            let aliases = crate::autocorrect::correction_aliases_enabled(autocorrect_types_from_request(request));
+            let base_segmentation = cut_pinyin_by_mode(&base_raw_input, CutMode::Correction, aliases).first().map(|cut| join_segments(cut)).unwrap_or_default();
             let help_codes = &request.raw_input[request.raw_input.len() - helpcode_length..];
             let base = self.quanpin.query(&base_raw_input, &base_segmentation, autocorrect_types_from_request(request), request.fuzzy_pinyin);
             return if helpcode_length == 2 {
@@ -273,6 +273,11 @@ impl<'a> PinyinProvider<'a> {
         if let Some(dictionary) = &self.fuzzy_dictionary {
             dictionary.reset_cache();
         }
+    }
+
+    /// 容错仲裁选中读音后的分段显示（大小写原样）；空表示当前串没有容错布局。
+    pub fn fault_segmentation_with_cases(&self) -> &str {
+        self.quanpin.fault_segmentation_with_cases()
     }
 
     pub fn reset_sentence_cache(&self) {
