@@ -47,3 +47,18 @@ U 模式部件反查（`d414268`）、S 模式符号输入（`3cd429b`）、五�
 2. 二档按质量收益挑：`a60e294`、`7ed4f2e`、`fc90cb1`、`d270395` 优先。
 3. 三档单独立项。要么整体按序摘（等于再来一轮"拼音候选主干"的移植 + 基线重导），要么承认 Rust 核心基于 10-05 的拼音行为，把差异当作已知差距记录。不要零散摘三档里的单个提交。
 4. 四档不进跨平台核心，等产品侧定稿再说；`nine_key_session` 上游已删，Rust 的九键保持原样但不再有对照源，后续不扩。
+
+## 一档摘取结果
+
+逐项核对本分支实际内容后，一档 8 项里 5 项早已在树里（`9eaffd6` 带进来的是演进过的同类实现），审计时按"上游 diff 能不能套"判断高估了待办：
+
+| 提交 | 结果 |
+|---|---|
+| `29c8917`、`777fb2a` | 已有：`looks_like_jianpin_spelling` 含句首声母规则，Rust 在 `autocorrect.rs` |
+| `93c7b81` | 已有：`nn` 收成单个拨音（还多了 konnichiwa 例外） |
+| `0bad4c1` | 已有：日语分段选词续接 `replace_japanese_raw_input`、`reading_length` |
+| `9a08042` | 已有：`LongerPrefixLemmas` |
+| `89a2bea`、`f71ac56` | **新摘**：C++ 与 Rust 同改（`quanpin_dictionary`：字面整词要求匹配码覆盖完整输入；单字母输入不提升字面整词，打 `e` 首位不再是「饿」） |
+| `d912a92` | **新摘**，只改 C++（Rust 没有 `get_lpis`） |
+
+基线：capi、ime_session、pinyin_provider、input_session、session 五份按新 C++ 重导；`expected_quanpin_dictionary.jsonl` 只覆盖受影响的 9 行。该探针的 `sources` 记录（整句来源，含 Google/词格/神经）在今天重导时与旧基线有 61 行差异，而改动前的 C++ 同样产生这些差异，所以它们不是这次摘取引起的；Rust 仍与旧值一致。这块的来源未查明，疑似环境相关（神经重排超时），待单独追查，在此之前不要整份重导这个基线。

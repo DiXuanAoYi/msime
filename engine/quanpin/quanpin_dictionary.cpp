@@ -297,13 +297,13 @@ std::string candidate_letters(const WordItem &item)
     return fold_autocorrect_letters(item.canonical_pinyin.empty() ? item.pinyin : item.canonical_pinyin);
 }
 
-// 字面整词：词库行、读音字母与敲的字母逐个相同（任一种切分都算）。
+// 字面整词：词库行、读音字母与敲的字母逐个相同，且匹配码覆盖完整输入（任一种切分都算）
 std::vector<WordItem>::iterator find_literal_whole_word(std::vector<WordItem> &candidates, const std::string &raw_input)
 {
     const std::string typed = fold_autocorrect_letters(raw_input);
     return std::find_if(candidates.begin(), candidates.end(), [&](const WordItem &item) {
         return (item.source == CandidateSource::Database || item.source == CandidateSource::UserDatabase) &&
-               candidate_letters(item) == typed;
+               candidate_letters(item) == typed && fold_autocorrect_letters(item.pinyin) == typed;
     });
 }
 
@@ -521,6 +521,10 @@ std::vector<WordItem> QuanpinDictionary::query_exact(const std::string &raw_inpu
 
     std::vector<WordItem> result;
     std::vector<WordItem> literal_mixed;
+    // 字面整词提升只对两个及以上字母的输入成立：它的用途是让「nbn」这类整词读法领衔。
+    // 一个字母的输入任何单字都能整串吃下，提升只会把「嗯」「哦」这类单字母读音的语气词
+    // 顶到所有常用字前面——打 n 的首位会变成「嗯」而不是「你」，而这与词频完全相反。
+    const bool promotes_literal_whole_word = fold_autocorrect_letters(raw_input).size() > 1;
     if (resolution.corrected_input)
     {
         result = query_series(raw_input, pinyin_segmentation_, resolution.corrected_segments);
@@ -532,7 +536,8 @@ std::vector<WordItem> QuanpinDictionary::query_exact(const std::string &raw_inpu
         // 只排在它后面，仍可选、仍带纠错标记。
         for (const auto &item : literal)
         {
-            if (literal_mixed_match(item, raw_input) || literal_jianpin_match(item, raw_input))
+            if (promotes_literal_whole_word &&
+                (literal_mixed_match(item, raw_input) || literal_jianpin_match(item, raw_input)))
                 literal_mixed.push_back(item);
         }
         append_unique_words(result, literal);
@@ -734,7 +739,7 @@ std::vector<WordItem> QuanpinDictionary::query_exact(const std::string &raw_inpu
         result = query_series(raw_input, pinyin_segmentation_, segments);
         for (const auto &item : result)
         {
-            if (literal_mixed_match(item, raw_input))
+            if (promotes_literal_whole_word && literal_mixed_match(item, raw_input))
                 literal_mixed.push_back(item);
         }
         if (!alternative_segmentations.empty())
@@ -750,7 +755,8 @@ std::vector<WordItem> QuanpinDictionary::query_exact(const std::string &raw_inpu
             result = arbitrate_legal_corrections(raw_input, leading_segments, resolution.legal_corrected_cuts,
                                                  std::move(result));
         }
-        keep_literal_whole_word_first(result, raw_input);
+        if (promotes_literal_whole_word)
+            keep_literal_whole_word_first(result, raw_input);
     }
     if (!literal_mixed.empty())
     {

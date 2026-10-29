@@ -121,10 +121,10 @@ fn candidate_letters(item: &Item) -> String {
     fold_letters(if item.canonical_pinyin.is_empty() { &item.pinyin } else { &item.canonical_pinyin })
 }
 
-/// 字面整词：词库行、读音字母与敲的字母逐个相同（任一种切分都算）。
+/// 字面整词：词库行、读音字母与敲的字母逐个相同，且匹配码覆盖完整输入（任一种切分都算）。
 fn find_literal_whole_word(candidates: &[Item], raw_input: &str) -> Option<usize> {
     let typed = fold_letters(raw_input);
-    candidates.iter().position(|item| is_dictionary_row(item) && candidate_letters(item) == typed)
+    candidates.iter().position(|item| is_dictionary_row(item) && candidate_letters(item) == typed && fold_letters(&item.pinyin) == typed)
 }
 
 /// 输入能切成词库里的真词时，首位留给这个字面整词。
@@ -579,13 +579,15 @@ impl<'a> QuanpinDictionary<'a> {
 
         let mut result: Vec<Item>;
         let mut literal_mixed: Vec<Item> = Vec::new();
+        // 字面整词提升只对两个及以上字母的输入成立：一个字母的输入任何单字都能整串吃下，提升只会把「嗯」「哦」顶到常用字前面。
+        let promotes_literal_whole_word = fold_letters(raw_input).len() > 1;
         if resolution.corrected_input {
             result = self.query_series(raw_input, &primary_segmentation, &resolution.corrected_segments);
             let fallback_segmentation = if segmentation.is_empty() { join_segments(&segments) } else { segmentation.to_string() };
             let literal = self.query_series(raw_input, &fallback_segmentation, &segments);
             // 纯简拼字面整词与混合简拼同样领衔：词库里真有这个简拼读法时纠错读法只排在它后面，仍可选、仍带纠错标记。
             for candidate in &literal {
-                if literal_mixed_match(candidate, raw_input) != 0 || literal_jianpin_match(candidate, raw_input) {
+                if promotes_literal_whole_word && (literal_mixed_match(candidate, raw_input) != 0 || literal_jianpin_match(candidate, raw_input)) {
                     literal_mixed.push(candidate.clone());
                 }
             }
@@ -603,7 +605,9 @@ impl<'a> QuanpinDictionary<'a> {
             }
         } else {
             result = self.query_series(raw_input, &primary_segmentation, &segments);
-            literal_mixed = result.iter().filter(|item| literal_mixed_match(item, raw_input) != 0).cloned().collect();
+            if promotes_literal_whole_word {
+                literal_mixed = result.iter().filter(|item| literal_mixed_match(item, raw_input) != 0).cloned().collect();
+            }
             if !alternative_segmentations.is_empty() {
                 result = self.merge_alternative_segmentations(raw_input, &primary_segmentation, &segments, &alternative_segmentations, result);
             }
@@ -613,7 +617,9 @@ impl<'a> QuanpinDictionary<'a> {
             if !resolution.legal_corrected_cuts.is_empty() {
                 result = self.arbitrate_legal_corrections(raw_input, &leading_segments, &resolution.legal_corrected_cuts, result);
             }
-            keep_literal_whole_word_first(&mut result, raw_input);
+            if promotes_literal_whole_word {
+                keep_literal_whole_word_first(&mut result, raw_input);
+            }
         }
         if !literal_mixed.is_empty() {
             // 重排之后再并，同词去重时原有的元数据与词频次序说了算。
