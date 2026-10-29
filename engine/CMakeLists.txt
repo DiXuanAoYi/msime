@@ -237,6 +237,10 @@ target_link_libraries(msime_input_contracts_probe PRIVATE MetasequoiaIme::Engine
 add_executable(msime_input_session_probe EXCLUDE_FROM_ALL tools/input_session_probe.cpp)
 target_link_libraries(msime_input_session_probe PRIVATE MetasequoiaIme::Engine)
 
+# 平台入口 Session（含九键）探针：真实的 Session 吃随机操作序列，每步导出操作结果和快照。
+add_executable(msime_session_probe EXCLUDE_FROM_ALL tools/session_probe.cpp)
+target_link_libraries(msime_session_probe PRIVATE MetasequoiaIme::Engine)
+
 # 输入会话探针：真实的 ImeSession 吃随机操作序列（按键、整串替换、动态候选、方案切换、前缀查询），每步导出状态。
 add_executable(msime_ime_session_probe EXCLUDE_FROM_ALL tools/ime_session_probe.cpp)
 target_link_libraries(msime_ime_session_probe PRIVATE MetasequoiaIme::Engine)
