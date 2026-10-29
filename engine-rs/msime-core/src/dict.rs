@@ -3,6 +3,7 @@
 use crate::lattice::Lexeme;
 use crate::table::{key, table_name};
 use rusqlite::{Connection, OpenFlags};
+use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +50,31 @@ pub enum QuerySource {
 
 pub struct Dictionary {
     connection: Connection,
+}
+
+/// 多音单字各读音的权重和（单字 → Σweight），只收词库里挂在两个以上读音下的字。词格用它算 P(读音|字)。
+pub type CharReadingTotals = HashMap<String, i64>;
+
+/// P(读音|字) 的免罚线与扣分上限（log10）。
+///
+/// 已有的 reading_prior 看 P(字|拼音)，分得出权重为 0 的「卷」读 gun，却分不出「大」读 tai（占 tai 的 0.47%，
+/// 只扣 0.33，翻不过语言模型对「大赚」的偏好）。换个角度，大 读 tai 只占它全部权重的 0.14%：这才是「这个字
+/// 几乎不这么读」。免罚线 10%：长 chang、重 chong、行 hang 这类常见第二读音不扣；大 tai/dai、会 kuai、都 du、
+/// 给 ji 扣 1.5~2。只罚单字：多音字的少见读音落在词里（会计、成都、大夫）时整词就是读音的证据。
+const RARE_CHAR_READING_SHARE: f64 = 0.1;
+const RARE_CHAR_READING_FLOOR: f64 = 2.5;
+
+fn rare_char_reading_penalty(value: &str, weight: i64, totals: &CharReadingTotals) -> f64 {
+    let Some(&total) = totals.get(value) else { return 0.0 };
+    if total <= 0 {
+        return 0.0;
+    }
+    let weight = if weight > 0 { weight as f64 } else { 0.0 };
+    let share = (weight + 1.0) / (total as f64 + 1.0);
+    if share >= RARE_CHAR_READING_SHARE {
+        return 0.0;
+    }
+    (-(share / RARE_CHAR_READING_SHARE).log10()).min(RARE_CHAR_READING_FLOOR)
 }
 
 impl Dictionary {
@@ -211,6 +237,38 @@ impl Dictionary {
     /// ü 的另一种写法先归一到词库存的那种；开了模糊音时近音读音同批查，每个与敲出读音不同的音节扣一份分，
     /// 再按折后权重排序、同字去重、截回 `span_limit`。
     pub fn lattice_lookup(&self, span: &[String], span_limit: i32, fuzzy_rules: u32) -> rusqlite::Result<Vec<Lexeme>> {
+        self.lattice_lookup_with(span, span_limit, fuzzy_rules, None)
+    }
+
+    /// 扫一遍全部单音节表，累计每个字的权重和与读音数，只留多音字。词库被学习写入时不必重载：调频改动的权重
+    /// 相对出厂权重的量级可以忽略。
+    pub fn load_char_reading_totals(&self) -> CharReadingTotals {
+        let mut tables: Vec<String> = Vec::new();
+        let names = self
+            .connection
+            .prepare(r"SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'tbl\_1\_%' ESCAPE '\'")
+            .and_then(|mut statement| statement.query_map([], |row| row.get::<_, String>(0)).and_then(|rows| rows.collect::<rusqlite::Result<Vec<_>>>()));
+        match names {
+            Ok(names) => tables.extend(names),
+            Err(_) => return CharReadingTotals::new(),
+        }
+        let mut sums: HashMap<String, (i64, i32)> = HashMap::new();
+        for table in &tables {
+            let sql = format!("SELECT value, weight FROM {table}");
+            let Ok(mut statement) = self.connection.prepare(&sql) else { continue };
+            let Ok(rows) = statement.query_map([], |row| Ok((row.get::<_, Option<String>>(0)?, row.get::<_, i64>(1)?))) else { continue };
+            for row in rows.flatten() {
+                let (Some(value), weight) = row else { continue };
+                let entry = sums.entry(value).or_insert((0, 0));
+                entry.0 += weight.max(0);
+                entry.1 += 1;
+            }
+        }
+        sums.into_iter().filter(|(_, (_, readings))| *readings > 1).map(|(value, (sum, _))| (value, sum)).collect()
+    }
+
+    /// `lattice_lookup`，给了 `totals` 时单字行按这个字少见的读音在 penalty 上扣分。
+    pub fn lattice_lookup_with(&self, span: &[String], span_limit: i32, fuzzy_rules: u32, totals: Option<&CharReadingTotals>) -> rusqlite::Result<Vec<Lexeme>> {
         let normalized: Vec<String> = span.iter().map(|s| canonical_syllable(s).to_string()).collect();
         let mut keys = vec![normalized.clone()];
         for mut variant in crate::fuzzy::fuzzy_segmentations(&normalized, fuzzy_rules, FUZZY_LATTICE_VARIANT_LIMIT) {
@@ -224,6 +282,9 @@ impl Dictionary {
             .into_iter()
             .map(|row| {
                 let mut lexeme = Lexeme { key: row.key.clone(), value: row.text, weight: row.weight, ..Lexeme::default() };
+                if let (1, Some(totals)) = (span.len(), totals) {
+                    lexeme.penalty += rare_char_reading_penalty(&lexeme.value, lexeme.weight, totals);
+                }
                 if keys.len() > 1 {
                     // 每个与敲出读音不同的音节扣一份分：一个词里错两个音，比只错一个更不可能。
                     for (typed, found) in normalized.iter().zip(row.key.split('\'')) {

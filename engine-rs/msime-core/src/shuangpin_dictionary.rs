@@ -118,6 +118,8 @@ pub struct ShuangpinDictionary<'a> {
     domain: DomainDictionary,
     /// 整串结果缓存（C++ 的 `_cached_buffer_series`）和三个辅助码筛出来的缓存，容量各 128。
     series_cache: RefCell<Cache<Vec<Item>>>,
+    /// 见 `QuanpinDictionary::char_reading_totals`。
+    char_reading_totals: std::cell::OnceCell<crate::dict::CharReadingTotals>,
     /// 当前拼音的词库行（C++ 的 `_cached_buffer`），不含整句。命中时要对一次 `data_version`，所以不能省。
     plain_cache: RefCell<Cache<Vec<Item>>>,
     single_helpcode_cache: RefCell<Cache<Vec<Item>>>,
@@ -178,6 +180,7 @@ impl<'a> ShuangpinDictionary<'a> {
             syllable_helpcodes: Vec::new(),
             domain: DomainDictionary::new(&db_path.with_file_name("domain-input.db")),
             series_cache: RefCell::new(Cache::new(128)),
+            char_reading_totals: std::cell::OnceCell::new(),
             plain_cache: RefCell::new(Cache::new(128)),
             single_helpcode_cache: RefCell::new(Cache::new(128)),
             single_helpcode_reversed_cache: RefCell::new(Cache::new(128)),
@@ -436,7 +439,8 @@ impl<'a> ShuangpinDictionary<'a> {
     /// 词格的跨度查询：词库行加上模糊音变体，按折后权重稳定排序，截到 `limit`。
     fn lattice_lookup(&self, span: &[String], limit: i32) -> Vec<Lexeme> {
         let Some(dictionary) = &self.dictionary else { return Vec::new() };
-        let mut rows = dictionary.lattice_lookup(span, limit, self.fuzzy_rules).unwrap_or_default();
+        let totals = self.char_reading_totals.get_or_init(|| dictionary.load_char_reading_totals());
+        let mut rows = dictionary.lattice_lookup_with(span, limit, self.fuzzy_rules, Some(totals)).unwrap_or_default();
         for row in self.domain.lattice(span, limit, self.fuzzy_rules) {
             match rows.iter_mut().find(|base| base.key == row.key && base.value == row.value) {
                 None => rows.push(row),

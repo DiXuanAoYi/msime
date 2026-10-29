@@ -345,6 +345,8 @@ pub struct QuanpinDictionary<'a> {
     fuzzy_rules: u32,
     /// 整串结果缓存（C++ 的 `series_cache_`，容量 128），键见 `series_cache_key` 与 `SeriesQueryResolution::cache_key`。
     series_cache: RefCell<Cache<Vec<Item>>>,
+    /// 多音单字各读音的权重和，词格第一次查跨度时载入，此后不随 reset_cache 重载。
+    char_reading_totals: std::cell::OnceCell<crate::dict::CharReadingTotals>,
     /// 逐路径的结果缓存（C++ 的 `cache_`，容量 128）：单字母展开会把展开后的列表写进来，之后含这个声母的前缀都读到展开版。
     path_cache: RefCell<Cache<Vec<Item>>>,
     /// 词库上一次见到的 `PRAGMA data_version`，别的连接改过库就清缓存。
@@ -371,6 +373,7 @@ impl<'a> QuanpinDictionary<'a> {
             rescoring_context: String::new(),
             fuzzy_rules: 0,
             series_cache: RefCell::new(Cache::new(128)),
+            char_reading_totals: std::cell::OnceCell::new(),
             path_cache: RefCell::new(Cache::new(128)),
             data_version: Cell::new(-1),
             external_changes: Cell::new(false),
@@ -1042,7 +1045,8 @@ impl<'a> QuanpinDictionary<'a> {
     fn lattice_lookup(&self, span: &[String], limit: i32, with_fuzzy: bool) -> Vec<Lexeme> {
         let Some(dictionary) = &self.dictionary else { return Vec::new() };
         let rules = if with_fuzzy { self.fuzzy_rules } else { 0 };
-        let mut rows = dictionary.lattice_lookup(span, limit, rules).unwrap_or_default();
+        let totals = self.char_reading_totals.get_or_init(|| dictionary.load_char_reading_totals());
+        let mut rows = dictionary.lattice_lookup_with(span, limit, rules, Some(totals)).unwrap_or_default();
         for row in self.domain.lattice(span, limit, rules) {
             match rows.iter_mut().find(|base| base.key == row.key && base.value == row.value) {
                 None => rows.push(row),

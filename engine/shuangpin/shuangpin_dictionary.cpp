@@ -1208,8 +1208,13 @@ void ShuangpinDictionary::set_enabled_domain_dictionaries(const std::string &csv
 
 quanpin::WordLatticeLookup ShuangpinDictionary::lattice_lookup(int limit)
 {
+    if (!char_reading_totals_)
+    {
+        char_reading_totals_ = quanpin::load_char_reading_totals(quanpin_db_);
+    }
     auto lookup = [this, limit](const quanpin::Segments &span) {
-        auto rows = quanpin::make_lattice_db_lookup(quanpin_db_, quanpin_statement_cache_, limit, fuzzy_pinyin_)(span);
+        auto rows = quanpin::make_lattice_db_lookup(quanpin_db_, quanpin_statement_cache_, limit, fuzzy_pinyin_,
+                                                    char_reading_totals_)(span);
         for (auto &extra : domain_.lattice(limit, fuzzy_pinyin_)(span))
         {
             auto duplicate = std::find_if(rows.begin(), rows.end(), [&](const auto &row) {
