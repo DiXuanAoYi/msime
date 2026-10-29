@@ -23,6 +23,7 @@ pub mod gram;
 pub mod google_pinyin;
 pub mod ime_session;
 pub mod helpcode;
+pub mod input_contracts;
 pub mod japanese;
 pub mod kenlm;
 pub mod lattice;
