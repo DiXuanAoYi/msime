@@ -66,7 +66,7 @@ fn shuangpin_to_quanpin(lower: &str, profile: &Profile) -> String {
 }
 
 /// 表情和颜文字共用一套流程，只有表名和 SQL 不同。
-fn query_emoticon(code: &str, shuangpin_scheme: bool, database_path: &Path, limit: i32, profile: &Profile, sql: &str, source: Source, name: &str) -> QueryResult {
+fn query_emoticon(code: &str, shuangpin_scheme: bool, database_path: &Path, limit: i32, profile: &Profile, sql: &str, source: Source, name: &str, exact_only: bool) -> QueryResult {
     let valid = !code.is_empty() && code.bytes().all(|b| b.is_ascii_alphabetic() || b == b'\'');
     if !valid || limit <= 0 {
         return QueryResult::default();
@@ -82,7 +82,12 @@ fn query_emoticon(code: &str, shuangpin_scheme: bool, database_path: &Path, limi
     if shuangpin_scheme {
         let quanpin = shuangpin_to_quanpin(&lower, profile);
         if !quanpin.is_empty() && quanpin != lower {
-            lookups[0].1 = false;
+            // 只要精确命中（emoji 混输）时原始码干脆不查。
+            if exact_only {
+                lookups.clear();
+            } else {
+                lookups[0].1 = false;
+            }
             lookups.push((quanpin, true));
         }
     }
@@ -130,6 +135,23 @@ pub fn query_emoji(code: &str, shuangpin_scheme: bool, database_path: &Path, lim
         "SELECT emoji,sort_order,key IS ?1 FROM emoji_pinyin WHERE key>=?1 AND key<?2 ORDER BY key IS NOT ?1,sort_order LIMIT ?3",
         Source::Emoji,
         "Emoji",
+        false,
+    )
+}
+
+/// emoji 混输：只认整串精确等于某个键，不做前缀匹配。双拼下只查展开后的全拼，原始码恰好等于某个简拼或英文键
+/// （xl → 😀）不是用户要打的词。
+pub fn query_mixed_emoji(code: &str, shuangpin_scheme: bool, database_path: &Path, limit: i32, profile: &Profile) -> QueryResult {
+    query_emoticon(
+        code,
+        shuangpin_scheme,
+        database_path,
+        limit,
+        profile,
+        "SELECT emoji,sort_order,1 FROM emoji_pinyin WHERE key=?1 AND key<?2 ORDER BY sort_order LIMIT ?3",
+        Source::Emoji,
+        "Emoji",
+        true,
     )
 }
 
@@ -143,6 +165,7 @@ pub fn query_kaomoji(code: &str, shuangpin_scheme: bool, database_path: &Path, l
         "SELECT kaomoji,sort_order,pinyin IS ?1 FROM kaomoji WHERE (pinyin>=?1 AND pinyin<?2) OR (jianpin>=?1 AND jianpin<?2) ORDER BY pinyin IS NOT ?1,sort_order LIMIT ?3",
         Source::Kaomoji,
         "Kaomoji",
+        false,
     )
 }
 

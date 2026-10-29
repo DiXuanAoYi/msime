@@ -213,7 +213,7 @@ impl CandidateQueries {
 
         let mut emoji_candidates = Vec::new();
         if expressive_options.emoji_candidates && prefix.len() >= 2 {
-            let found = convert_all(local::query_emoji(prefix, shuangpin, &other, 3, &self.profile).items);
+            let found = convert_all(local::query_mixed_emoji(prefix, shuangpin, &other, 3, &self.profile).items);
             emoji_candidates = collect_unique(found);
         }
 
