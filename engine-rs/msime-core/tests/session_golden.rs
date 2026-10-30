@@ -1,4 +1,4 @@
-//! 平台入口 `Session`（含九键 `NineKeySession`）对着真实的 C++ 核对。基线 `expected_session.jsonl` 由 `msime_session_probe` 导出：
+//! 平台入口 `Session`对着真实的 C++ 核对。基线 `expected_session.jsonl` 由 `msime_session_probe` 导出：
 //! 300 个序列，每个序列随机一组会话选项（纠错、辅助码、标点、学习、模糊音、调频、本地模式、英文与表情混排、五笔混输与通配），
 //! 一半从全拼开始并多半打开九键，再跑随机操作：字符（九键开着时偏向数字键）、命令、选词键、标点、选词、边缘字、置顶、删词、
 //! 固定位置、整句上屏、选九键拼写、开关九键、方案切换、辅助码开关、专用英文、五笔混输、标点开关、云/AI 候选；
@@ -15,7 +15,6 @@ use msime_core::input_session::{
 };
 use msime_core::kenlm::KenLm;
 use msime_core::lattice::{Item, Source};
-use msime_core::nine_key_session::NineKeySession;
 use msime_core::pinyin_provider::PinyinProvider;
 use msime_core::provider::ProviderRegistry;
 use msime_core::request::SchemeType;
@@ -157,7 +156,6 @@ fn snapshot_value(session: &Session) -> Value {
         "dedicated": u32::from(view.dedicated_english),
         "editing": view.editing_text,
         "caret": view.caret_position,
-        "spellings": view.nine_key_spellings,
         "online": online_json(&session.online_query()),
         "candidates": list_json(&view.candidates),
     })
@@ -204,7 +202,7 @@ fn session_matches_cpp() {
     let model = KenLm::open(&lm).unwrap_or_else(|e| panic!("载入失败：{e}"));
     let keymap = helpcode::parse_keymap(&fs::read_to_string(keymap_path).unwrap());
     let text = fs::read_to_string(golden_dir().join("expected_session.jsonl")).unwrap();
-    let (mut sequences, mut steps, mut nine_key_steps, mut nine_candidates, mut nine_spellings, mut committed) = (0, 0, 0, 0, 0, 0);
+    let (mut sequences, mut steps, mut committed) = (0, 0, 0);
     for line in text.lines() {
         let record: Value = serde_json::from_str(line).unwrap();
         let _ = fs::remove_dir_all(&user);
@@ -251,11 +249,7 @@ fn session_matches_cpp() {
             expressive: MixedExpressiveOptions { emoji_candidates: expressive[0].as_u64() == Some(1), kaomoji_candidates: expressive[1].as_u64() == Some(1) },
             wubi: WubiInputOptions { mixed_pinyin: wubi[0].as_u64() == Some(1), z_wildcard: wubi[1].as_u64() == Some(1) },
         };
-        let nine_key = NineKeySession::new(roots, options.learning, options.frequency, options.fuzzy_pinyin, Some(&model));
-        let mut session = Session::new(input, nine_key, &options).expect("会话选项");
-        if flag(&record, "nine") {
-            session.set_nine_key_enabled(true);
-        }
+        let mut session = Session::new(input, &options).expect("会话选项");
         assert_eq!(snapshot_value(&session), record["init"], "初始状态 第 {} 序列", record["round"]);
 
         let mut trail: Vec<String> = Vec::new();
@@ -274,8 +268,6 @@ fn session_matches_cpp() {
                 "fix" => result = key_result_json(&session.fix_position(step["i"].as_u64().unwrap() as usize, step["p"].as_i64().unwrap() as i32)),
                 "clear" => result = key_result_json(&session.clear_position(step["i"].as_u64().unwrap() as usize)),
                 "finish" => result = key_result_json(&session.finish(step["i"].as_u64().unwrap() as usize)),
-                "spelling" => result = key_result_json(&session.choose_nine_key_spelling(step["i"].as_u64().unwrap() as usize)),
-                "nine" => session.set_nine_key_enabled(flag(step, "v")),
                 "switch" => session.switch_scheme(scheme_of(step["to"].as_u64().unwrap())),
                 "helpcode" => session.set_helpcode_enabled(flag(step, "v")),
                 "dedicated" => session.set_dedicated_english(flag(step, "v")),
@@ -299,16 +291,11 @@ fn session_matches_cpp() {
             let state = snapshot_value(&session);
             assert_eq!(state, step["state"], "状态 {label}");
             steps += 1;
-            let view = session.snapshot();
-            let nine_active = !view.nine_key_spellings.is_empty() || (view.scheme == SchemeType::Quanpin && !view.editing_text.is_empty() && view.editing_text.chars().all(|c| ('2'..='9').contains(&c)));
-            nine_key_steps += usize::from(nine_active);
-            nine_candidates += usize::from(nine_active && !view.candidates.is_empty());
-            nine_spellings += usize::from(!view.nine_key_spellings.is_empty());
             committed += usize::from(result["c"].is_string());
         }
         sequences += 1;
     }
     let _ = fs::remove_dir_all(&work);
-    eprintln!("会话门面：{sequences} 个序列 {steps} 步，九键 {nine_key_steps}，九键有候选 {nine_candidates}，有拼写 {nine_spellings}，有上屏 {committed}");
-    assert!(sequences == 420 && steps > 14000 && nine_key_steps > 4000 && nine_candidates > 3000 && nine_spellings > 3000 && committed > 1000);
+    eprintln!("会话门面：{sequences} 个序列 {steps} 步，有上屏 {committed}");
+    assert!(sequences == 420 && steps > 14000 && committed > 1000);
 }

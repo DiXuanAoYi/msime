@@ -311,21 +311,18 @@ mod tests {
 /// 送进 Google 解码器的拼写：它的音节表里只有 nue/lue 和 nv/lv，没有 nve/lve，ju/qu/xu/yu 也只认 u 写法。
 /// 按音节整体替换，认不出的原样透传（手打分隔符切出来的块可能不止一个音节，交给解码器自己再切）。
 pub fn to_google_spelling(segmentation: &str) -> String {
-    const SPELLINGS: [(&str, &str); 10] = [
-        ("jv", "ju"),
-        ("qv", "qu"),
-        ("xv", "xu"),
-        ("yv", "yu"),
-        ("jve", "jue"),
-        ("qve", "que"),
-        ("xve", "xue"),
-        ("yve", "yue"),
-        ("lve", "lue"),
-        ("nve", "nue"),
-    ];
     segmentation
         .split('\'')
-        .map(|chunk| SPELLINGS.iter().find(|(from, _)| *from == chunk).map_or(chunk, |(_, to)| *to))
+        .map(|chunk| {
+            if !is_intact(chunk) {
+                return chunk.to_string();
+            }
+            let mut chunk = canonical_umlaut_spelling(chunk);
+            if chunk == "nve" || chunk == "lve" {
+                chunk.replace_range(1..2, "u");
+            }
+            chunk
+        })
         .collect::<Vec<_>>()
         .join("'")
 }

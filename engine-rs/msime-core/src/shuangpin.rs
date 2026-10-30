@@ -55,9 +55,11 @@ pub fn decodable_syllables() -> &'static HashSet<&'static str> {
     SET.get_or_init(|| {
         let mut set: HashSet<&'static str> = INTACT.iter().copied().collect();
         set.insert("eng");
-        for excluded in ["chua", "den", "fiao", "jve", "lo", "lue", "nou", "nue", "nun", "qve", "xve", "yve", "zhei"] {
+        for excluded in ["chua", "den", "fiao", "lo", "lue", "nou", "nue", "nun", "zhei"] {
             set.remove(excluded);
         }
+        // j/q/x/y 的 v 别名（jve、xvan……）解码器从不产出。
+        set.retain(|syllable| !crate::quanpin_utils::is_jqxy_v_alias(syllable));
         set
     })
 }

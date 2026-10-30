@@ -1,5 +1,6 @@
 //! 全拼词库（`msime.db`）的只读查询。
 
+use crate::quanpin_utils::canonical_umlaut_spelling;
 use crate::lattice::Lexeme;
 use crate::table::{key, table_name};
 use rusqlite::{Connection, OpenFlags};
@@ -23,23 +24,6 @@ pub struct KeyedEntry {
 /// 词格里模糊读音的行每错一个音节扣的分（对数），和模糊变体的路径数上限。
 const FUZZY_LATTICE_PENALTY_LOG: f64 = 1.0;
 const FUZZY_LATTICE_VARIANT_LIMIT: usize = 16;
-
-/// ü 的两种写法归一到词库存的那一种：j/q/x/y 后面写 u，l/n 后面写 v。
-fn canonical_syllable(syllable: &str) -> &str {
-    match syllable {
-        "jv" => "ju",
-        "qv" => "qu",
-        "xv" => "xu",
-        "yv" => "yu",
-        "jve" => "jue",
-        "qve" => "que",
-        "xve" => "xue",
-        "yve" => "yue",
-        "lue" => "lve",
-        "nue" => "nve",
-        other => other,
-    }
-}
 
 /// 全拼和双拼共用同一套查询，只有简拼那几级认键的方式不同。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,10 +263,10 @@ impl Dictionary {
 
     /// `lattice_lookup`，给了 `totals` 时单字行按这个字少见的读音在 penalty 上扣分。
     pub fn lattice_lookup_with(&self, span: &[String], span_limit: i32, fuzzy_rules: u32, totals: Option<&CharReadingTotals>) -> rusqlite::Result<Vec<Lexeme>> {
-        let normalized: Vec<String> = span.iter().map(|s| canonical_syllable(s).to_string()).collect();
+        let normalized: Vec<String> = span.iter().map(|s| canonical_umlaut_spelling(s)).collect();
         let mut keys = vec![normalized.clone()];
         for mut variant in crate::fuzzy::fuzzy_segmentations(&normalized, fuzzy_rules, FUZZY_LATTICE_VARIANT_LIMIT) {
-            variant.iter_mut().for_each(|s| *s = canonical_syllable(s).to_string());
+            variant.iter_mut().for_each(|s| *s = canonical_umlaut_spelling(s));
             keys.push(variant);
         }
         // 模糊变体与敲出的读音同批查（同表一条 SQL）。LIMIT 按表计，放宽到每个键一份，再截回 span_limit。

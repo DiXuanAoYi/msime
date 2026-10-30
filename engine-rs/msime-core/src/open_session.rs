@@ -8,7 +8,6 @@ use crate::helpcode::{self, Keymap};
 use crate::ime_session::ImeSession;
 use crate::input_session::{FrequencyAdjustmentOptions, InputSession};
 use crate::kenlm::KenLm;
-use crate::nine_key_session::NineKeySession;
 use crate::pinyin_provider::PinyinProvider;
 use crate::provider::ProviderRegistry;
 use crate::request::SchemeType;
@@ -83,7 +82,6 @@ pub fn open(options: &OpenOptions) -> Result<Session<'static>, String> {
     let engine = ImeSession::new(options.scheme, profile, registry);
     let mut input = InputSession::new(engine, roots.clone(), profile);
     input.set_helpcode_keymap(keymap);
-    let nine_key = NineKeySession::new(roots, options.learning, options.frequency, options.fuzzy_pinyin, model.map(|m| m as &dyn crate::lattice::LanguageModel));
     let session_options = SessionOptions {
         autocorrect_types: options.autocorrect_types,
         helpcode: options.helpcode,
@@ -96,5 +94,5 @@ pub fn open(options: &OpenOptions) -> Result<Session<'static>, String> {
         expressive: Default::default(),
         wubi: Default::default(),
     };
-    Session::new(input, nine_key, &session_options)
+    Session::new(input, &session_options)
 }

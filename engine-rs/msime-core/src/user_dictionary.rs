@@ -1723,10 +1723,14 @@ pub fn edit_personal_dictionary(
         Ok(entry) => entry,
         Err(message) => return fail_with(message),
     };
-    let new_entry = match replacement.map(|e| validate_personal_dictionary_entry(e.clone())).transpose() {
+    let mut new_entry = match replacement.map(|e| validate_personal_dictionary_entry(e.clone())).transpose() {
         Ok(entry) => entry,
         Err(message) => return fail_with(message),
     };
+    // 只归一新写入的词：查询会把 xvan、lue 先改成 xuan、lve 再查库，照原样存的行永远查不到。
+    if let Some(entry) = new_entry.as_mut().filter(|e| e.kind == PersonalDictionaryKind::Pinyin) {
+        entry.key = entry.key.split('\'').map(crate::quanpin_utils::canonical_umlaut_spelling).collect::<Vec<_>>().join("'");
+    }
     let (journal_path, english_path) = (paths.journal(), paths.english_dictionary());
     if !ensure_user_database(&journal_path) || !english::ensure_schema(&english_path) {
         return fail_with("Cannot prepare personal dictionary storage");

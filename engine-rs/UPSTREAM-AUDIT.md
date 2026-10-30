@@ -13,7 +13,7 @@
 
 - **Rust 移植与本分支的 C++ 逐位一致，不与上游一致。** 摘取任何一个上游改动 = 先改 C++、重导 golden 基线、再改 Rust 并重新过 golden。成本由 C++ 改动的大小决定，不是由补丁行数决定。
 - **整体应用冲突面不大但集中在最核心处。** 把上游引擎核心的整段 diff 用 `git apply --check -3` 试：16 个文件有冲突，全在 `quanpin/`（dictionary、query、utils、word_lattice、lattice_rerank）、`shuangpin/`（engine、dictionary）、`english_dictionary`、`input_session_composition`、`sentence_association_options`、`word_item`、`romaji_converter`。逐提交试，42 个里只有 `6e15526`（常驻内存/去重性能）不能直接套。也就是说单点摘取多数干净，整体合入冲突集中在拼音候选主干。
-- **上游删了本分支移植过的东西。** `1671c3a` 删除 `core/nine_key_session.*` 及其测试（Rust 的 `NineKeySession` 没有上游对应物）；`d414268` 删除 `local_modes/unicode_query.*`，换成 `radical_query`（U 模式改为部件拆字反查）。跟进这两处会让对应 Rust 模块作废或重写。
+- **上游删了本分支移植过的东西。** `1671c3a` 删九键已摘（Rust 的 `NineKeySession` 同步删除）；`d414268` 删除 `local_modes/unicode_query.*`，换成 `radical_query`（U 模式改为部件拆字反查）。跟进这两处会让对应 Rust 模块作废或重写。
 
 ## 分档
 
@@ -46,7 +46,7 @@ U 模式部件反查（`d414268`）、S 模式符号输入（`3cd429b`）、五�
 1. 先做一档（7 项里 6 项要改 Rust）：每项都小，各自加定向序列进探针，C++ 与 Rust 同提交，风险低。
 2. 二档按质量收益挑：`a60e294`、`7ed4f2e`、`fc90cb1`、`d270395` 优先。
 3. 三档单独立项。要么整体按序摘（等于再来一轮"拼音候选主干"的移植 + 基线重导），要么承认 Rust 核心基于 10-05 的拼音行为，把差异当作已知差距记录。不要零散摘三档里的单个提交。
-4. 四档不进跨平台核心，等产品侧定稿再说；`nine_key_session` 上游已删，Rust 的九键保持原样但不再有对照源，后续不扩。
+4. 四档不进跨平台核心，等产品侧定稿再说。
 
 ## 摘取结果
 
@@ -85,7 +85,7 @@ U 模式部件反查（`d414268`）、S 模式符号输入（`3cd429b`）、五�
   - `60c2b26`：多字纠错只收相邻键的 QWERTY 邻键（连击、任意字母插入不再算）；`cut_pinyin_by_mode` 的 `include_correction_aliases` 必填，关掉换位和邻键后手误别名层不再改写切分（ü 归一仍常开），方案、词典、辅助码、排序上下文键共用 `correction_aliases_enabled`，写回路径走 `cut_for_write`；
   - `e38626d`：长句手误超出纠错预算时走容错槽位词格仲裁（`build_fault_slots`、`fault_slot_correction_targets`、`decode_fault_lattice`、`arbitrate_fault_slots`，预编辑与选词消耗跟着胜出读音走）；
   - `5092125`：漏字、多字各一个独立开关，四位互不联动；`2f63067`：生成式远键替换改成生成器输出的 `kGeneratedShapeEntries`。
-  - 没摘的前置 `1671c3a`（完整 ü 别名音节 `jvan` 等、九键删除）：`e38626d` 用到的 `canonical_umlaut_spelling` / `is_jqxy_v_alias` 单独补进了 `quanpin_utils`，生成器换成上游版本后对本地音节表重新生成 `autocorrect_table.h`（上游音节表多了 `jvan`/`jvn` 之类，本地没有，所以表不与上游逐字节相同）。
+  - `1671c3a` 已摘：音节表补全 ü 别名（429 个，`jvan`/`jvn` 等），`canonical_umlaut_spelling` / `is_jqxy_v_alias` 成为唯一的 ü 归一规则（词格、词库、用户词入库、`to_google_spelling` 共用），双拼解码集合排除 j/q/x/y 的 v 别名，删九键（C++ `NineKeySession`、`Session` 的九键接口、capi 快照字段、Rust 对应模块与探针轮次），`autocorrect_table.h` 对新音节表重新生成。
   - 基线重导：`quanpin_autocorrect`、`quanpin_dictionary`、`pinyin_provider`、`ime_session`、`input_session`、`session`、`capi`、`expected_options`；探针新增长句容错读场景、槽位模型记录和 60 轮长句容错会话，Rust 全部逐位一致。
 
 ### 四档

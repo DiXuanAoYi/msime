@@ -31,7 +31,6 @@ pub mod lattice;
 pub mod local;
 mod lunar_table;
 pub mod msvc_sort;
-pub mod nine_key_session;
 pub mod open_session;
 pub mod neural;
 pub mod mid_sentence;
