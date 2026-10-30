@@ -14,7 +14,12 @@ class AudioCapture
     AudioCapture &operator=(const AudioCapture &) = delete;
     // Host grants microphone permission first, and serializes start/stop/destruction.
     // Callback runs on the capture thread; never call stop or destroy from it.
-    bool start(AudioCallback callback);
+    enum class Source
+    {
+        Microphone,
+        SystemPlayback
+    };
+    bool start(AudioCallback callback, Source source = Source::Microphone);
     void stop(); // idempotent; waits for the device callback before releasing it
     bool callback_failed() const;
 

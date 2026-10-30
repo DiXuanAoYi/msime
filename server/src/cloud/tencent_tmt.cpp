@@ -104,17 +104,19 @@ size_t WriteResponse(char *data, size_t size, size_t count, void *user)
     return size * count;
 }
 
-std::string Tc3Authorization(const TencentTmt::Credentials &credentials, const std::string &payload, time_t timestamp)
+std::string Tc3Authorization(const TencentTmt::Credentials &credentials, const std::string &payload, time_t timestamp,
+                             const char *host = kHost, const char *service = kService,
+                             const char *action = "texttranslatebatch")
 {
     const std::string date = UtcDate(timestamp);
     const std::string canonical_request =
-        std::string("POST\n/\n\n") + "content-type:application/json; charset=utf-8\n" + "host:" + kHost + "\n" +
-        "x-tc-action:texttranslatebatch\n\n" + "content-type;host;x-tc-action\n" + Sha256Hex(payload);
-    const std::string credential_scope = date + "/" + kService + "/tc3_request";
+        std::string("POST\n/\n\n") + "content-type:application/json; charset=utf-8\n" + "host:" + host + "\n" +
+        "x-tc-action:" + action + "\n\n" + "content-type;host;x-tc-action\n" + Sha256Hex(payload);
+    const std::string credential_scope = date + "/" + service + "/tc3_request";
     const std::string string_to_sign = std::string(kAlgorithm) + "\n" + std::to_string(timestamp) + "\n" +
                                        credential_scope + "\n" + Sha256Hex(canonical_request);
     const std::string secret_date = HmacSha256Raw(std::string("TC3") + credentials.secret_key, date);
-    const std::string secret_service = HmacSha256Raw(secret_date, kService);
+    const std::string secret_service = HmacSha256Raw(secret_date, service);
     const std::string secret_signing = HmacSha256Raw(secret_service, "tc3_request");
     unsigned char signature[32]{};
     if (secret_date.empty() || secret_service.empty() || secret_signing.empty() ||
@@ -127,6 +129,24 @@ std::string Tc3Authorization(const TencentTmt::Credentials &credentials, const s
 
 namespace TencentTmt
 {
+std::string TtsAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp)
+{
+    return Tc3Authorization(credentials, payload, timestamp, "tts.tencentcloudapi.com", "tts", "texttovoice");
+}
+
+std::string AsrAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp)
+{
+    return Tc3Authorization(credentials, payload, timestamp, "asr.tencentcloudapi.com", "asr", "sentencerecognition");
+}
+std::string OcrAuthorization(const Credentials &credentials, const std::string &payload, time_t timestamp,
+                             const std::string &action)
+{
+    std::string lower = action;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return Tc3Authorization(credentials, payload, timestamp, "ocr.tencentcloudapi.com", "ocr", lower.c_str());
+}
+
 std::vector<std::string> TextTranslateBatch(const Credentials &credentials, const std::vector<std::string> &texts,
                                             const std::string &source, const std::string &target)
 {

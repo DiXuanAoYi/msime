@@ -805,10 +805,11 @@ bool SharedMemoryAvailable()
 
 bool NegotiateMainPipeClient(const FanyImeNamedpipeData &hello, uint64_t registration_id)
 {
-    const auto protocol =
-        FanyImeProtocol::Negotiate(hello, FanyImeProtocol::Capabilities | FanyImeProtocol::CharacterSetShortcut |
-                                              FanyImeProtocol::CompositionRestore |
-                                              FanyImeProtocol::CaretStateIndicator | FanyImeProtocol::TrilingualCycle);
+    const auto protocol = FanyImeProtocol::Negotiate(
+        hello, FanyImeProtocol::Capabilities | FanyImeProtocol::CharacterSetShortcut |
+                   FanyImeProtocol::CompositionRestore | FanyImeProtocol::CaretStateIndicator |
+                   FanyImeProtocol::VocabularyCommit | FanyImeProtocol::FieldPrivacy |
+                   FanyImeProtocol::RuntimeSettings | FanyImeProtocol::TrilingualCycle);
     std::lock_guard lock(g_pipe_clients_mutex);
     auto it = g_pipe_clients.find(hello.client_id);
     if (it == g_pipe_clients.end() || registration_id == 0 || it->second.main_registration_id != registration_id)
@@ -841,6 +842,13 @@ bool ClientNegotiatedCompositionRestore(uint64_t client_id)
            (it->second.protocol.capabilities & FanyImeProtocol::CompositionRestore) != 0;
 }
 
+bool ClientNegotiatedVocabularyCommit(uint64_t client_id)
+{
+    std::lock_guard lock(g_pipe_clients_mutex);
+    const auto it = g_pipe_clients.find(client_id);
+    return it != g_pipe_clients.end() && !it->second.protocol.legacy &&
+           (it->second.protocol.capabilities & FanyImeProtocol::VocabularyCommit) != 0;
+}
 bool ClientNegotiatedCaretStateIndicator(uint64_t client_id)
 {
     // Legacy clients are excluded for the same reason as above: their key
@@ -857,6 +865,34 @@ bool ClientNegotiatedTrilingualCycle(uint64_t client_id)
     const auto it = g_pipe_clients.find(client_id);
     return it != g_pipe_clients.end() && !it->second.protocol.legacy &&
            (it->second.protocol.capabilities & FanyImeProtocol::TrilingualCycle) != 0;
+}
+
+bool ClientNegotiatedFieldPrivacy(uint64_t client_id)
+{
+    std::lock_guard lock(g_pipe_clients_mutex);
+    const auto it = g_pipe_clients.find(client_id);
+    return it != g_pipe_clients.end() && !it->second.protocol.legacy &&
+           (it->second.protocol.capabilities & FanyImeProtocol::FieldPrivacy) != 0;
+}
+
+bool ClientNegotiatedRuntimeSettings(uint64_t client_id)
+{
+    std::lock_guard lock(g_pipe_clients_mutex);
+    const auto it = g_pipe_clients.find(client_id);
+    return it != g_pipe_clients.end() && !it->second.protocol.legacy &&
+           (it->second.protocol.capabilities & FanyImeProtocol::RuntimeSettings) != 0;
+}
+
+std::vector<uint64_t> SnapshotRuntimeSettingsClients()
+{
+    std::lock_guard lock(g_pipe_clients_mutex);
+    std::vector<uint64_t> result;
+    for (const auto &[client, session] : g_pipe_clients)
+        if (client != 0 && !session.protocol.legacy &&
+            (session.protocol.capabilities & FanyImeProtocol::RuntimeSettings) && session.to_tsf_worker_thread_pipe &&
+            session.to_tsf_worker_thread_ready)
+            result.push_back(client);
+    return result;
 }
 
 uint64_t RegisterToTsfPipeClient(uint64_t client_id, HANDLE pipe)

@@ -1,0 +1,74 @@
+/* Workbench surfaces use the same opaque control surfaces in both themes. */
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) { min-width: 0; }
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) [hidden] { display: none !important; }
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) :is(input, select, textarea, button) { font: inherit; }
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) :is(input, select, textarea, button, summary, [role="switch"]):focus-visible { outline: 2px solid var(--accent-color) !important; outline-offset: 2px; }
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:not(.voice-secret-toggle):not(.dropdown-toggle):not(.voice-sound-expand):not(.number-stepper-btn):not([role="tab"]):not([data-library-view]):not([data-quote-source]) {
+  padding: 8px 12px; min-height: 34px; border: 1px solid var(--control-border); border-radius: 7px;
+  background: var(--surface-raised); color: var(--text-color); cursor: pointer; line-height: 1.45;
+}
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:not(.voice-secret-toggle):not(.dropdown-toggle):not(.voice-sound-expand):not(.number-stepper-btn):not([role="tab"]):not([data-library-view]):not([data-quote-source]):hover:not(:disabled) { border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 10%, var(--surface-raised)); }
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) button:disabled { cursor: default; opacity: .5; }
+:is(#voice-settings, #ai-assistant-settings, #personalLibraryPanel) :is(select option, select optgroup) {
+  background: var(--surface-raised); color: var(--text-color);
+}
+.voice-nav {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 6px;
+  position: sticky; top: 0; z-index: 2; padding: 8px; margin: 0 0 16px;
+  background: var(--surface-raised); border: 1px solid var(--control-border); border-radius: 10px;
+}
+.voice-nav button {
+  border: 1px solid transparent; border-radius: 6px; padding: 9px 7px; cursor: pointer;
+  color: var(--text-secondary); background: var(--surface-subtle); font-size: 13px;
+}
+.voice-nav button[aria-selected="true"] { color: var(--text-color); border-color: var(--accent-color); background: color-mix(in srgb, var(--accent-color) 15%, var(--surface-raised)); font-weight: 600; }
+.voice-nav button:focus-visible { outline: 2px solid var(--accent-color) !important; outline-offset: 2px; }
+#voice-settings :is(.voice-grid, .speech-fields), #ai-assistant-settings .ai-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); align-items: start;
+}
+:is(#voice-settings, #ai-assistant-settings) :is(.voice-field, .ai-field, label) { min-width: 0; }
+#voice-settings .speech-field :is(input, select, textarea), #voice-settings #speechLanguage { width: 100%; }
+#voice-settings .speech-field input[type="checkbox"] { width: auto; }
+#voice-settings .speech-field.model-control-bool { flex-direction: row; align-items: center; justify-content: space-between; min-height: 40px; }
+.voice-pane :is(.voice-description, [role="status"]) { line-height: 1.6; overflow-wrap: anywhere; }
+.voice-pane .local-asr-actions { gap: 8px; align-items: center; }
+.voice-pane .local-asr-actions button { min-height: 34px; white-space: normal; max-width: 100%; }
+.voice-pane details:not(.section), .workbench-details {
+  border: 1px solid var(--control-border); border-radius: 8px; padding: 10px 12px;
+  margin: 12px 0; background: var(--surface-subtle);
+}
+.voice-pane details:not(.section) > summary, .workbench-details > summary { cursor: pointer; color: var(--text-color); font-size: 13px; line-height: 1.5; }
+#voice-settings .local-tts-catalog { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; align-items: start; }
+#voice-settings .local-tts-catalog .local-asr-card { margin: 0; padding: 14px; background: var(--surface-raised); min-width: 0; }
+#voice-settings .local-tts-catalog .local-asr-card h4 { line-height: 1.45; }
+#voice-settings .local-tts-catalog .model-description { font-size: 12px; margin: 10px 0; background: var(--surface-subtle); }
+#voice-settings .speech-field textarea { resize: vertical; min-height: 88px; max-height: 60vh; }
+#voice-settings #studioText { min-height: 120px; }
+#voice-settings :is(#speechStatus, #studioStatus, #localTtsStatus) {
+  padding: 9px 12px; border-radius: 7px; background: var(--surface-sunken); color: var(--text-secondary);
+}
+#voice-settings :is(#speechStatus, #studioStatus, #localTtsStatus):empty { display: none; }
+#personalLibraryPanel .library-toolbar { display: grid; grid-template-columns: minmax(150px, 1fr) auto; align-items: end; gap: 10px; }
+#personalLibraryPanel .library-toolbar label { display: grid; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+#personalLibraryPanel .library-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin: 14px 0; align-items: center; }
+#personalLibraryPanel .library-search-row input { width: 100%; min-width: 0; }
+#personalLibraryPanel :is(.library-toolbar select, .library-search-row input) { padding: 8px 10px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--control-bg); color: var(--text-color); }
+#personalLibraryPanel .library-flags { gap: 12px; }
+#personalLibraryPanel .library-flags label, #personalLibraryPanel #libraryAppFields > label:last-child { flex-direction: row; align-items: center; }
+#personalLibraryPanel input[type="checkbox"] { width: auto; padding: 0; flex: 0 0 auto; accent-color: var(--accent-color); }
+#personalLibraryPanel .library-card { padding: 14px; margin: 0; min-width: 0; background: var(--surface-raised); border: 1px solid var(--control-border); border-radius: 8px; }
+#personalLibraryPanel .library-card pre { line-height: 1.6; max-height: 9em; overflow: auto; color: var(--text-color); font: inherit; font-size: 13px; }
+#personalLibraryPanel .library-card strong { color: var(--text-color); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+#personalLibraryPanel #libraryRows { display: grid; gap: 10px; }
+#personalLibraryPanel #libraryStatus { color: var(--text-secondary); line-height: 1.5; padding: 8px 10px; margin: 10px 0; border-radius: 6px; background: var(--surface-sunken); overflow-wrap: anywhere; }
+#personalLibraryPanel #libraryStatus:empty { display: none; }
+#personalLibraryPanel #libraryEditor { padding: 14px; margin: 12px 0; border: 1px solid var(--control-border); border-radius: 8px; background: var(--surface-subtle); }
+#personalLibraryPanel #libraryEditor:not([open]) > :not(summary) { display: none !important; }
+#ai-assistant-settings details.ai-section[open] > summary { margin-bottom: 12px; }
+#ai-assistant-settings .ai-description.ai-api-description { margin-top: 0; }
+@media (max-width: 700px) {
+  :is(#voice-settings, #ai-assistant-settings) :is(.voice-section, .ai-section) { padding: 16px; }
+  #personalLibraryPanel .library-search-row { grid-template-columns: minmax(0, 1fr); }
+  #personalLibraryPanel .library-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .voice-pane .local-asr-actions > :is(button, select) { flex: 1 1 150px; }
+}

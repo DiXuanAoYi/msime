@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <wincodec.h>
@@ -338,6 +339,44 @@ TEST_CASE(clipped_native_size_image_keeps_its_edges_after_snapping)
     }
 }
 
+TEST_CASE(rotated_native_image_preserves_transform_without_device_grid_snapping)
+{
+    ImageFixture fixture;
+    msimeui::DeviceResources resources;
+    REQUIRE(resources.EnsureForComposition(fixture.window.hwnd));
+    auto *dc = resources.GetDeviceContext();
+    auto *bitmap = resources.GetBitmapFromFile(fixture.file.path);
+    REQUIRE(bitmap != nullptr);
+    for (const float dpi : {96.0f, 120.0f, 144.0f, 192.0f})
+    {
+        dc->SetDpi(dpi, dpi);
+        Canvas canvas(dc, dpi);
+        msimeui::Image image(fixture.file.path);
+        image.SetStretch(msimeui::ImageStretch::Uniform);
+        const float scale = dpi / 96.0f;
+        const msimeui::RectF bounds{20.25f, 24.5f, kImageWidth / scale, kImageHeight / scale};
+        image.Arrange(bounds);
+        const auto transform = D2D1::Matrix3x2F::Rotation(17.0f) * D2D1::Matrix3x2F::Translation(50.3f, 22.6f);
+        const auto actual = canvas.Render([&]() {
+            dc->SetTransform(transform);
+            image.Render(resources);
+        });
+        const auto expected = canvas.Render([&]() {
+            auto *target = resources.GetRenderTarget();
+            target->SetTransform(transform);
+            target->DrawBitmap(bitmap,
+                               D2D1::RectF(bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height), 1.0f,
+                               D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+        });
+        int worst = 0;
+        for (size_t i = 0; i < actual.size(); ++i)
+            worst = (std::max)(worst, std::abs(static_cast<int>(actual[i]) - expected[i]));
+        std::printf("rotated image dpi=%.0f worst channel difference %d/255\n", dpi, worst);
+        // The same 1/255 tolerance as scaled-image tests covers float multiplication rounding.
+        REQUIRE(worst <= 1);
+    }
+}
+
 TEST_CASE(unstretched_image_crops_instead_of_squeezing_into_smaller_bounds)
 {
     Scenario scenario;
@@ -348,4 +387,33 @@ TEST_CASE(unstretched_image_crops_instead_of_squeezing_into_smaller_bounds)
     const int worst = CheckImagePixels(scenario);
     std::printf("cropped image worst channel difference %d/255\n", worst);
     REQUIRE(worst <= 1);
+}
+
+TEST_CASE(animated_image_preserves_layout_and_the_following_controls_transform)
+{
+    ImageFixture fixture;
+    msimeui::DeviceResources resources;
+    REQUIRE(resources.EnsureForComposition(fixture.window.hwnd));
+    auto *dc = resources.GetDeviceContext();
+    Canvas canvas(dc, 144.0f);
+    msimeui::Image image(fixture.file.path);
+    const msimeui::RectF bounds{20, 24, 100, 80};
+    image.Arrange(bounds);
+    image.SetRenderPose(3, -2, 1.02f);
+    const auto original = D2D1::Matrix3x2F::Translation(0.3f, 0.6f);
+    canvas.Render([&]() {
+        dc->SetTransform(original);
+        image.Render(resources);
+        D2D1_MATRIX_3X2_F after;
+        dc->GetTransform(&after);
+        REQUIRE(std::memcmp(&after, &original, sizeof(after)) == 0);
+    });
+    REQUIRE(image.GetBounds().x == bounds.x);
+    REQUIRE(image.GetBounds().height == bounds.height);
+    image.SetRenderPose(0, 0, 1);
+    const auto restored = canvas.Render([&]() { image.Render(resources); });
+    msimeui::Image unchanged(fixture.file.path);
+    unchanged.Arrange(bounds);
+    const auto baseline = canvas.Render([&]() { unchanged.Render(resources); });
+    REQUIRE(restored == baseline);
 }

@@ -1,3 +1,4 @@
+#include "companion/companion_feed.h"
 #include <msime/voice/audio_capture.h>
 #include <msime/voice/provider_protocol.h>
 #include <msime/voice/stt_service.h>
@@ -512,14 +513,14 @@ RecognitionResult Recognize(const std::vector<float> &samples, const VoiceInputC
     if (model_name.empty())
         return {{}, "ASR 模型名为空。"};
     const bool siliconflow = IsSiliconFlowAsr(config);
-    metasequoia::voice::MultipartRequest payload;
+    VoiceInput::AsrHttpRequest payload;
     try
     {
-        payload = VoiceInput::BuildBatchTranscription(samples, config);
+        payload = VoiceInput::BuildAsrHttpRequest(samples, config, std::time(nullptr));
     }
-    catch (const metasequoia::voice::VoiceError &)
+    catch (const std::exception &e)
     {
-        return {{}, "录音数据无效或超过 20 MiB 上传限制。"};
+        return {{}, e.what()};
     }
     const int attempts = siliconflow ? 2 : 1;
     std::string response;
@@ -538,12 +539,15 @@ RecognitionResult Recognize(const std::vector<float> &samples, const VoiceInputC
         if (!curl)
             return {{}, "无法初始化网络请求。"};
         curl_slist *headers = nullptr;
-        headers = curl_slist_append(headers, ("Authorization: Bearer " + asr_token).c_str());
+        for (const auto &header : payload.headers)
+            headers = curl_slist_append(headers, header.c_str());
         // Some gateways 500 on libcurl's default Expect: 100-continue.
         headers = curl_slist_append(headers, "Expect:");
         headers = curl_slist_append(headers, ("Content-Type: " + payload.content_type).c_str());
         curl_easy_setopt(curl, CURLOPT_URL, config.asr_endpoint.c_str());
         NetworkProxy::ApplyToCurl(curl);
+        if (config.asr_provider == "local")
+            curl_easy_setopt(curl, CURLOPT_PROXY, "");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_POST, 1L);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.body.data());
@@ -555,7 +559,7 @@ RecognitionResult Recognize(const std::vector<float> &samples, const VoiceInputC
         curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_error);
         curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15L);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, config.asr_provider == "local" ? 300L : 60L);
         curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
         result = curl_easy_perform(curl);
         http_status = 0;
@@ -585,11 +589,11 @@ RecognitionResult Recognize(const std::vector<float> &samples, const VoiceInputC
     }
     try
     {
-        return {metasequoia::voice::parse_transcription(response), {}};
+        return {VoiceInput::ParseAsrHttpResponse(response, config.asr_provider), {}};
     }
     catch (...)
     {
-        return {{}, "语音识别返回了无法解析的结果。"};
+        return {{}, "语音识别返回了无法解析的结果或服务拒绝了请求。"};
     }
 }
 
@@ -629,7 +633,9 @@ std::string Polish(const std::string &text, const VoiceInputConfig &config)
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     // Polishing is optional: if it cannot finish promptly, abort the request and
     // let the caller commit the original ASR text returned below.
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, kPolishTimeoutMs);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS,
+                     config.polish_provider == "deepseek" && config.polish_thinking != "disabled" ? 30000L
+                                                                                                  : kPolishTimeoutMs);
     const CURLcode result = curl_easy_perform(curl);
     long http_status = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status);
@@ -888,8 +894,10 @@ bool StartRecording()
     const std::string asr_token = VoiceInput::ResolveAsrToken(config);
     if (asr_token.empty())
     {
-        MessageBoxW(nullptr, L"请先在设置的“语音输入”分区填写当前 ASR 提供商的 API Token。", L"水杉 IME",
-                    MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(nullptr,
+                    config.asr_provider == "local" ? L"请先在设置的“语音输入 → 本地语音模型”中启动已下载的模型。"
+                                                   : L"请先在设置的“语音输入”分区填写当前 ASR 提供商的 API Token。",
+                    L"知语输入法", MB_OK | MB_ICONINFORMATION);
         return false;
     }
     g_starting = true;
@@ -932,7 +940,8 @@ bool StartRecording()
             g_stream_inline_this_session.store(false);
             g_last_inline_preedit.clear();
             g_doubao_asr.reset();
-            MessageBoxW(nullptr, L"无法启动豆包流式语音识别。请检查 config.toml。", L"水杉 IME", MB_OK | MB_ICONERROR);
+            MessageBoxW(nullptr, L"无法启动豆包流式语音识别。请检查 config.toml。", L"知语输入法",
+                        MB_OK | MB_ICONERROR);
             g_starting = false;
             return false;
         }
@@ -945,7 +954,7 @@ bool StartRecording()
     if (!g_capture.start(AudioCallback))
     {
         AbortPendingStart("capture start failed");
-        MessageBoxW(nullptr, L"无法启动麦克风。", L"水杉 IME", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"无法启动麦克风。", L"知语输入法", MB_OK | MB_ICONERROR);
         return false;
     }
     if (g_abort_start.exchange(false))
@@ -955,6 +964,7 @@ bool StartRecording()
         return false;
     }
     g_recording = true;
+    Companion::SetVoiceRecording(true);
     g_starting = false;
     g_overlay.set_input_level(0.0f);
     g_overlay.set_listening(true);
@@ -973,11 +983,12 @@ void StopRecording()
     if (g_capture.callback_failed())
     {
         CancelRecording();
-        MessageBoxW(nullptr, L"录音中断，请重试。", L"水杉 IME", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"录音中断，请重试。", L"知语输入法", MB_OK | MB_ICONERROR);
         return;
     }
     const VoiceInputConfig config = GetConfiguredVoiceInput();
     g_recording = false;
+    Companion::SetVoiceRecording(false);
     g_ralt_lock_mode = false;
     g_overlay.set_listening(false);
     g_overlay.set_input_level(0.0f);
@@ -1065,7 +1076,7 @@ void StopRecording()
             }
             if (!recognition.error.empty())
             {
-                MessageBoxW(nullptr, string_to_wstring(recognition.error).c_str(), L"水杉 IME", MB_OK | MB_ICONERROR);
+                MessageBoxW(nullptr, string_to_wstring(recognition.error).c_str(), L"知语输入法", MB_OK | MB_ICONERROR);
             }
             const std::string text = recognition.error.empty() ? Polish(recognition.text, config) : std::string();
             if (!batch_recognition && !polishing && !stream_inline && g_voice_session == voice_session && !text.empty())
@@ -1121,6 +1132,7 @@ void CancelRecording()
     }
     const VoiceInputConfig config = GetConfiguredVoiceInput();
     g_recording = false;
+    Companion::SetVoiceRecording(false);
     {
         std::lock_guard<std::mutex> send_lock(g_send_mutex);
         ++g_voice_session;

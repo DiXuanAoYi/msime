@@ -1,6 +1,12 @@
 #include "tests/includes/test_framework.h"
 
 #include "config/ime_config.h"
+#include "config/credential_protection.h"
+#include "english/speech_service.h"
+#include "settings/vision_config.h"
+#include "engine/contracts/webview/validator.h"
+#include "settings/config_update_dispatch.h"
+#include "settings/settings_environment.h"
 #include "global/globals.h"
 
 #include <windows.h>
@@ -85,6 +91,98 @@ std::string ReadText(const std::filesystem::path &path)
 }
 } // namespace
 
+TEST_CASE(credentials_migrate_once_and_cover_fork_tts_ocr_fields)
+{
+    const auto profile = MakeProfileRoot() / L"dpapi";
+    ScopedConfigLocation location(profile);
+    const auto data = profile / L"metasequoiaime";
+    SeedTemplate(data);
+    WriteText(data / L"config.toml",
+              "[speech]\nazure_key = \"synthetic-azure-key\"\n"
+              "elevenlabs_key = \"synthetic-eleven-key\"\n[vision]\nshiliu_appcode = \"synthetic-ocr-key\"\n"
+              "baidu_secret_key = \"synthetic-baidu-key\"\n[ai_assistant]\ntoken = \"synthetic-ai-key\"\n");
+    InitImeConfig();
+    const auto first = ReadText(data / L"config.toml");
+    REQUIRE(first.find("synthetic-") == std::string::npos);
+    const auto stored = toml::parse(first);
+    REQUIRE(CredentialProtection::IsProtected(stored["speech"]["azure_key"].value_or(std::string())));
+    REQUIRE(Speech::GetConfig().at("azure_key") == std::string("synthetic-azure-key"));
+    REQUIRE(VisionConfig::Get().at("shiliu_appcode") == std::string("synthetic-ocr-key"));
+    REQUIRE_EQ(GetConfiguredAiAssistantSnapshot().token, std::string("synthetic-ai-key"));
+    InitImeConfig();
+    REQUIRE_EQ(ReadText(data / L"config.toml"), first);
+    REQUIRE(Speech::SetConfig("azure_key", "synthetic-new-key"));
+    InitImeConfig();
+    REQUIRE(Speech::GetConfig().at("azure_key") == std::string("synthetic-new-key"));
+    REQUIRE(ReadText(data / L"config.toml").find("synthetic-new-key") == std::string::npos);
+}
+
+TEST_CASE(undecodable_credential_is_archived_in_place_and_never_used_as_token)
+{
+    const auto profile = MakeProfileRoot() / L"dpapi-bad";
+    ScopedConfigLocation location(profile);
+    const auto data = profile / L"metasequoiaime";
+    SeedTemplate(data);
+    WriteText(data / L"config.toml", "[ai_assistant]\ntoken = \"dpapi:not-base64!\"\n");
+    InitImeConfig();
+    REQUIRE(GetConfiguredAiAssistantSnapshot().token.empty());
+    REQUIRE(ReadText(data / L"config.toml").find("dpapi:not-base64!") != std::string::npos);
+    REQUIRE(SetConfiguredAiAssistantString("model", "test-model"));
+    REQUIRE(ReadText(data / L"config.toml").find("dpapi:not-base64!") != std::string::npos);
+}
+
+TEST_CASE(english_app_rules_and_domain_switches_round_trip_without_changing_old_mixed_mode)
+{
+    const auto profile = MakeProfileRoot() / L"runtime-rules";
+    ScopedConfigLocation location(profile);
+    const auto data = profile / L"metasequoiaime";
+    SeedTemplate(data);
+    InitImeConfig();
+    const auto mixed = GetConfiguredEnglishCandidatesEnabled();
+    REQUIRE(SetConfiguredEnglishCandidates(false));
+    REQUIRE(SetConfiguredEnglishCandidateAppRules(
+        R"([{"application":"Code.exe","mode":"enabled"},{"application":"notepad.exe","mode":"inherit"}])"));
+    REQUIRE(GetConfiguredEnglishCandidatesForApplication("C:\\apps\\CODE.EXE"));
+    REQUIRE(!GetConfiguredEnglishCandidatesForApplication("notepad.exe"));
+    const auto before = *GetConfiguredEnglishCandidateAppRules();
+    REQUIRE(!SetConfiguredEnglishCandidateAppRules(R"([{"application":"Code.exe","mode":"maybe"}])"));
+    REQUIRE_EQ(*GetConfiguredEnglishCandidateAppRules(), before);
+    REQUIRE(SetConfiguredEnabledDomainDictionaries("it,idioms,it"));
+    REQUIRE_EQ(*GetConfiguredEnabledDomainDictionaries(), std::string("idioms,it"));
+    REQUIRE(!SetConfiguredEnabledDomainDictionaries("invalid-pack"));
+    InitImeConfig();
+    REQUIRE(!GetConfiguredEnglishCandidates());
+    REQUIRE(GetConfiguredEnglishCandidatesForApplication("code.exe"));
+    REQUIRE_EQ(*GetConfiguredEnabledDomainDictionaries(), std::string("idioms,it"));
+    REQUIRE_EQ(GetConfiguredEnglishCandidatesEnabled(), mixed);
+}
+
+TEST_CASE(ai_local_and_custom_slots_preserve_independent_values_and_task_snapshot)
+{
+    const auto profile = MakeProfileRoot() / L"ai-slots";
+    ScopedConfigLocation location(profile);
+    SeedTemplate(profile / L"metasequoiaime");
+    InitImeConfig();
+    REQUIRE(SetConfiguredAiAssistantString("provider", "custom"));
+    REQUIRE(SetConfiguredAiAssistantString("endpoint", "https://example.invalid/v1/chat/completions"));
+    REQUIRE(SetConfiguredAiAssistantString("model", "custom-model"));
+    REQUIRE(SetConfiguredAiAssistantString("provider", "local"));
+    REQUIRE(SetConfiguredAiAssistantString("model", "local-model"));
+    REQUIRE(SetConfiguredAiAssistantString("thinking", "high"));
+    REQUIRE(SetConfiguredAiAssistantString("task", "completion"));
+    REQUIRE(SetConfiguredAiAssistantBool("completion_enabled", true));
+    REQUIRE(!SetConfiguredAiAssistantString("thinking", "arbitrary"));
+    REQUIRE(!SetConfiguredAiAssistantString("task", "translate"));
+    const auto snapshot = GetConfiguredAiAssistantSnapshot();
+    REQUIRE_EQ(snapshot.endpoint, std::string("http://127.0.0.1:11434/v1/chat/completions"));
+    REQUIRE(SetConfiguredAiAssistantString("provider", "custom"));
+    REQUIRE_EQ(GetConfiguredAiAssistantSnapshot().model, std::string("custom-model"));
+    InitImeConfig();
+    REQUIRE_EQ(GetConfiguredAiAssistantSnapshot().endpoint, std::string("https://example.invalid/v1/chat/completions"));
+    REQUIRE_EQ(snapshot.provider, std::string("local"));
+    REQUIRE(snapshot.completion_enabled);
+}
+
 TEST_CASE(config_round_trips_under_non_ascii_profile_path)
 {
     namespace fs = std::filesystem;
@@ -142,6 +240,81 @@ TEST_CASE(config_round_trips_under_non_ascii_profile_path)
     }
 
     fs::remove_all(unique_root, ec);
+}
+
+TEST_CASE(candidate_pinyin_display_defaults_on_and_survives_profile_reload)
+{
+    namespace fs = std::filesystem;
+    const fs::path root = MakeProfileRoot() / L"candidate-pinyin";
+    const fs::path data = root / L"metasequoiaime";
+    std::error_code ec;
+    fs::remove_all(root, ec);
+    SeedTemplate(data);
+    // An old profile has no annotation key: preserve the current visible default.
+    WriteText(data / L"config.toml", "[appearance]\npage_size = 6\n");
+    {
+        ScopedConfigLocation location(root);
+        InitImeConfig();
+        REQUIRE(GetConfiguredCandidateShowPinyin());
+        for (const bool enabled : {false, true, false})
+        {
+            REQUIRE(SetConfiguredCandidateShowPinyin(enabled));
+            InitImeConfig();
+            REQUIRE_EQ(GetConfiguredCandidateShowPinyin(), enabled);
+        }
+        REQUIRE(ReadText(data / L"config.toml").find("candidate_show_pinyin = false") != std::string::npos);
+    }
+    fs::remove_all(root, ec);
+}
+
+TEST_CASE(candidate_pinyin_json_dispatch_persists_for_both_settings_hosts)
+{
+    namespace fs = std::filesystem;
+    for (const bool embedded : {false, true})
+    {
+        const fs::path root = MakeProfileRoot() / (embedded ? L"embedded-dispatch" : L"standalone-dispatch");
+        const fs::path data = root / L"metasequoiaime";
+        std::error_code ec;
+        fs::remove_all(root, ec);
+        SeedTemplate(data);
+        {
+            ScopedConfigLocation location(root);
+            InitImeConfig();
+            for (const bool enabled : {false, true, false})
+            {
+                // Serialize and parse the same validated JSON envelope received by WebView2.
+                boost::json::object envelope = {
+                    {"type", "configUpdate"},
+                    {"protocolVersion", metasequoia::webview::Version},
+                    {"data", {{"path", "appearance.candidate_show_pinyin"}, {"value", enabled}}}};
+                const auto received = boost::json::parse(boost::json::serialize(envelope));
+                REQUIRE(metasequoia::webview::Validate(received, "client", "settings"));
+                const auto &payload = received.at("data").as_object();
+                if (embedded)
+                {
+                    const auto saved = SettingsConfig::ApplyCandidateAnnotationUpdate(payload);
+                    REQUIRE(saved.has_value());
+                    REQUIRE(*saved);
+                }
+                else
+                    REQUIRE(SettingsConfig::ApplyConfigUpdate(payload));
+                InitImeConfig();
+                REQUIRE_EQ(GetConfiguredCandidateShowPinyin(), enabled);
+                const auto stored = toml::parse(ReadText(data / L"config.toml"));
+                REQUIRE_EQ(stored["appearance"]["candidate_show_pinyin"].value_or(!enabled), enabled);
+            }
+            const boost::json::object invalid = {{"path", "appearance.candidate_show_pinyin"}, {"value", "true"}};
+            REQUIRE(!SettingsConfig::ApplyConfigUpdate(invalid));
+            const auto rejected = SettingsConfig::ApplyCandidateAnnotationUpdate(invalid);
+            REQUIRE(rejected.has_value());
+            REQUIRE(!*rejected);
+            InitImeConfig();
+            REQUIRE(!GetConfiguredCandidateShowPinyin());
+            REQUIRE(!SettingsConfig::ApplyCandidateAnnotationUpdate({{"path", "appearance.unknown"}, {"value", true}})
+                         .has_value());
+        }
+        fs::remove_all(root, ec);
+    }
 }
 
 TEST_CASE(trilingual_runtime_language_preserves_preferences_without_writing_config)
@@ -1190,4 +1363,60 @@ TEST_CASE(floating_toolbar_auto_hide_defaults_and_round_trips)
     }
 
     fs::remove_all(unique_root, ec);
+}
+
+TEST_CASE(settings_theme_dispatch_roundtrip_preserves_independent_surfaces)
+{
+    namespace fs = std::filesystem;
+    const auto unique_root = MakeProfileRoot();
+    const auto local_app_data = unique_root / L"主题隔离";
+    const auto data_dir = local_app_data / L"metasequoiaime";
+    std::error_code error;
+    fs::remove_all(unique_root, error);
+    SeedTemplate(data_dir);
+    {
+        ScopedConfigLocation isolated(local_app_data);
+        WriteText(data_dir / L"config.toml", "[appearance]\ntheme_mode = \"light\"\ntheme_settings = \"light\"\n"
+                                             "theme_cand = \"dark\"\ntheme_ftb = \"light\"\n");
+        InitImeConfig();
+        const auto update = [](const char *path, const char *value) {
+            const boost::json::object data{{"path", path}, {"value", value}};
+            const boost::json::object message{{"type", "configUpdate"}, {"protocolVersion", 1}, {"data", data}};
+            REQUIRE(metasequoia::webview::Validate(message, "client", "settings"));
+            REQUIRE(SettingsConfig::ApplyConfigUpdate(data));
+        };
+        update("appearance.theme_mode", "dark");
+        REQUIRE_EQ(ResolveConfiguredTheme(GetConfiguredThemeSettings()), std::string("light"));
+        update("appearance.theme_settings", "follow");
+        REQUIRE_EQ(ResolveConfiguredTheme(GetConfiguredThemeSettings()), std::string("dark"));
+        update("appearance.theme_mode", "light");
+        REQUIRE_EQ(ResolveConfiguredTheme(GetConfiguredThemeSettings()), std::string("light"));
+        InitImeConfig();
+        REQUIRE_EQ(GetConfiguredThemeSettings(), std::string("follow"));
+        REQUIRE_EQ(GetConfiguredThemeCand(), std::string("dark"));
+        REQUIRE_EQ(GetConfiguredThemeFtb(), std::string("light"));
+        update("appearance.theme_mode", "system");
+        REQUIRE_EQ(ResolveConfiguredTheme(GetConfiguredThemeSettings()),
+                   IsSystemAppsLightTheme() ? std::string("light") : std::string("dark"));
+        const auto before = ReadText(data_dir / L"config.toml");
+        REQUIRE(!SettingsConfig::ApplyConfigUpdate({{"path", "appearance.theme_settings"}, {"value", "invalid"}}));
+        REQUIRE_EQ(ReadText(data_dir / L"config.toml"), before);
+    }
+    fs::remove_all(unique_root, error);
+}
+
+TEST_CASE(settings_temporary_configuration_is_explicit_environment_metadata)
+{
+    ScopedEnv data(L"METASEQUOIA_IME_DATA_DIR", L"");
+    ScopedEnv config(L"METASEQUOIA_IME_CONFIG_DIR", L"");
+    REQUIRE(!SettingsEnvironment::HasTemporaryConfiguration());
+    {
+        ScopedEnv synthetic_data(L"METASEQUOIA_IME_DATA_DIR", L"fixture-data");
+        REQUIRE(SettingsEnvironment::HasTemporaryConfiguration());
+    }
+    {
+        ScopedEnv synthetic_config(L"METASEQUOIA_IME_CONFIG_DIR", L"fixture-config");
+        REQUIRE(SettingsEnvironment::HasTemporaryConfiguration());
+    }
+    REQUIRE(!SettingsEnvironment::HasTemporaryConfiguration());
 }

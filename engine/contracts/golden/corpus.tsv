@@ -1,0 +1,82 @@
+# 黄金样本：每行 `方案<TAB>按键`。用 engine/tools/golden_probe 生成对应的期望输出，
+# 别的实现（Rust 核心等）要对着这份输出逐条比对候选顺序。新增 bug 复现输入也加在这里。
+# --- 全拼：单音节 ---
+quanpin	ni
+quanpin	hao
+quanpin	wo
+quanpin	shi
+quanpin	de
+quanpin	zhong
+quanpin	lv
+quanpin	nv
+quanpin	yue
+quanpin	er
+# --- 全拼：词与短句 ---
+quanpin	nihao
+quanpin	zhongguo
+quanpin	shuru
+quanpin	shurufa
+quanpin	zhongwen
+quanpin	women
+quanpin	xiexie
+quanpin	zaijian
+quanpin	jintian
+quanpin	mingtian
+quanpin	tianqi
+quanpin	jisuanji
+quanpin	diannao
+quanpin	shouji
+quanpin	pengyou
+quanpin	gongzuo
+quanpin	xuexiao
+quanpin	woaini
+quanpin	jintiantianqihenhao
+quanpin	woxiangquchifan
+quanpin	zhegeshiqingwoyijingzhidaole
+quanpin	qingwenxiyoujianzaina
+# --- 全拼：切分歧义 ---
+quanpin	xian
+quanpin	xi'an
+quanpin	xianzai
+quanpin	fangan
+quanpin	fang'an
+quanpin	changan
+quanpin	chang'an
+quanpin	shiyi
+quanpin	shi'yi
+quanpin	tianan
+quanpin	tian'an
+# --- 全拼：简拼与首字母 ---
+quanpin	n
+quanpin	nh
+quanpin	zg
+quanpin	srf
+quanpin	zgr
+quanpin	wm
+quanpin	jt
+quanpin	mt
+quanpin	bj
+quanpin	sh
+quanpin	zhrmghg
+# --- 全拼：混写（全拼加简拼） ---
+quanpin	nih
+quanpin	zhongg
+quanpin	shurf
+# --- 全拼：边界 ---
+quanpin	a
+quanpin	o
+quanpin	e
+quanpin	ang
+quanpin	aiai
+quanpin	hhhh
+quanpin	xyz
+quanpin	nihaoa
+# --- 双拼（小鹤） ---
+shuangpin	nihk
+shuangpin	vsvs
+shuangpin	ui
+shuangpin	wo
+shuangpin	nihkwo
+shuangpin	jtjt
+shuangpin	zhrmghg
+shuangpin	xxxx

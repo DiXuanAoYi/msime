@@ -21,10 +21,13 @@ add_executable(portable_tests
     "${SERVER_ROOT}/tests/src/test_skin_css_policy.cpp"
     "${SERVER_ROOT}/tests/src/test_input_key_policy.cpp"
     "${SERVER_ROOT}/tests/src/test_candidate_text_policy.cpp"
+    "${SERVER_ROOT}/tests/src/test_personal_glossary.cpp"
+    "${SERVER_ROOT}/src/english/personal_glossary.cpp"
     "${SERVER_ROOT}/src/webview2/skin_css_policy.cpp"
 )
 
-target_include_directories(portable_tests PRIVATE "${SERVER_ROOT}" "${SERVER_ROOT}/src" "${SERVER_ROOT}/..")
+target_include_directories(portable_tests PRIVATE "${SERVER_ROOT}" "${SERVER_ROOT}/src" "${SERVER_ROOT}/.."
+    "${SERVER_ROOT}/../engine/utfcpp/source")
 
 if(MSIME_PORTABLE_TESTS_SANITIZE AND NOT MSVC)
     target_compile_options(portable_tests PRIVATE

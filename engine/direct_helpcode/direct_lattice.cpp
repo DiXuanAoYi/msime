@@ -238,9 +238,10 @@ class WordGraphBuilder
         }
 
         std::vector<CachedWord> words;
-        std::int64_t span_total = 0;
+        // 按读音分开求和，模糊读音的行不压低敲出读音的占比，见 quanpin::build_graph。
+        std::unordered_map<std::string, std::int64_t> reading_totals;
         for (const auto *row : accepted)
-            span_total += row->weight > 0 ? row->weight : 0;
+            reading_totals[row->key] += row->weight > 0 ? row->weight : 0;
         const std::string span_key = quanpin::join_segments(span);
         for (const auto *row : accepted)
         {
@@ -250,13 +251,14 @@ class WordGraphBuilder
             if (model_)
             {
                 word.index = model_->index(word.word);
-                word.base_score =
-                    dictionary_tiebreak(row->weight, options_) + reading_prior(row->weight, span_total, options_);
+                word.base_score = dictionary_tiebreak(row->weight, options_) +
+                                  reading_prior(row->weight, reading_totals[row->key], options_);
             }
             else
             {
                 word.base_score = heuristic_log_prob(row->weight, sequence.size(), options_);
             }
+            word.base_score -= row->penalty;
             words.push_back(std::move(word));
         }
         return words;

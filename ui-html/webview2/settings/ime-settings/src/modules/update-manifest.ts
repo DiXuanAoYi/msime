@@ -1,4 +1,4 @@
-// Validation and trust reporting for https://msime.app/update.json, kept apart from the settings DOM
+// Validation and trust reporting for this fork's GitHub releases, kept apart from the settings DOM
 // so it can be tested. The manifest publishes four fields about the installer; the settings page used
 // to read only two of them, so the digest the release pipeline had already computed never reached the
 // person who was about to download an unsigned executable.
@@ -6,6 +6,7 @@
 export type Version = {
   display: string;
   parts: number[];
+  suffix?: string;
 };
 
 export type UpdateManifest = {
@@ -24,22 +25,8 @@ export type ValidatedUpdate = {
   signed: boolean | null;
 };
 
-const RELEASE_TAG_URL = /^https:\/\/github\.com\/metasequoiaime\/([\w.-]+)\/releases\/tag\/([\w.+-]+)$/;
-
-// The mirror serves GitHub release assets under `<prefix><original download URL>`. The installer name has
-// already been held to the release pipeline's shape, and it is the file whose SHA256 the dialog shows, so
-// the digest applies to the mirrored copy unchanged. Without a tag URL or an installer name there is
-// nothing to point at, and the dialog offers GitHub only.
-export function mirrorDownloadUrl(update: ValidatedUpdate, prefix: string): string | null {
-  const tag = RELEASE_TAG_URL.exec(update.releaseUrl);
-  if (!tag || !update.installerName) {
-    return null;
-  }
-  return `${prefix}https://github.com/metasequoiaime/${tag[1]}/releases/download/${tag[2]}/${update.installerName}`;
-}
-
 export function parseVersion(value: string): Version | null {
-  const match = value.trim().match(/^v?(\d+(?:\.\d+)*)(?:[-+].*)?$/i);
+  const match = value.trim().match(/^v?(\d+(?:\.\d+)*)(?:-([\w.-]+))?(?:\+[\w.-]+)?$/i);
   if (!match) {
     return null;
   }
@@ -50,8 +37,9 @@ export function parseVersion(value: string): Version | null {
   }
 
   return {
-    display,
-    parts: display.split('.').map(Number)
+    display: match[2] ? `${display}-${match[2]}` : display,
+    parts: display.split('.').map(Number),
+    suffix: match[2]
   };
 }
 
@@ -63,7 +51,52 @@ export function compareVersions(left: Version, right: Version): number {
       return difference;
     }
   }
-  return 0;
+  if (left.suffix === right.suffix) return 0;
+  if (!left.suffix) return 1;
+  if (!right.suffix) return -1;
+  return left.suffix.localeCompare(right.suffix, 'en', { numeric: true });
+}
+
+export const PRODUCT_REPOSITORY = 'DiXuanAoYi/msime';
+export const PRODUCT_CHANNEL = 'chat';
+export const PRODUCT_RELEASE_REVISION = 1;
+export const PRODUCT_RELEASES_URL = `https://github.com/${PRODUCT_REPOSITORY}/releases`;
+export const PRODUCT_RELEASE_API = `https://api.github.com/repos/${PRODUCT_REPOSITORY}/releases?per_page=30`;
+
+/** Windows file versions are numeric; preserve the compiled personal-channel revision when ordering releases. */
+export function installedProductVersion(label: string): Version | null {
+  const version = parseVersion(label);
+  if (!version) return null;
+  return version.suffix ? version : parseVersion(`${version.display}-${PRODUCT_CHANNEL}.${PRODUCT_RELEASE_REVISION}`);
+}
+
+/** Stable /latest excludes this branch's prereleases. Explicitly select the chat channel from the release list. */
+export function selectProductRelease(value: unknown): ValidatedUpdate | null {
+  if (!Array.isArray(value)) return null;
+  let latest: ValidatedUpdate | null = null;
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue;
+    const release = entry as Record<string, unknown>;
+    if (release.draft !== false || typeof release.tag_name !== 'string' ||
+        !/^v\d+(?:\.\d+)*-chat\.\d+$/.test(release.tag_name) || !Array.isArray(release.assets)) continue;
+    const tag = release.tag_name;
+    const asset = release.assets.find((item: unknown) => {
+      if (!item || typeof item !== 'object') return false;
+      const row = item as Record<string, unknown>;
+      return row.state === 'uploaded' && typeof row.name === 'string' && INSTALLER_NAME.test(row.name) &&
+        row.name.includes(tag) && typeof row.size === 'number' && row.size > 0 &&
+        row.browser_download_url === `${PRODUCT_RELEASES_URL}/download/${tag}/${row.name}`;
+    }) as Record<string, unknown> | undefined;
+    if (!asset || release.html_url !== `${PRODUCT_RELEASES_URL}/tag/${tag}`) continue;
+    const digest = typeof asset.digest === 'string' && /^sha256:[0-9a-f]{64}$/.test(asset.digest)
+      ? asset.digest.slice(7) : undefined;
+    const update = validateManifest({ version: tag, releaseUrl: release.html_url,
+      installerName: asset.name, installerSha256: digest,
+      signed: typeof asset.name === 'string' && /-unsigned\.exe$/i.test(asset.name) ? false : undefined
+    }, PRODUCT_RELEASES_URL);
+    if (update && (!latest || compareVersions(update.version, latest.version) > 0)) latest = update;
+  }
+  return latest;
 }
 
 // The installer name reaches a command the user is told to paste, so it is restricted to the shape

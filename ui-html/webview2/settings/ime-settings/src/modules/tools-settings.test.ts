@@ -61,6 +61,10 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('leaves the relocated clipboard switch to the personal library owner', () => {
+  expect(toggles.has('clipboardHistoryToggleBtn')).toBe(false);
+});
+
 it('reports every mixed candidate switch to its config path', () => {
   const options: [string, string][] = [
     ['mixedCandidatesToggleBtn', 'utility.mixed_candidates'],

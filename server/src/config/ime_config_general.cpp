@@ -34,6 +34,30 @@ bool SetConfiguredTsfDiagnosticLogEnabled(bool enabled)
     return true;
 }
 
+bool GetConfiguredVocabularyEnabled()
+{
+    return g_vocabulary_enabled.load();
+}
+int GetConfiguredVocabularyRetentionDays()
+{
+    return g_vocabulary_retention_days.load();
+}
+bool SetConfiguredVocabularyEnabled(bool enabled)
+{
+    if (!WriteConfiguredValue("vocabulary", "enabled", enabled ? "true" : "false"))
+        return false;
+    g_vocabulary_enabled.store(enabled);
+    return true;
+}
+bool SetConfiguredVocabularyRetentionDays(int days)
+{
+    if (days != 30 && days != 90 && days != 365)
+        return false;
+    if (!WriteConfiguredValue("vocabulary", "retention_days", std::to_string(days)))
+        return false;
+    g_vocabulary_retention_days.store(days);
+    return true;
+}
 bool GetConfiguredStatisticsEnabled()
 {
     return g_statistics_enabled.load(std::memory_order_relaxed);
@@ -89,6 +113,41 @@ bool SetConfiguredCandidateTranslationsEnabled(bool enabled)
     if (!WriteConfiguredValue("general", "candidate_translations", enabled ? "true" : "false"))
         return false;
     g_candidate_translations_enabled = enabled;
+    return true;
+}
+
+bool GetConfiguredCandidateTranslationCloudEnabled()
+{
+    return g_candidate_translation_cloud_enabled.load();
+}
+
+bool SetConfiguredCandidateTranslationCloudEnabled(bool enabled)
+{
+    if (!WriteConfiguredValue("general", "candidate_translation_cloud", enabled ? "true" : "false"))
+        return false;
+    g_candidate_translation_cloud_enabled.store(enabled);
+    return true;
+}
+
+std::shared_ptr<const EnglishIme::PersonalGlossary> GetConfiguredPersonalTranslationGlossary()
+{
+    return std::atomic_load(&g_personal_translation_glossary);
+}
+
+uint64_t GetConfiguredPersonalTranslationGlossaryRevision()
+{
+    return g_personal_translation_glossary_revision.load();
+}
+
+bool SetConfiguredPersonalTranslationGlossary(const std::string &text)
+{
+    auto parsed = std::make_shared<EnglishIme::PersonalGlossary>();
+    if (!parsed->Parse(text) ||
+        !WriteConfiguredValue("general", "personal_translation_glossary", EscapeTomlBasicString(text)))
+        return false;
+    std::shared_ptr<const EnglishIme::PersonalGlossary> snapshot = std::move(parsed);
+    std::atomic_store(&g_personal_translation_glossary, std::move(snapshot));
+    g_personal_translation_glossary_revision.fetch_add(1);
     return true;
 }
 
@@ -521,5 +580,20 @@ bool SetConfiguredClipboardHistoryEnabled(bool enabled)
     if (was_enabled && !enabled)
         ClipboardHistory::Clear();
     ClipboardMonitor::Sync(enabled);
+    return true;
+}
+
+std::shared_ptr<const std::string> GetConfiguredDisabledTranslationDictionaries()
+{
+    return std::atomic_load(&g_disabled_translation_dictionaries);
+}
+bool SetConfiguredDisabledTranslationDictionaries(const std::string &ids)
+{
+    if (ids.size() > 8192 || ids.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-,") != std::string::npos)
+        return false;
+    if (!WriteConfiguredValue("general", "disabled_translation_dictionaries", EscapeTomlBasicString(ids)))
+        return false;
+    std::atomic_store(&g_disabled_translation_dictionaries, std::make_shared<const std::string>(ids));
+    g_personal_translation_glossary_revision.fetch_add(1);
     return true;
 }

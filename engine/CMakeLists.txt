@@ -30,7 +30,7 @@ set(METASEQUOIA_IME_ENGINE_SOURCES
     common/helpcode_utils.cpp
     common/string_utils.cpp
     core/session.cpp
-    core/nine_key_session.cpp
+    capi/msime_capi.cpp
     core/candidate_queries.cpp
     core/punctuation_policy.cpp
     core/runtime_paths.cpp
@@ -43,6 +43,7 @@ set(METASEQUOIA_IME_ENGINE_SOURCES
     direct_helpcode/direct_lattice.cpp
     direct_helpcode/direct_resolver.cpp
     direct_helpcode/spelling_graph.cpp
+    domain_dictionary/domain_dictionary.cpp
     english/english_dictionary.cpp
     japanese/japanese_matrix_search.cpp
     japanese/japanese_sentence_decoder.cpp
@@ -171,6 +172,110 @@ else()
     target_compile_options(MetasequoiaImeEngine PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+# 黄金样本探针：把输入串清单喂给引擎并输出候选，作为其他实现（如 Rust 核心）的行为规格。只在显式指定目标时构建。
+add_executable(msime_golden_probe EXCLUDE_FROM_ALL tools/golden_probe.cpp)
+target_link_libraries(msime_golden_probe PRIVATE MetasequoiaIme::Engine)
+
+# 调频探针：用合成词库跑真实的 adjust_candidate_ranking，输出调完的权重，当 Rust 调频算法的规格。
+add_executable(msime_ranking_probe EXCLUDE_FROM_ALL tools/ranking_probe.cpp)
+target_link_libraries(msime_ranking_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
+
+# 双拼与辅助码探针：导出方案表、解码、分段、取码与匹配的结果，当 Rust 实现的行为规格。
+add_executable(msime_helpshuang_probe EXCLUDE_FROM_ALL tools/helpshuang_probe.cpp)
+target_link_libraries(msime_helpshuang_probe PRIVATE MetasequoiaIme::Engine)
+
+# 词格探针：对随机场景跑真实的 decode_word_lattice / merge_lattice_candidates，输出输入与结果，当 Rust 实现的规格。
+add_executable(msime_lattice_probe EXCLUDE_FROM_ALL tools/lattice_probe.cpp)
+target_link_libraries(msime_lattice_probe PRIVATE MetasequoiaIme::Engine)
+
+# 语言模型探针：用真实的 kenlm 载入 sc.lm，导出词下标和逐词分数，当 Rust 读取器的规格。
+add_executable(msime_lm_probe EXCLUDE_FROM_ALL tools/lm_probe.cpp)
+target_link_libraries(msime_lm_probe PRIVATE MetasequoiaIme::Engine)
+
+# 五笔与日语探针：导出罗马字转换、五笔方案与码表查询、日语词条/整句/候选提供者的结果，当 Rust 实现的行为规格。
+add_executable(msime_wubi_japanese_probe EXCLUDE_FROM_ALL tools/wubi_japanese_probe.cpp)
+target_link_libraries(msime_wubi_japanese_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
+
+# 英文词典与本地模式探针：导出 Unicode、V 模式、日期时间、表情、颜文字、超级简拼、快捷短语和英文词典的结果，当 Rust 实现的行为规格。
+add_executable(msime_local_modes_probe EXCLUDE_FROM_ALL tools/local_modes_probe.cpp)
+target_link_libraries(msime_local_modes_probe PRIVATE MetasequoiaIme::Engine ${METASEQUOIA_IME_SQLITE_TARGET})
+
+# octagram .gram 探针：现建一份合成模型，用真实的 GramDb 跑编码与查询，当 Rust 读取器的行为规格。
+add_executable(msime_gram_probe EXCLUDE_FROM_ALL tools/gram_probe.cpp)
+target_link_libraries(msime_gram_probe PRIVATE MetasequoiaIme::Engine)
+
+# 自定义双拼方案探针：对内置方案随机改动后用真实的 BuildCustomShuangpinProfile 构建，导出错误信息和方案表。
+add_executable(msime_custom_shuangpin_probe EXCLUDE_FROM_ALL tools/custom_shuangpin_probe.cpp)
+target_link_libraries(msime_custom_shuangpin_probe PRIVATE MetasequoiaIme::Engine)
+
+# 双拼输入串处理探针：分段、转全拼、分隔符、全码辅助长度、句中辅助码解析，对九套内置方案跑随机输入串。
+add_executable(msime_shuangpin_query_probe EXCLUDE_FROM_ALL tools/shuangpin_query_probe.cpp)
+target_link_libraries(msime_shuangpin_query_probe PRIVATE MetasequoiaIme::Engine)
+
+# 输入方案探针：全拼、双拼、五笔、日语罗马字吃随机按键，导出每一步生成的 QueryRequest 和预编辑。
+add_executable(msime_scheme_probe EXCLUDE_FROM_ALL tools/scheme_probe.cpp)
+target_link_libraries(msime_scheme_probe PRIVATE MetasequoiaIme::Engine)
+
+# 拼音候选提供者探针：真实的 PinyinCandidateProvider 吃方案生成的请求，覆盖引擎层的辅助码、模糊音、动态候选缓存。
+add_executable(msime_pinyin_provider_probe EXCLUDE_FROM_ALL tools/pinyin_provider_probe.cpp)
+target_link_libraries(msime_pinyin_provider_probe PRIVATE MetasequoiaIme::Engine)
+
+# 标点策略探针：真实的 PunctuationPolicy 吃随机字符序列，导出每个字符的译文。
+add_executable(msime_punctuation_probe EXCLUDE_FROM_ALL tools/punctuation_probe.cpp)
+target_link_libraries(msime_punctuation_probe PRIVATE MetasequoiaIme::Engine)
+
+# 候选查询探针：真实的 CandidateQueries 跑九种本地模式和英文/表情/颜文字混排，每条导出候选列表。
+add_executable(msime_candidate_queries_probe EXCLUDE_FROM_ALL tools/candidate_queries_probe.cpp)
+target_link_libraries(msime_candidate_queries_probe PRIVATE MetasequoiaIme::Engine)
+
+# 输入形状契约探针：日期时间输入形状与双拼直接辅助码的按键形状。
+add_executable(msime_input_contracts_probe EXCLUDE_FROM_ALL tools/input_contracts_probe.cpp)
+target_link_libraries(msime_input_contracts_probe PRIVATE MetasequoiaIme::Engine)
+
+# 输入会话（InputSession）探针：真实的 InputSession 吃随机操作序列，每步导出操作结果和会话状态。
+add_executable(msime_input_session_probe EXCLUDE_FROM_ALL tools/input_session_probe.cpp)
+target_link_libraries(msime_input_session_probe PRIVATE MetasequoiaIme::Engine)
+
+# 平台入口 Session（含九键）探针：真实的 Session 吃随机操作序列，每步导出操作结果和快照。
+add_executable(msime_session_probe EXCLUDE_FROM_ALL tools/session_probe.cpp)
+target_link_libraries(msime_session_probe PRIVATE MetasequoiaIme::Engine)
+
+# 输入会话探针：真实的 ImeSession 吃随机操作序列（按键、整串替换、动态候选、方案切换、前缀查询），每步导出状态。
+add_executable(msime_ime_session_probe EXCLUDE_FROM_ALL tools/ime_session_probe.cpp)
+target_link_libraries(msime_ime_session_probe PRIVATE MetasequoiaIme::Engine)
+
+# 词格词库查询探针：真实的 make_lattice_db_lookup 在随包 msime.db 上查跨度（拼写归一、模糊变体、扣分、排序截断）。
+add_executable(msime_lattice_lookup_probe EXCLUDE_FROM_ALL tools/lattice_lookup_probe.cpp)
+target_link_libraries(msime_lattice_lookup_probe PRIVATE MetasequoiaIme::Engine)
+
+# 直接辅助码拼写图探针：真实的 build_spelling_graph / single_path 跑随机输入串（辅码谓词用确定的哈希代替辅码表）。
+add_executable(msime_spelling_graph_probe EXCLUDE_FROM_ALL tools/spelling_graph_probe.cpp)
+target_link_libraries(msime_spelling_graph_probe PRIVATE MetasequoiaIme::Engine)
+
+# 直接辅助码整句解码与解析器探针：真实的 decode_best_path / Resolver::resolve 在合成词库上跑随机输入串。
+add_executable(msime_direct_helpcode_probe EXCLUDE_FROM_ALL tools/direct_helpcode_probe.cpp)
+target_link_libraries(msime_direct_helpcode_probe PRIVATE MetasequoiaIme::Engine)
+
+# 用户词库探针：真实的 user_dictionary::* / 个人词库 / 词库状态读取在合成词库上跑随机操作序列，导出返回值和库状态哈希。
+add_executable(msime_user_dictionary_probe EXCLUDE_FROM_ALL tools/user_dictionary_probe.cpp)
+target_link_libraries(msime_user_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
+# 双拼词库探针：真实的 ShuangpinDictionary 在随包 msime.db 和合成小词库上跑查询、辅助码、造词/调频/删词，另带 std::sort 平局次序的样本。
+add_executable(msime_shuangpin_dictionary_probe EXCLUDE_FROM_ALL tools/shuangpin_dictionary_probe.cpp)
+target_link_libraries(msime_shuangpin_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
+# 全拼词库探针：真实的 QuanpinDictionary（不带纠错）在随包 msime.db 上查询、模糊音、单字母扩展，在合成小词库上造词/调频/删词。
+add_executable(msime_quanpin_dictionary_probe EXCLUDE_FROM_ALL tools/quanpin_dictionary_probe.cpp)
+target_link_libraries(msime_quanpin_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
+# 全拼纠错探针：真实的 autocorrect_cut_kbest、legal_input_correction_cuts、correction_cut_for_reading 等在随机手误输入上的输出。
+add_executable(msime_quanpin_autocorrect_probe EXCLUDE_FROM_ALL tools/quanpin_autocorrect_probe.cpp)
+target_link_libraries(msime_quanpin_autocorrect_probe PRIVATE MetasequoiaIme::Engine)
+
+# 领域词库探针：真实的 domain_dictionary::Dictionary 在随包 domain-input.db 上的查询、精确切分、词格跨度与合并。
+add_executable(msime_domain_dictionary_probe EXCLUDE_FROM_ALL tools/domain_dictionary_probe.cpp)
+target_link_libraries(msime_domain_dictionary_probe PRIVATE MetasequoiaIme::Engine)
+
 if(BUILD_TESTING)
     add_executable(test_segmentation_contract tests/src/test_segmentation_contract.cpp)
     target_link_libraries(test_segmentation_contract PRIVATE MetasequoiaIme::Engine)
@@ -188,9 +293,6 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME punctuation_contract COMMAND test_punctuation_contract)
 
-    add_executable(test_nine_key_session tests/src/test_nine_key_session.cpp)
-    target_link_libraries(test_nine_key_session PRIVATE MetasequoiaImeEngine)
-    add_test(NAME nine_key_session COMMAND test_nine_key_session)
 
     add_executable(test_platform_api tests/src/test_platform_api.cpp tests/src/test_public_session.cpp)
     target_link_libraries(test_platform_api PRIVATE MetasequoiaIme::Engine)
@@ -231,6 +333,14 @@ if(BUILD_TESTING)
     add_executable(test_fuzzy_pinyin tests/src/test_fuzzy_pinyin.cpp)
     target_link_libraries(test_fuzzy_pinyin PRIVATE MetasequoiaIme::Engine)
     add_test(NAME fuzzy_pinyin COMMAND test_fuzzy_pinyin)
+
+    add_executable(test_domain_input tests/src/test_domain_input.cpp)
+    target_link_libraries(test_domain_input PRIVATE MetasequoiaIme::Engine)
+    add_test(NAME domain_input COMMAND test_domain_input)
+
+    add_executable(test_octagram_scoring tests/src/test_octagram_scoring.cpp)
+    target_link_libraries(test_octagram_scoring PRIVATE MetasequoiaIme::Engine)
+    add_test(NAME octagram_scoring COMMAND test_octagram_scoring)
 
     add_executable(test_engine_smoke tests/src/test_engine_smoke.cpp)
     target_link_libraries(test_engine_smoke PRIVATE MetasequoiaIme::Engine)
@@ -313,3 +423,19 @@ option(METASEQUOIA_IME_BUILD_VOICE "Build shared voice input capabilities" OFF)
 if(METASEQUOIA_IME_BUILD_VOICE)
     add_subdirectory(voice)
 endif()
+
+# 词库状态暂存探针：真实的 stage_dictionary_state / prepare_runtime_paths，当 Rust 实现的规格。
+add_executable(msime_dictionary_state_probe EXCLUDE_FROM_ALL tools/dictionary_state_probe.cpp)
+target_link_libraries(msime_dictionary_state_probe PRIVATE MetasequoiaIme::Engine)
+
+# 神经重排探针：真实的 neural::SentenceModel / rerank_order，当 Rust 实现的规格。
+add_executable(msime_neural_probe EXCLUDE_FROM_ALL tools/neural_probe.cpp)
+target_link_libraries(msime_neural_probe PRIVATE MetasequoiaIme::Engine)
+
+# Google 拼音解码器探针：真实的 PinyinDecoder::sentence 与运行库 qsort，当 Rust 实现的规格。
+add_executable(msime_google_pinyin_probe EXCLUDE_FROM_ALL tools/google_pinyin_probe.cpp)
+target_link_libraries(msime_google_pinyin_probe PRIVATE MetasequoiaIme::Engine)
+
+# C 接口探针：真实的 msime_capi 吃随机操作序列，每步导出返回值、上屏文字和快照 JSON。
+add_executable(msime_capi_probe EXCLUDE_FROM_ALL tools/capi_probe.cpp)
+target_link_libraries(msime_capi_probe PRIVATE MetasequoiaIme::Engine)

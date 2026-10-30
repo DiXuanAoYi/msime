@@ -170,3 +170,83 @@ TEST_CASE(EnglishDictionaryUpsertsGlossForCloudFallback)
     REQUIRE(EnglishDictionary::upsert_gloss(test::Utf8(database.path()), false, "metasequoia", "水杉"));
     REQUIRE_EQ(dictionary.query_chinese_gloss("metasequoia"), std::string("水杉"));
 }
+
+TEST_CASE(BundledGlossaryLoadsLanguagesMergesDistinctSensesAndHonorsOverrides)
+{
+    TemporaryEnglishDatabase database;
+    const auto bundle = database.path().parent_path() / "qingjian-glossary.db";
+    sqlite3 *db = nullptr;
+    REQUIRE_EQ(sqlite3_open(test::Utf8(bundle).c_str(), &db), SQLITE_OK);
+    REQUIRE_EQ(sqlite3_exec(
+                   db,
+                   "CREATE TABLE glosses(language TEXT,word TEXT,gloss TEXT,PRIMARY KEY(language,word)) WITHOUT ROWID;"
+                   "INSERT INTO glosses VALUES('en','开发','v. develop; v. exploit');"
+                   "INSERT INTO glosses VALUES('ja','开发','v. 開発する (かいはつする)');"
+                   "INSERT INTO glosses VALUES('vi','开发','v. phát triển');"
+                   "INSERT INTO glosses VALUES('zh','hello','int. 你好');",
+                   nullptr, nullptr, nullptr),
+               SQLITE_OK);
+    sqlite3_close(db);
+    REQUIRE(EnglishDictionary::upsert_gloss(test::Utf8(database.path()), true, "开发", "exploit; tap"));
+    {
+        EnglishDictionary dictionary(test::Utf8(database.path()));
+        REQUIRE_EQ(dictionary.query_english_gloss("开发"), "v. develop; v. exploit; tap");
+        REQUIRE_EQ(dictionary.query_translation_gloss("开发", "vi"), "v. phát triển");
+        REQUIRE_EQ(dictionary.query_translation_gloss("开发", "ja"), "v. 開発する (かいはつする)");
+        REQUIRE_EQ(dictionary.query_chinese_gloss("hello"), "int. 你好");
+        dictionary.set_disabled_dictionaries("qingjian-en,qingjian-zh");
+        REQUIRE_EQ(dictionary.query_english_gloss("开发"), "exploit; tap");
+        REQUIRE(dictionary.query_chinese_gloss("hello").empty());
+        REQUIRE_EQ(dictionary.query_translation_gloss("开发", "ja"), "v. 開発する (かいはつする)");
+        dictionary.set_disabled_dictionaries("");
+        REQUIRE_EQ(dictionary.query_chinese_gloss("hello"), "int. 你好");
+        REQUIRE(dictionary.query_translation_gloss("开发", "unknown").empty());
+        REQUIRE(dictionary.query_translation_gloss("not-in-table", "en").empty());
+    }
+    const auto custom = database.path().parent_path() / "custom_translations.txt";
+    {
+        std::ofstream out(custom);
+        out << "开发\tmy corrected translation\n";
+    }
+    EnglishDictionary dictionary(test::Utf8(database.path()));
+    REQUIRE_EQ(dictionary.query_english_gloss("开发"), "my corrected translation");
+}
+TEST_CASE(MissingBundledGlossaryDoesNotCreateEmptyDatabase)
+{
+    TemporaryEnglishDatabase database;
+    EnglishDictionary dictionary(test::Utf8(database.path()));
+    REQUIRE(dictionary.query_translation_gloss("词", "ja").empty());
+    REQUIRE(!std::filesystem::exists(database.path().parent_path() / "qingjian-glossary.db"));
+}
+
+TEST_CASE(DictionarySwitchesIsolateOverlappingPacksAndRestoreWithoutReopening)
+{
+    TemporaryEnglishDatabase database;
+    sqlite3 *db = nullptr;
+    const auto bundle = database.path().parent_path() / "industry-learning.db";
+    REQUIRE_EQ(sqlite3_open(test::Utf8(bundle).c_str(), &db), SQLITE_OK);
+    REQUIRE_EQ(sqlite3_exec(db,
+                            "CREATE TABLE glosses(language TEXT,word TEXT,pack TEXT,gloss TEXT,PRIMARY "
+                            "KEY(language,word,pack)) WITHOUT ROWID;"
+                            "INSERT INTO glosses VALUES('en','学习','study-cet4','study');"
+                            "INSERT INTO glosses VALUES('en','学习','study-cet6','learn');"
+                            "INSERT INTO glosses VALUES('zh','study','study-cet4','学习');",
+                            nullptr, nullptr, nullptr),
+               SQLITE_OK);
+    sqlite3_close(db);
+    EnglishDictionary dictionary(test::Utf8(database.path()));
+    REQUIRE_EQ(dictionary.query_english_gloss("学习"), "study; learn");
+    dictionary.set_disabled_dictionaries("study-cet4");
+    REQUIRE_EQ(dictionary.query_english_gloss("学习"), "learn");
+    REQUIRE(dictionary.query_chinese_gloss("study").empty());
+    dictionary.set_disabled_dictionaries("study-cet4,study-cet6");
+    REQUIRE(dictionary.query_english_gloss("学习").empty());
+    dictionary.set_disabled_dictionaries("study-cet"); // Exact ids, not prefix matching.
+    REQUIRE_EQ(dictionary.query_english_gloss("学习"), "study; learn");
+    REQUIRE(EnglishDictionary::upsert_gloss(test::Utf8(database.path()), true, "回退", "fallback"));
+    REQUIRE_EQ(dictionary.query_english_gloss("回退"), "fallback");
+    dictionary.set_disabled_dictionaries("legacy-en");
+    REQUIRE(dictionary.query_english_gloss("回退").empty());
+    dictionary.set_disabled_dictionaries("");
+    REQUIRE_EQ(dictionary.query_english_gloss("回退"), "fallback");
+}

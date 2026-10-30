@@ -19,3 +19,7 @@
 # declared for the same reason user_dict.dat is: sampling the head is not a guarantee, and a .txt
 # that silently normalizes to LF is a corrupt dictionary rather than a formatting change.
 engine/googlepinyinime-rev/data/*utf16*.txt binary
+
+# Pinned corpus bytes participate in the source SHA-256 manifest.
+assets/translation-library/sources/cncf-titles.json -text
+assets/hanzi-question/IDS.txt -text

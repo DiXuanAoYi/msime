@@ -378,7 +378,7 @@ bool CMetasequoiaIME::_QueueInputHotkey(_In_ ITfContext *pContext, REFGUID hotke
     if (_pCompositionProcessorEngine != nullptr &&
         _pCompositionProcessorEngine->GetPreservedKeyAction(hotkeyGuid) ==
             CCompositionProcessorEngine::PreservedKeyAction::ToggleImeMode &&
-        !_serverUnavailableFallbackActive && IsTrilingualCycleEnabled())
+        !_serverUnavailableFallbackActive && _IsTrilingualCycleEnabled())
     {
         // Keep the existing configured language-hotkey detection (bare Shift
         // by default), but replace its binary toggle with the Server-owned

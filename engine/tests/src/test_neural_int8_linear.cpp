@@ -14,7 +14,7 @@ int main()
         return 0;
     }
 
-    for (std::size_t rows : {1u, 2u, 3u, 4u, 5u, 8u, 9u, 16u})
+    for (std::size_t rows : {1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 15u, 16u, 17u})
     {
         for (std::size_t inputs : {1u, 7u, 8u, 9u, 15u, 16u, 17u, 192u, 448u})
         {

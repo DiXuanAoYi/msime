@@ -12,6 +12,8 @@
 #include "FanyUtils.h"
 #include "Ipc.h"
 #include "CommitCandidateAndContinuePayload.h"
+#include "PunctuationCommitText.h"
+#include "../../../engine/contracts/trilingual_input.h"
 #include "FanyDefines.h"
 #include "../../../engine/contracts/preedit_caret_map.h"
 
@@ -165,7 +167,6 @@ HRESULT CMetasequoiaIME::_HandleCompleteCommitFirst(TfEditCookie ec, _In_ ITfCon
 
     HRESULT endResult = S_OK;
     _TerminateComposition(ec, pContext, FALSE, requireSuccessfulEnd ? &endResult : nullptr);
-
     return endResult;
 }
 
@@ -317,7 +318,7 @@ HRESULT CMetasequoiaIME::_HandleCycleInputMode(TfEditCookie ec, _In_ ITfContext 
         // A refused composition write must never fall back to the current
         // selection, which may no longer cover the same text.
         const HRESULT result = _pComposition ? _SetCompositionTextAndSelection(ec, pContext, &commitString)
-                                             : _AddCharAndFinalize(ec, pContext, &commitString, true);
+                                             : _AddCharAndFinalize(ec, pContext, &commitString);
         if (result != S_OK)
         {
             return result;
@@ -1614,10 +1615,16 @@ HRESULT CMetasequoiaIME::_HandleCompositionPunctuation(TfEditCookie ec, _In_ ITf
             punctuationIndex >= 1 ? punctuationStr[punctuationIndex - 1] : _GetPrecedingDocumentChar(ec, pContext);
     }
 
-    CStringRange punctuationString;
-    punctuationString.Set(punctuationStr.c_str(), punctuationStr.length());
-
     const bool hasActiveComposition = _IsComposing() ? true : false;
+    const std::wstring punctuationCommitText =
+        hasActiveComposition ? BuildPunctuationCommitText(GlobalIme::word_for_creating_word, punctuationStr)
+                             : punctuationStr;
+    GlobalIme::word_for_creating_word.clear();
+    GlobalIme::pending_create_word_preedit.clear();
+
+    CStringRange punctuationString;
+    punctuationString.Set(punctuationCommitText.c_str(), punctuationCommitText.length());
+
     if (hasActiveComposition)
     {
         hr = _InsertTextToComposition(ec, pContext, &punctuationString);
@@ -1639,6 +1646,8 @@ HRESULT CMetasequoiaIME::_HandleCompositionPunctuation(TfEditCookie ec, _In_ ITf
         }
     }
 
+    if (SUCCEEDED(hr))
+        ConfirmVocabularyCommit(requestId);
     if (hasActiveComposition)
     {
         _HandleCompleteCommitFirst(ec, pContext);

@@ -1,0 +1,87 @@
+水杉 Windows × 青简：集成说明（更新至 0.9.10）
+
+交付状态
+已完成 Windows x64 Server/Settings、x64 与 x86 TSF 构建和本机真实输入验证，可生成包含词库、模型、辅助程序及调试符号的完整安装包。
+Boost、vcpkg、Windows SDK、Inno Setup 依赖已补齐。本预发布为 unsigned 构建，Server 明确使用 uiAccess=false，普通桌面输入已验证，不承诺管理员窗口或安全桌面的跨权限输入。
+
+一、固定的源码基线
+水杉：v0.9.5 / 5d6eaa5bd1a6003e4bf25c4bef8c581443616da3
+https://github.com/metasequoiaime/msime-windows/releases/tag/v0.9.5
+青简：main 的源码快照 / 4a3e963dfe299126574bfe3c370ff70a3f85ee77
+https://github.com/qingjian-team/qingjian/tree/4a3e963dfe299126574bfe3c370ff70a3f85ee77
+按用户要求以已发布的水杉版本为底座，本地分支 feature/qingjian-learning。发布到用户分支与预发布标签，不改动用户仓库的 develop/main；不推送上游仓库。
+
+二、阅读源码后的取舍
+1. 个人译词优先与按语言隔离：已移植设计。
+   青简依据：crates/qingjian-translate/src/layered_translator.rs、personal_glossary.rs、glossary/mod.rs。
+   水杉已有 english.db 和 custom_translations.txt 覆盖层，但后者是中英用途，非英语目标原来跳过本地查询。
+   新实现支持八种目标语种的个人表，并接入现有异步翻译线程；个人表优先，然后查询青简离线释义与原词库，最后才考虑在线服务。
+
+2. 输入优先、释义不阻塞：保留并补强水杉既有机制。
+   青简依据：crates/qingjian-core/src/engine/commit/mod.rs 的 annotate 与 query 分离，engine/translator.rs。
+   水杉依据：server/src/english/english_ime.cpp、ipc/event_listener_candidates.cpp、ipc/event_listener_async_candidates.cpp。
+   新词表在设置加载/保存时解析成不可变快照。输入线程只交出快照引用，工作线程查询，不在逐键路径读文件或重建词表。
+   语言、词表版本和联网开关纳入刷新范围；修改词表可触发重新查询，旧代次结果不再更新当前候选。
+
+3. 云功能明确可选：已加入独立的译文在线补全开关。
+   青简依据：README.md 数据说明、crates/qingjian-core/src/engine/privacy.rs、engine/gloss/mod.rs。
+   默认关闭在线译文补全，本地查词仍可用。入队、发出请求、接收结果以及缓存读取均检查此开关。
+   关闭后不能撤回已经发出的网络包；已存入原英语词库的历史译文仍属于本地数据。
+   这是“译文补全”开关，不是整个输入法的断网模式，不控制原有云候选、AI 联想或语音服务。
+
+4. 两条简短释义、可直接输入译词：适配导入，复用水杉原功能。
+   青简依据：crates/qingjian-core/src/candidate/translation.rs、part_of_speech.rs、engine/commit/mod.rs。
+   青简个人 TSV 可导入；取前两条释义，移除词性和竖线后的读音。水杉已有 Ctrl+Enter 译词选择，上屏仍沿用它。
+   0.9.10 原样收录青简五份 GPL-3.0-or-later TSV，保留许可证、来源版本、原说明与 SHA256：中译英 232213、中译日 248128、中译西 193292、中译越 91655、英译中 44924 条。构建为独立的只读 qingjian-glossary.db，不修改产品锁内原 english.db。候选行保留词性、读音与两条释义，多余显示 +N；Ctrl+Enter 选择上屏时移除词性和读音。未导入 .qj、私人输入日志或旧学习历史。
+
+5. 生词熟悉度、按上屏时的候选页计数：已移植设计。
+   青简依据：crates/qingjian-core/src/engine/vocabulary/mod.rs、crates/qingjian-learning/src/vocabulary_book.rs。
+   增加 vocabulary.db，以“目标语言 + 译词”为键，分别累计看到、选过、直接用过；同一页去重，曝光达到 3 次标为熟悉。
+   Server 保存实际渲染页的快照，TSF 成功插入文本后通过协商的可选能力确认；请求、客户及焦点代次必须匹配，确认只消费一次，10 秒过期。
+   逐键刷新、取消、失败提交、过期或重复确认不计数。旧 DLL 未协商此能力时仍可输入，但不生成新学习统计。
+   写库在后台有限队列执行；默认关闭，可选保留 30/90/365 天，最多保留 10 万条。设置页查看最近 500 条、导出全部 TSV、二次确认清空。
+   清空时间屏障阻止此前排队的记录重新出现；升级保留主库与 SQLite sidecar。未达到 3 次曝光的译词显示橙色，词性与分隔符淡化；关闭生词统计则不显示生词着色。只统计实际展示的前两条释义，后台刷新熟悉词快照，逐键路径不访问数据库。没有导入青简旧学习历史，也没有复制 Rust 引擎。
+
+6. 整句模型、拼写纠错、跨平台 Rust 核心：本次没有替换。
+   水杉 v0.9.5 本来就有本地神经重排、octagram、全拼纠错和双拼辅码。未做统一语料和逐键延迟基准前，不能认定青简模型更优。
+   保留水杉 DLL/Server 隔离与现有引擎接口，避免把两套输入状态机混在一起。
+
+三、已实现的使用流程
+进入设置 → 输入 → 候选词翻译。
+个人译词表支持英语 en、日语 ja、西班牙语 es、法语 fr、德语 de、俄语 ru、韩语 ko、越南语 vi。
+每行以 Tab 分隔：语言代码、中文词、译词，可附第二条译词。例如随包 personal-translations.example.tsv。
+可以直接编辑，或导入 TSV / 青简个人 TSV，再点击“保存词表”。导入只进入草稿，不自动覆盖已保存配置；同语言同词最后一行生效。
+导入青简单语 TSV 前先选择目标语种；其词性和读音不保留。混合语言水杉 TSV 本身带语言列。
+导出导出的是当前编辑草稿；清空文本并保存可删除个人表。
+总表上限 64 KiB，每个字段上限 1024 UTF-8 字节。格式错误会报告行号并阻止保存；服务器再独立校验一次。
+个人表存入 general.personal_translation_glossary，沿用现有 config.toml 原子替换与升级模板合并。适用于个人小词表，不承诺大词库性能。
+在线补全由 general.candidate_translation_cloud 控制，默认 false。旧配置没有此项时也按 false；希望继续使用在线翻译的用户需要在设置中明确开启。
+英语、日语、西班牙语、越南语已有青简离线译词库；法语、德语、俄语、韩语仍使用个人词表或可选在线补全。青简上游说明这些词表为机器生成，保留其质量说明；覆盖条数不等于所有释义都准确。
+
+四、0.9.6 历史验证（2026-10-10；0.9.10 验证见随包 windows-v0910-validation.txt）
+1. 完整 Server Release 构建通过；CTest 3/3 通过，其中主套件 601 项、WebView 60 个共享契约夹具全部通过。
+2. x64、x86 TSF Release 构建通过，各 9/9 CTest 通过；真实命名管道探针两个架构均通过新旧客户端、版本拒绝、重连、可选能力协商。
+3. 设置页 18 个测试文件、114 项测试通过，TypeScript 与 Vite 生产构建通过；SQLite/工作线程专用集成套件 10 项通过。套件存在重叠，不将总数相加。
+4. 本机新建真实 Win32 EDIT 测试窗口（tests/tsf-host），分别确认载入本次构建的 32/64 位 DLL：
+   x64：nihao 显示“你好 / hello”，空格上屏；ni + Ctrl+Enter 上屏 you；PageDown 翻页、Backspace 取消、输入框切换成功。
+   x86：ni 显示“你 / you”，Ctrl+Enter 上屏 you。
+   数据库验证：hello=(看到1,选过1,用过0)，you=(看到4,选过3,用过2)，取消未增加计数。
+   正常启动原生 Settings，实际刷新后显示 2 词、熟悉 1 词，you 已熟悉、hello 生词 1/3。
+   实机使用独立合成词表与数据目录；结束后恢复原 0.9.5 的 32/64 位 COM 注册与 Server/Watchdog。
+5. 安装器数据保留清单、打包文件夹具、构建失败中止检查通过；版本资源、生成契约同步、GUI 边界、格式及 diff 检查通过。
+6. 范围边界：未覆盖所有宿主应用（如 Office/UWP）、在线提供商请求、完整清洁虚拟机的安装/卸载与重启循环，也无公开信任代码签名。实机验证不等于所有应用兼容承诺。
+
+五、构建与交付
+版本真源 version.txt=0.9.6，预发布标签 v0.9.6-qingjian.1。
+构建依赖：Visual Studio 2026 C++、Windows SDK、CMake、vcpkg 基线 04a9d8e5212d01ee1dd9478eadd9caade4f8b0d4、Boost locale/json x64-windows-static-md、Node/pnpm、Inno Setup 6.7.3。
+按仓库流程准备依赖与锁定词库/模型，Server 使用 x64-windows manifest 和独立的 static-md Boost_ROOT；TSF 使用自己的 x86/x64 static triplet，勿共用构建目录。
+在 Windows 使用短路径工作目录（本次通过 subst W: 缩短路径），避免 vcpkg 的 libiconv RC2136 长路径错误。
+前端等价构建命令：python ui-html/scripts/sync-contracts.py --check，然后在设置前端目录 pnpm exec tsc、pnpm exec vite build；本机无 python3 命令别名。
+无签名证书时在 Server 完成链接后执行：
+  ./scripts/ci/embed-server-manifest.ps1 -BuildDir server/build-release/bin/Release -Unsigned
+随后 Prepare-PackageFiles.ps1 -TargetVersion 0.9.6 -IncludeSymbols、product_lock.py manifest --windows-repository DiXuanAoYi/msime 写入确切提交、Compile-Installer.ps1。
+不要对无签名程序启用 uiAccess=true，否则 Windows 可能拒绝启动；不要将本地自签名证书作为公开信任签名分发。
+安装包附 SHA256SUMS 与验证报告；源码从相同标签获取。克隆后执行 git submodule update --init --recursive，再按锁文件准备第三方产物。
+
+许可与来源
+两仓均包含 GPL v3 许可证文本；青简 README 声明 GPL-3.0-or-later。本次保留水杉 LICENSE 与已有第三方许可，以青简行为设计及 TSV 格式为参考重新实现 C++/TypeScript 适配，没有复制其 Rust 引擎或打包其数据集。用户自行导入的数据仍应保留相应来源与许可。

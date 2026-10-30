@@ -48,6 +48,7 @@ class EngineInputSession : public IInputSession
     std::vector<WordItem> candidates_without_mid_sentence_helpcode() override;
 
     void set_rescoring_context(std::string context) override;
+    void set_enabled_domain_dictionaries(const std::string &domains) override;
     void set_pinyin_sequence(const std::string &pinyin_sequence) override;
     void set_pinyin_sequence_with_cases(const std::string &pinyin_sequence) override;
 

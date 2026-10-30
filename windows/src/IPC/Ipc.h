@@ -12,7 +12,6 @@
 #include "../../../engine/contracts/windows_ipc.h"
 #include "../../../engine/contracts/direct_helpcode.h"
 #include "../../../engine/contracts/v_mode_input.h"
-#include "../../../engine/contracts/trilingual_input.h"
 
 int InitIpc();
 int InitNamedpipe();
@@ -48,7 +47,9 @@ bool EnsureNamedpipeFocusSessionActivated();
 bool SupportsCharacterSetShortcut();
 bool SupportsCompositionRestore();
 bool SupportsCaretStateIndicator();
+bool SupportsFieldPrivacy();
 bool SupportsTrilingualCycle();
+int SendFieldPrivacyToUIProcessViaNamedPipe(uint32_t flags);
 bool FlushNamedpipeFocusSessionReset();
 bool FlushNamedpipeImeDeactivation(uint64_t focusToken = 0);
 
@@ -102,6 +103,7 @@ int WriteDataToNamedPipe(              //
     UINT write_flag                    //
 );
 KeyEventSendResult SendKeyEventToUIProcessViaNamedPipe(_Out_opt_ uint64_t *requestId = nullptr);
+void ConfirmVocabularyCommit(uint64_t requestId);
 int SendHideCandidateWndEventToUIProcessViaNamedPipe();
 int SendHideCaretStateEventToUIProcessViaNamedPipe();
 int SendShowCandidateWndEventToUIProcessViaNamedPipe();
@@ -133,10 +135,8 @@ inline bool IsDeliveredServerRequestId(uint64_t requestId)
 // Edit-session result for a commit whose reply never arrived although the
 // request was delivered. The key is dropped with the composition and never
 // sent again (DeferredKeyFailureReason::DeliveryAmbiguous).
+constexpr HRESULT FANY_S_PROJECTION_INVALIDATED = MAKE_HRESULT(SEVERITY_SUCCESS, FACILITY_ITF, 0x201);
 constexpr HRESULT FANY_E_COMMIT_REPLY_AMBIGUOUS = __HRESULT_FROM_WIN32(ERROR_TIMEOUT);
-// A key handler applied its key, but the result differs from what the deferred
-// FIFO projected for the keys queued behind it. Maps to ProjectionInvalidated.
-constexpr HRESULT FANY_S_PROJECTION_INVALIDATED = MAKE_HRESULT(SEVERITY_SUCCESS, FACILITY_ITF, 0x0301);
 
 //
 // Modifiers:
@@ -233,8 +233,6 @@ inline std::atomic_bool DirectHelpcodeSlashEnabled{true};
 // 不开。V 后面的数字和 . + - * / ( ) 按 engine/contracts/v_mode_input.h 的规则当编码键吃掉。
 inline std::atomic<FanyImeVModeInput::Trigger> VModeTrigger{FanyImeVModeInput::Trigger::Off};
 inline std::atomic_bool JapaneseInputModeEnabled{false};
-// Enabled only after a supporting Server sends the persisted setting.
-inline std::atomic_bool TrilingualCycleEnabled{false};
 inline std::atomic_bool CapsLockEnabled{false};
 inline std::atomic_bool TsfDiagnosticLogEnabled{false};
 // Default off, like the persisted setting: until the Server sends the switch on

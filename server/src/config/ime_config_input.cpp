@@ -254,36 +254,6 @@ bool SetConfiguredWubiMixedPinyin(bool enabled)
     return true;
 }
 
-bool GetConfiguredWubiFourCodeAutoCommit()
-{
-    return g_wubi_four_code_auto_commit;
-}
-
-bool SetConfiguredWubiFourCodeAutoCommit(bool enabled)
-{
-    if (!WriteConfiguredValue("input", "wubi_four_code_auto_commit", enabled ? "true" : "false"))
-    {
-        return false;
-    }
-    g_wubi_four_code_auto_commit = enabled;
-    return true;
-}
-
-bool GetConfiguredWubiFifthCodeTopCommit()
-{
-    return g_wubi_fifth_code_top_commit;
-}
-
-bool SetConfiguredWubiFifthCodeTopCommit(bool enabled)
-{
-    if (!WriteConfiguredValue("input", "wubi_fifth_code_top_commit", enabled ? "true" : "false"))
-    {
-        return false;
-    }
-    g_wubi_fifth_code_top_commit = enabled;
-    return true;
-}
-
 bool GetConfiguredEscapeKeepsSelectedWord()
 {
     return g_escape_keeps_selected_word;
@@ -624,6 +594,36 @@ bool SetConfiguredQuanpinAutocorrectNeighbor(bool enabled)
     return true;
 }
 
+bool GetConfiguredQuanpinAutocorrectDeletion()
+{
+    return g_quanpin_autocorrect_deletion;
+}
+
+bool SetConfiguredQuanpinAutocorrectDeletion(bool enabled)
+{
+    if (!WriteConfiguredValue("quanpin", "autocorrect_deletion", enabled ? "true" : "false"))
+    {
+        return false;
+    }
+    g_quanpin_autocorrect_deletion = enabled;
+    return true;
+}
+
+bool GetConfiguredQuanpinAutocorrectInsertion()
+{
+    return g_quanpin_autocorrect_insertion;
+}
+
+bool SetConfiguredQuanpinAutocorrectInsertion(bool enabled)
+{
+    if (!WriteConfiguredValue("quanpin", "autocorrect_insertion", enabled ? "true" : "false"))
+    {
+        return false;
+    }
+    g_quanpin_autocorrect_insertion = enabled;
+    return true;
+}
+
 bool GetConfiguredQuanpinAutocorrectMarker()
 {
     return g_quanpin_autocorrect_marker;
@@ -792,58 +792,14 @@ bool SetConfiguredInputMode(const std::string &mode)
         return false;
     }
     g_input_mode = mode;
+    g_configured_input_mode_japanese.store(mode == "japanese");
+    g_active_input_mode.store(ActiveInputMode::Configured);
     g_configured_input_mode_japanese.store(mode == "japanese", std::memory_order_relaxed);
     // Choosing a language in settings is where the next cycle starts from;
     // the cycle switch itself is independent of it.
     g_active_input_mode.store(ActiveInputMode::Configured, std::memory_order_relaxed);
     RefreshEffectiveTsfPreeditStyle();
     NotifyImeServerInputSchemeChanged();
-    return true;
-}
-
-bool GetConfiguredTrilingualCycleEnabled()
-{
-    return g_trilingual_cycle_enabled.load(std::memory_order_relaxed);
-}
-
-bool SetConfiguredTrilingualCycleEnabled(bool enabled)
-{
-    if (!WriteConfiguredValue("keybindings", "trilingual_cycle", enabled ? "true" : "false"))
-    {
-        return false;
-    }
-    if (g_trilingual_cycle_enabled.exchange(enabled, std::memory_order_relaxed) != enabled)
-        g_active_input_mode.store(ActiveInputMode::Configured, std::memory_order_relaxed);
-    RefreshEffectiveTsfPreeditStyle();
-    return true;
-}
-
-const std::string &GetActiveInputMode()
-{
-    static const std::string chinese = "chinese";
-    static const std::string japanese = "japanese";
-    switch (g_active_input_mode.load(std::memory_order_relaxed))
-    {
-    case ActiveInputMode::Chinese:
-        return chinese;
-    case ActiveInputMode::Japanese:
-        return japanese;
-    default:
-        // Never hand out g_input_mode itself: a config reload on another
-        // thread may reassign it while the key thread compares the result.
-        return g_configured_input_mode_japanese.load(std::memory_order_relaxed) ? japanese : chinese;
-    }
-}
-
-bool SetActiveInputMode(const std::string &mode)
-{
-    if (!g_trilingual_cycle_enabled.load(std::memory_order_relaxed) || (mode != "chinese" && mode != "japanese"))
-    {
-        return false;
-    }
-    g_active_input_mode.store(mode == "japanese" ? ActiveInputMode::Japanese : ActiveInputMode::Chinese,
-                              std::memory_order_relaxed);
-    RefreshEffectiveTsfPreeditStyle();
     return true;
 }
 

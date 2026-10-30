@@ -195,6 +195,7 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
         // 同理，上屏必须回 Normal：_HandleCandidateFinalize 只在 Normal 时写入文本，
         // 而且它写的就是 candidate_string 本身，不会再补标点。
         Global::MsgTypeToTsf = Global::DataFromServerMsgType::Normal;
+        CaptureVocabularySelection(index, true);
         ui.selected_text = ui.page_words[index];
         return;
     }
@@ -233,8 +234,24 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
         return;
     }
 
+    if (is_valid_selection &&
+        (curWordItem.source == CandidateSource::AiCompletion || curWordItem.source == CandidateSource::AiQuestion))
+    {
+        const auto text = string_to_wstring(CandidateTextForOutput(curWordItem.word));
+        ClearState();
+        Global::MsgTypeToTsf = Global::DataFromServerMsgType::Normal;
+        Global::candidate_ui.selected_text = text;
+        return;
+    }
+
     if (is_valid_selection)
     {
+        CaptureVocabularySelection(index);
+        if (curWordItem.source != CandidateSource::Emoji && curWordItem.source != CandidateSource::Kaomoji &&
+            curWordItem.source != CandidateSource::DateTime && curWordItem.source != CandidateSource::Fallback)
+            EnqueueApplicationSelectionTask(
+                g_inputSession->get_pinyin_sequence_with_cases(), curWordItem.word,
+                g_english_input_mode || curWordItem.source == CandidateSource::EnglishDictionary, client_id);
         // Capture ranking keys before reset_state()/composition advance clears the
         // input sequence. CandidateDatabaseKey() consults get_pinyin_sequence(),
         // and for single-code lists (e.g. "n") it must keep item.pinyin ("na"/"nv")
@@ -259,12 +276,16 @@ void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_e
         const size_t absolute_index =
             static_cast<size_t>(Global::candidate_ui.page_index) * static_cast<size_t>(Global::candidate_ui.page_size) +
             static_cast<size_t>(index);
-        LearnQuickPhraseOrder(curWordItem, absolute_index, client_id, activation_epoch);
-        LearnEnglishSlot(curWordItem, absolute_index, client_id, activation_epoch);
+        if (curWordItem.source != CandidateSource::AppDictionary)
+        {
+            LearnQuickPhraseOrder(curWordItem, absolute_index, client_id, activation_epoch);
+            LearnEnglishSlot(curWordItem, absolute_index, client_id, activation_epoch);
+        }
         Global::candidate_ui.selected_text = Global::candidate_ui.page_words[index];
         std::string curWord = curWordItem.word;
         std::string curWordPinyin = curWordItem.pinyin;
         if (curWordItem.source == CandidateSource::EnglishDictionary ||
+            curWordItem.source == CandidateSource::AppDictionary ||
             curWordItem.source == CandidateSource::QuickPhrase || curWordItem.source == CandidateSource::Emoji ||
             curWordItem.source == CandidateSource::Kaomoji || curWordItem.source == CandidateSource::DateTime ||
             curWordItem.source == CandidateSource::Generated)

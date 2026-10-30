@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { compareVersions, describeInstallerTrust, mirrorDownloadUrl, parseVersion, validateManifest } from './update-manifest';
+import { compareVersions, describeInstallerTrust, parseVersion, validateManifest,
+  selectProductRelease, installedProductVersion, PRODUCT_RELEASES_URL } from './update-manifest';
 
 const RELEASES = 'https://github.com/metasequoiaime/MSIME-Windows/releases';
 const DIGEST = 'a'.repeat(64);
@@ -18,7 +19,7 @@ describe('parseVersion', () => {
     expect(parseVersion('0.3.1')?.parts).toEqual([0, 3, 1]);
     expect(parseVersion('v0.3.1')?.display).toBe('0.3.1');
     expect(parseVersion(' 0.0.9.2 ')?.parts).toEqual([0, 0, 9, 2]);
-    expect(parseVersion('1.2.3-beta.1')?.display).toBe('1.2.3');
+    expect(parseVersion('1.2.3-beta.1')?.display).toBe('1.2.3-beta.1');
   });
 
   it('rejects anything it cannot order', () => {
@@ -37,6 +38,35 @@ describe('compareVersions', () => {
     // A shorter version is not automatically older: 0.3 and 0.3.0 are the same release.
     expect(order('0.3', '0.3.0')).toBe(0);
     expect(order('0.3.1', '0.3')).toBeGreaterThan(0);
+    expect(order('0.10.2-chat.10', '0.10.2-chat.2')).toBeGreaterThan(0);
+    expect(order('0.10.2', '0.10.2-chat.2')).toBeGreaterThan(0);
+  });
+});
+
+describe('personal release channel', () => {
+  it('compares numeric installed file versions within the compiled chat channel', () => {
+    const current = installedProductVersion('0.10.2')!;
+    expect(current.display).toBe('0.10.2-chat.1');
+    expect(compareVersions(parseVersion('0.10.2-chat.2')!, current)).toBeGreaterThan(0);
+    expect(installedProductVersion('0.10.2-chat.3')?.display).toBe('0.10.2-chat.3');
+  });
+  const release = (tag: string, changes: Record<string, unknown> = {}) => ({
+    draft: false, prerelease: true, tag_name: tag, html_url: `${PRODUCT_RELEASES_URL}/tag/${tag}`,
+    assets: [{ state: 'uploaded', name: `MetasequoiaIME_Setup_${tag}.exe`, size: 123,
+      digest: `sha256:${DIGEST}`,
+      browser_download_url: `${PRODUCT_RELEASES_URL}/download/${tag}/MetasequoiaIME_Setup_${tag}.exe` }],
+    ...changes
+  });
+  it('includes prereleases, orders chat revisions, and carries GitHub asset digests', () => {
+    const selected = selectProductRelease([release('v0.10.2-chat.2'), release('v0.10.2-chat.10')]);
+    expect(selected?.version.display).toBe('0.10.2-chat.10');
+    expect(selected?.installerSha256).toBe(DIGEST);
+  });
+  it('rejects official channel, drafts, missing installers and external assets', () => {
+    expect(selectProductRelease([release('v99.0.0')])).toBeNull();
+    expect(selectProductRelease([release('v0.10.2-chat.1', { draft: true })])).toBeNull();
+    expect(selectProductRelease([release('v0.10.2-chat.1', { assets: [] })])).toBeNull();
+    expect(selectProductRelease([release('v0.10.2-chat.1', { html_url: 'https://github.com/metasequoiaime/msime-windows/releases/tag/v0.10.2' })])).toBeNull();
   });
 });
 
@@ -96,23 +126,5 @@ describe('describeInstallerTrust', () => {
     const trust = describeInstallerTrust(validateManifest({ version: '1.0.0', releaseUrl: RELEASES }, RELEASES)!);
     expect(trust.warning).toBeNull();
     expect(trust.verify).toBeNull();
-  });
-});
-
-describe('mirrorDownloadUrl', () => {
-  const MIRROR = 'https://dl.msime.app/gh/';
-
-  it('points at the installer the dialog describes, under its GitHub download URL', () => {
-    const update = validateManifest(manifest(), RELEASES);
-    expect(update && mirrorDownloadUrl(update, MIRROR)).toBe(
-      'https://dl.msime.app/gh/https://github.com/metasequoiaime/MSIME-Windows/releases/download/v0.3.1/MetasequoiaIME_Setup_v0.3.1-unsigned.exe'
-    );
-  });
-
-  it('offers nothing without an installer name or a tag URL', () => {
-    const noInstaller = validateManifest(manifest({ installerName: undefined }), RELEASES);
-    expect(noInstaller && mirrorDownloadUrl(noInstaller, MIRROR)).toBeNull();
-    const pageOnly = validateManifest(manifest({ releaseUrl: RELEASES }), RELEASES);
-    expect(pageOnly && mirrorDownloadUrl(pageOnly, MIRROR)).toBeNull();
   });
 });

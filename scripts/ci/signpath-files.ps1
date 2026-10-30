@@ -23,6 +23,8 @@ $files = if ($Set -eq 'Payload') {
         'server_exe/MetasequoiaImeKeyboardPanel.exe',
         'server_exe/MetasequoiaImeHandwritingPanel.exe',
         'server_exe/MetasequoiaImeSettings.exe',
+        'server_exe/MetasequoiaImeChatCapture.exe',
+        'server_exe/local-asr/MetasequoiaLocalASR.exe',
         'tsf_dll/32/MetasequoiaImeTsf.dll',
         'tsf_dll/64/MetasequoiaImeTsf.dll'
     )

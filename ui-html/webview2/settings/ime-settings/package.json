@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "prebuild": "python3 ../../../scripts/sync-contracts.py --check",
+    "prebuild": "node ../../../scripts/run-python.mjs ../../../scripts/sync-contracts.py --check",
     "test": "vitest run"
   },
   "packageManager": "pnpm@10.34.5",
   "devDependencies": {
+    "@types/chai": "5.2.3",
     "@types/chrome": "^0.3.2",
     "@types/node": "^26.6.3",
     "typescript": "~7.0.2",

@@ -2,10 +2,12 @@
 #include "../contracts/dictionary/format.h"
 #include "quanpin_query.h"
 
+#include "fuzzy_pinyin.h"
 #include "quanpin_utils.h"
 #include "../shuangpin/shuangpin_utils.h"
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <map>
 #include <sqlite3.h>
 #include <stdexcept>
@@ -39,6 +41,21 @@ constexpr size_t kCorrectionPathLimit = 32;
 
 using CorrectionAliases = std::unordered_map<std::string, std::vector<std::string>>;
 
+// 非纠错的拼写归一：ü 归一（jv -> ju）。它不属于手误纠正，永远生效——关掉纠错开关
+// 也要把 jv 当 ju 查库（jv 本身不是合法音节，靠这条归一才能切出来）。n/l 系的
+// nue/lue -> nve/lve 由 normalize_umlaut_aliases 在段级完成，不进这张表。
+const CorrectionAliases &pinyin_normalization_aliases()
+{
+    static const CorrectionAliases kAliases = [] {
+        CorrectionAliases aliases;
+        aliases["jv"].push_back("ju");
+        return aliases;
+    }();
+    return kAliases;
+}
+
+// 手误别名：换位形状（aing/uang/ian/uan/iao/agn/egn/on）、多一个 h、漏一个 g，外加
+// 上面那条 ü 归一。属纠错，按掩码门控（开关关掉时不参与切分）。
 const CorrectionAliases &pinyin_correction_aliases()
 {
     static const CorrectionAliases kAliases = [] {
@@ -75,6 +92,7 @@ const CorrectionAliases &pinyin_correction_aliases()
         add_suffix_aliases("ang", "agn");
         add_suffix_aliases("eng", "egn");
         add_alias("egn", "eng");
+        // ü 归一也留在这张表里，纠错开着时一张表就够；关掉时只查 pinyin_normalization_aliases。
         add_alias("jv", "ju");
         // Missing final g before the next syllable: zhonguo -> zhong guo.
         add_suffix_aliases("ong", "on");
@@ -93,7 +111,7 @@ const CorrectionAliases &pinyin_correction_aliases()
     return kAliases;
 }
 
-std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin)
+std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin, bool include_correction_aliases)
 {
     struct RankedPath
     {
@@ -103,7 +121,9 @@ std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin)
     };
 
     const auto &valid_pinyin = intact_pinyin_set();
-    const auto &aliases = pinyin_correction_aliases();
+    // include=false keeps only the ü normalization (jv -> ju); the hand-mistake
+    // aliases are part of autocorrection and follow its switch.
+    const auto &aliases = include_correction_aliases ? pinyin_correction_aliases() : pinyin_normalization_aliases();
     std::unordered_map<size_t, std::vector<RankedPath>> memo;
 
     const auto solve = [&](auto &&self, size_t index) -> std::vector<RankedPath> {
@@ -198,12 +218,12 @@ std::vector<Segments> cut_one_piece_with_corrections(const std::string &pinyin)
     return paths;
 }
 
-std::vector<Segments> cut_pinyin_with_corrections(const std::string &pinyin)
+std::vector<Segments> cut_pinyin_with_corrections(const std::string &pinyin, bool include_correction_aliases)
 {
     std::vector<Segments> merged_paths = {Segments{}};
     for (const auto &part : split(pinyin, '\''))
     {
-        const auto part_paths = cut_one_piece_with_corrections(part);
+        const auto part_paths = cut_one_piece_with_corrections(part, include_correction_aliases);
         if (part_paths.empty())
         {
             return {};
@@ -940,7 +960,8 @@ Segments cut_pinyin_greedy(const std::string &pinyin, bool intact_only)
     return merged;
 }
 
-std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::string &mode)
+std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::string &mode,
+                                         bool include_correction_aliases)
 {
     if (mode != "greedy" && mode != "correction")
     {
@@ -957,7 +978,7 @@ std::vector<Segments> cut_pinyin_by_mode(const std::string &pinyin, const std::s
         return {};
     }
 
-    const auto corrected_paths = cut_pinyin_with_corrections(pinyin);
+    const auto corrected_paths = cut_pinyin_with_corrections(pinyin, include_correction_aliases);
     if (!corrected_paths.empty())
     {
         return corrected_paths;
@@ -1061,7 +1082,8 @@ std::vector<KeyedQueryItem> query_initial(sqlite3 *db, const std::string &prefix
 
 QueryResult query_words(const std::string &pinyin, const std::string &db_path, const std::string &mode, int limit)
 {
-    const auto cuts = cut_pinyin_by_mode(pinyin, mode);
+    // 离线查询工具，不挂在任何会话的纠错开关上。
+    const auto cuts = cut_pinyin_by_mode(pinyin, mode, true);
     QueryResult result{pinyin, mode, {}};
     if (cuts.empty())
     {
@@ -1264,40 +1286,200 @@ std::vector<KeyedQueryItem> query_exact_segmentations_keyed_flat(
     return result;
 }
 
-// ü 的两种写法归一到词库存的那一种。intact_pinyin_list() 两种都认，可词库只存
-// 一种：j/q/x/y 后面写 u（ju、jue），l/n 后面写 v（lv、lve）。切出来的 jv、lue
-// 这类音节因此一行都查不到，精确键查询查空，整个词格就断在这里——wo'men'lue'de
-// 解不出任何路径，长句联想直接消失。这不是模糊音降级，lue 和 lve 本来就是同一个
-// 读音的两种拼写，归一化之后仍然是精确匹配。
-const std::string &canonical_syllable(const std::string &syllable)
+std::vector<KeyedQueryItem> query_key_range_keyed(sqlite3 *db,
+                                                  std::unordered_map<std::string, sqlite3_stmt *> &statement_cache,
+                                                  const std::string &table, const std::string &lower,
+                                                  const std::string &upper, const int limit)
 {
-    static const std::unordered_map<std::string, std::string> kSpellings = {
-        {"jv", "ju"},   {"qv", "qu"},   {"xv", "xu"},   {"yv", "yu"},   {"jve", "jue"},
-        {"qve", "que"}, {"xve", "xue"}, {"yve", "yue"}, {"lue", "lve"}, {"nue", "nve"},
-    };
-    const auto found = kSpellings.find(syllable);
-    return found == kSpellings.end() ? syllable : found->second;
+    if (db == nullptr || table.empty() || lower.empty() || lower >= upper || limit <= 0)
+    {
+        return {};
+    }
+    const std::string sql = "SELECT \"key\", \"value\", \"weight\" FROM \"" + table +
+                            "\" WHERE \"key\" >= ?1 AND \"key\" < ?2 ORDER BY \"weight\" DESC LIMIT ?3";
+    sqlite3_stmt *stmt = nullptr;
+    const auto found = statement_cache.find(sql);
+    if (found != statement_cache.end())
+    {
+        stmt = found->second;
+        sqlite3_reset(stmt);
+        sqlite3_clear_bindings(stmt);
+    }
+    else
+    {
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+        {
+            return {};
+        }
+        statement_cache.emplace(sql, stmt);
+    }
+    sqlite3_bind_text(stmt, 1, lower.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, upper.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 3, limit);
+
+    std::vector<KeyedQueryItem> rows;
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        const unsigned char *key = sqlite3_column_text(stmt, 0);
+        const unsigned char *value_text = sqlite3_column_text(stmt, 1);
+        rows.push_back(KeyedQueryItem{
+            key == nullptr ? "" : reinterpret_cast<const char *>(key),
+            value_text == nullptr ? "" : reinterpret_cast<const char *>(value_text),
+            sqlite3_column_int64(stmt, 2),
+        });
+    }
+    sqlite3_reset(stmt);
+    sqlite3_clear_bindings(stmt);
+    return rows;
 }
 
-WordLatticeLookup make_lattice_db_lookup(sqlite3 *db, std::unordered_map<std::string, sqlite3_stmt *> &statement_cache,
-                                         int span_limit)
+std::shared_ptr<const CharReadingTotals> load_char_reading_totals(sqlite3 *db)
 {
-    return [db, &statement_cache, span_limit](const Segments &span) {
+    auto totals = std::make_shared<CharReadingTotals>();
+    if (db == nullptr)
+        return totals;
+
+    std::vector<std::string> tables;
+    sqlite3_stmt *statement = nullptr;
+    if (sqlite3_prepare_v2(
+            db, "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'tbl\\_1\\_%' ESCAPE '\\'", -1,
+            &statement, nullptr) != SQLITE_OK)
+        return totals;
+    while (sqlite3_step(statement) == SQLITE_ROW)
+    {
+        const auto *name = reinterpret_cast<const char *>(sqlite3_column_text(statement, 0));
+        if (name != nullptr)
+            tables.emplace_back(name);
+    }
+    sqlite3_finalize(statement);
+
+    // 先按字累计权重和读音数，再只留多音字：单读音的字占比恒为 1，存着只占内存。
+    std::unordered_map<std::string, std::pair<std::int64_t, int>> sums;
+    for (const auto &table : tables)
+    {
+        const std::string sql = "SELECT value, weight FROM " + table;
+        if (sqlite3_prepare_v2(db, sql.c_str(), -1, &statement, nullptr) != SQLITE_OK)
+            continue;
+        while (sqlite3_step(statement) == SQLITE_ROW)
+        {
+            const auto *value = reinterpret_cast<const char *>(sqlite3_column_text(statement, 0));
+            if (value == nullptr)
+                continue;
+            auto &[sum, readings] = sums[value];
+            sum += (std::max)(sqlite3_column_int64(statement, 1), sqlite3_int64{0});
+            ++readings;
+        }
+        sqlite3_finalize(statement);
+    }
+    for (const auto &[value, sum] : sums)
+    {
+        if (sum.second > 1)
+            totals->emplace(value, sum.first);
+    }
+    return totals;
+}
+
+namespace
+{
+
+// P(读音|字) 的免罚线与扣分上限（log10）。
+//
+// 已有的 reading_prior 看的是 P(字|拼音)：这一行占该拼音全部行的权重比。它分得出权重为 0 的
+// 「卷」读 gun，却分不出「大」读 tai——大 的 tai 行有 4719，占 tai 的 0.47%，只扣 0.33，翻不过
+// 语言模型对「大赚」的偏好（差 1.6 左右），tai'zhuan'qian'le 于是出「大赚钱了」。同一行换个
+// 角度看，大 的 da 行有 327 万，读 tai 的只占 0.14%：这才是「这个字几乎不这么读」。语言模型
+// 只认汉字，这一维只能由读音补上（噪声信道里的 P(拼音|字)）。
+//
+// 免罚线定在 10%：长 chang 42%、重 chong 20%、行 hang 15% 这类常见的第二读音一分不扣，
+// 觉 jiao、还 huan（8%~9%）只扣零点零几，着 zhao/zhuo、地 di（3%~4%）扣 0.4~0.5。真正的
+// 生僻读音——大 tai/dai、会 kuai、都 du、给 ji——都在 0.1%~0.3%，扣 1.5~2。了 liao（0.47%）
+// 扣 1.3，「受不了」「去不了」仍靠语言模型的上下文赢下 料/聊。5% 那一档还差一点翻不过
+// 「大赚钱了」，20% 在评测句上与 10% 结果相同，取保守的一边。上限只管权重为 0 的读音，那些
+// reading_prior 已经扣过一大截。
+//
+// 只罚单字：多音字的少见读音落在词里（会计、成都、大夫）时整词就是读音的证据。没有同音
+// 竞争的字（得 只有它一个读 dei）各条路径扣得一样多，排序不受影响。
+constexpr double kRareCharReadingShare = 0.1;
+constexpr double kRareCharReadingFloor = 2.5;
+
+double rare_char_reading_penalty(const LatticeLexeme &lexeme, const CharReadingTotals *totals)
+{
+    if (totals == nullptr)
+        return 0.0;
+    const auto found = totals->find(lexeme.value);
+    if (found == totals->end() || found->second <= 0)
+        return 0.0;
+    const double weight = lexeme.weight > 0 ? static_cast<double>(lexeme.weight) : 0.0;
+    const double share = (weight + 1.0) / (static_cast<double>(found->second) + 1.0);
+    if (share >= kRareCharReadingShare)
+        return 0.0;
+    return (std::min)(-std::log10(share / kRareCharReadingShare), kRareCharReadingFloor);
+}
+
+} // namespace
+
+WordLatticeLookup make_lattice_db_lookup(sqlite3 *db, std::unordered_map<std::string, sqlite3_stmt *> &statement_cache,
+                                         int span_limit, metasequoia::FuzzyPinyinOptions fuzzy,
+                                         std::shared_ptr<const CharReadingTotals> char_totals)
+{
+    return [db, &statement_cache, span_limit, fuzzy, char_totals = std::move(char_totals)](const Segments &span) {
+        // ü 的两种写法归一到词库存的那一种。intact_pinyin_list() 两种都认，可词库只存
+        // 一种：切出来的 jv、lue 这类音节一行都查不到，精确键查询查空，整个词格就断在
+        // 这里——wo'men'lue'de 解不出任何路径，长句联想直接消失。这不是模糊音降级，lue
+        // 和 lve 本来就是同一个读音的两种拼写，归一化之后仍然是精确匹配。
         Segments normalized;
         normalized.reserve(span.size());
         for (const auto &syllable : span)
-            normalized.push_back(canonical_syllable(syllable));
+            normalized.push_back(canonical_umlaut_spelling(syllable));
 
         // 词格只收「键与跨度完全相等」的行。query_segments_keyed_flat 是带降级的
         // 查询：精确键查不到就退到前缀区间扫描（key >= "gun'qi" AND key < …），
         // gun'qi 于是捞出 gun'qiu 的「滚球」——拿这种行去造句，联想出来的短语读音
         // 根本对不上用户敲的拼音。简拼那两级同理。走批量精确键查询既堵住这个口子，
         // 也省掉了白扫的前缀区间。
-        const auto rows = query_exact_segmentations_keyed_flat({normalized}, db, statement_cache, span_limit);
+        std::vector<Segments> keys{normalized};
+        for (auto &variant : fuzzy_segmentations(normalized, fuzzy, kFuzzyLatticeVariantLimit))
+        {
+            for (auto &syllable : variant)
+                syllable = canonical_umlaut_spelling(std::move(syllable));
+            keys.push_back(std::move(variant));
+        }
+        // 模糊变体与敲出的读音同批查（同表一条 SQL）。LIMIT 按表计，放宽到每个键一份，
+        // 免得高频的模糊读音把敲出读音的行挤出去；折算之后再截回 span_limit。
+        const int limit = span_limit * static_cast<int>(keys.size());
+        const auto rows = query_exact_segmentations_keyed_flat(keys, db, statement_cache, limit);
         std::vector<LatticeLexeme> lexemes;
         lexemes.reserve(rows.size());
         for (const auto &row : rows)
-            lexemes.push_back({row.key, row.value, row.weight});
+        {
+            LatticeLexeme lexeme{row.key, row.value, row.weight};
+            if (span.size() == 1)
+                lexeme.penalty += rare_char_reading_penalty(lexeme, char_totals.get());
+            if (keys.size() > 1)
+            {
+                // 每个与敲出读音不同的音节扣一份分：一个词里错两个音，比只错一个更不可能。
+                const auto syllables = split_segments(row.key);
+                for (size_t i = 0; i < syllables.size() && i < normalized.size(); ++i)
+                    lexeme.penalty += syllables[i] == normalized[i] ? 0.0 : kFuzzyLatticePenaltyLog;
+            }
+            lexemes.push_back(std::move(lexeme));
+        }
+        if (keys.size() > 1)
+        {
+            // 按折后权重排序再截断：与 build_graph 一样，参与解码的只是排在前面的 span_limit 行。
+            std::stable_sort(lexemes.begin(), lexemes.end(), [](const LatticeLexeme &a, const LatticeLexeme &b) {
+                return static_cast<double>(a.weight) * std::pow(10.0, -a.penalty) >
+                       static_cast<double>(b.weight) * std::pow(10.0, -b.penalty);
+            });
+            // 同一个字两种读音都收（多音字），只留排在前面的那行。
+            std::unordered_set<std::string> seen;
+            lexemes.erase(
+                std::remove_if(lexemes.begin(), lexemes.end(),
+                               [&](const LatticeLexeme &lexeme) { return !seen.insert(lexeme.value).second; }),
+                lexemes.end());
+            if (lexemes.size() > static_cast<size_t>(std::max(0, span_limit)))
+                lexemes.resize(static_cast<size_t>(std::max(0, span_limit)));
+        }
         return lexemes;
     };
 }

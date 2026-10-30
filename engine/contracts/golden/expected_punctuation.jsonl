@@ -1,0 +1,400 @@
+{"round":0,"input":"|\"\";-\"","output":[null,"“","”","；",null,"“"]}
+{"round":1,"input":"~{`},*~#)( <-@_) @","output":[null,null,"·",null,"，",null,null,null,"）","（",null,"《",null,null,"——","）",null,null]}
+{"round":2,"input":".;\";?>@?_a='1`,a: >`=@`&1<`{_<`?:[~>@:\\.","output":["。","；","“","；","？","》",null,"？","——",null,null,"‘",null,"·","，",null,"：",null,"》","·",null,null,"·",null,null,"《","·",null,"——","〈","·","？","：","【",null,"〉",null,"：","、","。"]}
+{"round":3,"input":";|{{1a&-~\">~%<\"^^)& )<'%+'=\\<","output":["；",null,null,null,null,null,null,null,null,"“","》",null,null,"《","”","……","……","）",null,null,"）","〈","‘",null,null,"’",null,"、","〈"]}
+{"round":4,"input":"]?'~<\\=`@'","output":["】","？","‘",null,"《","、",null,"·",null,"’"]}
+{"round":5,"input":"`&\"`\\\"@>:{**%=$<","output":["·",null,"“","·","、","”",null,"》","：",null,null,null,null,null,"￥","《"]}
+{"round":6,"input":"\"([~-{\\?: /~'+>~<+$\\~:","output":["“","（","【",null,null,null,"、","？","：",null,null,null,"‘",null,"》",null,"《",null,"￥","、",null,"："]}
+{"round":7,"input":"^>>}?\"+/ '&//}]\\=","output":["……","》","》",null,"？","“",null,null,null,"‘",null,null,null,null,"】","、",null]}
+{"round":8,"input":"/\"a`*","output":[null,"“",null,"·",null]}
+{"round":9,"input":"<<.%;|:)*(#~.?;@!*-a`%,[?\\?/)#\"\"[#,/>","output":["《","〈","。",null,"；",null,"：","）",null,"（",null,null,"。","？","；",null,"！",null,null,null,"·",null,"，","【","？","、","？",null,"）",null,"“","”","【",null,"，",null,"〉"]}
+{"round":10,"input":"*>;$\"\"}!)<<??<*$)];","output":[null,"》","；","￥","“","”",null,"！","）","《","〈","？","？","〈",null,"￥","）","】","；"]}
+{"round":11,"input":"'|%>\",<_>&-#;!\";+:}.}(+_#>^/&)[(,&))","output":["‘",null,null,"》","“","，","《","——","》",null,null,null,"；","！","”","；",null,"：",null,"。",null,"（",null,"——",null,"》","……",null,null,"）","【","（","，",null,"）","）"]}
+{"round":12,"input":"^>@1\"1}*:`&\\>}\\\"_'","output":["……","》",null,null,"“",null,null,null,"：","·",null,"、","》",null,"、","”","——","‘"]}
+{"round":13,"input":"\"\"<","output":["“","”","《"]}
+{"round":14,"input":"+)'%?;.|`\"<-(<@)[`\">'@_]|/'|#@)1;*^?/'+","output":[null,"）","‘",null,"？","；","。",null,"·","“","《",null,"（","〈",null,"）","【","·","”","〉","’",null,"——","】",null,null,"‘",null,null,null,"）",null,"；",null,"……","？",null,"’",null]}
+{"round":15,"input":"<>:+(~-{,1^>,\":[%a\"$_~?a'!1_><[ ~!)'%<]","output":["《","》","：",null,"（",null,null,null,"，",null,"……","》","，","“","：","【",null,null,"”","￥","——",null,"？",null,"‘","！",null,"——","》","《","【",null,null,"！","）","’",null,"〈","】"]}
+{"round":16,"input":"\\]?'}\"<'{","output":["、","】","？","‘",null,"“","《","’",null]}
+{"round":17,"input":"1'%=$*$*|?(#\"%\\ \":]^a{`+1>1/\"\"\"|\"","output":[null,"‘",null,null,"￥",null,"￥",null,null,"？","（",null,"“",null,"、",null,"”","：","】","……",null,null,"·",null,null,"》",null,null,"“","”","“",null,"”"]}
+{"round":18,"input":"$\\;{'!.<:(_.>>,\"=! 1>_;'{!","output":["￥","、","；",null,"‘","！","。","《","：","（","——","。","》","》","，","“",null,"！",null,null,"》","——","；","’",null,"！"]}
+{"round":19,"input":"/`1_\"[`'[&+><}%(' [[''!%`(~.~*%'|:>>;?>~","output":[null,"·",null,"——","“","【","·","‘","【",null,null,"》","《",null,null,"（","’",null,"【","【","‘","’","！",null,"·","（",null,"。",null,null,null,"‘",null,"：","》","》","；","？","》",null]}
+{"round":20,"input":"=,~<\"^*>%>[,'","output":[null,"，",null,"《","“","……",null,"》",null,"》","【","，","‘"]}
+{"round":21,"input":"?(^~{\\\"{$@\"","output":["？","（","……",null,null,"、","“",null,"￥",null,"”"]}
+{"round":22,"input":"-\\:  \"","output":[null,"、","：",null,null,"“"]}
+{"round":23,"input":" .\"+\"{]^%\\.{|'><}:\"|*_","output":[null,"。","“",null,"”",null,"】","……",null,"、","。",null,null,"‘","》","《",null,"：","“",null,null,"——"]}
+{"round":24,"input":" <1\"~","output":[null,"《",null,"“",null]}
+{"round":25,"input":"\">","output":["“","》"]}
+{"round":26,"input":"{+>|<*}<$1,&<{%)?['?]<\\1a_","output":[null,null,"》",null,"《",null,null,"〈","￥",null,"，",null,"〈",null,null,"）","？","【","‘","？","】","〈","、",null,null,"——"]}
+{"round":27,"input":"'<}<|\">\"*~\"#'~$.a<>\"_,1a/ ?\"'~)';|","output":["‘","《",null,"〈",null,"“","〉","”",null,null,"“",null,"’",null,"￥","。",null,"〈","〉","”","——","，",null,null,null,null,"？","“","‘",null,"）","’","；",null]}
+{"round":28,"input":".>:{|')==;('\"|?/@{","output":["。","》","：",null,null,"‘","）",null,null,"；","（","’","“",null,"？",null,null,null]}
+{"round":29,"input":"'<#%\" '@'^'\"/","output":["‘","《",null,null,"“",null,"’",null,"‘","……","’","”",null]}
+{"round":30,"input":">`}/ :{>","output":["》","·",null,null,null,"：",null,"》"]}
+{"round":31,"input":"(:%\">-;` |!{*<,!]`&","output":["（","：",null,"“","》",null,"；","·",null,null,"！",null,null,"《","，","！","】","·",null]}
+{"round":32,"input":"> >@>!}<``\\\\'@[:??''{)&?*<'<^^;[","output":["》",null,"》",null,"》","！",null,"《","·","·","、","、","‘",null,"【","：","？","？","’","‘",null,"）",null,"？",null,"〈","’","〈","……","……","；","【"]}
+{"round":33,"input":"!{;]~_}<|'_*\"_\\|'\\>:@<(% #","output":["！",null,"；","】",null,"——",null,"《",null,"‘","——",null,"“","——","、",null,"’","、","》","：",null,"《","（",null,null,null]}
+{"round":34,"input":"**","output":[null,null]}
+{"round":35,"input":">1[*\"'^_`*","output":["》",null,"【",null,"“","‘","……","——","·",null]}
+{"round":36,"input":"| )\"=/*^*>|-","output":[null,null,"）","“",null,null,null,"……",null,"》",null,null]}
+{"round":37,"input":"(\"^><>}\\)#\")[>=< ","output":["（","“","……","》","《","》",null,"、","）",null,"”","）","【","》",null,"《",null]}
+{"round":38,"input":":>&1;=&&</>\\-\":\\'.|{\\#:';-1\\a!_^=>\"","output":["：","》",null,null,"；",null,null,null,"《",null,"》","、",null,"“","：","、","‘","。",null,null,"、",null,"：","’","；",null,null,"、",null,"！","——","……",null,"》","”"]}
+{"round":39,"input":"+%$\"|;a',#!*]@>]:,'\"@}","output":[null,null,"￥","“",null,"；",null,"‘","，",null,"！",null,"】",null,"》","】","：","，","’","”",null,null]}
+{"round":40,"input":"<@\"a\" {}`","output":["《",null,"“",null,"”",null,null,null,"·"]}
+{"round":41,"input":"'<~',^\"\\<\"![\\|#`-''&?*\"\"~?@?>","output":["‘","《",null,"’","，","……","“","、","〈","”","！","【","、",null,null,"·",null,"‘","’",null,"？",null,"“","”",null,"？",null,"？","〉"]}
+{"round":42,"input":"'<^!'>","output":["‘","《","……","！","’","》"]}
+{"round":43,"input":",\"|a(","output":["，","“",null,null,"（"]}
+{"round":44,"input":"!.<^/","output":["！","。","《","……",null]}
+{"round":45,"input":">^(>=%\">$>~<)~)\"\\<'=>_~><}|","output":["》","……","（","》",null,null,"“","》","￥","》",null,"《","）",null,"）","”","、","〈","‘",null,"〉","——",null,"》","《",null,null]}
+{"round":46,"input":"\"-+_^;@'<.=<_^`11>~!%~`''`+-","output":["“",null,null,"——","……","；",null,"‘","《","。",null,"〈","——","……","·",null,null,"〉",null,"！",null,null,"·","’","‘","·",null,null]}
+{"round":47,"input":"_1{","output":["——",null,null]}
+{"round":48,"input":"/~'?_;-%<><`-'\"/ _~>%<1\"\"","output":[null,null,"‘","？","——","；",null,null,"《","》","《","·",null,"’","“",null,null,"——",null,"》",null,"《",null,"”","“"]}
+{"round":49,"input":"'(>~::=<%>'<\"_!>_1+{&><\"a/>[:<=&@1^}(","output":["‘","（","》",null,"：","：",null,"《",null,"》","’","《","“","——","！","》","——",null,null,null,null,"》","《","”",null,null,"》","【","：","《",null,null,null,null,"……",null,"（"]}
+{"round":50,"input":")\"<%>'>1<?'","output":["）","“","《",null,"》","‘","》",null,"《","？","’"]}
+{"round":51,"input":">)$'~_,\"a>'}\"\"<+>>-|:\":@/&a+<","output":["》","）","￥","‘",null,"——","，","“",null,"》","’",null,"”","“","《",null,"》","》",null,null,"：","”","：",null,null,null,null,null,"《"]}
+{"round":52,"input":"!(~\"'\"_*{>>1:!#`","output":["！","（",null,"“","‘","”","——",null,null,"》","》",null,"：","！",null,"·"]}
+{"round":53,"input":" $}_>$<\\/%=!`<{-)\"#*<\"^*|+{,!+{$[\"=","output":[null,"￥",null,"——","》","￥","《","、",null,null,null,"！","·","〈",null,null,"）","“",null,null,"〈","”","……",null,null,null,null,"，","！",null,null,"￥","【","“",null]}
+{"round":54,"input":"'$']:^\\\\<&^<?-*&|)'\"|\",<#+|_~[>\"[@-['*\"","output":["‘","￥","’","】","：","……","、","、","《",null,"……","〈","？",null,null,null,null,"）","‘","“",null,"”","，","〈",null,null,null,"——",null,"【","〉","“","【",null,null,"【","’",null,"”"]}
+{"round":55,"input":"?_?~<>`*=[%<<(-/\":&&}}\"","output":["？","——","？",null,"《","》","·",null,null,"【",null,"《","〈","（",null,null,"“","：",null,null,null,null,"”"]}
+{"round":56,"input":"@[&.*>>#@a\\<&.(,\"[~a\".=>/,.@)a\"","output":[null,"【",null,"。",null,"》","》",null,null,null,"、","《",null,"。","（","，","“","【",null,null,"”","。",null,"》",null,"，","。",null,"）",null,"“"]}
+{"round":57,"input":":?>:>","output":["：","？","》","：","》"]}
+{"round":58,"input":">[|)<a ^})$<","output":["》","【",null,"）","《",null,null,"……",null,"）","￥","〈"]}
+{"round":59,"input":"+~!$\"\"a(~*@-`>*$$'^~'1-%%<!1\"/","output":[null,null,"！","￥","“","”",null,"（",null,null,null,null,"·","》",null,"￥","￥","‘","……",null,"’",null,null,null,null,"《","！",null,"“",null]}
+{"round":60,"input":"\"@[':'","output":["“",null,"【","‘","：","’"]}
+{"round":61,"input":"':.'?+","output":["‘","：","。","’","？",null]}
+{"round":62,"input":"'?<>\":/\">!1(&<#={1 %)<{'_'\"\"&?=&/ )!*'`>","output":["‘","？","《","》","“","：",null,"”","》","！",null,"（",null,"《",null,null,null,null,null,null,"）","〈",null,"’","——","‘","“","”",null,"？",null,null,null,null,"）","！",null,"’","·","〉"]}
+{"round":63,"input":"*=.>/\"^'^'>'&$[^(\"::\".<%","output":[null,null,"。","》",null,"“","……","‘","……","’","》","‘",null,"￥","【","……","（","”","：","：","“","。","《",null]}
+{"round":64,"input":"\"] >!>!_'`(.~(:#>\";[)*_$a}/1","output":["“","】",null,"》","！","》","！","——","‘","·","（","。",null,"（","：",null,"》","”","；","【","）",null,"——","￥",null,null,null,null]}
+{"round":65,"input":">\"$@@'[{>","output":["》","“","￥",null,null,"‘","【",null,"》"]}
+{"round":66,"input":"*]\"'>\"[) \\.<\"{\"%`'<^[","output":[null,"】","“","‘","》","”","【","）",null,"、","。","《","“",null,"”",null,"·","’","〈","……","【"]}
+{"round":67,"input":"';\"[{:>>#\"|>%@.'\"}>.","output":["‘","；","“","【",null,"：","》","》",null,"”",null,"》",null,null,"。","’","“",null,"》","。"]}
+{"round":68,"input":"|<\\|'_;<& <!!\"[?$$]","output":[null,"《","、",null,"‘","——","；","〈",null,null,"〈","！","！","“","【","？","￥","￥","】"]}
+{"round":69,"input":"' $>('>","output":["‘",null,"￥","》","（","’","》"]}
+{"round":70,"input":"\"&<a>{@]\\<","output":["“",null,"《",null,"》",null,null,"】","、","《"]}
+{"round":71,"input":">*>'#>}%]>","output":["》",null,"》","‘",null,"》",null,null,"】","》"]}
+{"round":72,"input":"^*[","output":["……",null,"【"]}
+{"round":73,"input":"\"]<]_' <1&-'>..-({\"'>'@)}-'.@[%=\"_+]/","output":["“","】","《","】","——","‘",null,"〈",null,null,null,"’","〉","。","。",null,"（",null,"”","‘","》","’",null,"）",null,null,"‘","。",null,"【",null,null,"“","——",null,"】",null]}
+{"round":74,"input":"\\\\&1|1{$","output":["、","、",null,null,null,null,null,"￥"]}
+{"round":75,"input":"?>)&`?\\<>>>#  '-:!>]|&>$]:[`>&${\\: {`\"/","output":["？","》","）",null,"·","？","、","《","》","》","》",null,null,null,"‘",null,"：","！","》","】",null,null,"》","￥","】","：","【","·","》",null,"￥",null,"、","：",null,null,"·","“",null]}
+{"round":76,"input":"1+","output":[null,null]}
+{"round":77,"input":"|[","output":[null,"【"]}
+{"round":78,"input":"]#|-'\">:_*'\\'\"[+<","output":["】",null,null,null,"‘","“","》","：","——",null,"’","、","‘","”","【",null,"《"]}
+{"round":79,"input":"@a_$}>[&._<(\"\"#<<^{\")$@] \"%}","output":[null,null,"——","￥",null,"》","【",null,"。","——","《","（","“","”",null,"〈","〈","……",null,"“","）","￥",null,"】",null,"”",null,null]}
+{"round":80,"input":")?\"?(;{<%'_>^>a(\"[]\"* =)@(*?>>\"%1a#","output":["）","？","“","？","（","；",null,"《",null,"‘","——","》","……","》",null,"（","”","【","】","“",null,null,null,"）",null,"（",null,"？","》","》","”",null,null,null,null]}
+{"round":81,"input":">>]$<~<^+`'/>>\\:><\",}[?<<?a\"+a',-?=","output":["》","》","】","￥","《",null,"〈","……",null,"·","‘",null,"〉","》","、","：","》","《","“","，",null,"【","？","〈","〈","？",null,"”",null,null,"’","，",null,"？",null]}
+{"round":82,"input":"?&^.$<'|1\";:&[>=(]~/..^/*,^|'1?$","output":["？",null,"……","。","￥","《","‘",null,null,"“","；","：",null,"【","》",null,"（","】",null,null,"。","。","……",null,null,"，","……",null,"’",null,"？","￥"]}
+{"round":83,"input":"\"*\"","output":["“",null,"”"]}
+{"round":84,"input":"&`>%/`~? ^>/,}<)>^'","output":[null,"·","》",null,null,"·",null,"？",null,"……","》",null,"，",null,"《","）","》","……","‘"]}
+{"round":85,"input":"*\"-)a&><,>|[&<>'<<a+_:|'\\'a#","output":[null,"“",null,"）",null,null,"》","《","，","》",null,"【",null,"《","》","‘","《","〈",null,null,"——","：",null,"’","、","‘",null,null]}
+{"round":86,"input":"?;)|_.|`","output":["？","；","）",null,"——","。",null,"·"]}
+{"round":87,"input":">?'_/$(>/ >%[ ',?#.% ,<\"(@@%","output":["》","？","‘","——",null,"￥","（","》",null,null,"》",null,"【",null,"’","，","？",null,"。",null,null,"，","《","“","（",null,null,null]}
+{"round":88,"input":"(!?`||}-/\"a?>)a~\"<(`1)?","output":["（","！","？","·",null,null,null,null,null,"“",null,"？","》","）",null,null,"”","《","（","·",null,"）","？"]}
+{"round":89,"input":"=.>`:)(.>\"@&+:$~:","output":[null,"。","》","·","：","）","（","。","》","“",null,null,null,"：","￥",null,"："]}
+{"round":90,"input":"(\"'~1=\"{$!_^/<;-","output":["（","“","‘",null,null,null,"”",null,"￥","！","——","……",null,"《","；",null]}
+{"round":91,"input":")<%',+>={<\\:> |<.~=~;'<_,\"*!*[& `><;<>)","output":["）","《",null,"‘","，",null,"》",null,null,"《","、","：","》",null,null,"《","。",null,null,null,"；","’","〈","——","，","“",null,"！",null,"【",null,null,"·","〉","〈","；","〈","〉","）"]}
+{"round":92,"input":"<+=/[<1]&,;~1($>>$'[*\":%\"<_?1\")=\\","output":["《",null,null,null,"【","〈",null,"】",null,"，","；",null,null,"（","￥","〉","》","￥","‘","【",null,"“","：",null,"”","《","——","？",null,"“","）",null,"、"]}
+{"round":93,"input":"!<@>'1 <~ ,<<%@'\"[1,(#@","output":["！","《",null,"》","‘",null,null,"《",null,null,"，","〈","〈",null,null,"’","“","【",null,"，","（",null,null]}
+{"round":94,"input":"_(<_%+{\"@'<?/1>.<`_=&{~;*<_","output":["——","（","《","——",null,null,null,"“",null,"‘","〈","？",null,null,"〉","。","〈","·","——",null,null,null,null,"；",null,"〈","——"]}
+{"round":95,"input":"!{}\\-)+~;\"$_`#+:<>}@*?}~a>[_.","output":["！",null,null,"、",null,"）",null,null,"；","“","￥","——","·",null,null,"：","《","》",null,null,null,"？",null,null,null,"》","【","——","。"]}
+{"round":96,"input":"a<]>''^{,<]`%>,>~:","output":[null,"《","】","》","‘","’","……",null,"，","《","】","·",null,"》","，","》",null,"："]}
+{"round":97,"input":"!'[\\^_<>\"'(+,:*?/[<`#{`(]","output":["！","‘","【","、","……","——","《","》","“","’","（",null,"，","：",null,"？",null,"【","《","·",null,null,"·","（","】"]}
+{"round":98,"input":")!1\"/{#!-'/+ >\"$^!1:|{<!''!\\]~\\<%","output":["）","！",null,"“",null,null,null,"！",null,"‘",null,null,null,"》","”","￥","……","！",null,"：",null,null,"《","！","’","‘","！","、","】",null,"、","〈",null]}
+{"round":99,"input":"-/[,\\\">\"","output":[null,null,"【","，","、","“","》","”"]}
+{"round":100,"input":"~<\"*[<|\"","output":[null,"《","“",null,"【","〈",null,"”"]}
+{"round":101,"input":"?!\"}`:<{|:+*<{\\/`<1}>","output":["？","！","“",null,"·","：","《",null,null,"：",null,null,"〈",null,"、",null,"·","〈",null,null,"〉"]}
+{"round":102,"input":"/\\<&<","output":[null,"、","《",null,"〈"]}
+{"round":103,"input":"''}:","output":["‘","’",null,"："]}
+{"round":104,"input":"a>\"a,\\$1;&{])$~'{^^>:","output":[null,"》","“",null,"，","、","￥",null,"；",null,null,"】","）","￥",null,"‘",null,"……","……","》","："]}
+{"round":105,"input":"\"`\")\"%\"`<","output":["“","·","”","）","“",null,"”","·","《"]}
+{"round":106,"input":")","output":["）"]}
+{"round":107,"input":".<[*@'","output":["。","《","【",null,null,"‘"]}
+{"round":108,"input":">%\"]}(?])+!*|","output":["》",null,"“","】",null,"（","？","】","）",null,"！",null,null]}
+{"round":109,"input":" /a`,","output":[null,null,null,"·","，"]}
+{"round":110,"input":"'|#%)<\\'[<>'1}","output":["‘",null,null,null,"）","《","、","’","【","〈","〉","‘",null,null]}
+{"round":111,"input":"\"*\"})>\"\";'\",,.","output":["“",null,"”",null,"）","》","“","”","；","‘","“","，","，","。"]}
+{"round":112,"input":"\"@","output":["“",null]}
+{"round":113,"input":";<\"`\\^a\"+>~_>-a,'*$.-=?'","output":["；","《","“","·","、","……",null,"”",null,"》",null,"——","》",null,null,"，","‘",null,"￥","。",null,null,"？","’"]}
+{"round":114,"input":"=<1_\"^((\", '*^`?`~/*#>|^'{_>&' #!/.?)`","output":[null,"《",null,"——","“","……","（","（","”","，",null,"‘",null,"……","·","？","·",null,null,null,null,"》",null,"……","’",null,"——","》",null,"‘",null,null,"！",null,"。","？","）","·"]}
+{"round":115,"input":">.1a&","output":["》","。",null,null,null]}
+{"round":116,"input":"{#!,<@1%*?!~>\"]>'./ >'@%:1>>\"-a1>","output":[null,null,"！","，","《",null,null,null,null,"？","！",null,"》","“","】","》","‘","。",null,null,"》","’",null,null,"：",null,"》","》","”",null,null,null,"》"]}
+{"round":117,"input":"_<?-a`$a.'}-!<$","output":["——","《","？",null,null,"·","￥",null,"。","‘",null,null,"！","〈","￥"]}
+{"round":118,"input":"#>&-@a '>$_&&=<(]]>\"`<[}","output":[null,"》",null,null,null,null,null,"‘","》","￥","——",null,null,null,"《","（","】","】","》","“","·","《","【",null]}
+{"round":119,"input":"{","output":[null]}
+{"round":120,"input":"*' /+</a}$_\\{>.11'a1'($/-\"{a ~< ?&^","output":[null,"‘",null,null,null,"《",null,null,null,"￥","——","、",null,"》","。",null,null,"’",null,null,"‘","（","￥",null,null,"“",null,null,null,null,"《",null,"？",null,"……"]}
+{"round":121,"input":">~+`\\~a*(`+<=!1?1:)=1>\"'>..>\".<\"'<}^\"|","output":["》",null,null,"·","、",null,null,null,"（","·",null,"《",null,"！",null,"？",null,"：","）",null,null,"》","“","‘","》","。","。","》","”","。","《","“","’","〈",null,"……","”",null]}
+{"round":122,"input":".<<\\#&[-%+)^~'\\~&>>*>^<=>","output":["。","《","〈","、",null,null,"【",null,null,null,"）","……",null,"‘","、",null,null,"〉","》",null,"》","……","《",null,"》"]}
+{"round":123,"input":"#]`'><|>:","output":[null,"】","·","‘","》","《",null,"》","："]}
+{"round":124,"input":"1,a\"?;aa,>` \"+>_@>1 :@?a'&|","output":[null,"，",null,"“","？","；",null,null,"，","》","·",null,"”",null,"》","——",null,"》",null,null,"：",null,"？",null,"‘",null,null]}
+{"round":125,"input":"\"a.>@\\*><<\"[\"!]","output":["“",null,"。","》",null,"、",null,"》","《","〈","”","【","“","！","】"]}
+{"round":126,"input":"+%|=>*&>|@_']^%+-}","output":[null,null,null,null,"》",null,null,"》",null,null,"——","‘","】","……",null,null,null,null]}
+{"round":127,"input":"',!<~':{<\"<_]/.1","output":["‘","，","！","《",null,"’","：",null,"〈","“","〈","——","】",null,"。",null]}
+{"round":128,"input":"\"\"%=>:'><\\1'/`'`>=+#=/!\\1<~#[]","output":["“","”",null,null,"》","：","‘","》","《","、",null,"’",null,"·","‘","·","》",null,null,null,null,null,"！","、",null,"《",null,null,"【","】"]}
+{"round":129,"input":"'1<#@-&>1~}+<{#\"=}=<'{;`</,$,\"[+%'|","output":["‘",null,"《",null,null,null,null,"》",null,null,null,null,"《",null,null,"“",null,null,null,"〈","’",null,"；","·","〈",null,"，","￥","，","”","【",null,null,"‘",null]}
+{"round":130,"input":"$*-=","output":["￥",null,null,null]}
+{"round":131,"input":"]&&=","output":["】",null,null,null]}
+{"round":132,"input":"*&?#<_-\"@<>`=*aa-a|@,><;!+{:!1!]_&>:=","output":[null,null,"？",null,"《","——",null,"“",null,"〈","〉","·",null,null,null,null,null,null,null,null,"，","》","《","；","！",null,null,"：","！",null,"！","】","——",null,"》","：",null]}
+{"round":133,"input":"{>(^","output":[null,"》","（","……"]}
+{"round":134,"input":"@#>#`*\"`?\"","output":[null,null,"》",null,"·",null,"“","·","？","”"]}
+{"round":135,"input":"1+\"!>>a>^&\\'@'(","output":[null,null,"“","！","》","》",null,"》","……",null,"、","‘",null,"’","（"]}
+{"round":136,"input":"@<1#<'$+\"*\"1%<!}]([,\"}' '?<[","output":[null,"《",null,null,"〈","‘","￥",null,"“",null,"”",null,null,"〈","！",null,"】","（","【","，","“",null,"’",null,"‘","？","〈","【"]}
+{"round":137,"input":"./&&=~{1()?=+_!\\\"<\\*:<<^?]<)\\`&[","output":["。",null,null,null,null,null,null,null,"（","）","？",null,null,"——","！","、","“","《","、",null,"：","〈","〈","……","？","】","〈","）","、","·",null,"【"]}
+{"round":138,"input":"$'|_(\\%!|#*.a);'\"&","output":["￥","‘",null,"——","（","、",null,"！",null,null,null,"。",null,"）","；","’","“",null]}
+{"round":139,"input":",\"')>)@\"`&#=*\"{<\\*<}\"/$[`^{","output":["，","“","‘","）","》","）",null,"”","·",null,null,null,null,"“",null,"《","、",null,"〈",null,"”",null,"￥","【","·","……",null]}
+{"round":140,"input":"^& ","output":["……",null,null]}
+{"round":141,"input":"[_)\"\\[% },1^ |>$*'1<","output":["【","——","）","“","、","【",null,null,null,"，",null,"……",null,null,"》","￥",null,"‘",null,"《"]}
+{"round":142,"input":"a(,`<@]!_+@`'{\\@a'>%^ '<;%&/ ,","output":[null,"（","，","·","《",null,"】","！","——",null,null,"·","‘",null,"、",null,null,"’","》",null,"……",null,"‘","《","；",null,null,null,null,"，"]}
+{"round":143,"input":".<})>,~>~(`)_~\">a{=']<%>>_<","output":["。","《",null,"）","》","，",null,"》",null,"（","·","）","——",null,"“","》",null,null,null,"‘","】","《",null,"》","》","——","《"]}
+{"round":144,"input":"<^+#{;\".,_+^':[(:+*|@+,|_!</[(<`?<;","output":["《","……",null,null,null,"；","“","。","，","——",null,"……","‘","：","【","（","：",null,null,null,null,null,"，",null,"——","！","〈",null,"【","（","〈","·","？","〈","；"]}
+{"round":145,"input":"]?\"'\"","output":["】","？","“","‘","”"]}
+{"round":146,"input":"`='#\\","output":["·",null,"‘",null,"、"]}
+{"round":147,"input":"||\"})-:/'({(","output":[null,null,"“",null,"）",null,"：",null,"‘","（",null,"（"]}
+{"round":148,"input":"~\\<$$<:<)_a;>\"+&`&\\a\"#'<$)|_>*","output":[null,"、","《","￥","￥","〈","：","〈","）","——",null,"；","〉","“",null,null,"·",null,"、",null,"”",null,"‘","〈","￥","）",null,"——","〉",null]}
+{"round":149,"input":"%/-@<%","output":[null,null,null,null,"《",null]}
+{"round":150,"input":">\"@|>%  '`!@{$).<","output":["》","“",null,null,"》",null,null,null,"‘","·","！",null,null,"￥","）","。","《"]}
+{"round":151,"input":"\"&\\=';>>_\"]|[>)","output":["“",null,"、",null,"‘","；","》","》","——","”","】",null,"【","》","）"]}
+{"round":152,"input":">>(<!-<:+\"] >&,","output":["》","》","（","《","！",null,"〈","：",null,"“","】",null,"〉",null,"，"]}
+{"round":153,"input":";?>>*=_/)<\"'#=~/\\\\},*:;+\"=#\"@\"&.\\:\"$a^","output":["；","？","》","》",null,null,"——",null,"）","《","“","‘",null,null,null,null,"、","、",null,"，",null,"：","；",null,"”",null,null,"“",null,"”",null,"。","、","：","“","￥",null,"……"]}
+{"round":154,"input":"]~=<\"!\"#+1a)\"]?>\"\"[<><&a}\"'| $\\{a>>>_a>","output":["】",null,null,"《","“","！","”",null,null,null,null,"）","“","】","？","》","”","“","【","《","》","《",null,null,null,"”","‘",null,null,"￥","、",null,null,"》","》","》","——",null,"》"]}
+{"round":155,"input":"(}\":\"=%","output":["（",null,"“","：","”",null,null]}
+{"round":156,"input":"@,;]1\\\".>\"=:]\"~>{+;\\<</{&#-\">>\\!!`>*~","output":[null,"，","；","】",null,"、","“","。","》","”",null,"：","】","“",null,"》",null,null,"；","、","《","〈",null,null,null,null,null,"”","〉","》","、","！","！","·","》",null,null]}
+{"round":157,"input":"$<|\".>'>|>*\"\\`*","output":["￥","《",null,"“","。","》","‘","》",null,"》",null,"”","、","·",null]}
+{"round":158,"input":"(~)[1@)@@]/*`~<]","output":["（",null,"）","【",null,null,"）",null,null,"】",null,null,"·",null,"《","】"]}
+{"round":159,"input":"$\">>;1! [>#_%<\"?!@![","output":["￥","“","》","》","；",null,"！",null,"【","》",null,"——",null,"《","”","？","！",null,"！","【"]}
+{"round":160,"input":",)#!\"#?`}<\"_\"a%((?;\\|#\":<^>?_,[\" ","output":["，","）",null,"！","“",null,"？","·",null,"《","”","——","“",null,null,"（","（","？","；","、",null,null,"”","：","〈","……","〉","？","——","，","【","“",null]}
+{"round":161,"input":"$\"+\"}!$","output":["￥","“",null,"”",null,"！","￥"]}
+{"round":162,"input":">,{`1'{<<<$:\"<]>>/>,]\"+~>? \"{'<~_:}","output":["》","，",null,"·",null,"‘",null,"《","〈","〈","￥","：","“","〈","】","〉","〉",null,"〉","，","】","”",null,null,"》","？",null,"“",null,"’","《",null,"——","：",null]}
+{"round":163,"input":"a= $>@='%||&*-[+,![?.),","output":[null,null,null,"￥","》",null,null,"‘",null,null,null,null,null,null,"【",null,"，","！","【","？","。","）","，"]}
+{"round":164,"input":"'=&~#\"^#}\"|$<\"${<-?>>{'^<^>@a\"\"^ ","output":["‘",null,null,null,null,"“","……",null,null,"”",null,"￥","《","“","￥",null,"〈",null,"？","〉","》",null,"’","……","《","……","》",null,null,"”","“","……",null]}
+{"round":165,"input":"<[`'>]11'(>`?%%@)><+{$:{\">","output":["《","【","·","‘","》","】",null,null,"’","（","》","·","？",null,null,null,"）","》","《",null,null,"￥","：",null,"“","》"]}
+{"round":166,"input":"`}<@@'\",+,\"} >>-\" {+%.\"{}_%->}\"~","output":["·",null,"《",null,null,"‘","“","，",null,"，","”",null,null,"》","》",null,"“",null,null,null,null,"。","”",null,null,"——",null,null,"》",null,"“",null]}
+{"round":167,"input":") !)$+_#:$>^<%=;$(<&\"<.=:[`!}!-<^`]>=\">)","output":["）",null,"！","）","￥",null,"——",null,"：","￥","》","……","《",null,null,"；","￥","（","〈",null,"“","〈","。",null,"：","【","·","！",null,"！",null,"〈","……","·","】","〉",null,"”","〉","）"]}
+{"round":168,"input":"{]<!<\"'#$\"$'` .}\\^'}<>$:<!<-</\\@\"<(a","output":[null,"】","《","！","〈","“","‘",null,"￥","”","￥","’","·",null,"。",null,"、","……","‘",null,"〈","〉","￥","：","〈","！","〈",null,"〈",null,"、",null,"“","〈","（",null]}
+{"round":169,"input":"><'{,\\}@\\'a.>(a^::~]","output":["》","《","‘",null,"，","、",null,null,"、","’",null,"。","》","（",null,"……","：","：",null,"】"]}
+{"round":170,"input":"\"=}!\"$\"=<<='\"$\"*$|'{#~>;{1/a^~%(!1@ \"`","output":["“",null,null,"！","”","￥","“",null,"《","〈",null,"‘","”","￥","“",null,"￥",null,"’",null,null,null,"〉","；",null,null,null,null,"……",null,null,"（","！",null,null,null,"”","·"]}
+{"round":171,"input":",!>_~<('&","output":["，","！","》","——",null,"《","（","‘",null]}
+{"round":172,"input":"#[!@[.!|=^._.\"\"<>\"{!:/?`))|]\"< $?`~_\\","output":[null,"【","！",null,"【","。","！",null,null,"……","。","——","。","“","”","《","》","“",null,"！","：",null,"？","·","）","）",null,"】","”","《",null,"￥","？","·",null,"——","、"]}
+{"round":173,"input":"~!'{>","output":[null,"！","‘",null,"》"]}
+{"round":174,"input":"~=<","output":[null,null,"《"]}
+{"round":175,"input":"\"&[>\"&>[!!^</\"( !*)-1\"-<.||`]/\"!a~<>]@<","output":["“",null,"【","》","”",null,"》","【","！","！","……","《",null,"“","（",null,"！",null,"）",null,null,"”",null,"〈","。",null,null,"·","】",null,"“","！",null,null,"〈","〉","】",null,"〈"]}
+{"round":176,"input":",><.[#=;__.(>_,>\"[","output":["，","》","《","。","【",null,null,"；","——","——","。","（","》","——","，","》","“","【"]}
+{"round":177,"input":"_a}\"<{>|+?.<+=,'^}<@1%&","output":["——",null,null,"“","《",null,"》",null,null,"？","。","《",null,null,"，","‘","……",null,"〈",null,null,null,null]}
+{"round":178,"input":"))-?{a>*;a>-\")+(),1!`-'({_$","output":["）","）",null,"？",null,null,"》",null,"；",null,"》",null,"“","）",null,"（","）","，",null,"！","·",null,"‘","（",null,"——","￥"]}
+{"round":179,"input":"%!@&`+;%=","output":[null,"！",null,null,"·",null,"；",null,null]}
+{"round":180,"input":"&&|;:.1]+~*~^<?\"[._^","output":[null,null,null,"；","：","。",null,"】",null,null,null,null,"……","《","？","“","【","。","——","……"]}
+{"round":181,"input":";_'?`11@&<>\"<,*&!:|\"^$,a:?},|}~$<;\\*","output":["；","——","‘","？","·",null,null,null,null,"《","》","“","《","，",null,null,"！","：",null,"”","……","￥","，",null,"：","？",null,"，",null,null,null,"￥","〈","；","、",null]}
+{"round":182,"input":"`&\"<!;:1~[%<`$%'$,/'@+*=,+\":\\/\"'","output":["·",null,"“","《","！","；","：",null,null,"【",null,"〈","·","￥",null,"‘","￥","，",null,"’",null,null,null,null,"，",null,"”","：","、",null,"“","‘"]}
+{"round":183,"input":"|[^`&%_*![\"#;","output":[null,"【","……","·",null,null,"——",null,"！","【","“",null,"；"]}
+{"round":184,"input":"%}<`@+:?;',|1\"^!\"*^\"~\"<(\"'\\+/[|1#||@_]","output":[null,null,"《","·",null,null,"：","？","；","‘","，",null,null,"“","……","！","”",null,"……","“",null,"”","〈","（","“","’","、",null,null,"【",null,null,null,null,null,null,"——","】"]}
+{"round":185,"input":"<?_\"/?(}?1 +1?>%}'>|\"=?'>","output":["《","？","——","“",null,"？","（",null,"？",null,null,null,null,"？","》",null,null,"‘","》",null,"”",null,"？","’","》"]}
+{"round":186,"input":"'+<|/.&%.?<1\"|'-=!\"@\"@>}+:`","output":["‘",null,"《",null,null,"。",null,null,"。","？","〈",null,"“",null,"’",null,null,"！","”",null,"“",null,"〉",null,null,"：","·"]}
+{"round":187,"input":"\"@<%'_ \"<a%@(~!a\"|\"# ` =\"","output":["“",null,"《",null,"‘","——",null,"”","〈",null,null,null,"（",null,"！",null,"“",null,"”",null,null,"·",null,null,"“"]}
+{"round":188,"input":">","output":["》"]}
+{"round":189,"input":"\"^|<}\">>+^)^}'{1)!a([","output":["“","……",null,"《",null,"”","》","》",null,"……","）","……",null,"‘",null,null,"）","！",null,"（","【"]}
+{"round":190,"input":"a^/> ^;","output":[null,"……",null,"》",null,"……","；"]}
+{"round":191,"input":"'&};'*~<(1\"<a,?\"\")\"-|\\-;` @~1","output":["‘",null,null,"；","’",null,null,"《","（",null,"“","〈",null,"，","？","”","“","）","”",null,null,"、",null,"；","·",null,null,null,null]}
+{"round":192,"input":"'>)1)+\"#(;{\"(@<","output":["‘","》","）",null,"）",null,"“",null,"（","；",null,"”","（",null,"《"]}
+{"round":193,"input":",","output":["，"]}
+{"round":194,"input":"&[","output":[null,"【"]}
+{"round":195,"input":"='\"\",.","output":[null,"‘","“","”","，","。"]}
+{"round":196,"input":"#.=[1&' +\"\"`-@","output":[null,"。",null,"【",null,null,"‘",null,null,"“","”","·",null,null]}
+{"round":197,"input":" +<&><.1++>>@","output":[null,null,"《",null,"》","《","。",null,null,null,"》","》",null]}
+{"round":198,"input":";! _]+=%,{`&.#*a} ;@- +`<;-","output":["；","！",null,"——","】",null,null,null,"，",null,"·",null,"。",null,null,null,null,null,"；",null,null,null,null,"·","《","；",null]}
+{"round":199,"input":"\"!><(aa$\\;+(>)(>;`&\">","output":["“","！","》","《","（",null,null,"￥","、","；",null,"（","》","）","（","》","；","·",null,"”","》"]}
+{"round":200,"input":"?]>.a*;??-}!;^;!+\">;='`%\"&!|\"-,):#<#;]>","output":["？","】","》","。",null,null,"；","？","？",null,null,"！","；","……","；","！",null,"“","》","；",null,"‘","·",null,"”",null,"！",null,"“",null,"，","）","：",null,"《",null,"；","】","》"]}
+{"round":201,"input":"^<$,\"^].}~\\>^]]?>$a];<a:%(!<\":<|>+>\\'_\"!","output":["……","《","￥","，","“","……","】","。",null,null,"、","》","……","】","】","？","》","￥",null,"】","；","《",null,"：",null,"（","！","〈","”","：","〈",null,"〉",null,"〉","、","‘","——","“","！"]}
+{"round":202,"input":"\"1@-%$\"/!$<~!-$\"<?\"[}\\&1\")_%a]'","output":["“",null,null,null,null,"￥","”",null,"！","￥","《",null,"！",null,"￥","“","〈","？","”","【",null,"、",null,null,"“","）","——",null,null,"】","‘"]}
+{"round":203,"input":"_])<1\"`/'\",>,.\\$_'@$1{!^<;\">&[~.","output":["——","】","）","《",null,"“","·",null,"‘","”","，","》","，","。","、","￥","——","’",null,"￥",null,null,"！","……","《","；","“","》",null,"【",null,"。"]}
+{"round":204,"input":"_,-a`@_+=({-]&","output":["——","，",null,null,"·",null,"——",null,null,"（",null,null,"】",null]}
+{"round":205,"input":"^a^|*..#1{{<'{>1~>%_'~$'<#,:|`a\"]|<@(","output":["……",null,"……",null,null,"。","。",null,null,null,null,"《","‘",null,"》",null,null,"》",null,"——","’",null,"￥","‘","《",null,"，","：",null,"·",null,"“","】",null,"〈",null,"（"]}
+{"round":206,"input":"'{'/!:`1.&a^&*<","output":["‘",null,"’",null,"！","：","·",null,"。",null,null,"……",null,null,"《"]}
+{"round":207,"input":">#>>%$a","output":["》",null,"》","》",null,"￥",null]}
+{"round":208,"input":"#a:\\<\"=!;}$\\&#|}>(>","output":[null,null,"：","、","《","“",null,"！","；",null,"￥","、",null,null,null,null,"》","（","》"]}
+{"round":209,"input":"\"a.'^@<}_a}#)'a).\\*?|~'~/\"~-.|',<''1\"<<","output":["“",null,"。","‘","……",null,"《",null,"——",null,null,null,"）","’",null,"）","。","、",null,"？",null,null,"‘",null,null,"”",null,null,"。",null,"’","，","〈","‘","’",null,"“","〈","〈"]}
+{"round":210,"input":"!<%%*$*]<1:>%a;&#{'@:<_%;\"/_1(&&","output":["！","《",null,null,null,"￥",null,"】","〈",null,"：","〉",null,null,"；",null,null,null,"‘",null,"：","〈","——",null,"；","“",null,"——",null,"（",null,null]}
+{"round":211,"input":"'^>'}={.~&_)<]{_<\"1%:'?&*_:)@ '<","output":["‘","……","》","’",null,null,null,"。",null,null,"——","）","《","】",null,"——","〈","“",null,null,"：","‘","？",null,null,"——","：","）",null,null,"’","〈"]}
+{"round":212,"input":"+/*)%=&+_]>,a# \"|!1)<>}:<.","output":[null,null,null,"）",null,null,null,null,"——","】","》","，",null,null,null,"“",null,"！",null,"）","《","》",null,"：","《","。"]}
+{"round":213,"input":"($-@>|\">&'!*);=\"(a)>^a|*{==&<`>\"#\"_~?","output":["（","￥",null,null,"》",null,"“","》",null,"‘","！",null,"）","；",null,"”","（",null,"）","》","……",null,null,null,null,null,null,null,"《","·","》","“",null,"”","——",null,"？"]}
+{"round":214,"input":"%>;=|~*&'~@\">\"@-_@|\"a%>","output":[null,"》","；",null,null,null,null,null,"‘",null,null,"“","》","”",null,null,"——",null,null,"“",null,null,"》"]}
+{"round":215,"input":"_@&#&>","output":["——",null,null,null,null,"》"]}
+{"round":216,"input":";\"#^~^<!<\"(-,_<<>;}","output":["；","“",null,"……",null,"……","《","！","〈","”","（",null,"，","——","〈","〈","〉","；",null]}
+{"round":217,"input":"'(#`{><:,.;,","output":["‘","（",null,"·",null,"》","《","：","，","。","；","，"]}
+{"round":218,"input":"\"~:?/;:?;'*>$|^\\^-;<%)\\=`%+/>^>;**:","output":["“",null,"：","？",null,"；","：","？","；","‘",null,"》","￥",null,"……","、","……",null,"；","《",null,"）","、",null,"·",null,null,null,"》","……","》","；",null,null,"："]}
+{"round":219,"input":"'!`^<?,!:'+`-?!,^<<)|%\\{>`|,/\"\"\",.*.%","output":["‘","！","·","……","《","？","，","！","：","’",null,"·",null,"？","！","，","……","〈","〈","）",null,null,"、",null,"〉","·",null,"，",null,"“","”","“","，","。",null,"。",null]}
+{"round":220,"input":"#&`)/*<<?<\\","output":[null,null,"·","）",null,null,"《","〈","？","〈","、"]}
+{"round":221,"input":".<}","output":["。","《",null]}
+{"round":222,"input":"`:\"\"\">'#<;'\"!,]&/] ~*))[,=* ~|]#-$ 1<+[","output":["·","：","“","”","“","》","‘",null,"《","；","’","”","！","，","】",null,null,"】",null,null,null,"）","）","【","，",null,null,null,null,null,"】",null,null,"￥",null,null,"〈",null,"【"]}
+{"round":223,"input":"_-||,<'>&?}&<~;?<*''","output":["——",null,null,null,"，","《","‘","》",null,"？",null,null,"《",null,"；","？","〈",null,"’","‘"]}
+{"round":224,"input":")/~} ]}<'_%-><+*\");&{^\"}*\"1-# ^>/|(","output":["）",null,null,null,null,"】",null,"《","‘","——",null,null,"》","《",null,null,"“","）","；",null,null,"……","”",null,null,"“",null,null,null,null,"……","》",null,null,"（"]}
+{"round":225,"input":"\"+@&>>$/@ `.$!+^([:%-<=>;( >;>)\"+];-","output":["“",null,null,null,"》","》","￥",null,null,null,"·","。","￥","！",null,"……","（","【","：",null,null,"《",null,"》","；","（",null,"》","；","》","）","”",null,"】","；",null]}
+{"round":226,"input":"1[>,_/--,]['\\/(.\"","output":[null,"【","》","，","——",null,null,null,"，","】","【","‘","、",null,"（","。","“"]}
+{"round":227,"input":"@_>=*[ \"</`-","output":[null,"——","》",null,null,"【",null,"“","《",null,"·",null]}
+{"round":228,"input":"'\"(!)[&\\}<*?|$@[","output":["‘","“","（","！","）","【",null,"、",null,"《",null,"？",null,"￥",null,"【"]}
+{"round":229,"input":"\\+\"#>&;>(*$,;","output":["、",null,"“",null,"》",null,"；","》","（",null,"￥","，","；"]}
+{"round":230,"input":"<*$^<#\" _>]_]@'|%\"=<a>","output":["《",null,"￥","……","〈",null,"“",null,"——","〉","】","——","】",null,"‘",null,null,"”",null,"〈",null,"〉"]}
+{"round":231,"input":"\"^<.>++!>&+]>&<>*,';'/:","output":["“","……","《","。","》",null,null,"！","》",null,null,"】","》",null,"《","》",null,"，","‘","；","’",null,"："]}
+{"round":232,"input":"\"<:\">\\[<(']1;)'#./@=|>~:-","output":["“","《","：","”","》","、","【","《","（","‘","】",null,"；","）","’",null,"。",null,null,null,null,"》",null,"：",null]}
+{"round":233,"input":",]\"]'~~$)!^//#~- \"*\\[#&<:('@+[-]","output":["，","】","“","】","‘",null,null,"￥","）","！","……",null,null,null,null,null,null,"”",null,"、","【",null,null,"《","：","（","’",null,null,"【",null,"】"]}
+{"round":234,"input":"(1//}|","output":["（",null,null,null,null,null]}
+{"round":235,"input":"1\"/#(>%,<(\"?[#!,>},1,',\\/<<#@+[\"[#]","output":[null,"“",null,null,"（","》",null,"，","《","（","”","？","【",null,"！","，","》",null,"，",null,"，","‘","，","、",null,"《","〈",null,null,null,"【","“","【",null,"】"]}
+{"round":236,"input":"#:>})~_a,;<[,|<:>_<<~<=')<,{^<>??~","output":[null,"：","》",null,"）",null,"——",null,"，","；","《","【","，",null,"〈","：","〉","——","〈","〈",null,"〈",null,"‘","）","〈","，",null,"……","〈","〉","？","？",null]}
+{"round":237,"input":">a]a-_]/-@;}[//>/'.'a{^=*=[:{<{[","output":["》",null,"】",null,null,"——","】",null,null,null,"；",null,"【",null,null,"》",null,"‘","。","’",null,null,"……",null,null,null,"【","：",null,"《",null,"【"]}
+{"round":238,"input":">1/$<","output":["》",null,null,"￥","《"]}
+{"round":239,"input":"'*=+>`a{<:.<<(#-+]#(<{}]'=~` *%^","output":["‘",null,null,null,"》","·",null,null,"《","：","。","〈","〈","（",null,null,null,"】",null,"（","〈",null,null,"】","’",null,null,"·",null,null,null,"……"]}
+{"round":240,"input":".' #~|?\"}<]_.?a:]\"#+ {<{~@>>a~-\"_<}","output":["。","‘",null,null,null,null,"？","“",null,"《","】","——","。","？",null,"：","】","”",null,null,null,null,"〈",null,null,null,"〉","》",null,null,null,"“","——","《",null]}
+{"round":241,"input":"#\"a","output":[null,"“",null]}
+{"round":242,"input":"]+{#)","output":["】",null,null,null,"）"]}
+{"round":243,"input":"'^\"'&;<)\\\"<+>@1 !|.{1\"*;<&`\",'`","output":["‘","……","“","’",null,"；","《","）","、","”","〈",null,"〉",null,null,null,"！",null,"。",null,null,"“",null,"；","〈",null,"·","”","，","‘","·"]}
+{"round":244,"input":"\\_#\",{{>*|%_'=","output":["、","——",null,"“","，",null,null,"》",null,null,null,"——","‘",null]}
+{"round":245,"input":")]^]]1<{!<<|]<%^#","output":["）","】","……","】","】",null,"《",null,"！","〈","〈",null,"】","〈",null,"……",null]}
+{"round":246,"input":"$a\"&-*","output":["￥",null,"“",null,null,null]}
+{"round":247,"input":"/_&-'|!\"\\\"1","output":[null,"——",null,null,"‘",null,"！","“","、","”",null]}
+{"round":248,"input":"`'","output":["·","‘"]}
+{"round":249,"input":"|/`(\"!}&+1!)),\"`,+\"]$-)@\"'%>~((]?\"#{\"`)","output":[null,null,"·","（","“","！",null,null,null,null,"！","）","）","，","”","·","，",null,"“","】","￥",null,"）",null,"”","‘",null,"》",null,"（","（","】","？","“",null,null,"”","·","）"]}
+{"round":250,"input":"}%^?$&$[?>'>*' ","output":[null,null,"……","？","￥",null,"￥","【","？","》","‘","》",null,"’",null]}
+{"round":251,"input":"~<>>.&\\.&+`<\\/*'&:\\","output":[null,"《","》","》","。",null,"、","。",null,null,"·","《","、",null,null,"‘",null,"：","、"]}
+{"round":252,"input":"\"_#^ {\">^:;","output":["“","——",null,"……",null,null,"”","》","……","：","；"]}
+{"round":253,"input":">]%[&>[\"$>#+_('~a&>?]_>=","output":["》","】",null,"【",null,"》","【","“","￥","》",null,null,"——","（","‘",null,null,null,"》","？","】","——","》",null]}
+{"round":254,"input":">><aa<","output":["》","》","《",null,null,"〈"]}
+{"round":255,"input":"<-+~|)./>!*:%","output":["《",null,null,null,null,"）","。",null,"》","！",null,"：",null]}
+{"round":256,"input":" a\"';~}{;|''& a'<-","output":[null,null,"“","‘","；",null,null,null,"；",null,"’","‘",null,null,null,"’","《",null]}
+{"round":257,"input":"','+./a]`%=+*>1]>.(\"%) +@\"={[\\+/","output":["‘","，","’",null,"。",null,null,"】","·",null,null,null,null,"》",null,"】","》","。","（","“",null,"）",null,null,null,"”",null,null,"【","、",null,null]}
+{"round":258,"input":"?(*-<&\"-","output":["？","（",null,null,"《",null,"“",null]}
+{"round":259,"input":"@~/,~?;>$*%/<1 ","output":[null,null,null,"，",null,"？","；","》","￥",null,null,null,"《",null,null]}
+{"round":260,"input":"{?[\"^/.<'a_'=a<^' (([@|]{\"'>\"$","output":[null,"？","【","“","……",null,"。","《","‘",null,"——","’",null,null,"〈","……","‘",null,"（","（","【",null,null,"】",null,"”","’","〉","“","￥"]}
+{"round":261,"input":"{}>%<{-'\"1/]|%\"1\\<)\"&>`{?<\"!|+!,","output":[null,null,"》",null,"《",null,null,"‘","“",null,null,"】",null,null,"”",null,"、","〈","）","“",null,"〉","·",null,"？","〈","”","！",null,null,"！","，"]}
+{"round":262,"input":"[~\">","output":["【",null,"“","》"]}
+{"round":263,"input":"\"^#><*+&a>&%[']${1|;\"&>$\"\"'@!%+","output":["“","……",null,"》","《",null,null,null,null,"》",null,null,"【","‘","】","￥",null,null,null,"；","”",null,"》","￥","“","”","’",null,"！",null,null]}
+{"round":264,"input":" )''`{!)}:=+){\":`&1\\!{\\]^|}~^#:\"[]","output":[null,"）","‘","’","·",null,"！","）",null,"：",null,null,"）",null,"“","：","·",null,null,"、","！",null,"、","】","……",null,null,null,"……",null,"：","”","【","】"]}
+{"round":265,"input":"\"(1|[!=*)a,!;\\1!\\<,%.|`}=+>-^ \")|{;>#","output":["“","（",null,null,"【","！",null,null,"）",null,"，","！","；","、",null,"！","、","《","，",null,"。",null,"·",null,null,null,"》",null,"……",null,"”","）",null,null,"；","》",null]}
+{"round":266,"input":"^%-@}]\"<1+?:=-@\\[_]#<`]!'!#","output":["……",null,null,null,null,"】","“","《",null,null,"？","：",null,null,null,"、","【","——","】",null,"〈","·","】","！","‘","！",null]}
+{"round":267,"input":">#%;/[#;?;@`<\")><?+>'>#!1$,{(<&a~,}~$","output":["》",null,null,"；",null,"【",null,"；","？","；",null,"·","《","“","）","》","《","？",null,"》","‘","》",null,"！",null,"￥","，",null,"（","《",null,null,null,"，",null,null,"￥"]}
+{"round":268,"input":">_><<'&~~[:\"#","output":["》","——","》","《","〈","‘",null,null,null,"【","：","“",null]}
+{"round":269,"input":"^.=#\\&,[-@]~","output":["……","。",null,null,"、",null,"，","【",null,null,"】",null]}
+{"round":270,"input":" <$_>*~ ;;","output":[null,"《","￥","——","》",null,null,null,"；","；"]}
+{"round":271,"input":"')>[>|a)>`,~>\\\"$'\" ","output":["‘","）","》","【","》",null,null,"）","》","·","，",null,"》","、","“","￥","’","”",null]}
+{"round":272,"input":"*,^a*,","output":[null,"，","……",null,null,"，"]}
+{"round":273,"input":"&)}=|=;\"$>)&!-","output":[null,"）",null,null,null,null,"；","“","￥","》","）",null,"！",null]}
+{"round":274,"input":"\" ^><`,*=?-]#~1@","output":["“",null,"……","》","《","·","，",null,null,"？",null,"】",null,null,null,null]}
+{"round":275,"input":"a>~'#}>:<<\\~&>><'=","output":[null,"》",null,"‘",null,null,"》","：","《","〈","、",null,null,"〉","》","《","’",null]}
+{"round":276,"input":";[:'*\"*\\??.","output":["；","【","：","‘",null,"“",null,"、","？","？","。"]}
+{"round":277,"input":"|/,&$%\" ''","output":[null,null,"，",null,"￥",null,"“",null,"‘","’"]}
+{"round":278,"input":"|~.:+.';)#\"-#{[ ","output":[null,null,"。","：",null,"。","‘","；","）",null,"“",null,null,null,"【",null]}
+{"round":279,"input":"@)</","output":[null,"）","《",null]}
+{"round":280,"input":"$&]% _/%\\","output":["￥",null,"】",null,null,"——",null,null,"、"]}
+{"round":281,"input":">-a+]+a&<}#{?~:$-%\"<@_\"=* '%:}']1/>@\"\"+>","output":["》",null,null,null,"】",null,null,null,"《",null,null,null,"？",null,"：","￥",null,null,"“","〈",null,"——","”",null,null,null,"‘",null,"：",null,"’","】",null,null,"〉",null,"“","”",null,"》"]}
+{"round":282,"input":"^/$a]'>^1|$|}_1{]`</<\"- \"","output":["……",null,"￥",null,"】","‘","》","……",null,null,"￥",null,null,"——",null,null,"】","·","《",null,"〈","“",null,null,"”"]}
+{"round":283,"input":"|{\";\" <\":|'|{|)>?)a(](>$)?' ,'<,??%)@< ","output":[null,null,"“","；","”",null,"《","“","：",null,"‘",null,null,null,"）","》","？","）",null,"（","】","（","》","￥","）","？","’",null,"，","‘","《","，","？","？",null,"）",null,"〈",null]}
+{"round":284,"input":":'\" >\"]>!: &.\">^>>^%","output":["：","‘","“",null,"》","”","】","》","！","：",null,null,"。","“","》","……","》","》","……",null]}
+{"round":285,"input":"-","output":[null]}
+{"round":286,"input":"!a1${ ,<>'`","output":["！",null,null,"￥",null,null,"，","《","》","‘","·"]}
+{"round":287,"input":"=?","output":[null,"？"]}
+{"round":288,"input":"^++&{<>.\"{<1|' <@1\\`$*>?%;('<]:|a1/","output":["……",null,null,null,null,"《","》","。","“",null,"《",null,null,"‘",null,"〈",null,null,"、","·","￥",null,"〉","？",null,"；","（","’","〈","】","：",null,null,null,null]}
+{"round":289,"input":"-*)=@_-$%;(;\\/\"\\a!|>>%&<1=?%'&\\ ~{>\"1","output":[null,null,"）",null,null,"——",null,"￥",null,"；","（","；","、",null,"“","、",null,"！",null,"》","》",null,null,"《",null,null,"？",null,"‘",null,"、",null,null,null,"》","”",null]}
+{"round":290,"input":"<`]><\"[`'<{&1+.>=-`@@&,-;-:1\">;>#","output":["《","·","】","》","《","“","【","·","‘","〈",null,null,null,null,"。","〉",null,null,"·",null,null,null,"，",null,"；",null,"：",null,"”","》","；","》",null]}
+{"round":291,"input":"*<$:","output":[null,"《","￥","："]}
+{"round":292,"input":"<{\"<><(.]%{]>+&'?<^|$","output":["《",null,"“","〈","〉","〈","（","。","】",null,null,"】","〉",null,null,"‘","？","〈","……",null,"￥"]}
+{"round":293,"input":"|{]","output":[null,null,"】"]}
+{"round":294,"input":",>!#% )-&!/|$&=,&>'\\<;1><;+=>(","output":["，","》","！",null,null,null,"）",null,null,"！",null,null,"￥",null,null,"，",null,"》","‘","、","《","；",null,"》","《","；",null,null,"》","（"]}
+{"round":295,"input":"'~{>'+>>a-+/1\":+@%,<& -/>?\\\"<<{_<>`/]>>","output":["‘",null,null,"》","’",null,"》","》",null,null,null,null,null,"“","：",null,null,null,"，","《",null,null,null,null,"》","？","、","”","《","〈",null,"——","〈","〉","·",null,"】","〉","》"]}
+{"round":296,"input":"}}a","output":[null,null,null]}
+{"round":297,"input":"|\"=\\>!'\")|\"]","output":[null,"“",null,"、","》","！","‘","”","）",null,"“","】"]}
+{"round":298,"input":"'?:&\"+|.*\"\"`~/~@/>@","output":["‘","？","：",null,"“",null,null,"。",null,"”","“","·",null,null,null,null,null,"》",null]}
+{"round":299,"input":">a)<'}a-^+_:]${'<","output":["》",null,"）","《","‘",null,null,null,"……",null,"——","：","】","￥",null,"’","〈"]}
+{"round":300,"input":"']\\\"><'<}@1*\\@[<&>*\",>,;a<?'>\"[[/'","output":["‘","】","、","“","》","《","’","〈",null,null,null,null,"、",null,"【","〈",null,"〉",null,"”","，","〉","，","；",null,"〈","？","‘","〉","“","【","【",null,"’"]}
+{"round":301,"input":"=(^/';_{|(<>&}&'[\\\"<><+|<-*&':<`*$_</-:|","output":[null,"（","……",null,"‘","；","——",null,null,"（","《","》",null,null,null,"’","【","、","“","《","》","《",null,null,"〈",null,null,null,"‘","：","〈","·",null,"￥","——","〈",null,null,"：",null]}
+{"round":302,"input":"'&%\"`1'@\\][\\?/","output":["‘",null,null,"“","·",null,"’",null,"、","】","【","、","？",null]}
+{"round":303,"input":"{>_/(:,,]<>)%+]>=<<<","output":[null,"》","——",null,"（","：","，","，","】","《","》","）",null,null,"】","》",null,"《","〈","〈"]}
+{"round":304,"input":"{/'~&!<<~>*>{<\"#?\"` \"?\"&'$/_]>!* <a$<):)","output":[null,null,"‘",null,null,"！","《","〈",null,"〉",null,"》",null,"《","“",null,"？","”","·",null,"“","？","”",null,"’","￥",null,"——","】","》","！",null,null,"《",null,"￥","〈","）","：","）"]}
+{"round":305,"input":"};<,\"'\\`!<<&[!$<=%})'`-$/(\".<]>\"1;' ;","output":[null,"；","《","，","“","‘","、","·","！","〈","〈",null,"【","！","￥","〈",null,null,null,"）","’","·",null,"￥",null,"（","”","。","〈","】","〉","“",null,"；","‘",null,"；"]}
+{"round":306,"input":"@>~[1[<@{'>=/->`=* ;<~`","output":[null,"》",null,"【",null,"【","《",null,null,"‘","》",null,null,null,"》","·",null,null,null,"；","《",null,"·"]}
+{"round":307,"input":"<@{;@)\"> -'>{(@?\"-}<]'})?[~","output":["《",null,null,"；",null,"）","“","》",null,null,"‘","》",null,"（",null,"？","”",null,null,"《","】","’",null,"）","？","【",null]}
+{"round":308,"input":">~.[ ^_^>1>;`]\"\"a'a.['#{_","output":["》",null,"。","【",null,"……","——","……","》",null,"》","；","·","】","“","”",null,"‘",null,"。","【","’",null,null,"——"]}
+{"round":309,"input":"&]@'%;'`\"{`++>#\" &/\"@1_;_\"{<a\"=_<_","output":[null,"】",null,"‘",null,"；","’","·","“",null,"·",null,null,"》",null,"”",null,null,null,"“",null,null,"——","；","——","”",null,"《",null,"“",null,"——","〈","——"]}
+{"round":310,"input":"%#>-=.'}'~]<1-~}-+]?","output":[null,null,"》",null,null,"。","‘",null,"’",null,"】","《",null,null,null,null,null,null,"】","？"]}
+{"round":311,"input":"!^{>|':`-__/!<,>%>># ","output":["！","……",null,"》",null,"‘","：","·",null,"——","——",null,"！","《","，","》",null,"》","》",null,null]}
+{"round":312,"input":"#=\\~@\"-(%:\\;","output":[null,null,"、",null,null,"“",null,"（",null,"：","、","；"]}
+{"round":313,"input":";?`^)!&@_=>!a#*{%+``&(]@><]<\"*a''].$","output":["；","？","·","……","）","！",null,null,"——",null,"》","！",null,null,null,null,null,null,"·","·",null,"（","】",null,"》","《","】","〈","“",null,null,"‘","’","】","。","￥"]}
+{"round":314,"input":"**,[% &^'-};}{><\"<&<<#(, #?","output":[null,null,"，","【",null,null,null,"……","‘",null,null,"；",null,null,"》","《","“","〈",null,"〈","〈",null,"（","，",null,null,"？"]}
+{"round":315,"input":">$:,}''.[1&}\"1}(@-><^_'a]#&<`\"?^`>}?_[","output":["》","￥","：","，",null,"‘","’","。","【",null,null,null,"“",null,null,"（",null,null,"》","《","……","——","‘",null,"】",null,null,"〈","·","”","？","……","·","〉",null,"？","——","【"]}
+{"round":316,"input":"1&?\\^?\"@\"~~'+](`#\"':1@>}`","output":[null,null,"？","、","……","？","“",null,"”",null,null,"‘",null,"】","（","·",null,"“","’","：",null,null,"》",null,"·"]}
+{"round":317,"input":"1[>}/+^,%1_'.]=","output":[null,"【","》",null,null,null,"……","，",null,null,"——","‘","。","】",null]}
+{"round":318,"input":" |1?]>?}a#+=\"'>a.1#: '>\"<`*\"[\"","output":[null,null,null,"？","】","》","？",null,null,null,null,null,"“","‘","》",null,"。",null,null,"：",null,"’","》","”","《","·",null,"“","【","”"]}
+{"round":319,"input":"$!)$&'","output":["￥","！","）","￥",null,"‘"]}
+{"round":320,"input":"%a/&#!","output":[null,null,null,null,null,"！"]}
+{"round":321,"input":":,<\"(,$-\"'._]([ >1/.!%]~*a':)!?}}:{>:","output":["：","，","《","“","（","，","￥",null,"”","‘","。","——","】","（","【",null,"》",null,null,"。","！",null,"】",null,null,null,"’","：","）","！","？",null,null,"：",null,"》","："]}
+{"round":322,"input":":>.]:[<\"#)}1?>`<&\\\\.;~ -/\\=>\"?>`)a>1<>^^","output":["：","》","。","】","：","【","《","“",null,"）",null,null,"？","》","·","《",null,"、","、","。","；",null,null,null,null,"、",null,"》","”","？","》","·","）",null,"》",null,"《","》","……","……"]}
+{"round":323,"input":"`(~.~'&[>,@$<;:/\"|*<>>>(<<(","output":["·","（",null,"。",null,"‘",null,"【","》","，",null,"￥","《","；","：",null,"“",null,null,"〈","〉","》","》","（","《","〈","（"]}
+{"round":324,"input":"@1)?^'#=<<1+\\}.*#~$;<*<,\"~'/\"'\\#","output":[null,null,"）","？","……","‘",null,null,"《","〈",null,null,"、",null,"。",null,null,null,"￥","；","〈",null,"〈","，","“",null,"’",null,"”","‘","、",null]}
+{"round":325,"input":"^[a!,)>><}\\\\ [ |_@a\"~(1\\,% :>;-","output":["……","【",null,"！","，","）","》","》","《",null,"、","、",null,"【",null,null,"——",null,null,"“",null,"（",null,"、","，",null,null,"：","》","；",null]}
+{"round":326,"input":"*^==,>~,>}!_","output":[null,"……",null,null,"，","》",null,"，","》",null,"！","——"]}
+{"round":327,"input":">|\"/~@!>]'&?=\\/<)=>1","output":["》",null,"“",null,null,null,"！","》","】","‘",null,"？",null,"、",null,"《","）",null,"》",null]}
+{"round":328,"input":"{a~' ","output":[null,null,null,"‘",null]}
+{"round":329,"input":":\\*]@+{}$.(!\"]$.~\"&\\\"%>#>'<(`>","output":["：","、",null,"】",null,null,null,null,"￥","。","（","！","“","】","￥","。",null,"”",null,"、","“",null,"》",null,"》","‘","《","（","·","》"]}
+{"round":330,"input":";-| 1(<~'<,\">..+ >.# !><","output":["；",null,null,null,null,"（","《",null,"‘","〈","，","“","〉","。","。",null,null,"》","。",null,null,"！","》","《"]}
+{"round":331,"input":"]1?<>:]\\>'","output":["】",null,"？","《","》","：","】","、","》","‘"]}
+{"round":332,"input":"*]}>'^'\"%; 1.`1'{-~ [!)%\"&>#'","output":[null,"】",null,"》","‘","……","’","“",null,"；",null,null,"。","·",null,"‘",null,null,null,null,"【","！","）",null,"”",null,"》",null,"’"]}
+{"round":333,"input":"\",`<]<:>?","output":["“","，","·","《","】","〈","：","〉","？"]}
+{"round":334,"input":"\"*>&'`@>\"&^`<&'>'#!\"[]1&` {@/?`|>'/ ]=","output":["“",null,"》",null,"‘","·",null,"》","”",null,"……","·","《",null,"’","》","‘",null,"！","“","【","】",null,null,"·",null,null,null,null,"？","·",null,"》","’",null,null,"】",null]}
+{"round":335,"input":">&{^\"@|$\\)a~>?{@a*<>~;\\\"<<\"(<]","output":["》",null,null,"……","“",null,null,"￥","、","）",null,null,"》","？",null,null,null,null,"《","》",null,"；","、","”","《","〈","“","（","〈","】"]}
+{"round":336,"input":"-<\"$( .&\\{<^1>'>:%~","output":[null,"《","“","￥","（",null,"。",null,"、",null,"〈","……",null,"〉","‘","》","：",null,null]}
+{"round":337,"input":"~@=>(\"1(^<[\\-:;+]>[;>#|#!/<>^?',","output":[null,null,null,"》","（","“",null,"（","……","《","【","、",null,"：","；",null,"】","》","【","；","》",null,null,null,"！",null,"《","》","……","？","‘","，"]}
+{"round":338,"input":"^??%+:~<#=>@>%&,\\\"1\"&<>:],.$</\",'!","output":["……","？","？",null,null,"：",null,"《",null,null,"》",null,"》",null,null,"，","、","“",null,"”",null,"《","》","：","】","，","。","￥","《",null,"“","，","‘","！"]}
+{"round":339,"input":">1_\"~\"_%&> |>$1< -~<= \"$-\"+,\"[<]-(_*\".","output":["》",null,"——","“",null,"”","——",null,null,"》",null,null,"》","￥",null,"《",null,null,null,"〈",null,null,"“","￥",null,"”",null,"，","“","【","〈","】",null,"（","——",null,"”","。"]}
+{"round":340,"input":",.~::|<{'$>.\\<\" ;&'","output":["，","。",null,"：","：",null,"《",null,"‘","￥","》","。","、","《","“",null,"；",null,"’"]}
+{"round":341,"input":");([\"'%|</==:$.. >+:~]\":a?*/?~: \"[a.*`%/","output":["）","；","（","【","“","‘",null,null,"《",null,null,null,"：","￥","。","。",null,"》",null,"：",null,"】","”","：",null,"？",null,null,"？",null,"：",null,"“","【",null,"。",null,"·",null,null]}
+{"round":342,"input":"~1, ~","output":[null,null,"，",null,null]}
+{"round":343,"input":";)a{]\"{:~%<>/","output":["；","）",null,null,"】","“",null,"：",null,null,"《","》",null]}
+{"round":344,"input":"+<?:[a@$1:>%#}<<>'>=)&\"?}.<|~->*","output":[null,"《","？","：","【",null,null,"￥",null,"：","》",null,null,null,"《","〈","〉","‘","》",null,"）",null,"“","？",null,"。","《",null,null,null,"》",null]}
+{"round":345,"input":" *@~';`@~/!{}a\"!(\"^,''#&'>=>1\"<]<}","output":[null,null,null,null,"‘","；","·",null,null,null,"！",null,null,null,"“","！","（","”","……","，","’","‘",null,null,"’","》",null,"》",null,"“","《","】","〈",null]}
+{"round":346,"input":"+<'-#'%a{,\"<","output":[null,"《","‘",null,null,"’",null,null,null,"，","“","〈"]}
+{"round":347,"input":"]':a!,]<>+?_$_#$=<<\"&)=,_\\>+<,~*@\"|'{","output":["】","‘","：",null,"！","，","】","《","》",null,"？","——","￥","——",null,"￥",null,"《","〈","“",null,"）",null,"，","——","、","〉",null,"〈","，",null,null,null,"”",null,"’",null]}
+{"round":348,"input":"} )\\?]<!(`!= /\".{%\"'][_(^' ]/>;a|})\"%,","output":[null,null,"）","、","？","】","《","！","（","·","！",null,null,null,"“","。",null,null,"”","‘","】","【","——","（","……","’",null,"】",null,"》","；",null,null,null,"）","“",null,"，"]}
+{"round":349,"input":"~',_$+","output":[null,"‘","，","——","￥",null]}
+{"round":350,"input":"<|a>%_ !.[*(1$\"1'>>->*&,/*#+')\"`~~\"<]?","output":["《",null,null,"》",null,"——",null,"！","。","【",null,"（",null,"￥","“",null,"‘","》","》",null,"》",null,null,"，",null,null,null,null,"’","）","”","·",null,null,"“","《","】","？"]}
+{"round":351,"input":">*","output":["》",null]}
+{"round":352,"input":"')-=<,1\"a--","output":["‘","）",null,null,"《","，",null,"“",null,null,null]}
+{"round":353,"input":"= ","output":[null,null]}
+{"round":354,"input":"\"%/~!\\{`{')","output":["“",null,null,null,"！","、",null,"·",null,"‘","）"]}
+{"round":355,"input":"=^}+?#","output":[null,"……",null,null,"？",null]}
+{"round":356,"input":"^(=<'$.)-!*`$='","output":["……","（",null,"《","‘","￥","。","）",null,"！",null,"·","￥",null,"’"]}
+{"round":357,"input":"<?_%a;< ]/~1+?%\";!a@#^ ","output":["《","？","——",null,null,"；","〈",null,"】",null,null,null,null,"？",null,"“","；","！",null,null,null,"……",null]}
+{"round":358,"input":"a<`{+|<a~<++$\"]$-<~1_'.\"%>#?\"&-!@-)","output":[null,"《","·",null,null,null,"〈",null,null,"〈",null,null,"￥","“","】","￥",null,"〈",null,null,"——","‘","。","”",null,"〉",null,"？","“",null,null,"！",null,null,"）"]}
+{"round":359,"input":">.a.^`//a'_#;:=<)*`\"=]{'\\\\/1}@(a[!{<","output":["》","。",null,"。","……","·",null,null,null,"‘","——",null,"；","：",null,"《","）",null,"·","“",null,"】",null,"’","、","、",null,null,null,null,"（",null,"【","！",null,"〈"]}
+{"round":360,"input":"-#:>> (/|=/%!","output":[null,null,"：","》","》",null,"（",null,null,null,null,null,"！"]}
+{"round":361,"input":"{(^-%]$)]);`''1|;11\"1{]","output":[null,"（","……",null,null,"】","￥","）","】","）","；","·","‘","’",null,null,"；",null,null,"“",null,null,"】"]}
+{"round":362,"input":"^:;_}<]<'><&[[1~^<~'~","output":["……","：","；","——",null,"《","】","〈","‘","〉","〈",null,"【","【",null,null,"……","〈",null,"’",null]}
+{"round":363,"input":"+<<^=?;+11<=>)(&'->,+:1,:}[)","output":[null,"《","〈","……",null,"？","；",null,null,null,"〈",null,"〉","）","（",null,"‘",null,"〉","，",null,"：",null,"，","：",null,"【","）"]}
+{"round":364,"input":" !/{^$}]#.|[]%\"<%^/\"1)<`,<","output":[null,"！",null,null,"……","￥",null,"】",null,"。",null,"【","】",null,"“","《",null,"……",null,"”",null,"）","〈","·","，","〈"]}
+{"round":365,"input":"],>a]+\\>&;%\">^>\"{ -!,*:","output":["】","，","》",null,"】",null,"、","》",null,"；",null,"“","》","……","》","”",null,null,null,"！","，",null,"："]}
+{"round":366,"input":"~_<1/@>,___[']>_> !","output":[null,"——","《",null,null,null,"》","，","——","——","——","【","‘","】","》","——","》",null,"！"]}
+{"round":367,"input":"^&]*;@#(-;=?)& ?}>[","output":["……",null,"】",null,"；",null,null,"（",null,"；",null,"？","）",null,null,"？",null,"》","【"]}
+{"round":368,"input":"|[>","output":[null,"【","》"]}
+{"round":369,"input":"\"{","output":["“",null]}
+{"round":370,"input":"[{\\'\\)<\"+>'1+;\"","output":["【",null,"、","‘","、","）","《","“",null,"》","’",null,null,"；","”"]}
+{"round":371,"input":"`%\\?-@/@>-'@","output":["·",null,"、","？",null,null,null,null,"》",null,"‘",null]}
+{"round":372,"input":"*>)<#>*=>^ ],?%>>\\=&","output":[null,"》","）","《",null,"》",null,null,"》","……",null,"】","，","？",null,"》","》","、",null,null]}
+{"round":373,"input":"[a::~;.>(@\\}~\">1\"[<;a>.>:/ +&]","output":["【",null,"：","：",null,"；","。","》","（",null,"、",null,null,"“","》",null,"”","【","《","；",null,"》","。","》","：",null,null,null,null,"】"]}
+{"round":374,"input":"#]|^|<[>:=}{a*^$>');1'^|/_`,:(;`{<&-_ ;","output":[null,"】",null,"……",null,"《","【","》","：",null,null,null,null,null,"……","￥","》","‘","）","；",null,"’","……",null,null,"——","·","，","：","（","；","·",null,"《",null,null,"——",null,"；"]}
+{"round":375,"input":":<<]@+>@)>?!#&;.+||,,\\^#&::a#_+&<+","output":["：","《","〈","】",null,null,"〉",null,"）","》","？","！",null,null,"；","。",null,null,null,"，","，","、","……",null,null,"：","：",null,null,"——",null,null,"《",null]}
+{"round":376,"input":"  =+\"\"$>1<}:>'&:$>;>/|)>\".].\"","output":[null,null,null,null,"“","”","￥","》",null,"《",null,"：","》","‘",null,"：","￥","》","；","》",null,null,"）","》","“","。","】","。","”"]}
+{"round":377,"input":"*#<a_'/ :'}#]?)\".' ,_}>?):~  .-(<*\"&&","output":[null,null,"《",null,"——","‘",null,null,"：","’",null,null,"】","？","）","“","。","‘",null,"，","——",null,"》","？","）","：",null,null,null,"。",null,"（","《",null,"”",null,null]}
+{"round":378,"input":")_ [{[<+}a;%#\"@'}|!","output":["）","——",null,"【",null,"【","《",null,null,null,"；",null,null,"“",null,"‘",null,null,"！"]}
+{"round":379,"input":"_<{+\\_#~._*;>'=<\"'~1<^\".;<`/\\","output":["——","《",null,null,"、","——",null,null,"。","——",null,"；","》","‘",null,"《","“","’",null,null,"〈","……","”","。","；","〈","·",null,"、"]}
+{"round":380,"input":"}*,,","output":[null,null,"，","，"]}
+{"round":381,"input":"~<><1\"|{^?%})'$;.',`>'1[;(*.](|<\"1<","output":[null,"《","》","《",null,"“",null,null,"……","？",null,null,"）","‘","￥","；","。","’","，","·","》","‘",null,"【","；","（",null,"。","】","（",null,"《","”",null,"〈"]}
+{"round":382,"input":"\"%/.=<_%*_<!:-\\^ >^<;!?{@a&^__'>'.1(@","output":["“",null,null,"。",null,"《","——",null,null,"——","〈","！","：",null,"、","……",null,"〉","……","〈","；","！","？",null,null,null,null,"……","——","——","‘","〉","’","。",null,"（",null]}
+{"round":383,"input":"#.><a(<=`^}/a=&*!<$a,&&|}]]?~+|.'#+","output":[null,"。","》","《",null,"（","〈",null,"·","……",null,null,null,null,null,null,"！","〈","￥",null,"，",null,null,null,null,"】","】","？",null,null,null,"。","‘",null,null]}
+{"round":384,"input":"}_|=`&`< =-{%_>]}){;","output":[null,"——",null,null,"·",null,"·","《",null,null,null,null,null,"——","》","】",null,"）",null,"；"]}
+{"round":385,"input":"'%>+,^};-=]\"<=|`1\"=%<;\"@'\"\\> +]","output":["‘",null,"》",null,"，","……",null,"；",null,null,"】","“","《",null,null,"·",null,"”",null,null,"〈","；","“",null,"’","”","、","〉",null,null,"】"]}
+{"round":386,"input":"$_.^{@<>;;<>?","output":["￥","——","。","……",null,null,"《","》","；","；","《","》","？"]}
+{"round":387,"input":"\"_-!\"[=:~\"\"&[a +><)","output":["“","——",null,"！","”","【",null,"：",null,"“","”",null,"【",null,null,null,"》","《","）"]}
+{"round":388,"input":"{:1!={><&?>=!|}\"'(&1-&)?';+<'\"`/","output":[null,"：",null,"！",null,null,"》","《",null,"？","》",null,"！",null,null,"“","‘","（",null,null,null,null,"）","？","’","；",null,"《","‘","”","·",null]}
+{"round":389,"input":"~_-{*","output":[null,"——",null,null,null]}
+{"round":390,"input":"%><>\" <[a? #!(_.*,,1&~+/*!{*(,'\\<)}(;","output":[null,"》","《","》","“",null,"《","【",null,"？",null,null,"！","（","——","。",null,"，","，",null,null,null,null,null,null,"！",null,null,"（","，","‘","、","〈","）",null,"（","；"]}
+{"round":391,"input":"//'$\\'{/=<??(>`<?(+\"]1)?-{}$-^]>/\\","output":[null,null,"‘","￥","、","’",null,null,null,"《","？","？","（","》","·","《","？","（",null,"“","】",null,"）","？",null,null,null,"￥",null,"……","】","》",null,"、"]}
+{"round":392,"input":"%;<\"","output":[null,"；","《","“"]}
+{"round":393,"input":"`<\";*^|`$='@!'^?}<?\\\"_<\"","output":["·","《","“","；",null,"……",null,"·","￥",null,"‘",null,"！","’","……","？",null,"〈","？","、","”","——","〈","“"]}
+{"round":394,"input":"[<,;\"\"({) <: ,/\"#1\\(a@)%{:?:>.=+","output":["【","《","，","；","“","”","（",null,"）",null,"〈","：",null,"，",null,"“",null,null,"、","（",null,null,"）",null,null,"：","？","：","〉","。",null,null]}
+{"round":395,"input":"1<&.[%^$-;\"","output":[null,"《",null,"。","【",null,"……","￥",null,"；","“"]}
+{"round":396,"input":"\\[ \\}\"/$\">$='+1-<`# ","output":["、","【",null,"、",null,"“",null,"￥","”","》","￥",null,"‘",null,null,null,"《","·",null,null]}
+{"round":397,"input":"\"]~-]>%>[ +]'[:&@!>^11'/  { <>}}>'","output":["“","】",null,null,"】","》",null,"》","【",null,null,"】","‘","【","：",null,null,"！","》","……",null,null,"’",null,null,null,null,null,"《","》",null,null,"》","‘"]}
+{"round":398,"input":"'|>' \\>$&%@$!|a, >&a.<-)1]]*-~","output":["‘",null,"》","’",null,"、","》","￥",null,null,null,"￥","！",null,null,"，",null,"》",null,null,"。","《",null,"）",null,"】","】",null,null,null]}
+{"round":399,"input":"\"[:!;>+[@%<<?@:^-\"&@`a%+*<+a!-=1\"?'.+-","output":["“","【","：","！","；","》",null,"【",null,null,"《","〈","？",null,"：","……",null,"”",null,null,"·",null,null,null,null,"〈",null,null,"！",null,null,null,"“","？","‘","。",null,null]}

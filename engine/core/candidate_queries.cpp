@@ -147,9 +147,10 @@ std::vector<WordItem> CandidateQueries::mixed(std::vector<WordItem> candidates, 
     std::vector<WordItem> emoji_candidates;
     if (expressive_options.emoji_candidates && prefix.size() >= 2)
     {
-        emoji_candidates = collect_unique(
-            local_modes::query_emoji(prefix, scheme, paths_.resource(assets::other_dictionary), 3, shuangpin_profile_)
-                .candidates);
+        emoji_candidates =
+            collect_unique(local_modes::query_mixed_emoji(prefix, scheme, paths_.resource(assets::other_dictionary), 3,
+                                                          shuangpin_profile_)
+                               .candidates);
     }
 
     std::vector<WordItem> kaomoji_candidates;

@@ -1,0 +1,140 @@
+<div class="content" id="personalLibraryPanel">
+<div class="qp">
+  <header class="phead">
+    <div><h1>剪贴板与资料库</h1><p class="lead">复制过的内容和常用短语。在任意输入框按快捷键，光标旁就会出现列表，按数字键直接粘贴。</p></div>
+    <div class="phead-side"><button class="btn sm" type="button" data-open-conn="">服务连接</button><button class="hk" type="button" data-hk="clip" title="点击修改快捷键"></button><button class="btn primary sm" type="button" data-try="clip">试一试</button></div>
+  </header>
+  <div class="seg" role="tablist" aria-label="剪贴板" data-seg="clip">
+    <button type="button" role="tab" data-tab="content" aria-selected="true">内容</button>
+    <button type="button" role="tab" data-tab="settings" aria-selected="false">设置</button>
+  </div>
+  <div class="tabpane" data-pane-of="clip" data-pane="settings" hidden>
+    <div class="card">
+      <div class="card-h"><h2>剪贴板记录</h2><p>是否记录复制内容，用“内容”页标题旁的开关。</p></div>
+      <div class="row"><div class="row-l"><b>排序</b><small>“最近优先”让刚复制的排第一；固定的内容总在最上面</small></div><div class="row-r"><div class="opt" data-cfg="clipboard.sort"><button type="button" data-v="recent">最近优先</button><button type="button" data-v="frequent">常用优先</button></div></div></div>
+      <div class="row"><div class="row-l"><b>最多保留</b></div><div class="row-r"><select data-cfg="clipboard.max_items" aria-label="最多保留条数"><option value="100">100 条</option><option value="200">200 条</option><option value="500">500 条</option></select><select data-cfg="clipboard.retention_days" aria-label="保留时长"><option value="7">7 天</option><option value="30">30 天</option><option value="0">一直保留</option></select></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>隐私</h2></div>
+      <div class="row"><div class="row-l"><b>跳过密码和敏感内容</b><small>密码管理器等软件复制时会标记“不要记录”，遵守这个标记</small></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="clipboard.respect_privacy_flag" aria-label="跳过敏感内容"></button></div></div>
+      <div class="row"><div class="row-l"><b>不记录这些软件</b><small>填程序文件名，用分号隔开，例如 KeePass.exe;1Password.exe</small></div><div class="row-r"><input type="text" data-cfg="clipboard.exclude_apps" aria-label="不记录的软件" style="width:320px" maxlength="400"></div></div>
+      <div class="row"><div class="row-l"><b>锁屏时暂停记录</b></div><div class="row-r"><button class="tg" type="button" role="switch" data-cfg="clipboard.pause_on_lock" aria-label="锁屏时暂停记录"></button></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>已移到更合适的页面</h2><p>这些功能和剪贴板无关，原来的数据不动，只是换了入口。</p></div>
+      <div class="moved">
+        <button type="button" data-goto="voice:studio"><svg class="ic"><use href="#i-spk"/></svg><span><b>语音收藏</b> → 语音与发音 › 语音消息</span></button>
+        <button type="button" data-lib-jump="study"><svg class="ic"><use href="#i-dot"/></svg><span><b>生词复习、学习记录</b> → 词库 › 学习</span></button>
+        <button type="button" data-lib-jump="rules"><svg class="ic"><use href="#i-dot"/></svg><span><b>软件词库（按软件独立学习）</b> → 词库 › 按软件</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="tabpane" id="libraryContent" data-pane-of="clip" data-pane="content">
+  <div class="clipboard-heading">
+    <div class="clipboard-heading-description">
+      <div class="clipboard-title-row"><h2>剪贴板</h2><div class="ftb-toggle-btn" id="clipboardHistoryToggleBtn" role="switch" aria-label="剪贴板管理" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
+      <p>相同内容合并，末尾显示复制次数。右键可复制、加入常用语或删除。</p>
+    </div>
+    <div class="clipboard-heading-actions"><button id="libraryClearHistory" type="button">清空</button><button id="libraryRefresh" type="button">刷新</button></div>
+  </div>
+  <div class="clipboard-workspace">
+  <nav class="clipboard-tabs" aria-label="剪贴板与资料类型">
+    <button type="button" data-library-view="history" aria-pressed="true">剪贴内容</button>
+    <button type="button" data-library-view="clips" aria-pressed="false">常用语</button>
+    <button type="button" data-library-view="quotes" aria-pressed="false">语录</button>
+    <div id="libraryCustomGroups" class="clipboard-custom-groups" aria-label="自定义资料分组"></div>
+    <button type="button" data-extra data-library-view="favorites" aria-pressed="false">语音收藏</button>
+    <button type="button" data-extra data-library-view="study" aria-pressed="false">生词复习</button>
+    <button type="button" data-extra data-library-view="rules" aria-pressed="false">软件词库</button>
+    <button type="button" data-extra data-library-view="learning" aria-pressed="false">学习记录</button>
+  </nav>
+  <div class="clipboard-panel-content">
+  <select id="libraryView" hidden aria-hidden="true"><option value="history">剪贴内容</option><option value="clips">常用语</option><option value="quotes">语录</option><option value="favorites">语音收藏</option><option value="rules">软件词库</option><option value="learning">学习记录</option><option value="study">生词复习</option></select>
+  <input id="libraryGroup" type="hidden" value="phrases" />
+  <div id="libraryError" class="clipboard-error" role="alert" hidden><span id="libraryErrorText"></span><button id="libraryDismissError" type="button" aria-label="关闭错误提示">关闭</button></div>
+  <div id="librarySearchArea" class="library-search-row"><input id="librarySearch" type="search" maxlength="160" placeholder="搜索标题、文字、软件或编码" aria-label="搜索当前资料" /><span id="libraryResultCount" class="voice-description"></span><button id="libraryNewTop" class="btn sm" type="button">新建</button></div>
+  <div id="libraryQuoteSources" class="clipboard-quote-sources" hidden>
+    <div class="clipboard-quote-tabs" aria-label="语录词典">
+      <button type="button" data-quote-source="all" aria-pressed="true">全部语录</button>
+      <button type="button" data-quote-source="classic" aria-pressed="false">经典语录</button>
+      <button type="button" data-quote-source="famous" aria-pressed="false">名人语录</button>
+      <button type="button" data-quote-source="poetry" aria-pressed="false">青简诗词名句</button>
+      <button type="button" data-quote-source="custom" aria-pressed="false">自定义语录</button>
+    </div>
+    <p id="libraryQuoteSourceNote" class="voice-description"></p>
+  </div>
+  <div id="libraryApplicationManager" class="prompt-library" hidden>
+    <p>启用软件独立学习后，新造词、英文回车学习与候选使用次数仅保存在此软件；原有全局词典继续作为基础词库。关闭独立学习可恢复原有共享行为，已经记录的内容仍保留。</p>
+    <label>已配置的软件<select id="libraryApplicationSelect"><option value="">选择或填写新软件</option></select></label>
+    <label>软件文件名<input id="libraryScope" placeholder="例如 WeChat.exe、Code.exe" maxlength="260" /></label>
+    <div class="local-asr-actions library-flags">
+      <label><input id="libraryIsolation" type="checkbox" checked /> 独立词库与学习</label>
+      <label><input id="libraryAutoLearn" type="checkbox" checked /> 自动学习新词</label>
+      <label><input id="libraryFrequency" type="checkbox" checked /> 按本软件使用次数排序</label>
+    </div>
+    <div class="local-asr-actions"><button id="libraryNewRule" type="button">新建软件词条</button><button id="librarySaveApplication" type="button">保存软件开关</button><button id="libraryExportApplication" type="button">导出此软件词库</button><button id="libraryImportApplication" type="button">导入并合并到此软件</button><input id="libraryImportFile" type="file" accept="application/json,.json" hidden /></div>
+    <p>导入会合并并去重，不覆盖已有词条、软件开关和全局用户词典。学习记录可逐条删除；建议先导出备份。</p>
+  </div>
+  <div id="libraryEditor" class="dict-modal library-editor-overlay" aria-hidden="true">
+  <div class="dict-dialog library-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="libraryEditorTitle">
+    <h3 id="libraryEditorTitle">新建</h3>
+    <div id="libraryTitleFields"><label>标题<input id="libraryName" maxlength="80" /></label></div>
+    <div id="libraryAppFields">
+      <label
+        >应用程序文件名<input
+          id="libraryApplication"
+          placeholder="例如 WeChat.exe、Code.exe；仅作用于此程序" /></label
+      ><label
+        >触发编码<input
+          id="libraryCode"
+          maxlength="80"
+          placeholder="小写字母编码；只在完整匹配时出现" /></label
+      ><label
+        ><input id="libraryEnabled" type="checkbox" checked /> 启用此词条</label
+      >
+    </div>
+    <label
+      >文字内容<textarea id="libraryText" rows="4" maxlength="5000"></textarea>
+    </label>
+    <div class="local-asr-actions">
+      <button id="libraryCancelEdit" type="button">取消</button><button id="librarySave" type="button">保存</button>
+    </div>
+    <p id="libraryEditorError" role="alert" hidden></p>
+  </div></div>
+  <div id="libraryStudy" hidden>
+    <p>
+      依据已记录的学习生词安排间隔复习：忘记 10 分钟后再看，模糊 1
+      天后再看，记住则逐步延长。不会改写原来的熟悉度统计。
+    </p>
+    <button id="libraryLoadStudy" type="button">载入到期复习</button>
+    <h3 id="libraryStudyWord"></h3>
+    <p id="libraryStudyAnswer" hidden></p>
+    <div class="local-asr-actions">
+      <button id="libraryReveal" type="button">查看释义</button
+      ><button data-review="0" type="button">忘记</button
+      ><button data-review="1" type="button">模糊</button
+      ><button data-review="2" type="button">记住</button>
+    </div>
+    <p id="libraryStudyCount"></p>
+  </div>
+  <div id="libraryBrowse" class="clipboard-browser">
+    <div id="libraryRows" class="clipboard-list" role="listbox" aria-label="当前内容列表"></div>
+  </div>
+  <div id="libraryGroups" class="prompt-library">
+    <details class="workbench-details"><summary>管理分组 · 添加、重命名和转移</summary>
+    <label>分组名称<input
+        id="libraryGroupName"
+        placeholder="填写分组名后添加，或给当前分组重命名"
+    /></label>
+    <div class="local-asr-actions">
+      <button id="libraryNew" type="button">新建</button><button id="libraryAddGroup" type="button">添加分组</button
+      ><button id="libraryRenameGroup" type="button">重命名当前分组</button
+      ><button id="libraryRemoveGroup" type="button">删除分组并转移内容</button>
+    </div></details>
+  </div>
+  <div id="libraryContextMenu" class="clipboard-context-menu" role="menu" aria-label="内容操作" hidden></div>
+  </div>
+  </div>
+</div>
+</div>

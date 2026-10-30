@@ -12,6 +12,7 @@
 #include <string>
 #include <utility>
 #include "webview2/windows_webview2.h"
+#include "webview2/candidate_window_template.h"
 #include "utils/common_utils.h"
 #include "utils/webview_utils.h"
 #include "utils/window_utils.h"
@@ -559,7 +560,7 @@ int FineTuneWindow(HWND hwnd)
             // This callback runs long after the worker posted the show request, so take the published page instead of
             // the vectors it may already be rebuilding.
             const Global::CandidatePageSnapshotPtr candidatePage = Global::LoadCandidatePageSnapshot();
-            std::wstring str = preedit + L"," + candidatePage->candidate_string;
+            std::wstring str = BuildCandidateTemplatePayload(preedit, candidatePage->html_items);
             // Empty composition with no candidates means the session already ended.
             if (GlobalIme::composition.raw_input_with_cases.empty() && candidatePage->candidate_string.empty())
             {

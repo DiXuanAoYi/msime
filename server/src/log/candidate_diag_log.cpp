@@ -33,7 +33,7 @@ const std::wstring &ResolveLogPathUnlocked()
         const DWORD attributes = GetFileAttributesW(desktop.c_str());
         if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
         {
-            g_log_path = desktop + L"\\水杉IME诊断日志.log";
+            g_log_path = desktop + L"\\知语IME诊断日志.log";
             return g_log_path;
         }
     }
@@ -52,7 +52,7 @@ const std::wstring &ResolveLogPathUnlocked()
     if (!CreateDirectoryW(log_directory.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS)
         return g_log_path;
 
-    g_log_path = log_directory + L"\\水杉IME诊断日志.log";
+    g_log_path = log_directory + L"\\知语IME诊断日志.log";
     return g_log_path;
 }
 

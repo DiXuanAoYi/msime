@@ -1,3 +1,5 @@
+#include "companion/companion_feed.h"
+#include "english/candidate_speech.h"
 #include "window/candidate_presenter.h"
 
 #include "config/ime_config.h"
@@ -92,6 +94,7 @@ struct CandSkinTokens
     D2D1_COLOR_F accent = ColorFromRgb(0x6B69D6);
     // Alpha 0: follow the candidate text at the CSS opacity .62 (see CandidateList::Appearance).
     D2D1_COLOR_F translation = D2D1::ColorF(0, 0.0f);
+    D2D1_COLOR_F translationPos{}, translationSeparator{}, selectedTranslationPos{}, selectedTranslationSeparator{};
     float radius = 6.0f;
     float borderWidth = 1.5f;
     float containerPad = 5.0f;
@@ -161,6 +164,10 @@ void ApplyPackageColors(const CandidateSkinCatalog::CandidateColors &colors, Can
     apply(colors.selectedText, tokens.rowTextSelected);
     apply(colors.selectedNumber, tokens.rowLabelSelected);
     apply(colors.selectedTranslation, tokens.rowTranslationSelected);
+    apply(colors.translationPos, tokens.translationPos);
+    apply(colors.translationSeparator, tokens.translationSeparator);
+    apply(colors.selectedTranslationPos, tokens.selectedTranslationPos);
+    apply(colors.selectedTranslationSeparator, tokens.selectedTranslationSeparator);
     apply(colors.preeditBackground, tokens.preeditBackground);
     apply(colors.preeditDivider, tokens.preeditDivider);
     apply(colors.menuBackground, tokens.menuFill);
@@ -313,6 +320,10 @@ struct CandidatePresenter::Impl
     bool contextSubmenuOpen = false;
     bool hostExpandedForMenu = false;
     size_t contextMenuPageIndex = 0;
+    bool decorationPressed = false;
+    bool decorationHovered = false;
+    float decorationTilt = 0.0f;
+    ULONGLONG decorationPulseStart = 0;
 };
 
 CandidatePresenter::CandidatePresenter() = default;
@@ -363,6 +374,12 @@ void CandidatePresenter::RebuildScene()
     impl_->preedit->SetHorizontalAlignment(msimeui::HorizontalAlignment::Leading);
     impl_->list = std::make_shared<msimeui::CandidateList>(28.0f);
     impl_->list->SetOnItemActivated([this](size_t index) { CommitItem(index); });
+    impl_->list->SetOnModifiedItemActivated([](size_t index, WPARAM keys, bool translation) {
+        if (!(keys & MK_CONTROL))
+            return false;
+        CandidateSpeech::Speak(index, translation);
+        return true;
+    });
     impl_->list->SetOnContextMenu(
         [this](size_t index, const POINT &clientPoint) { ShowItemContextMenu(index, clientPoint); });
     impl_->body = std::make_shared<msimeui::StackPanel>(2.0f);
@@ -436,6 +453,7 @@ void CandidatePresenter::ApplySkin()
                 << GetConfiguredCandidateWindowPreeditFontSize() << '|' << GetConfiguredCandidateWindowLayout() << '|'
                 << GetConfiguredCandidateTextColor() << '|' << GetConfiguredCandidateWindowPreeditStyle();
     fingerprint << '|' << GetConfiguredCandidateEnglishFont();
+    fingerprint << '|' << GetConfiguredCandidateFitContentMode();
     // 同一个外部皮肤的 skin.toml 或图片改了，只有强制重载能看出来；带上重载代数让 D2D 也重读 manifest。
     fingerprint << '|' << GetCandidateSkinReloadRevision();
     for (const auto &font : GetConfiguredCandidateFallbackFonts())
@@ -446,6 +464,9 @@ void CandidatePresenter::ApplySkin()
         return;
     }
     lastSkinFingerprint_ = skinKey;
+    stickyCardKey_.clear();
+    stickyCardWidthDip_ = 0.0f;
+    stickyCardHeightDip_ = 0.0f;
     CandSkinTokens tokens;
     if (candLight)
     {
@@ -474,6 +495,11 @@ void CandidatePresenter::ApplySkin()
     // 再往下套用配色与尺寸。重建会清掉指纹，这里补回去。
     const bool pageArrows = CandidateSkinCatalog::ResolvePageArrows(std::filesystem::path(skinsRoot), skinId,
                                                                     package ? &*package : nullptr);
+    const auto &fitMode = GetConfiguredCandidateFitContentMode();
+    const bool fitContent =
+        fitMode == "enabled" ||
+        (fitMode == "follow" && CandidateSkinCatalog::ResolveFitContent(std::filesystem::path(skinsRoot), skinId,
+                                                                        package ? &*package : nullptr));
     if (pageArrows != impl_->scenePageArrows || horizontalLayout != impl_->sceneHorizontal)
     {
         impl_->scenePageArrows = pageArrows;
@@ -777,7 +803,8 @@ void CandidatePresenter::ApplySkin()
     appearance.contentPadBottom = tokens.itemExtraHeight * 0.5f;
     appearance.textPadLeft = 5.0f;
     appearance.labelGap = tokens.labelGap;
-    appearance.minItemWidth = tokens.minItemWidth;
+    appearance.minItemWidth = fitContent ? 0.0f : tokens.minItemWidth;
+    appearance.fitContent = fitContent;
     appearance.selectedBarWidth = tokens.selectedBarWidth;
     appearance.selectedBarHeight = fontSize * tokens.selectedBarHeightEm;
     appearance.selectedBarInside = tokens.selectedBarInside;
@@ -800,6 +827,10 @@ void CandidatePresenter::ApplySkin()
     appearance.labelColor = tokens.number;
     appearance.annotationColor = palette.candidateText;
     appearance.translationColor = tokens.translation;
+    translationPos_ = tokens.translationPos;
+    translationSeparator_ = tokens.translationSeparator;
+    selectedTranslationPos_ = tokens.selectedTranslationPos;
+    selectedTranslationSeparator_ = tokens.selectedTranslationSeparator;
     appearance.rowTranslationSelected = tokens.rowTranslationSelected;
     appearance.rowFillSelected = tokens.selected;
     appearance.rowFillHover = tokens.hover;
@@ -895,7 +926,7 @@ void CandidatePresenter::ApplySkin()
     // 底边贴着卡片顶边、不与卡片重叠，按 align 贴卡片左/中/右，图片在盒内等比居中（contain）。
     decorationTopDip_ = 0.0f;
     decorationWidthDip_ = 0.0f;
-    cardMinWidthDip_ = kCandidateMinWidthDip;
+    cardMinWidthDip_ = fitContent ? 0.0f : kCandidateMinWidthDip;
     std::wstring decorationPath;
     std::wstring backgroundPath;
     const std::wstring packageRoot = package ? skinsRoot + L"\\" + string_to_wstring(package->id) + L"\\" : L"";
@@ -907,8 +938,8 @@ void CandidatePresenter::ApplySkin()
             decorationPath = packageRoot + string_to_wstring(package->decorationImage);
         if (!package->backgroundImage.empty())
             backgroundPath = packageRoot + string_to_wstring(package->backgroundImage);
-        cardMinWidthDip_ =
-            (std::max)({cardMinWidthDip_, static_cast<float>(package->minWidthDip), decorationWidthDip_});
+        cardMinWidthDip_ = (std::max)(
+            {cardMinWidthDip_, fitContent ? 0.0f : static_cast<float>(package->minWidthDip), decorationWidthDip_});
     }
     // 卡片上方留给阴影的 kShadowPadTop 与装饰盒重叠，装饰盒高过它时不再额外留白。
     float framePadTop = kShadowPadTop;
@@ -960,8 +991,39 @@ std::uint64_t CandidatePresenter::FillItemsFromUi()
         item.label = std::to_wstring(i + 1);
         item.text = string_to_wstring(view.text + view.badge);
         item.annotation = string_to_wstring(view.annotation);
+        item.overline = string_to_wstring(view.reading);
         if (translationsEnabled)
+        {
             item.translation = string_to_wstring(view.translation);
+            if (!view.translation_runs.empty())
+            {
+                item.translation.clear();
+                for (const auto &run : view.translation_runs)
+                {
+                    auto text = string_to_wstring(run.text);
+                    msimeui::CandidateList::TextSpan span;
+                    span.start = static_cast<uint32_t>(item.translation.size());
+                    span.length = static_cast<uint32_t>(text.size());
+                    span.opacity = run.muted ? 0.65f : 1.0f;
+                    if (run.kind == TranslationDisplayRun::Kind::PartOfSpeech)
+                    {
+                        span.color = translationPos_;
+                        span.selectedColor = selectedTranslationPos_;
+                    }
+                    else if (run.kind == TranslationDisplayRun::Kind::Separator)
+                    {
+                        span.color = translationSeparator_;
+                        span.selectedColor = selectedTranslationSeparator_;
+                    }
+                    if (span.color.a > 0.001f || span.selectedColor.a > 0.001f)
+                        span.opacity = 1.0f;
+                    if (run.fresh)
+                        span.color = D2D1::ColorF(0xed9409);
+                    item.translationSpans.push_back(span);
+                    item.translation += text;
+                }
+            }
+        }
         items.push_back(std::move(item));
     }
     ignoreSelectionCallback_ = true;
@@ -1408,9 +1470,10 @@ void CandidatePresenter::ShowFromGlobalState(POINT caret)
     ApplySkin();
     std::wstring preedit;
     size_t caretIndex = 0;
-    if (GetConfiguredCandidateWindowPreeditStyle() != "empty")
+    if (GetConfiguredCandidateWindowPreeditStyle() != "empty" ||
+        !Global::LoadCandidatePageSnapshot()->task_status.empty())
     {
-        preedit = GetPreeditWithCaretMarker();
+        preedit = GetCandidatePreeditWithTaskStatus();
         const size_t marker = preedit.find(L'\uE000');
         if (marker != std::wstring::npos)
         {
@@ -1508,6 +1571,11 @@ void CandidatePresenter::ShowFromGlobalState(POINT caret)
     PlaceAndShow(caret, widthDip, heightDip, cardLeftDip, cardTopDip, scale);
     ::is_global_wnd_cand_shown = true;
     Global::SetCandidateWindowRenderedVisible(true);
+    {
+        RECT bounds{};
+        if (GetWindowRect(hwnd_, &bounds))
+            Companion::SetCandidate(true, bounds);
+    }
     // PlaceAndShow paints synchronously, so the page is on screen now. Echo the generation of the
     // snapshot that was actually rendered (not the latest published one) so a pending digit/space
     // selection can settle against the same page the user is looking at.
@@ -1521,8 +1589,10 @@ void CandidatePresenter::Hide()
         return;
     }
     CloseContextMenu(false);
+    ResetDecorationMotion();
     ::is_global_wnd_cand_shown = false;
     Global::SetCandidateWindowRenderedVisible(false);
+    Companion::SetCandidate(false, RECT{});
     hoverArmed_ = false;
     wheelDeltaAccumulator_ = 0;
     if (impl_ && impl_->list)
@@ -1642,11 +1712,94 @@ void CandidatePresenter::ArmHoverIfPointerMoved()
     }
 }
 
+namespace
+{
+constexpr UINT_PTR kDecorationTimer = 0x4D534441;
+constexpr ULONGLONG kDecorationPulseMs = 320;
+} // namespace
+
+void CandidatePresenter::ResetDecorationMotion()
+{
+    if (hwnd_)
+        KillTimer(hwnd_, kDecorationTimer);
+    if (!impl_)
+        return;
+    impl_->decorationPressed = false;
+    impl_->decorationHovered = false;
+    impl_->decorationTilt = 0;
+    impl_->decorationPulseStart = 0;
+    if (impl_->decoration)
+        impl_->decoration->SetRenderPose(0, 0, 1);
+}
+
+bool CandidatePresenter::HandleDecorationMessage(UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message == WM_TIMER && wParam == kDecorationTimer)
+    {
+        const ULONGLONG elapsed = GetTickCount64() - impl_->decorationPulseStart;
+        if (!::is_global_wnd_cand_shown || elapsed >= kDecorationPulseMs)
+        {
+            KillTimer(hwnd_, kDecorationTimer);
+            impl_->decorationPulseStart = 0;
+            impl_->decoration->SetRenderPose(impl_->decorationTilt, impl_->decorationHovered ? -1.0f : 0.0f, 1);
+        }
+        else
+        {
+            const float phase = static_cast<float>(elapsed) / kDecorationPulseMs;
+            const float pulse = std::sin(phase * 3.14159265f);
+            impl_->decoration->SetRenderPose(impl_->decorationTilt + 2 * std::sin(phase * 6.2831853f) * (1 - phase),
+                                             -3 * pulse, 1 + 0.025f * pulse);
+        }
+        Present();
+        return true;
+    }
+    if (message != WM_MOUSEMOVE && message != WM_MOUSELEAVE && message != WM_LBUTTONDOWN && message != WM_LBUTTONUP)
+        return false;
+    BOOL animate = TRUE;
+    SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animate, 0);
+    if (!animate || !::is_global_wnd_cand_shown || !impl_->decoration || impl_->decoration->GetSource().empty())
+    {
+        ResetDecorationMotion();
+        return false;
+    }
+    const auto bounds = impl_->decoration->GetBounds();
+    const POINT clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    const auto point = impl_->window->ClientPixelsToDips(clientPoint);
+    const bool hit = message != WM_MOUSELEAVE && point.x >= bounds.x && point.x <= bounds.x + bounds.width &&
+                     point.y >= bounds.y && point.y <= bounds.y + bounds.height && !impl_->contextMenuOpen;
+    if (message == WM_MOUSEMOVE || message == WM_MOUSELEAVE)
+    {
+        impl_->decorationHovered = hit;
+        impl_->decorationTilt = hit && bounds.width > 0 ? 2 * (2 * (point.x - bounds.x) / bounds.width - 1) : 0;
+        if (!impl_->decorationPulseStart)
+            impl_->decoration->SetRenderPose(impl_->decorationTilt, hit ? -1.0f : 0.0f, 1);
+        // Still dispatch movement/leave to clear candidate hover and arm TRACKMOUSEEVENT.
+        return false;
+    }
+    if (message == WM_LBUTTONDOWN)
+    {
+        impl_->decorationPressed = hit;
+        return hit;
+    }
+    const bool pressed = impl_->decorationPressed;
+    impl_->decorationPressed = false;
+    if (pressed && hit)
+    {
+        impl_->decorationPulseStart = GetTickCount64();
+        SetTimer(hwnd_, kDecorationTimer, 16, nullptr);
+    }
+    return pressed || hit;
+}
+
 bool CandidatePresenter::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam)
 {
     if (!bound_ || !impl_ || !impl_->window)
     {
         return false;
+    }
+    if (HandleDecorationMessage(message, wParam, lParam))
+    {
+        return true;
     }
     switch (message)
     {

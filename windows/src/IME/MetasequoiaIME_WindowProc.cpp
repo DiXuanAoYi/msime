@@ -4,6 +4,7 @@
 #include "Private.h"
 #include "Globals.h"
 #include "MetasequoiaIME.h"
+#include "../../../engine/contracts/input_runtime_settings.h"
 #include "CandidateListUIPresenter.h"
 #include "CompositionProcessorEngine.h"
 #include "Compartment.h"
@@ -235,6 +236,15 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
 
     switch (message)
     {
+    case WM_ApplyRuntimeSettings:
+        // The atomic flag prevents new words immediately. An existing raw
+        // English word finishes at the next user commit boundary, so an async
+        // forced finalize cannot overtake queued letters.
+        break;
+    case NativeCommitUndo::CaptureMessage:
+        pIME->_CaptureNativeLastCommit(static_cast<uint64_t>(static_cast<uint32_t>(wParam)) |
+                                       (static_cast<uint64_t>(static_cast<uint32_t>(lParam)) << 32));
+        return 0;
     case WM_BareShiftRelease:
         pIME->_HandleHookedBareShiftRelease(static_cast<UINT>(wParam));
         return 0;
@@ -541,7 +551,7 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
                 _KEYSTROKE_STATE KeystrokeState;
                 KeystrokeState.Category = CATEGORY_CANDIDATE;
                 KeystrokeState.Function = FUNCTION_FINALIZE_CANDIDATELIST;
-                pIME->_InvokeKeyHandler(pContext, 0, 0, 0, KeystrokeState, FANY_IME_UNSOLICITED_REQUEST_ID,
+                pIME->_InvokeKeyHandler(pContext, 0, 0, 0, KeystrokeState, request.vocabularyRequestId,
                                         std::move(request.text), 0, request.compositionEpoch, request.focusToken);
                 pContext->Release();
             }
@@ -892,6 +902,9 @@ LRESULT CALLBACK CMetasequoiaIME_WindowProc(HWND hWnd, UINT message, WPARAM wPar
     case WM_RefreshLanguageBarTheme: {
         if (wParam != 0)
         {
+            if (auto *engine = pIME->GetCompositionProcessorEngine())
+                engine->SyncPunctuationWithCapsLock(pIME->_GetThreadMgr(), pIME->_GetClientId(),
+                                                    Global::CapsLockEnabled.load(std::memory_order_relaxed));
             pIME->_RefreshLanguageBarThemeIcons();
             break;
         }

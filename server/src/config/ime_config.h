@@ -1,7 +1,12 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include "english/personal_glossary.h"
+
 #include "engine/core/fuzzy_pinyin_options.h"
 #include "engine/core/scheme_type.h"
+#include "engine/ngram/octagram/octagram_gram.h"
 #include "engine/shuangpin/shuangpin_profile.h"
 #include <toml++/toml.h>
 #include <filesystem>
@@ -23,6 +28,7 @@ struct VoiceInputConfig
     // Empty means "infer from asr_app_key", which keeps configs written before this setting working.
     std::string doubao_auth_mode = "api_key";
     std::string asr_app_key;
+    std::string tencent_secret_id;
     std::string asr_token;
     // Per-provider tokens so switching ASR/polish providers restores the matching key.
     std::map<std::string, std::string> asr_tokens;
@@ -40,10 +46,12 @@ struct VoiceInputConfig
     std::map<std::string, std::string> polish_tokens;
     std::string polish_endpoint = "https://api.siliconflow.cn/v1/chat/completions";
     std::string polish_model;
+    std::string polish_thinking = "disabled";
     // cleanup | faithful | zh2en | casual | custom_1 | custom_2 | custom_3
     std::string polish_prompt_id = "cleanup";
     // Legacy single custom prompt. Retained for config compatibility.
     std::string polish_prompt;
+    std::string prompt_library;
     std::string polish_prompt_custom_1;
     std::string polish_prompt_custom_2;
     std::string polish_prompt_custom_3;
@@ -68,24 +76,29 @@ struct AiAssistantConfig
     std::map<std::string, std::string> tokens;
     std::string endpoint = "https://api.deepseek.com/chat/completions";
     std::string model = "deepseek-v4-flash";
+    std::string thinking = "disabled";
+    std::string task = "pinyin";
+    bool completion_enabled = false;
+    bool question_enabled = false;
     std::map<std::string, std::string> endpoints{{"deepseek", "https://api.deepseek.com/chat/completions"},
                                                  {"openai", "https://api.openai.com/v1/chat/completions"},
                                                  {"siliconflow", "https://api.siliconflow.cn/v1/chat/completions"},
                                                  {"groq", "https://api.groq.com/openai/v1/chat/completions"},
-                                                 {"custom", ""}};
-    // Groq 已弃用 llama-3.3-70b-versatile，默认模型改用 qwen/qwen3.8-27b。
-    // custom 槽位不预设接口地址和模型，全部由用户填写并单独保存。
+                                                 {"custom", ""},
+                                                 {"local", "http://127.0.0.1:11434/v1/chat/completions"}};
     std::map<std::string, std::string> models{{"deepseek", "deepseek-v4-flash"},
                                               {"openai", "gpt-4o-mini"},
                                               {"siliconflow", "Qwen/Qwen3-8B"},
                                               {"groq", "qwen/qwen3.8-27b"},
-                                              {"custom", ""}};
+                                              {"custom", ""},
+                                              {"local", ""}};
     int candidate_limit = 3;
     // custom_1 | custom_2 | custom_3
     std::string prompt_id = "custom_1";
     std::string prompt_custom_1;
     std::string prompt_custom_2;
     std::string prompt_custom_3;
+    std::string prompt_library;
     // Resolved active prompt. `prompt` is also retained as the legacy slot-one key.
     std::string prompt =
         R"PROMPT(你是一个中文全拼输入法联想引擎。输入为已经切分好的拼音数组、前文上下文和候选数量。
@@ -137,6 +150,26 @@ struct NiuTransConfig
     std::string apikey;
 };
 
+// Candidate translation is independent of input assistance, voice polish and Vision translation.
+// The default preserves the previous NiuTrans > Custom > Tencent legacy selection without enabling cloud lookup.
+struct CandidateTranslationConfig
+{
+    std::string provider = "legacy"; // legacy | dictionary | tencent | custom | niutrans | ai
+    std::string ai_provider = "deepseek";
+    std::string token;
+    std::string endpoint = "https://api.deepseek.com/chat/completions";
+    std::string model = "deepseek-v4-flash";
+    std::map<std::string, std::string> tokens;
+    std::map<std::string, std::string> endpoints = AiAssistantConfig{}.endpoints;
+    std::map<std::string, std::string> models = AiAssistantConfig{}.models;
+    TencentTmtConfig tencent;
+    CustomTranslationConfig custom;
+    NiuTransConfig niutrans;
+    uint64_t revision = 1;
+};
+CandidateTranslationConfig GetConfiguredCandidateTranslationSnapshot();
+bool SetConfiguredCandidateTranslationString(const std::string &key, const std::string &value);
+
 // [network] 段：云输入、模型下载、AI、翻译、语音等所有出站请求共用的代理设置。
 struct NetworkProxyConfig
 {
@@ -158,8 +191,8 @@ void NotifyImeServerCandidateSkinRefresh();
 void NotifyImeServerInputSchemeChanged();
 // 请求输入法后台进程重启（由 Watchdog 拉起）。返回是否成功送达。
 bool NotifyImeServerRestart();
-// 升级用：以新版模板为骨架重建配置。用户改过的值（与 baseline 中的旧默认值不同）保留，
-// 其余跟随新默认值；模板里没有的旧键被丢弃。baseline 为空时一律保留用户值。
+// Upgrade adds missing defaults, retaining all existing values and extension slots, including old defaults.
+// baseline_text remains accepted for older callers but never authorizes overwriting a persisted value.
 std::string MergeConfigIntoTemplate(const std::string &template_text, const std::string &user_text,
                                     const std::string &baseline_text);
 bool ReloadImeConfigIfChanged();
@@ -185,6 +218,10 @@ bool SetConfiguredDiagnosticLogEnabled(bool enabled);
 bool GetConfiguredTsfDiagnosticLogEnabled();
 bool SetConfiguredTsfDiagnosticLogEnabled(bool enabled);
 // 本机输入统计总开关，默认关闭：关闭时 Server 不创建也不写 stats.db。
+bool GetConfiguredVocabularyEnabled();
+bool SetConfiguredVocabularyEnabled(bool enabled);
+int GetConfiguredVocabularyRetentionDays();
+bool SetConfiguredVocabularyRetentionDays(int days);
 bool GetConfiguredStatisticsEnabled();
 bool SetConfiguredStatisticsEnabled(bool enabled);
 // 统计保留策略：forever|30d|90d|180d|365d，默认 forever。缺键或非法值一律回落
@@ -205,6 +242,19 @@ std::string GetConfiguredInputSchemeName();
 bool SetConfiguredInputScheme(const std::string &scheme);
 const std::string &GetConfiguredInputMode();
 bool SetConfiguredInputMode(const std::string &mode);
+const std::string &GetActiveInputMode();
+bool SetActiveInputMode(const std::string &mode);
+bool GetConfiguredTrilingualCycleEnabled();
+bool SetConfiguredTrilingualCycleEnabled(bool enabled);
+bool GetConfiguredWubiFourCodeAutoCommit();
+bool SetConfiguredWubiFourCodeAutoCommit(bool enabled);
+bool GetConfiguredWubiFifthCodeTopCommit();
+bool SetConfiguredWubiFifthCodeTopCommit(bool enabled);
+bool GetConfiguredVimModeForApplication(const std::string &application);
+std::shared_ptr<const std::string> GetConfiguredVimModeApps();
+bool SetConfiguredVimModeApps(const std::string &apps);
+gram::GrammarConfig GetConfiguredCollocationGrammar();
+bool SetConfiguredCollocationGrammar(const gram::GrammarConfig &config);
 bool GetConfiguredTrilingualCycleEnabled();
 bool SetConfiguredTrilingualCycleEnabled(bool enabled);
 // Runtime language during cycling; the saved preference remains GetConfiguredInputMode().
@@ -329,6 +379,10 @@ bool GetConfiguredQuanpinAutocorrectTransposition();
 bool SetConfiguredQuanpinAutocorrectTransposition(bool enabled);
 bool GetConfiguredQuanpinAutocorrectNeighbor();
 bool SetConfiguredQuanpinAutocorrectNeighbor(bool enabled);
+bool GetConfiguredQuanpinAutocorrectDeletion();
+bool SetConfiguredQuanpinAutocorrectDeletion(bool enabled);
+bool GetConfiguredQuanpinAutocorrectInsertion();
+bool SetConfiguredQuanpinAutocorrectInsertion(bool enabled);
 bool GetConfiguredQuanpinAutocorrectMarker();
 bool SetConfiguredQuanpinAutocorrectMarker(bool enabled);
 // Fuzzy pinyin rules are flat [input] booleans ("fuzzy_z_zh", ...) so the settings page can
@@ -369,6 +423,10 @@ bool GetConfiguredShowQuanpinHelpcodeInCandidateWindow();
 bool SetConfiguredShowQuanpinHelpcodeInCandidateWindow(bool enabled);
 bool GetConfiguredFloatingToolbarEnabled();
 bool SetConfiguredFloatingToolbarEnabled(bool enabled);
+bool GetConfiguredFloatingToolbarShadow();
+bool SetConfiguredFloatingToolbarShadow(bool enabled);
+const std::string &GetConfiguredCandidateFitContentMode();
+bool SetConfiguredCandidateFitContentMode(const std::string &mode);
 bool GetConfiguredCaretStateIndicatorEnabled();
 bool SetConfiguredCaretStateIndicatorEnabled(bool enabled);
 // Also announce the current mode when focus moves into another text field,
@@ -385,6 +443,9 @@ struct FloatingToolbarItemsConfig
     bool character_set = true;
     bool emoji = true;
     bool screen_keyboard = false;
+    bool voice = true;
+    bool reply = true;
+    bool clipboard = true;
     bool settings = true;
 };
 const FloatingToolbarItemsConfig &GetConfiguredFloatingToolbarItems();
@@ -405,6 +466,11 @@ bool GetConfiguredEnglishCandidatesEnabled();
 bool SetConfiguredEnglishCandidatesEnabled(bool enabled);
 bool GetConfiguredCandidateTranslationsEnabled();
 bool SetConfiguredCandidateTranslationsEnabled(bool enabled);
+bool GetConfiguredCandidateTranslationCloudEnabled();
+bool SetConfiguredCandidateTranslationCloudEnabled(bool enabled);
+std::shared_ptr<const EnglishIme::PersonalGlossary> GetConfiguredPersonalTranslationGlossary();
+uint64_t GetConfiguredPersonalTranslationGlossaryRevision();
+bool SetConfiguredPersonalTranslationGlossary(const std::string &text);
 int GetConfiguredEnglishMixedInputMinChars();
 bool SetConfiguredEnglishMixedInputMinChars(int min_chars);
 bool GetConfiguredEmojiMixedInputEnabled();
@@ -520,6 +586,8 @@ bool SetConfiguredCandidateWindowLayout(const std::string &layout);
 bool GetConfiguredCandidateWindowFollowCursor();
 bool SetConfiguredCandidateWindowFollowCursor(bool enabled);
 // 固定排位候选词徽标：总开关 + 样式枚举（"paperclip" | "pushpin" | "dot"）。
+bool GetConfiguredCandidateShowPinyin();
+bool SetConfiguredCandidateShowPinyin(bool enabled);
 bool GetConfiguredCandidateFixedBadge();
 bool SetConfiguredCandidateFixedBadge(bool enabled);
 const std::string &GetConfiguredCandidateFixedBadgeStyle();
@@ -535,6 +603,9 @@ const std::string &GetConfiguredUiBackend();
 bool SetConfiguredUiBackend(const std::string &backend);
 // Process-lifetime renderer chosen at InitImeConfig. Independent of later reloads.
 bool UseD2dSmallWindowUi();
+// Process-only recovery; never changes the user's requested backend in config.toml.
+void ActivateNativeSmallWindowFallback();
+bool IsNativeSmallWindowFallbackActive();
 // "fluent" | "wechat" | "graphite" | "willow_green" | "autumn_osmanthus" | "microsoft"
 // — candidate-window and floating-toolbar skin.
 const std::string &GetConfiguredCandidateSkin();
@@ -571,6 +642,16 @@ VoiceInputConfig GetConfiguredVoiceInput();
 bool SetConfiguredVoiceInputString(const std::string &key, const std::string &value);
 bool SetConfiguredVoiceInputBool(const std::string &key, bool value);
 const AiAssistantConfig &GetConfiguredAiAssistant();
+AiAssistantConfig GetConfiguredAiAssistantSnapshot();
+bool SetConfiguredLocalAiConnection(const std::string &endpoint, const std::string &model, const std::string &token,
+                                    bool enabled = true);
+bool GetConfiguredEnglishCandidates();
+bool SetConfiguredEnglishCandidates(bool enabled);
+std::shared_ptr<const std::string> GetConfiguredEnglishCandidateAppRules();
+bool SetConfiguredEnglishCandidateAppRules(const std::string &rules);
+bool GetConfiguredEnglishCandidatesForApplication(const std::string &application);
+std::shared_ptr<const std::string> GetConfiguredEnabledDomainDictionaries();
+bool SetConfiguredEnabledDomainDictionaries(const std::string &ids);
 const TencentTmtConfig &GetConfiguredTencentTmt();
 bool SetConfiguredTencentTmtString(const std::string &key, const std::string &value);
 const CustomTranslationConfig &GetConfiguredCustomTranslation();
@@ -591,3 +672,6 @@ bool SetConfiguredFrequencyAdjustmentInt(const std::string &key, int value);
 bool SetConfiguredAiAssistantString(const std::string &key, const std::string &value);
 bool SetConfiguredAiAssistantBool(const std::string &key, bool value);
 bool SetConfiguredAiAssistantInt(const std::string &key, int value);
+
+std::shared_ptr<const std::string> GetConfiguredDisabledTranslationDictionaries();
+bool SetConfiguredDisabledTranslationDictionaries(const std::string &ids);

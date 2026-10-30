@@ -1,139 +1,28 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { setupModelFetch } from './model-fetch';
-
-class FakeElement extends EventTarget {
-  textContent = '';
-  disabled = false;
-  dataset: Record<string, string> = {};
-  children: FakeElement[] = [];
-  className = '';
-  title = '';
-  classList = {
-    values: new Set<string>(),
-    add: (name: string) => { this.classList.values.add(name); },
-    remove: (name: string) => { this.classList.values.delete(name); },
-    contains: (name: string) => this.classList.values.has(name)
-  };
-  replaceChildren(...nodes: FakeElement[]): void {
-    this.children = nodes;
-  }
-  get childElementCount(): number {
-    return this.children.length;
-  }
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+const handlers=vi.hoisted(()=>new Map<string,(value:any)=>void>());
+vi.mock('../utils/host-messages',()=>({onHostMessage:(type:string,cb:(value:any)=>void)=>handlers.set(type,cb)}));
+import {setupModelFetch,modelDisplayName} from './model-fetch';
+class Element extends EventTarget {
+ value='';textContent='';id='';hidden=false;disabled=false;type='';title='';children:Element[]=[];parentElement?:Element;
+ attributes=new Map<string,string>();classes=new Set<string>();classList={add:(x:string)=>this.classes.add(x),remove:(x:string)=>this.classes.delete(x),contains:(x:string)=>this.classes.has(x),toggle:(x:string,on:boolean)=>on?this.classes.add(x):this.classes.delete(x)};
+ setAttribute(k:string,v:string){this.attributes.set(k,v);}removeAttribute(k:string){this.attributes.delete(k);}focus(){}scrollIntoView(){}
+ append(x:Element){x.parentElement=this;this.children.push(x);}replaceChildren(){this.children=[];}querySelectorAll(selector:string){return selector.includes(':not')?this.children.filter(x=>!x.hidden):this.children;}contains(x:Element){return x===this||this.children.includes(x);}click(){this.dispatchEvent(new Event('click'));}
 }
-
-let button: FakeElement;
-let status: FakeElement;
-let menu: FakeElement;
-let postMessage: ReturnType<typeof vi.fn>;
-let hostListener: ((event: Event & { data?: unknown }) => void) | undefined;
-
-beforeEach(() => {
-  button = new FakeElement();
-  button.textContent = '获取模型';
-  status = new FakeElement();
-  menu = new FakeElement();
-  postMessage = vi.fn();
-  vi.stubGlobal('document', {
-    getElementById: (id: string) => {
-      if (id === 'modelButton') return button;
-      if (id === 'modelStatus') return status;
-      if (id === 'modelMenu') return menu;
-      return null;
-    },
-    createElement: () => new FakeElement(),
-    querySelectorAll: () => []
-  });
-  vi.stubGlobal('window', {
-    chrome: { webview: {
-      postMessage,
-      addEventListener: (_type: string, listener: (event: Event & { data?: unknown }) => void) => {
-        hostListener = listener;
-      }
-    } }
-  });
-  vi.stubGlobal('MsimeProtocol', {
-    version: 1,
-    validate: () => true,
-    serializeClientMessage: (message: unknown) => JSON.stringify(message)
-  });
+let nodes:Map<string,Element>,post:ReturnType<typeof vi.fn>;
+beforeEach(()=>{handlers.clear();vi.useFakeTimers();nodes=new Map(['input','arrow','menu','fetch','status'].map(x=>[x,new Element()]));post=vi.fn();vi.stubGlobal('window',{chrome:{webview:{postMessage:post}}});vi.stubGlobal('document',{getElementById:(id:string)=>nodes.get(id),createElement:()=>new Element(),addEventListener:vi.fn()});});
+afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
+const setup=()=>setupModelFetch({inputId:'input',arrowId:'arrow',menuId:'menu',buttonId:'fetch',statusId:'status',service:()=> 'ai.assistant',readConfig:()=>({provider:'local',endpoint:'http://localhost:11434/v1/chat/completions',model:'manual-model',token:''})});
+it('does not query models or download on setup and keeps arbitrary input on failure',()=>{setup();expect(post).not.toHaveBeenCalled();nodes.get('input')!.value='my-own-name';nodes.get('fetch')!.click();const req=JSON.parse(post.mock.calls[0][0]);expect(req.type).toBe('apiModelList');expect(req.data.config.provider).toBe('local');handlers.get('apiModelListResult')!({requestId:req.data.requestId,ok:false,message:'list unsupported',models:[]});expect(nodes.get('input')!.value).toBe('my-own-name');expect(nodes.get('fetch')!.disabled).toBe(false);});
+it('uses escaped text, ArrowUp chooses last option and selection remains editable',()=>{setup();nodes.get('fetch')!.click();const req=JSON.parse(post.mock.calls[0][0]);handlers.get('apiModelListResult')!({requestId:req.data.requestId,ok:true,message:'ok',models:['model-a','<img onerror=bad>','model-z']});expect(nodes.get('menu')!.children[1].textContent).toBe('<img onerror=bad>');const event=new Event('keydown',{cancelable:true});Object.defineProperty(event,'key',{value:'ArrowUp'});nodes.get('input')!.dispatchEvent(event);const enter=new Event('keydown',{cancelable:true});Object.defineProperty(enter,'key',{value:'Enter'});nodes.get('input')!.dispatchEvent(enter);expect(nodes.get('input')!.value).toBe('model-z');nodes.get('input')!.value='custom-text';expect(nodes.get('input')!.value).toBe('custom-text');});
+it('provider reset rejects the earlier provider response',()=>{const reset=setup();nodes.get('fetch')!.click();const req=JSON.parse(post.mock.calls[0][0]);reset();handlers.get('apiModelListResult')!({requestId:req.data.requestId,ok:true,message:'old provider',models:['old-model']});expect(nodes.get('menu')!.children).toHaveLength(0);expect(nodes.get('status')!.textContent).toBe('');});
+it('timeout restores the manual model field',()=>{setup();nodes.get('input')!.value='offline-local';nodes.get('fetch')!.click();vi.advanceTimersByTime(20000);expect(nodes.get('fetch')!.disabled).toBe(false);expect(nodes.get('input')!.value).toBe('offline-local');expect(nodes.get('status')!.textContent).toContain('超时');});
+it('shows the current service display name while selecting the actual API ID',()=>{
+ setup();nodes.get('fetch')!.click();const req=JSON.parse(post.mock.calls[0][0]);
+ handlers.get('apiModelListResult')!({requestId:req.data.requestId,ok:true,message:'ok',models:['deepseek-flash'],modelDetails:[{id:'deepseek-flash',name:'DeepSeek-V4.1-Flash'}]});
+ expect(nodes.get('menu')!.children[0].textContent).toBe('DeepSeek-V4.1-Flash · deepseek-flash');
+ nodes.get('menu')!.children[0].click();expect(nodes.get('input')!.value).toBe('deepseek-flash');
 });
-
-afterEach(() => vi.unstubAllGlobals());
-
-function setup(): () => void {
-  return setupModelFetch({
-    buttonId: 'modelButton',
-    statusId: 'modelStatus',
-    menuId: 'modelMenu',
-    service: () => 'ai.assistant',
-    readConfig: () => ({ provider: 'groq', token: 'token', endpoint: 'https://api.groq.com/openai/v1/chat/completions' })
-  });
-}
-
-it('posts the current config and renders the returned models into the menu', () => {
-  setup();
-  button.dispatchEvent(new Event('click'));
-  expect(button.disabled).toBe(true);
-  expect(button.textContent).toBe('获取中…');
-  const request = JSON.parse(postMessage.mock.calls[0]![0]);
-  expect(request).toMatchObject({
-    type: 'apiModelList',
-    data: { service: 'ai.assistant', config: { provider: 'groq' } }
-  });
-
-  hostListener?.({ data: {
-    type: 'apiModelListResult', requestId: request.data.requestId,
-    ok: true, message: '获取成功', models: ['llama-3.3-70b-versatile', 'qwen/qwen3.8-27b']
-  } } as Event & { data?: unknown });
-
-  expect(button.disabled).toBe(false);
-  expect(button.textContent).toBe('获取模型');
-  expect(menu.children.map(item => item.dataset.value)).toEqual(['llama-3.3-70b-versatile', 'qwen/qwen3.8-27b']);
-  expect(status.textContent).toBe('获取到 2 个模型');
-  expect(status.dataset.kind).toBe('success');
-  expect(menu.classList.contains('open')).toBe(true);
-});
-
-it('keeps the menu untouched and reports the error when the query fails', () => {
-  setup();
-  button.dispatchEvent(new Event('click'));
-  const request = JSON.parse(postMessage.mock.calls[0]![0]);
-  hostListener?.({ data: {
-    type: 'apiModelListResult', requestId: request.data.requestId,
-    ok: false, message: '获取模型列表失败：HTTP 401', models: []
-  } } as Event & { data?: unknown });
-
-  expect(menu.children).toEqual([]);
-  expect(status.textContent).toBe('获取模型列表失败：HTTP 401');
-  expect(status.dataset.kind).toBe('error');
-});
-
-it('ignores results that do not match the pending request', () => {
-  setup();
-  button.dispatchEvent(new Event('click'));
-  hostListener?.({ data: {
-    type: 'apiModelListResult', requestId: 'stale', ok: true, message: '获取成功', models: ['x']
-  } } as Event & { data?: unknown });
-
-  expect(button.disabled).toBe(true);
-  expect(menu.children).toEqual([]);
-});
-
-it('drops an in-flight result after reset, such as on a provider switch', () => {
-  const reset = setup();
-  button.dispatchEvent(new Event('click'));
-  const request = JSON.parse(postMessage.mock.calls[0]![0]);
-  reset();
-  expect(button.disabled).toBe(false);
-  expect(button.textContent).toBe('获取模型');
-
-  hostListener?.({ data: {
-    type: 'apiModelListResult', requestId: request.data.requestId,
-    ok: true, message: '获取成功', models: ['llama-3.3-70b-versatile']
-  } } as Event & { data?: unknown });
-
-  expect(menu.children).toEqual([]);
-  expect(menu.classList.contains('open')).toBe(false);
-  expect(status.textContent).toBe('');
+it('does not invent an official model version for third-party endpoints',()=>{
+ expect(modelDisplayName('deepseek-flash',[],{provider:'deepseek',endpoint:'https://api.deepseek.com/chat/completions'})).toContain('V4.1');
+ expect(modelDisplayName('deepseek-flash',[],{provider:'custom',endpoint:'https://example.test/v1/chat/completions'})).toBe('deepseek-flash');
 });

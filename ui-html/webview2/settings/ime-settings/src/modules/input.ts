@@ -1,3 +1,11 @@
+import {setupCandidateTranslation, candidateTranslationSelection, selectCandidateTranslation, candidateTranslationAiConfig} from "./candidate-translation";
+export {applyCandidateTranslationConfig} from "./candidate-translation";
+import {setupInputAdvanced} from './input-advanced';
+import {renderTranslationServiceLinks} from './translation-service-links';
+import { setupVocabulary } from './vocabulary';
+export { applyVocabularyConfig } from './vocabulary';
+import { applyPersonalGlossaryConfig, setupPersonalGlossaryEditor } from './personal-glossary-editor';
+export { applyPersonalGlossaryConfig };
 import { serializeHostMessage } from '../../../../shared/messages';
 import { applyDropdownValue, applyToggleState, setFuzzyRuleOptionsDisabled, setSmartPunctuationOptionsDisabled, setupDropdownMenu, setupToggleButton } from './shared';
 import { updateConfig } from './config-sync';
@@ -9,7 +17,7 @@ import { hoistOverlay } from '../utils/overlay-host';
 type InputScheme = 'quanpin' | 'shuangpin' | 'wubi';
 type InputMode = 'chinese' | 'japanese';
 
-type TranslationProvider = 'tencent' | 'niutrans' | 'custom';
+type TranslationProvider = 'tencent' | 'niutrans' | 'custom' | 'ai' | 'dictionary';
 
 let applyingInputConfig = false;
 let customTranslationEnabled = false;
@@ -106,8 +114,6 @@ export function applyInputConfig(
   wubiSchema: string | undefined,
   wubiMixedPinyin?: boolean | undefined,
   wubiZMode?: string | undefined,
-  wubiFourCodeAutoCommit?: boolean | undefined,
-  wubiFifthCodeTopCommit?: boolean | undefined,
   defaultImeMode?: string | undefined,
   imeModeScope?: string | undefined,
   japaneseSchema?: string | undefined
@@ -136,12 +142,6 @@ export function applyInputConfig(
   if (typeof wubiZMode === 'string') {
     applyToggleState('wubiZModeToggleBtn', wubiZMode === 'wildcard');
   }
-  if (typeof wubiFourCodeAutoCommit === 'boolean') {
-    applyToggleState('wubiFourCodeAutoCommitToggleBtn', wubiFourCodeAutoCommit);
-  }
-  if (typeof wubiFifthCodeTopCommit === 'boolean') {
-    applyToggleState('wubiFifthCodeTopCommitToggleBtn', wubiFifthCodeTopCommit);
-  }
   applyDropdownValue('defaultImeModeBtn', 'defaultImeModeMenu', defaultImeMode);
   applyDropdownValue('imeModeScopeBtn', 'imeModeScopeMenu', imeModeScope);
   const japaneseRadio = document.querySelector<HTMLInputElement>(
@@ -169,11 +169,20 @@ export function applyFrequencyConfig(config: any): void {
   applyDropdownValue('frequencyLinearStepBtn', 'frequencyLinearStepMenu', String(config?.linear_step ?? 1));
 }
 
+export function applyTranslationCloudEnabled(enabled: boolean): void {
+  applyToggleState('candidateTranslationCloudToggleBtn', enabled);
+  // Provider discovery and registration must be available before opting in to network lookup.
+  const provider=document.getElementById('translationOnlineProvider');if(provider)provider.hidden=false;
+  const credentials=document.getElementById('translationOnlineCredentials');if(credentials)credentials.hidden=!enabled;
+}
+
 function syncCandidateTranslationOptions(enabled: boolean): void {
   document.getElementById('candidateTranslationApiOptions')?.classList.toggle('is-disabled', !enabled);
 }
 
 function activeTranslationProvider(): TranslationProvider {
+  const selected=candidateTranslationSelection();
+  if(selected!=='legacy')return selected;
   if (niutransTranslationEnabled) return 'niutrans';
   if (customTranslationEnabled) return 'custom';
   return 'tencent';
@@ -185,6 +194,7 @@ function inputValue(id: string): string {
 
 function translationTestConfig(): Record<string, string> {
   const provider = activeTranslationProvider();
+  if(provider==='ai')return candidateTranslationAiConfig();
   if (provider === 'niutrans') {
     return { appId: inputValue('niutransAppId'), apiKey: inputValue('niutransApiKey') };
   }
@@ -198,6 +208,8 @@ function syncCandidateTranslationWarning(): void {
   const warning = document.getElementById('candidateTranslationApiWarning');
   if (!warning) return;
   const provider = activeTranslationProvider();
+  if(provider==='dictionary') {warning.textContent='仅查询本地词典和个人译词，不发送在线请求';warning.classList.remove('is-hidden');return;}
+  if(provider==='ai') {const config=candidateTranslationAiConfig();warning.textContent=config.provider==='local'?'本地文本模型需已启动，Token 可留空；只补全本地词典未命中的词':'AI 翻译需要独立地址、模型和有效凭据；只补全本地词典未命中的词';warning.classList.remove('is-hidden');return;}
   if (provider === 'custom') {
     const endpoint = (document.getElementById('customTranslationEndpoint') as HTMLInputElement | null)?.value.trim();
     const valid = /^https?:\/\/\S+$/i.test(endpoint ?? '');
@@ -219,18 +231,21 @@ function syncCandidateTranslationWarning(): void {
 }
 
 function syncTranslationProviderView(provider: TranslationProvider): void {
+  renderTranslationServiceLinks('candidateTranslationProviderLinks',provider);
   const tencentFields = document.getElementById('tencentTranslationFields');
   const niutransFields = document.getElementById('niutransTranslationFields');
   const customFields = document.getElementById('customTranslationFields');
   if (tencentFields) tencentFields.hidden = provider !== 'tencent';
   if (niutransFields) niutransFields.hidden = provider !== 'niutrans';
   if (customFields) customFields.hidden = provider !== 'custom';
+  const aiFields=document.getElementById('candidateAiTranslationFields');if(aiFields)aiFields.hidden=provider!=='ai';
+  const test=document.getElementById('candidateTranslationTestButton') as HTMLButtonElement|null;if(test)test.disabled=provider==='dictionary';
   syncCandidateTranslationWarning();
 }
 
 function refreshTranslationProvider(): void {
   const provider = activeTranslationProvider();
-  applyDropdownValue('translationProviderBtn', 'translationProviderMenu', provider);
+  applyDropdownValue('translationProviderBtn', 'translationProviderMenu', candidateTranslationSelection());
   syncTranslationProviderView(provider);
 }
 
@@ -280,6 +295,13 @@ function setupSecretVisibility(inputId: string, buttonId: string, name: string):
 }
 
 export function setupInput(): void {
+  setupInputAdvanced();
+  setupVocabulary(updateConfig);
+  setupPersonalGlossaryEditor(text => updateConfig('general.personal_translation_glossary', text));
+  setupToggleButton('candidateTranslationCloudToggleBtn', (active) => {
+    applyTranslationCloudEnabled(active);
+    updateConfig('general.candidate_translation_cloud', active);
+  });
   document.querySelectorAll<HTMLInputElement>('input[name="input-mode"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       if (applyingInputConfig) return;
@@ -338,13 +360,6 @@ export function setupInput(): void {
   setupToggleButton('wubiZModeToggleBtn', (active) => {
     updateConfig('input.wubi_z_mode', active ? 'wildcard' : 'off');
   });
-  // 两个上屏开关彼此独立，各自只写自己的键：默认都开，关掉一个不影响另一个。
-  setupToggleButton('wubiFourCodeAutoCommitToggleBtn', (active) => {
-    updateConfig('input.wubi_four_code_auto_commit', active);
-  });
-  setupToggleButton('wubiFifthCodeTopCommitToggleBtn', (active) => {
-    updateConfig('input.wubi_fifth_code_top_commit', active);
-  });
 
   setupPageOptions();
   setupFrequencyOptions();
@@ -370,6 +385,12 @@ export function setupInput(): void {
   });
   setupToggleButton('autocorrectNeighborToggleBtn', (active) => {
     updateConfig('quanpin.autocorrect_neighbor', active);
+  });
+  setupToggleButton('autocorrectDeletionToggleBtn', (active) => {
+    updateConfig('quanpin.autocorrect_deletion', active);
+  });
+  setupToggleButton('autocorrectInsertionToggleBtn', (active) => {
+    updateConfig('quanpin.autocorrect_insertion', active);
   });
   setupToggleButton('autocorrectMarkerToggleBtn', (active) => {
     updateConfig('quanpin.autocorrect_marker', active);
@@ -400,17 +421,11 @@ export function setupInput(): void {
   document.getElementById('translationProviderMenu')?.addEventListener('click', (event: Event) => {
     const item = (event.target as HTMLElement | null)?.closest<HTMLElement>('.dropdown-item');
     if (!item) return;
-    const provider: TranslationProvider = item.dataset.value === 'niutrans'
-      ? 'niutrans'
-      : item.dataset.value === 'custom'
-        ? 'custom'
-        : 'tencent';
-    niutransTranslationEnabled = provider === 'niutrans';
-    customTranslationEnabled = provider === 'custom';
-    syncTranslationProviderView(provider);
-    // Only one provider is active; keep the mutually-exclusive flags in sync.
-    updateConfig('niutrans.enabled', niutransTranslationEnabled);
-    updateConfig('custom_translation.enabled', customTranslationEnabled);
+    const value=item.dataset.value;
+    const provider=['legacy','dictionary','tencent','custom','niutrans','ai'].includes(value??'')?value as 'legacy'|'dictionary'|'tencent'|'custom'|'niutrans'|'ai':'legacy';
+    // Keep legacy credentials/flags intact; the new explicit selector is the only effective provider.
+    selectCandidateTranslation(provider);
+
   });
   const translationFields: Record<string, string> = {
     tencentTmtSecretId: 'tencent_tmt.secret_id',
@@ -428,13 +443,14 @@ export function setupInput(): void {
       syncCandidateTranslationWarning();
     });
   });
+  setupCandidateTranslation(refreshTranslationProvider);
   setupSecretVisibility('tencentTmtSecretKey', 'tencentTmtSecretKeyVisibility', 'SecretKey');
   setupSecretVisibility('niutransApiKey', 'niutransApiKeyVisibility', 'API Key');
   setupSecretVisibility('customTranslationApiKey', 'customTranslationApiKeyVisibility', 'API Key');
   setupCredentialTest(
     'candidateTranslationTestButton',
     'candidateTranslationTestStatus',
-    () => `translation.${activeTranslationProvider()}`,
+    () => {const provider=activeTranslationProvider();return provider==='dictionary'?'translation.tencent':`translation.${provider}`;},
     translationTestConfig
   );
   setupToggleButton('cloudCandidatesToggleBtn', (active) => {

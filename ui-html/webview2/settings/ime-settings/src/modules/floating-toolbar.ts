@@ -5,7 +5,7 @@ import { syncAppearancePreviews } from './skin';
 import { applyToolbarIconGlyphFallbacks } from './toolbar-icon-glyphs';
 import ftbHTML from '../../../../ftb/default.html?raw';
 
-type FloatingToolbarItem = 'fullwidth' | 'punctuation' | 'character_set' | 'emoji' | 'screen_keyboard' | 'settings';
+type FloatingToolbarItem = 'fullwidth' | 'punctuation' | 'character_set' | 'emoji' | 'screen_keyboard' | 'voice' | 'reply' | 'clipboard' | 'settings';
 type FloatingToolbarItemsConfig = Partial<Record<FloatingToolbarItem, boolean>>;
 
 const toolbarItems: FloatingToolbarItem[] = [
@@ -14,6 +14,9 @@ const toolbarItems: FloatingToolbarItem[] = [
   'character_set',
   'emoji',
   'screen_keyboard',
+  'voice',
+  'reply',
+  'clipboard',
   'settings'
 ];
 
@@ -23,6 +26,9 @@ const toolbarItemState: Record<FloatingToolbarItem, boolean> = {
   character_set: true,
   emoji: true,
   screen_keyboard: false,
+  voice: true,
+  reply: true,
+  clipboard: true,
   settings: true
 };
 
@@ -40,6 +46,7 @@ export function setupFloatingToolbar(): void {
   syncCaretStateIndicatorPreview();
   syncAppearancePreviews();
 
+  setupToggleButton('ftbShadowToggleBtn',active=>{updateConfig('general.floating_toolbar_shadow',active);applyFloatingToolbarShadow(active);});
   setupToggleButton('ftbToggleBtn', (active) => {
     updateConfig('general.floating_toolbar', active);
     document.getElementById('ftbToggleBtn')?.setAttribute('aria-checked', String(active));
@@ -242,3 +249,5 @@ function applyPreviewAppearance(): void {
   host.style.setProperty('--ftb-scale', String(toolbarScale));
   host.style.setProperty('--ftb-icon-size', `${toolbarFontSize}px`);
 }
+
+export function applyFloatingToolbarShadow(enabled?:boolean):void {if(typeof enabled!=='boolean')return;applyToggleState('ftbShadowToggleBtn',enabled);document.querySelectorAll<HTMLElement>('.ftb-preview-host').forEach(host=>host.style.setProperty('--msime-ftb-shadow',enabled?'4px 4px 4px rgba(0,0,0,.4)':'none'));}

@@ -607,7 +607,32 @@
           "punct": 10,
           "other": 0
         },
-        "todayHourly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 5, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "todayHourly": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          5,
+          12,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
         "daily": [
           {
             "dayKey": 20260919,
@@ -720,7 +745,32 @@
           "punct": 0,
           "other": 0
         },
-        "todayHourly": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "todayHourly": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
         "daily": []
       }
     },
@@ -786,5 +836,953 @@
     "direction": "client",
     "surface": "settings",
     "valid": false
+  },
+  {
+    "name": "vocabulary overview request",
+    "message": {
+      "type": "vocabularyRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "v1",
+        "action": "overview"
+      }
+    },
+    "direction": "client",
+    "surface": "settings",
+    "valid": true
+  },
+  {
+    "name": "vocabulary rejects unrecognized action",
+    "message": {
+      "type": "vocabularyRequest",
+      "data": {
+        "requestId": "v1",
+        "action": "deleteFile"
+      }
+    },
+    "direction": "client",
+    "surface": "settings",
+    "valid": false
+  },
+  {
+    "name": "vocabulary request restricted to settings",
+    "message": {
+      "type": "vocabularyRequest",
+      "data": {
+        "requestId": "v1",
+        "action": "clear"
+      }
+    },
+    "direction": "client",
+    "surface": "candidate",
+    "valid": false
+  },
+  {
+    "name": "vocabulary response",
+    "message": {
+      "type": "vocabularyResponse",
+      "protocolVersion": 1,
+      "requestId": "v1",
+      "action": "overview",
+      "ok": true,
+      "message": "ok",
+      "rows": [
+        {
+          "language": "en",
+          "word": "develop",
+          "seen": 3,
+          "selected": 2,
+          "used": 1,
+          "last": 1
+        }
+      ]
+    },
+    "direction": "server",
+    "valid": true
+  },
+  {
+    "name": "reply generate scoped payload",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "generate",
+        "mode": "high_eq",
+        "incoming": "hello",
+        "count": 3
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply invalid action",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply invalid count",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "generate",
+        "count": 4
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply group context save",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "save",
+        "sessionId": "g1",
+        "kind": "group",
+        "platform": "WeChat",
+        "context": "Alice: hello"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply invalid session kind",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "r1",
+        "action": "save",
+        "kind": "unknown"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply results",
+    "message": {
+      "type": "assistantResponse",
+      "requestId": "r1",
+      "action": "generate",
+      "ok": true,
+      "message": "done",
+      "replies": [
+        {
+          "label": "friendly",
+          "text": "hello"
+        }
+      ]
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "reply result missing text",
+    "message": {
+      "type": "assistantResponse",
+      "requestId": "r1",
+      "action": "generate",
+      "ok": true,
+      "message": "done",
+      "replies": [
+        {
+          "label": "friendly"
+        }
+      ]
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "chat scan",
+    "message": {
+      "type": "chatRequest",
+      "data": {
+        "action": "scan",
+        "requestId": "c1"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat cannot send",
+    "message": {
+      "type": "chatRequest",
+      "data": {
+        "action": "send",
+        "requestId": "c1"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat cannot inject snapshot",
+    "message": {
+      "type": "chatRequest",
+      "data": {
+        "action": "poll",
+        "requestId": "c1",
+        "windows": []
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat model isolated origin",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "action": "generate",
+        "requestId": "c1",
+        "origin": "chat",
+        "mode": "high_eq",
+        "incoming": "hello",
+        "count": 3
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "chat scan response",
+    "message": {
+      "type": "chatResponse",
+      "requestId": "c1",
+      "action": "scan",
+      "ok": true,
+      "message": "done",
+      "windows": []
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "toolbar voice",
+    "message": {
+      "type": "voiceInput"
+    },
+    "valid": true,
+    "surface": "toolbar",
+    "direction": "client"
+  },
+  {
+    "name": "toolbar reply",
+    "message": {
+      "type": "openReplyStudio"
+    },
+    "valid": true,
+    "surface": "toolbar",
+    "direction": "client"
+  },
+  {
+    "name": "reply cannot open on candidate",
+    "message": {
+      "type": "openReplyStudio"
+    },
+    "valid": false,
+    "surface": "candidate",
+    "direction": "client"
+  },
+  {
+    "name": "explicit rewrite task",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "test",
+        "action": "generate",
+        "task": "rewrite",
+        "length": "short",
+        "relationship": "同事",
+        "incoming": "原文",
+        "mode": "polish"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reject automatic send task",
+    "message": {
+      "type": "assistantRequest",
+      "data": {
+        "requestId": "test",
+        "action": "generate",
+        "task": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "dictionary catalog list",
+    "message": {
+      "type": "dictionaryLibraryRequest",
+      "data": {
+        "requestId": "one",
+        "action": "list"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "dictionary export cannot supply a filesystem destination",
+    "message": {
+      "type": "dictionaryLibraryRequest",
+      "data": {
+        "requestId": "one",
+        "action": "export",
+        "id": "study-cet4",
+        "path": "C:/secret"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "candidate speak translation",
+    "message": {
+      "type": "candidateSpeak",
+      "data": {
+        "index": 2,
+        "translation": true
+      }
+    },
+    "valid": true,
+    "surface": "candidate",
+    "direction": "client"
+  },
+  {
+    "name": "candidate speak rejects bad index",
+    "message": {
+      "type": "candidateSpeak",
+      "data": {
+        "index": 0,
+        "translation": true
+      }
+    },
+    "valid": false,
+    "surface": "candidate",
+    "direction": "client"
+  },
+  {
+    "name": "candidate speak rejects settings surface",
+    "message": {
+      "type": "candidateSpeak",
+      "data": {
+        "index": 2,
+        "translation": true
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "dictionary catalog metadata",
+    "message": {
+      "type": "dictionaryLibraryResponse",
+      "requestId": "one",
+      "ok": true,
+      "message": "",
+      "books": [
+        {
+          "id": "study-zk",
+          "name": "中考 / 初中",
+          "category": "学习",
+          "language": "中英双向",
+          "source": "https://github.com/skywind3000/ECDICT",
+          "version": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+          "license": "MIT",
+          "note": "依据上游历史标签筛选，非最新官方考试大纲；词典间可能重叠。",
+          "entries": 8633,
+          "headwords": 1603,
+          "bytes": 270831,
+          "sha256": "ab725cfcb20b51b653aa3e27e0771b21a0018abefcd8138cc4ca380942994cc3",
+          "enabled": true
+        }
+      ]
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "speech preview",
+    "message": {
+      "type": "speechRequest",
+      "data": {
+        "requestId": "test",
+        "action": "preview",
+        "text": "你好",
+        "language": "zh"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "speech no send",
+    "message": {
+      "type": "speechRequest",
+      "data": {
+        "requestId": "test",
+        "action": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "tts status",
+    "message": {
+      "type": "localTtsRequest",
+      "data": {
+        "requestId": "test",
+        "action": "status"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "tts download explicit",
+    "message": {
+      "type": "localTtsRequest",
+      "data": {
+        "requestId": "test",
+        "action": "download",
+        "modelId": "kokoro"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "tts unknown action",
+    "message": {
+      "type": "localTtsRequest",
+      "data": {
+        "requestId": "test",
+        "action": "autoDownloadAll"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio generation parameters",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "generate",
+        "text": "今天见",
+        "language": "zh",
+        "voice": "Eric",
+        "rate": 1,
+        "optionsJson": "{\"chunk_size\":6}"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio explicit file copy",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "copy",
+        "artifactId": "draft-id"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio explicit device route",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "route",
+        "artifactId": "draft-id",
+        "deviceId": 2
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio has no chat send operation",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "send"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio rejects invalid speed",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "generate",
+        "text": "hello",
+        "rate": 3
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "studio rejects invalid output device",
+    "message": {
+      "type": "voiceStudioRequest",
+      "data": {
+        "requestId": "test-studio",
+        "action": "route",
+        "deviceId": -1
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "temporary configuration boolean only snapshot",
+    "message": {
+      "type": "configSnapshot",
+      "data": {
+        "environment": {
+          "temporary_configuration": true
+        }
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "legacy snapshot has no environment metadata",
+    "message": {
+      "type": "configSnapshot",
+      "data": {}
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "temporary configuration rejects string boolean",
+    "message": {
+      "type": "configSnapshot",
+      "data": {
+        "environment": {
+          "temporary_configuration": "true"
+        }
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "temporary configuration does not disclose profile paths",
+    "message": {
+      "type": "configSnapshot",
+      "data": {
+        "environment": {
+          "temporary_configuration": true,
+          "path": "private"
+        }
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "optional domain warning leaves original library operation successful",
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-putClip-1",
+      "ok": true,
+      "message": "",
+      "domainWarning": "optional pack unavailable",
+      "book": {
+        "clips": []
+      },
+      "books": []
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "domain catalog rejects a null pack",
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "domains-domainCatalog-1",
+      "ok": true,
+      "message": "",
+      "books": [
+        null
+      ]
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "domain catalog requires pack metrics for rendering",
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "domains-domainCatalog-1",
+      "ok": true,
+      "message": "",
+      "books": [
+        {
+          "id": "idioms",
+          "name": "idioms"
+        }
+      ]
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "domain catalog accepts complete pack metadata",
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "domains-domainCatalog-1",
+      "ok": true,
+      "message": "",
+      "books": [
+        {
+          "id": "idioms",
+          "name": "idioms",
+          "entries": 1,
+          "bytes": 24,
+          "license": "MIT",
+          "source": "fixture",
+          "version": "v1",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "exportable": true
+        }
+      ]
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "server"
+  },
+  {
+    "name": "named current model IDs",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "apiModelListResult",
+      "requestId": "models-fixture",
+      "ok": true,
+      "message": "ok",
+      "models": [
+        "deepseek-flash"
+      ],
+      "modelDetails": [
+        {
+          "id": "deepseek-flash",
+          "name": "DeepSeek-V4.1-Flash"
+        }
+      ]
+    }
+  },
+  {
+    "name": "question answer with separate structure explanation",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "aiTaskResult",
+      "requestId": "question-fixture",
+      "ok": true,
+      "task": "question",
+      "message": "ok",
+      "completion": "",
+      "answers": [
+        {
+          "text": "草",
+          "pinyin": "cǎo",
+          "source": "本地 IDS 字形表",
+          "explanation": "艹在上，早在下"
+        }
+      ]
+    }
+  },
+  {
+    "name": "clear clipboard history scoped settings",
+    "surface": "settings",
+    "direction": "client",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryRequest",
+      "data": {
+        "requestId": "library-clear-fixture",
+        "action": "clearHistory"
+      }
+    }
+  },
+  {
+    "name": "clipboard copy count response",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": 12
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard rejects zero count",
+    "surface": "settings",
+    "direction": "server",
+    "valid": false,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": 0
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard rejects overflow count",
+    "surface": "settings",
+    "direction": "server",
+    "valid": false,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": 2147483648
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard rejects string count",
+    "surface": "settings",
+    "direction": "server",
+    "valid": false,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-status-count",
+      "ok": true,
+      "message": "已读取",
+      "history": [
+        "测试\n😀"
+      ],
+      "historyEntries": [
+        {
+          "text": "测试\n😀",
+          "copies": "12"
+        }
+      ]
+    }
+  },
+  {
+    "name": "clipboard edit preserves text identity",
+    "surface": "settings",
+    "direction": "client",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryRequest",
+      "data": {
+        "requestId": "library-edit-fixture",
+        "action": "editHistory",
+        "previousText": "原文\n😀",
+        "text": "修改后的文字"
+      }
+    }
+  },
+  {
+    "name": "poetry quote catalog response",
+    "surface": "settings",
+    "direction": "server",
+    "valid": true,
+    "message": {
+      "type": "personalLibraryResponse",
+      "requestId": "library-quoteCatalog-fixture",
+      "ok": true,
+      "message": "",
+      "quoteEntries": [
+        {
+          "id": "poetry-1",
+          "name": "青简 · 诗词名句",
+          "text": "海内存知己"
+        }
+      ]
+    }
+  },
+  {
+    "name": "reply profile get",
+    "message": {
+      "type": "replyProfileRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "r1",
+        "action": "get"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "reply profile unknown action",
+    "message": {
+      "type": "replyProfileRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "r1",
+        "action": "drop"
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "quick action run",
+    "message": {
+      "type": "quickActionRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "q1",
+        "action": "run",
+        "id": "ocr"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "quick action extra field",
+    "message": {
+      "type": "quickActionRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "q1",
+        "action": "run",
+        "id": "ocr",
+        "x": 1
+      }
+    },
+    "valid": false,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "vision history",
+    "message": {
+      "type": "visionRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "v1",
+        "action": "history"
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
+  },
+  {
+    "name": "pin clipboard entry",
+    "message": {
+      "type": "personalLibraryRequest",
+      "protocolVersion": 1,
+      "data": {
+        "requestId": "p1",
+        "action": "pinHistory",
+        "text": "a",
+        "enabled": true
+      }
+    },
+    "valid": true,
+    "surface": "settings",
+    "direction": "client"
   }
 ]

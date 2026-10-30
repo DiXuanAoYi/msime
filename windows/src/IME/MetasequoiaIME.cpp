@@ -296,7 +296,6 @@ CMetasequoiaIME::CMetasequoiaIME()
     _nextDeferredKeyReplayToken = 0;
     _deferredKeyProjectionValid = false;
     _deferredProjectedImeOpen = false;
-    _deferredProjectedJapaneseMode = false;
     _deferredProjectedPunctuationOpen = false;
     _deferredProjectedDoubleSingleByteOpen = false;
     _deferredProjectedInputLength = 0;
@@ -334,6 +333,7 @@ thread_local CMetasequoiaIME *CMetasequoiaIME::_bareShiftHookOwner = nullptr;
 
 CMetasequoiaIME::~CMetasequoiaIME()
 {
+    _ClearLastCommit();
     _UninitBareShiftKeyboardHook();
     _ClearDeferredKeyDowns();
     // Deactivate normally owns the unbind.  Keep this owner-aware fallback for
@@ -937,6 +937,8 @@ ExitError:
 
 STDAPI CMetasequoiaIME::Deactivate()
 {
+    _undoKeyHeld = false;
+    _ClearLastCommit();
     _UninitBareShiftKeyboardHook();
     Global::HostUiLessMode = false;
     Global::CandidateUiLessMode = false;

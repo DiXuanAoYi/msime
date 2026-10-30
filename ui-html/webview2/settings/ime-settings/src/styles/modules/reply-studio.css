@@ -1,0 +1,229 @@
+.studio {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.studio h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  line-height: 1.4;
+}
+.studio p {
+  margin: 0;
+  line-height: 1.7;
+}
+.studio-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: start;
+}
+.studio-heading p,
+.studio-note {
+  font-size: 13px;
+  color: var(--text-secondary, #999);
+}
+.studio label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  min-width: 0;
+}
+.studio input,
+.studio select,
+.studio textarea {
+  font: inherit;
+  color: var(--text-color);
+  background: var(--control-bg);
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+.studio textarea {
+  resize: vertical;
+  line-height: 1.7;
+}
+.studio select option {
+  background: var(--card-bg-solid);
+  color: var(--text-color);
+}
+.studio button {
+  font: inherit;
+  font-size: 13px;
+  padding: 9px 13px;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.14);
+  color: inherit;
+  cursor: pointer;
+  white-space: normal;
+}
+.studio button:hover {
+  background: rgba(140, 130, 225, 0.23);
+}
+.studio button:focus-visible,
+.studio input:focus-visible,
+.studio textarea:focus-visible,
+.studio select:focus-visible {
+  outline: 2px solid #938de3;
+  outline-offset: 2px;
+}
+.studio-primary {
+  background: #6a63ba !important;
+  color: white !important;
+}
+.studio button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.studio-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(110px, 1fr);
+  gap: 16px;
+}
+.studio-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.studio-toolbar > label:first-child {
+  flex: 1;
+  min-width: 150px;
+}
+.studio-checks {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.studio-checks label {
+  flex-direction: row;
+  align-items: center;
+}
+.studio-checks input {
+  width: auto;
+}
+.studio details {
+  border: 1px solid rgba(127, 127, 127, 0.2);
+  padding: 14px;
+  border-radius: 10px;
+}
+.studio summary {
+  cursor: pointer;
+  line-height: 1.8;
+}
+.studio details[open] > label,
+.studio details[open] > .studio-toolbar {
+  margin-top: 14px;
+}
+.studio-file input {
+  font-size: 12px;
+}
+.studio-confirm {
+  padding: 12px;
+  border: 1px solid #ba9763;
+  border-radius: 8px;
+}
+.studio [hidden] {
+  display: none !important;
+}
+.studio-replies {
+  display: grid;
+  gap: 12px;
+}
+.studio-reply {
+  padding: 16px;
+  border: 1px solid rgba(140, 130, 225, 0.3);
+  border-radius: 10px;
+  background: rgba(140, 130, 225, 0.05);
+}
+.studio-reply h3 {
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+.studio-reply p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-bottom: 12px !important;
+}
+#rsStatus {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary, #aaa);
+  min-height: 22px;
+}
+@media (max-width: 620px) {
+  .studio-heading {
+    flex-direction: column;
+  }
+  .studio-grid {
+    grid-template-columns: 1fr;
+  }
+  .studio {
+    padding: 18px;
+  }
+  .studio-toolbar button {
+    flex-grow: 1;
+  }
+}
+
+.studio-chat-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 20rem;
+  overflow: auto;
+  font: inherit;
+}
+.studio-monitor {
+  margin-block: 1rem;
+}
+.studio-quick-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.studio-context-badge {
+  padding: 10px 14px;
+  border-left: 3px solid #938de3;
+  background: rgba(140, 130, 225, 0.09);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+#rsIncoming { min-height: 130px; }
+#rsGenerate { min-width: 160px; }
+#rsReplies:empty::before {
+  content: "生成后，这里会显示不同策略的回复。可以逐条复制，也可以选入草稿再修改。";
+  display: block;
+  padding: 20px;
+  border: 1px dashed rgba(140, 130, 225, 0.35);
+  border-radius: 10px;
+  color: var(--text-secondary, #999);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.studio-monitor select {
+  max-width: 100%;
+}
+.studio-stale {
+  opacity: 0.75;
+  border-style: dashed;
+}
+.studio label.studio-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  line-height: 1.6;
+}
+.studio label.studio-check input[type="checkbox"] {
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 0.3rem;
+}
+
+.studio-actions { position: sticky; bottom: 0; z-index: 2; padding: 12px 0; background: var(--card-bg-solid, #222); border-top: 1px solid rgba(127,127,127,.2); }

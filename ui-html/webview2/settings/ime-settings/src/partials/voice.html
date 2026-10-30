@@ -1,11 +1,79 @@
 <div class="content" id="voice-settings">
-  <div class="content-header"><span>语音输入</span></div>
-
-  <div class="section voice-section">
+<div class="qp"><header class="phead">
+  <div><h1>语音与发音</h1><p class="lead">按住快捷键说话，松开就上屏。下面可以直接试，改了设置马上能听到效果。</p></div>
+  <div class="phead-side"><button class="btn sm" type="button" data-open-conn="">服务连接</button><span class="chip off" data-chip="voiceAsr" hidden></span><span class="chip off" data-chip="voicePolish" hidden></span></div>
+</header></div>
+<div class="voice-nav" role="tablist" aria-label="语音功能"><button type="button" role="tab" id="voiceTab-recognition" data-voice-target="input" aria-controls="voicePane-recognition" aria-selected="true">语音输入</button><button type="button" role="tab" id="voiceTab-speech" data-voice-target="tts" aria-controls="voicePane-speech" aria-selected="false" tabindex="-1">朗读发音</button><button type="button" role="tab" id="voiceTab-studio" data-voice-target="studio" aria-controls="voicePane-studio" aria-selected="false" tabindex="-1">语音消息</button><button type="button" role="tab" id="voiceTab-models" data-voice-target="models" aria-controls="voicePane-models" aria-selected="false" tabindex="-1">本地模型</button></div>
+<div id="voicePane-speech" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-speech" data-voice-pane="tts" hidden>
+<details class="section voice-section" id="speechPanel" open>
+    <summary class="section-title">候选发音 · 文字转语音</summary>
+    <p class="voice-description">按住 Ctrl 点击原词或译文朗读，不会上屏。默认离线；切换云服务后仅发送你点击的文字。</p>
+    <label><input type="checkbox" id="speech-enabled" checked> 启用 Ctrl 点击发音</label>
+    <div class="speech-fields"><label class="speech-field">发音引擎<select id="speech-provider"></select></label>
+    <label class="speech-field">语速（0.5–2 倍）<input id="speech-rate" type="number" min="0.5" max="2" step="0.1" value="1"></label>
+    <label class="speech-field">音量（0–100）<input id="speech-volume" type="number" min="0" max="100" value="100"></label></div>
+    <p id="speechProviderNote" class="voice-description"></p><div id="speechLinks" class="local-asr-actions"></div>
+    <div id="speechFields" class="speech-fields"></div>
+    <details id="speechModelControlsPanel"><summary>当前模型 · 方言与高级参数</summary><div id="speechModelControls"></div></details>
+    <label class="speech-field">试听文本<textarea id="speechText" rows="2" maxlength="600">你好，欢迎使用知语输入法。</textarea></label>
+    <div class="local-asr-actions"><select id="speechLanguage" aria-label="试听语言"><option value="zh">中文</option><option value="en">English</option></select><button type="button" id="speechPreview" class="credential-test-button">试听 / 测试连接</button><button type="button" id="speechStop" class="credential-test-button">停止朗读</button></div>
+    <p id="speechStatus" role="status" class="voice-description"></p>
+    
+  </details>
+</div>
+<div id="voicePane-studio" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-studio" data-voice-pane="studio" hidden>
+<details class="section voice-section" id="voiceStudioPanel">
+    <summary class="section-title">语音工作台 · 语音发送 / 转方言</summary>
+    <p class="voice-description">先录音或导入音频，在本机识别为文字；检查文字并选择音色后生成语音。也可以直接输入文字。不会自动上屏或发送消息。</p>
+    <div class="local-asr-actions"><button id="studioRecord" type="button" class="credential-test-button">开始录音</button><button id="studioRecordStop" type="button" class="credential-test-button" disabled>结束录音</button><button id="studioImport" type="button" class="credential-test-button">导入音频</button><button id="studioTranscribe" type="button" class="credential-test-button" disabled>本地识别成文字</button></div>
+    <p id="studioDuration" class="voice-description">输入音频：0 秒 · 已生成：0 秒</p>
+    <label class="speech-field">要发送的内容 / 可编辑识别结果<textarea id="studioText" rows="4" maxlength="2000" placeholder="识别完成后请检查，也可以直接粘贴要说的话。"></textarea></label>
+    <p id="studioBytes" class="voice-description"></p><p id="studioProvider" class="voice-description"></p>
+    <div class="speech-fields"><label class="speech-field">语言<select id="studioLanguage"></select></label><label class="speech-field">音色 / 方言<select id="studioVoice"></select></label><label class="speech-field">语速<input id="studioRate" type="number" min="0.5" max="2" step="0.1" value="1"></label></div>
+    <p id="studioDialect" class="voice-description"></p>
+    <details><summary>本次生成参数（不修改候选发音设置）</summary><div id="studioOptions"></div></details>
+    <div class="local-asr-actions"><button id="studioGenerate" type="button" class="credential-test-button">生成并试听</button><button id="studioStop" type="button" class="credential-test-button">停止 / 取消</button><button id="studioPlay" type="button" class="credential-test-button" disabled>再次试听</button></div>
+    <p id="studioStatus" role="status" class="voice-description">本地模型支持边生成边试听；Windows 本机语音及部分云服务会在生成后试听。</p>
+    <div class="section-title">作为音频文件发送</div>
+    <p class="voice-description">音频草稿保存在本机 voice-outbox 目录。复制后在微信、QQ、企业微信、钉钉或飞书聊天输入框粘贴，再手动发送；也可以保存 WAV 后添加为附件。</p>
+    <div class="local-asr-actions"><button id="studioCopy" type="button" class="credential-test-button" disabled>复制音频文件</button><button id="studioFavorite" type="button" class="credential-test-button" disabled>收藏语音</button><button id="studioSave" type="button" class="credential-test-button" disabled>另存为 WAV</button></div>
+    <details class="workbench-details"><summary>进阶：输出到虚拟麦克风作为原生语音消息</summary>
+    <p class="voice-description">需要虚拟音频设备，且聊天客户端必须具备录音入口。将聊天软件的麦克风选为虚拟设备的录音端，在下方选择对应播放端。点击后有 3 秒时间切回聊天软件并开始录音，结束录音及发送都由你手动操作。没有录音入口的客户端请使用音频文件方式。</p>
+    <label class="speech-field">虚拟麦克风对应的播放设备<select id="studioDevice"><option value="">请选择虚拟音频输出设备</option></select></label>
+    <div class="local-asr-actions"><button id="studioRoute" type="button" class="credential-test-button" disabled>3 秒后输出到虚拟麦克风</button><button id="studioCableHelp" type="button" class="credential-test-button">虚拟音频设备官网 / 下载</button></div>
+    </details>
+  </details>
+<div class="qp" style="margin-top:12px"><div class="card">
+  <div class="card-h"><h2>语音收藏</h2><p>原来在“剪贴板与资料库”里，现在放在这里。收藏的语音消息可以反复发送，数据没有变。</p></div>
+  <div class="row"><div class="row-l"><b>打开语音收藏</b><small>在列表里复制音频文件、重命名或删除</small></div><div class="row-r"><button class="btn sm" type="button" data-lib-jump="favorites">打开</button></div></div>
+</div></div>
+</div>
+<div id="voicePane-recognition" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-recognition" data-voice-pane="input">
+<div class="qp" id="voiceHero">
+  <div class="card">
+    <div class="mic-hero">
+      <div class="mic-col"><button class="mic" type="button" id="micBtn" aria-label="按住说话测试"><svg class="ic"><use href="#i-mic"/></svg></button><div class="mic-label" id="micLabel">按住说话<br>或按住右 Alt</div></div>
+      <div class="mic-main">
+        <div class="pipe" id="pipe"></div>
+        <div class="vt" id="vt" aria-live="polite"><span class="vt-ph">按住左边的按钮说一句话，把录音和本机识别试一遍。云端引擎和润色请用快捷键在任意输入框里试。</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>识别引擎</h2><p>点一个引擎，下面只显示它需要填的内容。</p></div>
+    <div class="engs">
+      <button class="eng" type="button" data-asr="local"><b>本地离线</b><small>音频不出本机；SenseVoice Small</small><span class="chip off" data-chip="asrLocal"></span></button>
+      <button class="eng" type="button" data-asr="doubao"><span class="rec">推荐</span><b>豆包</b><small>中文准确率高，边说边出字</small><span class="chip off" data-chip="asrDoubao"></span></button>
+      <button class="eng" type="button" data-asr="openai"><b>OpenAI 兼容</b><small>OpenAI、SiliconFlow、Groq 或自定义地址</small><span class="chip off" data-chip="asrOpenai"></span></button>
+      <button class="eng" type="button" data-asr="aliyun"><b>阿里云百炼</b><small>Paraformer 实时识别</small><span class="chip off" data-chip="asrAliyun"></span></button>
+      <button class="eng" type="button" data-asr="tencent"><b>腾讯云</b><small>实时语音识别，需要 SecretId / SecretKey</small><span class="chip off" data-chip="asrTencent"></span></button>
+    </div>
+  </div>
+</div>
+<div class="section voice-section">
     <div class="section-header"><div><div class="section-title">启用语音输入</div><div class="voice-description">在右键菜单中点击“语音输入”开始或停止录音</div></div><div class="ftb-toggle-btn active" id="voiceEnabled" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
   </div>
-
-  <div class="section voice-section voice-sound-section">
+<div class="section voice-section voice-sound-section">
     <div class="voice-basic-row">
       <button class="voice-sound-expand" id="voiceSoundExpand" type="button" aria-expanded="false" aria-controls="voiceSoundDetails">
         <span>录音提示音</span><span class="voice-sound-chevron" aria-hidden="true"></span>
@@ -17,12 +85,10 @@
       <div class="voice-basic-row"><span>结束录音时播放</span><div class="ftb-toggle-btn active" id="voiceEndSound" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
     </div>
   </div>
-
-  <div class="section voice-section">
+<div class="section voice-section">
     <div class="section-header"><div><div class="section-title">录音时静音其他声音</div><div class="voice-description">录音期间暂时关闭系统中其他应用的播放声音，结束后自动恢复</div></div><div class="ftb-toggle-btn" id="voiceMuteSystemAudio" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
   </div>
-
-  <div class="section voice-section shortcut-section section-page-option">
+<div class="section voice-section shortcut-section section-page-option">
     <div class="shortcut-section-heading"><div><div class="section-title">语音输入快捷键</div><div class="shortcut-section-description">勾选启用对应快捷键；长按快捷键松开后停止录音，录音时按 Space 可锁定</div></div></div>
     <div class="content-page-option">
       <label class="check-option"><input type="checkbox" name="voice-hotkey" id="voiceHotkeyRAltCheckbox" value="ralt" checked><span>RAlt（长按录音）</span></label>
@@ -36,10 +102,9 @@
       <label class="check-option"><input type="checkbox" name="voice-hotkey" id="voiceHotkeyCtrlF9Checkbox" value="ctrl-f9" checked><span>Ctrl + F9（开始 / 停止录音）</span></label>
     </div>
   </div>
-
-  <div class="section voice-section">
+<div class="section voice-section">
     <div class="section-title voice-heading">ASR API</div>
-    <div class="voice-description">豆包为流式识别；OpenAI、SiliconFlow、Groq 走 OpenAI 兼容的语音转写接口。每个提供商的 Token 分开保存，切换时只换当前使用的那一份。</div>
+    <div class="voice-description">豆包为流式识别；OpenAI、SiliconFlow、Groq 走 OpenAI 兼容的语音转写接口。阿里云走百炼语音，腾讯云走签名认证。本地模型离线识别。各提供商凭据分开保存。</div>
     <div class="voice-grid">
       <div class="voice-field">
         <span>服务提供商</span>
@@ -49,13 +114,17 @@
             <img src="./assets/arrow.svg" alt="">
           </button>
           <div class="dropdown-menu" id="voiceAsrProviderMenu">
+            <div class="dropdown-item" data-value="local">本地离线模型</div>
             <div class="dropdown-item" data-value="doubao">豆包</div>
             <div class="dropdown-item" data-value="openai">OpenAI</div>
             <div class="dropdown-item" data-value="siliconflow">SiliconFlow</div>
             <div class="dropdown-item" data-value="groq">Groq</div>
+            <div class="dropdown-item" data-value="aliyun">阿里云 · 百炼</div>
+            <div class="dropdown-item" data-value="tencent">腾讯云</div>
           </div>
         </div>
       </div>
+      <label id="voiceTencentSecretIdField" hidden><span>SecretId（腾讯云 ASR）</span><input id="voiceTencentSecretId" autocomplete="off" spellcheck="false"></label>
       <div class="voice-field" id="voiceDoubaoAuthModeField">
         <span>豆包鉴权方式</span>
         <div class="dropdown">
@@ -69,9 +138,10 @@
           </div>
         </div>
       </div>
+      <label id="voiceAsrResourceIdField"><span>Resource ID · 火山引擎资源</span><input id="voiceAsrResourceId" type="text" autocomplete="off" placeholder="volc.seedasr.sauc.duration"><small>填写控制台中已授权的资源 ID；留空使用默认资源。</small></label>
       <label id="voiceAsrAppKeyField"><span>App ID / App Key</span><input id="voiceAsrAppKey" type="text" autocomplete="off"></label>
       <label id="voiceAsrModelField"><span>模型</span><input id="voiceAsrModel" type="text" autocomplete="off" spellcheck="false" placeholder="whisper-1"></label>
-      <div class="voice-field voice-wide">
+      <div class="voice-field voice-wide" id="voiceAsrTokenField">
         <label for="voiceAsrToken">Access Token / API Key</label>
         <span class="voice-secret-input">
           <input id="voiceAsrToken" type="password" autocomplete="off" spellcheck="false">
@@ -89,12 +159,8 @@
         </span>
       </div>
       <label class="voice-wide"><span>接口地址</span><input id="voiceAsrEndpoint" type="url" autocomplete="off"></label>
-      <div class="voice-field voice-wide" id="voiceAsrResourceIdField">
-        <label for="voiceAsrResourceId">Resource ID（资源 ID）</label>
-        <input id="voiceAsrResourceId" type="text" autocomplete="off" spellcheck="false" aria-describedby="voiceAsrResourceIdHint">
-        <div class="voice-description" id="voiceAsrResourceIdHint">填写豆包控制台已开通服务的资源 ID，留空则恢复默认的 2.0 小时版。2.0 并发版为 volc.seedasr.sauc.concurrent；只开通了 1.0 服务的填 volc.bigasr.sauc.duration（小时版）或 volc.bigasr.sauc.concurrent（并发版）。</div>
-      </div>
     </div>
+    <div id="voiceAsrLinks" class="voice-provider-links"></div>
     <div class="credential-test-row">
       <button id="voiceAsrTestButton" class="credential-test-button" type="button">测试配置</button>
       <span id="voiceAsrTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
@@ -123,74 +189,7 @@
     </div>
   </div>
 
-  <div class="section voice-section">
-    <div class="section-header voice-heading"><div class="section-title">文本润色 API</div><div class="ftb-toggle-btn" id="voicePolishText" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
-    <div class="voice-description">SiliconFlow、OpenAI、DeepSeek、Groq 均走 OpenAI 兼容的 Chat Completions 接口。</div>
-    <div class="voice-grid">
-      <div class="voice-field">
-        <span>服务提供商</span>
-        <div class="dropdown">
-          <button class="dropdown-toggle" id="voicePolishProviderBtn" type="button">
-            <span>SiliconFlow</span>
-            <img src="./assets/arrow.svg" alt="">
-          </button>
-          <div class="dropdown-menu" id="voicePolishProviderMenu">
-            <div class="dropdown-item" data-value="siliconflow">SiliconFlow</div>
-            <div class="dropdown-item" data-value="openai">OpenAI</div>
-            <div class="dropdown-item" data-value="deepseek">DeepSeek</div>
-            <div class="dropdown-item" data-value="groq">Groq</div>
-          </div>
-        </div>
-      </div>
-      <label><span>模型</span><input id="voicePolishModel" type="text" autocomplete="off" spellcheck="false" placeholder="Qwen/Qwen3-8B"></label>
-      <div class="voice-field voice-wide">
-        <label for="voicePolishToken">API Token</label>
-        <span class="voice-secret-input">
-          <input id="voicePolishToken" type="password" autocomplete="off" spellcheck="false">
-          <button id="voicePolishTokenVisibility" class="voice-secret-toggle" type="button" aria-label="显示 API Token" aria-pressed="false" title="显示 API Token">
-            <svg class="voice-secret-icon voice-secret-icon-show" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
-              <circle cx="12" cy="12" r="2.75"></circle>
-            </svg>
-            <svg class="voice-secret-icon voice-secret-icon-hide" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 3l18 18"></path>
-              <path d="M10.6 6.1A9.2 9.2 0 0 1 12 6c6 0 9.5 6 9.5 6a16.7 16.7 0 0 1-2.6 3.2M6.2 6.2C3.8 8 2.5 12 2.5 12s3.5 6 9.5 6a9 9 0 0 0 3-.5"></path>
-              <path d="M9.8 9.8a3 3 0 0 0 4.4 4.4"></path>
-            </svg>
-          </button>
-        </span>
-      </div>
-      <label class="voice-wide"><span>接口地址</span><input id="voicePolishEndpoint" type="url" autocomplete="off"></label>
-    </div>
-    <div class="credential-test-row">
-      <button id="voicePolishTestButton" class="credential-test-button" type="button">测试配置</button>
-      <span id="voicePolishTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
-    </div>
-    <div class="voice-prompt-header">
-      <div class="voice-field">
-        <span>润色提示词</span>
-        <div class="dropdown">
-          <button class="dropdown-toggle" id="voicePolishPromptBtn" type="button">
-            <span>精炼整理</span>
-            <img src="./assets/arrow.svg" alt="">
-          </button>
-          <div class="dropdown-menu" id="voicePolishPromptMenu">
-            <div class="dropdown-item" data-value="cleanup">精炼整理</div>
-            <div class="dropdown-item" data-value="faithful">忠实校对</div>
-            <div class="dropdown-item" data-value="zh2en">中翻英</div>
-            <div class="dropdown-item" data-value="casual">口语整理</div>
-            <div class="dropdown-item" data-value="custom_1">自定义一</div>
-            <div class="dropdown-item" data-value="custom_2">自定义二</div>
-            <div class="dropdown-item" data-value="custom_3">自定义三</div>
-          </div>
-        </div>
-      </div>
-      <button class="voice-prompt-reset" id="voicePolishPromptReset" type="button">恢复默认</button>
-    </div>
-    <textarea id="voicePolishPrompt" class="voice-prompt" autocomplete="off" spellcheck="false" placeholder="选择预设后可直接使用，也可改成自己的提示词。"></textarea>
-  </div>
-
-  <div class="section voice-section">
+<div class="section voice-section">
     <div class="section-title voice-heading">基础设置</div>
     <div class="voice-basic-row">
       <span>识别语言</span>
@@ -226,4 +225,69 @@
     </div>
     <div class="voice-description">豆包流式识别时，已识别文字直接显示在输入框中，松开录音键后上屏。仅 TSF 上屏时生效。</div>
   </div>
+</div>
+<div id="voicePane-polish" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-recognition" data-voice-pane="input" hidden>
+<div class="section voice-section">
+    <div class="section-header voice-heading"><div class="section-title">文本润色 API</div><div class="ftb-toggle-btn" id="voicePolishText" role="switch" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div></div>
+    <div class="voice-description">SiliconFlow、OpenAI、DeepSeek、Groq、阿里云和腾讯混元均走 OpenAI 兼容的 Chat Completions 接口。</div>
+    <div id="voicePromptLibrary" class="prompt-library"></div>
+    <textarea id="voicePolishPrompt" class="voice-prompt" autocomplete="off" spellcheck="false" placeholder="选择预设后可直接使用，也可改成自己的提示词。"></textarea>
+    <details class="workbench-details"><summary>润色 API · 连接、凭据与测试</summary>
+    <div class="voice-grid">
+      <div class="voice-field">
+        <span>服务提供商</span>
+        <div class="dropdown">
+          <button class="dropdown-toggle" id="voicePolishProviderBtn" type="button">
+            <span>SiliconFlow</span>
+            <img src="./assets/arrow.svg" alt="">
+          </button>
+          <div class="dropdown-menu" id="voicePolishProviderMenu">
+            <div class="dropdown-item" data-value="siliconflow">SiliconFlow</div>
+            <div class="dropdown-item" data-value="openai">OpenAI</div>
+            <div class="dropdown-item" data-value="deepseek">DeepSeek</div>
+            <div class="dropdown-item" data-value="groq">Groq</div>
+            <div class="dropdown-item" data-value="aliyun">阿里云 · 百炼</div>
+            <div class="dropdown-item" data-value="tencent">腾讯云</div>
+          </div>
+        </div>
+      </div>
+      <div class="ai-field"><label for="voicePolishModel">模型 · 可直接输入名称</label><div class="model-combo"><input id="voicePolishModel" type="text" autocomplete="off" spellcheck="false" placeholder="Qwen/Qwen3-8B"><button id="voicePolishModelArrow" type="button" aria-label="展开或查询模型">⌄</button><div id="voicePolishModelMenu" class="model-menu"></div></div><button id="voicePolishModelFetch" type="button">查询模型</button><span id="voicePolishModelStatus" role="status"></span></div>
+      <div id="voiceThinkingField" class="ai-field is-hidden"><span>DeepSeek 思考强度</span><div class="dropdown"><button id="voiceThinkingBtn" class="dropdown-toggle" type="button"><span>关闭 · 更快</span><img src="./assets/arrow.svg" alt=""></button><div id="voiceThinkingMenu" class="dropdown-menu"><div class="dropdown-item" data-value="disabled">关闭 · 更快</div><div class="dropdown-item" data-value="low">低</div><div class="dropdown-item" data-value="high">高</div><div class="dropdown-item" data-value="max">最高</div></div></div><small>开启会延长等待，失败时保留原识别文字。</small></div>
+      <div class="voice-field voice-wide">
+        <label for="voicePolishToken">API Token</label>
+        <span class="voice-secret-input">
+          <input id="voicePolishToken" type="password" autocomplete="off" spellcheck="false">
+          <button id="voicePolishTokenVisibility" class="voice-secret-toggle" type="button" aria-label="显示 API Token" aria-pressed="false" title="显示 API Token">
+            <svg class="voice-secret-icon voice-secret-icon-show" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+              <circle cx="12" cy="12" r="2.75"></circle>
+            </svg>
+            <svg class="voice-secret-icon voice-secret-icon-hide" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 3l18 18"></path>
+              <path d="M10.6 6.1A9.2 9.2 0 0 1 12 6c6 0 9.5 6 9.5 6a16.7 16.7 0 0 1-2.6 3.2M6.2 6.2C3.8 8 2.5 12 2.5 12s3.5 6 9.5 6a9 9 0 0 0 3-.5"></path>
+              <path d="M9.8 9.8a3 3 0 0 0 4.4 4.4"></path>
+            </svg>
+          </button>
+        </span>
+      </div>
+      <label class="voice-wide"><span>接口地址</span><input id="voicePolishEndpoint" type="url" autocomplete="off"></label>
+    </div>
+    <div id="voicePolishLinks" class="voice-provider-links"></div>
+    <div class="credential-test-row">
+      <button id="voicePolishTestButton" class="credential-test-button" type="button">测试配置</button>
+      <span id="voicePolishTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
+    </div>
+    </details>
+  </div>
+</div>
+<div id="voicePane-models" class="voice-pane" role="tabpanel" aria-labelledby="voiceTab-models" data-voice-pane="models" hidden>
+<details class="section voice-section" id="localAsrPanel">
+    <summary class="section-title">本地语音模型 · 下载与使用</summary>
+    <p class="voice-description">下载完成后可离线识别，音频留在本机。如开启云端文本润色，转写后的文字仍会发给润色服务；完全离线请关闭文本润色。大小来自锁定版本的文件清单；1 GB = 10 亿字节。内存建议为预留参考，并非显存占用实测。下载支持暂停续传，完成后校验 SHA-256。</p>
+    <div class="local-asr-actions"><button type="button" id="localAsrRefresh" class="credential-test-button">刷新状态</button><button type="button" id="localAsrStop" class="credential-test-button">停止本地识别</button></div>
+    <p id="localAsrStatus" role="status" aria-live="polite">展开后载入模型清单。</p>
+    <div id="localAsrModels"></div>
+  </details>
+<details id="localTtsPanel"><summary>开源发音模型 · 下载与运行</summary><p class="voice-description">模型按需下载；大小是所列文件总和，运行环境另外安装。各模型特点、许可证和硬件要求见卡片。</p><p id="localTtsStatus" role="status"></p><div class="local-asr-actions"><button id="localTtsRefresh" type="button">刷新模型状态</button><button id="localTtsStop" type="button">停止本地服务</button></div><div id="localTtsModels" class="local-tts-catalog"></div></details>
+</div>
 </div>

@@ -1,3 +1,4 @@
+import {setupDefaultIme} from './default-ime';
 import { updateConfig } from './config-sync';
 
 // 网络代理设置（[network] 段）。代理的权威在宿主：地址由 Server 规范化后随快照回放，
@@ -39,6 +40,13 @@ function refreshServerState(): void {
 }
 
 export function setupHelpSettings(): void {
+  setupDefaultIme();
+  document.querySelectorAll<HTMLButtonElement>('[data-help-target]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      const target=button.dataset.helpTarget;
+      if(target)document.querySelector<HTMLElement>(`.sidebar .item[data-target="${target}"]`)?.click();
+    });
+  });
   document.querySelectorAll<HTMLInputElement>('input[name="network-proxy-mode"]').forEach((radio) => {
     radio.addEventListener('change', () => {
       if (!radio.checked) return;

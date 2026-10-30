@@ -77,3 +77,18 @@ TEST_CASE(ui_backend_policy_keeps_settings_web_and_small_windows_native_by_defau
     REQUIRE(!IsSupported("unknown"));
     REQUIRE(IsSupported("d2d"));
 }
+
+TEST_CASE(candidate_gloss_runs_separate_pos_familiarity_and_more_senses)
+{
+    CandidateViewItem item;
+    item.translation = "int. hello; int. hi; greetings";
+    DecorateCandidateTranslation(item, [](const std::string &word) { return word == "hi"; });
+    REQUIRE_EQ(item.translation_runs.size(), size_t{6});
+    REQUIRE(item.translation_runs[0].muted);
+    REQUIRE(item.translation_runs[1].fresh);
+    REQUIRE_EQ(item.translation_runs[1].text, "hello");
+    REQUIRE(!item.translation_runs[4].fresh);
+    REQUIRE_EQ(item.translation_runs.back().text, " · +1");
+    REQUIRE_EQ(item.translation, "int. hello; int. hi; greetings");
+    REQUIRE(CandidateViewHtml(item).find("color:#ed9409") != std::string::npos);
+}

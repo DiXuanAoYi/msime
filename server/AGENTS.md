@@ -2,7 +2,7 @@
 
 组织级约定见 [组织 AGENTS.md](https://github.com/metasequoiaime/.github/blob/main/AGENTS.md)，仓库地图和组件之间的边界见[仓库根 AGENTS.md](../AGENTS.md)。本文件补充本组件的实现、数据和验证规则，路径都相对于 `server/`。
 
-本组件是常驻后端进程：输入引擎与候选状态、配置、词典、Named Pipe 服务，以及候选窗、悬浮工具栏、托盘菜单、设置窗口的原生宿主与 WebView2 控制器。
+本组件包括常驻后端（输入引擎与候选状态、配置、词典、Named Pipe、候选窗/工具栏/托盘）和独立 `MetasequoiaImeSettings.exe` 设置宿主。设置入口统一通过 `settings_launcher`，不得恢复已经删除的同进程设置窗口；读写映射位于 `settings_app` 与 `config_update_dispatch`。
 
 ## vcpkg_installed 的解析
 

@@ -1,6 +1,10 @@
-# 水杉输入法
+# 知语输入法 · Zhiyu IME
 
-[官网](https://msime.app) · [用户文档](https://msime.app/docs/) · [隐私说明](PRIVACY.md) · [代码签名策略 / Code signing policy](docs/code-signing-policy.md) · [English README](README.en.md)
+本个人分支基于水杉输入法继续开发，借鉴青简输入法的词库与候选体验，扩展语音、发音、聊天辅助、OCR、翻译和个人资料管理。感谢上游作者与开源贡献者。用户配置、聊天上下文、已下载模型及已有输入法注册身份保持兼容。
+
+2026-10-15 更新（v0.10.4-chat.1）：产品显示名统一为“知语输入法”；剪贴板与资料库采用受限渲染的连续滚动列表，常用语、语录、语音收藏、软件词库及学习记录统一紧凑行高；帮助、关于页更新为当前功能说明。升级保留原配置、聊天上下文与已有模型。[完整更新与验证说明](docs/release-v0.10.4-chat.1.md)。下方上游文档与徽章用于水杉基础功能参考，个人分支说明以本仓库文档与安装后的帮助页为准。
+
+[水杉上游官网](https://msime.app) · [上游基础文档](https://msime.app/docs/) · [隐私说明](PRIVACY.md) · [代码签名策略 / Code signing policy](docs/code-signing-policy.md) · [English README](README.en.md)
 
 <!-- badges:start -->
 [![CI](https://img.shields.io/github/actions/workflow/status/metasequoiaime/MSIME-Windows/ci.yml?branch=develop&label=CI)](https://github.com/metasequoiaime/MSIME-Windows/actions/workflows/ci.yml)
@@ -15,10 +19,10 @@
 
 ## 下载与安装
 
-- **安装包**：[Releases](https://github.com/metasequoiaime/MSIME-Windows/releases)，或[官网下载页](https://msime.app/download/)
+- **本个人分支安装包**：[DiXuanAoYi/msime Releases](https://github.com/DiXuanAoYi/msime/releases)。[水杉上游发行版](https://github.com/metasequoiaime/MSIME-Windows/releases)另行维护。
 - **安装步骤与常见问题**：[docs/installation.md](docs/installation.md)
 
-安装后用 `Win + 空格` 切换到水杉输入法。如果切换不过去、Server 反复退出或设置窗口一闪即关，多半是缺少 Visual C++ 2015–2022 Redistributable（**x64**），处理办法见安装文档的常见问题。
+安装后用 `Win + 空格` 切换到知语输入法。升级前已经运行的软件需完整退出后重开，才能加载新版名称及组件；无需清空原有配置。如果切换不过去、Server 反复退出或设置窗口一闪即关，可先检查 Visual C++ 2015–2022 Redistributable（**x64**），处理办法见安装文档的常见问题。
 
 其他平台：[macOS 与 iOS](https://github.com/metasequoiaime/MSIME-Apple) · [Linux](https://github.com/metasequoiaime/MSIME-Linux)
 
@@ -36,6 +40,8 @@ Issue 已经逐条核过并按可接手程度打了标签，可以直接筛：
 写代码、写文档、整理词库、测试 Bug、制作教程，都是非常有价值的开源贡献。可以纯手写，也可以借助 AI；但请认真检查和测试，并注意不要在 PR、Issue、截图或日志中泄露 API Key 等敏感信息。完整的贡献约定见[贡献指南](https://github.com/metasequoiaime/.github/blob/main/CONTRIBUTING.md)。
 
 **要动代码的话，本仓的环境要求、从源码构建、打包和提交前检查全部写在 [CONTRIBUTING.md](CONTRIBUTING.md) 里。**
+
+本个人分支按已确认的[水杉上游更新与青简功能移植规划](docs/plans/qingjian-upstream-v010-plan.md)实施。[v0.10.0 和 v0.10.1 逐项对照](docs/plans/upstream-v010-release-checklist.md)保留规划时的基线，当前实现、测试证据及尚未验证的环境见[实施记录](docs/plans/implementation-progress.md)。
 
 ## 项目结构
 
@@ -72,7 +78,7 @@ Windows 端的全部一方源码都在本仓，一次 clone 就能拿到完整�
 - 竖排候选窗支持中英互译释义；本地未命中时可走腾讯云机器翻译。
 - 候选混输（总开关 + 分项开关）：英文、emoji、颜文字、快捷短语、日期时间；独立英文候选输入模式。
 - 词库管理：全拼 / 五笔 / 英文查询、新增、批量导入与导出。
-- 语音输入：豆包流式识别，以及 OpenAI / SiliconFlow / Groq 转写；可选文本润色。
+- 语音输入：豆包流式识别，OpenAI / SiliconFlow / Groq / 阿里云 / 腾讯云转写，以及五款可下载的本地模型；可选文本润色。模型下载显示大小和进度，详见[本地识别与云服务](docs/local-asr.md)。
 - 手写识别、屏幕键盘、悬浮工具栏、剪贴板历史。
 - 输入统计（默认关闭）：只在本机记录字符数量与活跃时长，可在设置 → 统计中查看与清理。
 - 快捷短语（K，可选混入候选）、日期时间（T）、Unicode（U）、Emoji（E）、颜文字（M）、超级简拼（J）、临时英文（Y）、临时日语（R）。
@@ -262,9 +268,23 @@ Windows 端的全部一方源码都在本仓，一次 clone 就能拿到完整�
 
 剪贴板管理开启后，复制过的文本会出现在表情面板的剪贴板分页中；关闭会立即清空记录，且只记录文本。
 
+### 候选词离线翻译（0.9.10）
+
+收录青简固定版本的五份离线释义表，中译英约 23.2 万条，并包含日语、西班牙语、越南语与英译中。候选行显示词性、两条释义和生词颜色，更多释义通过 Ctrl+Enter 选择；个人译词优先。来源、许可与详细行为见 [青简集成说明](docs/qingjian-integration.txt)。
+
+### 学习、截图与翻译工作台（0.9.16）
+
+新增候选带调拼音、润色和联想提示词模板管理、剪贴板分组、按软件词条、语音收藏、生词复习，以及 Ctrl+Alt+Backspace 撤销最近上屏。截图工作台整合双方向长截图、可编辑 OCR、对话/照片/屏幕翻译和本地语音字幕。OCR 模型需用户自行下载；默认使用 Windows 离线 OCR 和本机词典。方言、模型许可、GPU 回退和识别限制见[使用说明](docs/learning-vision-workbench.md)。
+
+### 嘴替与回复工作台（本分支新增）
+
+联系人和群聊分别保存上下文，可粘贴/导入原话、按发言人和时间追加记录、生成摘要及 3/5 条备选回复。15 种风格同时接入语音润色，包括恋爱军师、高情商回复、回怼王、情话撩人和工作汇报。
+
+悬浮工具栏新增麦克风与嘴替图标，嘴替一键打开聊天工作区。常用聊天风格、关系、意图与回复长度可直接设置，生成后选入草稿再编辑。也可在设置 → **嘴替 · 回复** 使用；模型共用“语音输入 → 润色”的配置。支持手动导入任意软件的文本，以及微信、QQ、企业微信、钉钉、飞书的只读窗口适配；需先扫描和绑定会话，默认不监测、不请求模型。只生成备选，不自动发送。各客户端版本与布局限制见 [聊天读取说明](docs/chat-window-reader.txt)。详细使用、容量限制和数据说明见 [回复工作台说明](docs/voice-reply-studio.txt)。
+
 ### 语音输入
 
-需要网络服务。可在右键菜单中开始或停止录音，也可使用快捷键：
+支持按需下载的本地离线模型，也可配置云服务。可在右键菜单中开始或停止录音，也可使用快捷键：
 
 - `RAlt`：长按录音，松开后识别。
 - `Ctrl + Win`、`RCtrl + RAlt`：同样为长按录音。
@@ -370,3 +390,5 @@ GPL-3.0。
   <img src="https://api.star-history.com/svg?repos=metasequoiaime/MSIME-Windows&type=Date" alt="Star History Chart" width="600">
 </a>
 <!-- star-history:end -->
+
+离线学习与行业词典、独立开关、导出和 Ctrl 点击发音的用法见 [词典与候选发音](docs/translation-library.md)。

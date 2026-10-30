@@ -134,6 +134,21 @@ TEST_CASE(candidate_skin_scan_skips_default_settings_folder)
 // The installer renames a bundled skin the user already had to <id>.bak (or <id>.2.bak) before overwriting it.
 // Those backups keep the original manifest id, so without skipping them the settings page would list each one as
 // a broken skin.
+TEST_CASE(candidate_skin_fit_content_defaults_inherits_and_rejects_wrong_type)
+{
+    const auto root = MakeSkinsRoot(L"fit-content");
+    REQUIRE(!CandidateSkinCatalog::ResolveFitContent(root, "fluent", nullptr));
+    WriteDefaultSkin(root, "fluent", "[candidate_window]\nfit_content = true\n");
+    REQUIRE(CandidateSkinCatalog::ResolveFitContent(root, "fluent", nullptr));
+    WriteExternalSkin(root, "fit-example", "fluent", "fit_content = false\n");
+    const auto package = CandidateSkinCatalog::Load(root, "fit-example");
+    REQUIRE(package && package->fitContent.has_value() && !*package->fitContent);
+    REQUIRE(!CandidateSkinCatalog::ResolveFitContent(root, "fit-example", &*package));
+    WriteExternalSkin(root, "bad-fit", "fluent", "fit_content = \"true\"\n");
+    REQUIRE(!CandidateSkinCatalog::Load(root, "bad-fit"));
+    Cleanup(root);
+}
+
 TEST_CASE(candidate_skin_scan_skips_installer_backups)
 {
     const auto root = MakeSkinsRoot(L"backup");

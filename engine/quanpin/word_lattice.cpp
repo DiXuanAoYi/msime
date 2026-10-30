@@ -72,6 +72,7 @@ struct LatticeEdge
     std::string word;
     std::string key;
     std::int64_t weight = 0;
+    std::vector<std::string> input_domains;
     // Context-free part of the edge score: the heuristic when there is no
     // model, the dictionary tiebreak when there is one.
     double base_score = 0;
@@ -127,6 +128,7 @@ struct Hyp
     int prev_idx = -1;
     std::string word;
     std::string key;
+    std::vector<std::string> input_domains;
     // Trailing n-gram context of this path. Unused (and left zeroed) when
     // decoding with the heuristic.
     ngram::State state;
@@ -194,11 +196,12 @@ std::vector<std::vector<LatticeEdge>> build_graph(const Segments &syllables, con
             }
             const auto &rows = pins.empty() ? cached->second : constrained_rows;
             const size_t take = (std::min)(rows.size(), static_cast<size_t>(std::max(0, options.span_limit)));
-            // 先验的分母：跨度内实际参与解码的那些行。行数被 span_limit 截断，
-            // 截掉的都是权重最低的尾巴，对和的影响可以忽略。
-            std::int64_t span_total = 0;
+            // 先验的分母：跨度内实际参与解码、读音相同的那些行。行数被 span_limit 截断，
+            // 截掉的都是权重最低的尾巴，对和的影响可以忽略。按读音分开求和：模糊音把别的
+            // 读音的行混进同一跨度，算进一个分母会把敲出读音的行的占比压低。
+            std::unordered_map<std::string, std::int64_t> reading_totals;
             for (size_t i = 0; i < take; ++i)
-                span_total += rows[i].weight > 0 ? rows[i].weight : 0;
+                reading_totals[rows[i].key] += rows[i].weight > 0 ? rows[i].weight : 0;
             for (size_t i = 0; i < take; ++i)
             {
                 const auto &row = rows[i];
@@ -209,16 +212,18 @@ std::vector<std::vector<LatticeEdge>> build_graph(const Segments &syllables, con
                 edge.word = row.value;
                 edge.key = row.key.empty() ? span_key : row.key;
                 edge.weight = row.weight;
+                edge.input_domains = row.input_domains;
                 if (model)
                 {
                     edge.index = model->index(edge.word);
-                    edge.base_score =
-                        dictionary_tiebreak(edge.weight, options) + reading_prior(edge.weight, span_total, options);
+                    edge.base_score = dictionary_tiebreak(edge.weight, options) +
+                                      reading_prior(edge.weight, reading_totals[row.key], options);
                 }
                 else
                 {
                     edge.base_score = heuristic_log_prob(edge.weight, end - start, options);
                 }
+                edge.base_score -= row.penalty;
                 graph[start].push_back(std::move(edge));
             }
         }
@@ -344,6 +349,7 @@ std::vector<LatticePath> decode_word_lattice(const Segments &syllables, const Wo
                 next.prev_idx = hi;
                 next.word = edge.word;
                 next.key = edge.key;
+                next.input_domains = edge.input_domains;
                 columns[edge.end].push_back(std::move(next));
             }
         }
@@ -363,6 +369,109 @@ std::vector<LatticePath> decode_word_lattice(const Segments &syllables, const Wo
         LatticePath path;
         path.log_prob = final_col[static_cast<size_t>(i)].score;
         int pos = static_cast<int>(n);
+        int idx = i;
+        std::vector<std::string> keys;
+        while (pos > 0 && idx >= 0)
+        {
+            const Hyp &h = columns[static_cast<size_t>(pos)][static_cast<size_t>(idx)];
+            path.words.push_back(h.word);
+            for (const auto &id : h.input_domains)
+                if (std::find(path.input_domains.begin(), path.input_domains.end(), id) == path.input_domains.end())
+                    path.input_domains.push_back(id);
+            keys.push_back(h.key);
+            pos = h.prev_pos;
+            idx = h.prev_idx;
+        }
+        std::reverse(path.words.begin(), path.words.end());
+        std::reverse(keys.begin(), keys.end());
+        for (const auto &w : path.words)
+            path.sentence += w;
+        for (size_t k = 0; k < keys.size(); ++k)
+        {
+            if (k)
+                path.key.push_back('\'');
+            path.key += keys[k];
+        }
+        if (path.sentence.empty() || !seen.insert(path.sentence).second)
+            continue;
+        paths.push_back(std::move(path));
+    }
+    return paths;
+}
+
+std::vector<LatticePath> decode_fault_lattice(const size_t slot_count,
+                                              const std::vector<std::vector<FaultLatticeEdge>> &edges_by_start,
+                                              const WordLatticeOptions &options)
+{
+    if (slot_count == 0)
+        return {};
+    const ngram::LanguageModel *model = active_model(options);
+
+    // 与 decode_word_lattice 同一套 Viterbi：边由调用方按容错槽位预先查出并已折进
+    // 手误代价，这里只负责 kenlm 打分、beam 剪枝与 n-best 去重。裁决用的解码刻意
+    // 不装配搭配 scorer（octagram 禁令），量纲与词格主分同域（log10）。
+    std::vector<std::vector<Hyp>> columns(slot_count + 1);
+    Hyp start;
+    start.score = 0.0;
+    // 同 decode_word_lattice：shipped sc.lm 无 <s>/</s>，从空上下文起步。
+    if (model)
+        start.state = model->null_state();
+    columns[0].push_back(std::move(start));
+
+    for (size_t pos = 0; pos < slot_count; ++pos)
+    {
+        keep_beam(columns[pos], options.beam);
+        if (columns[pos].empty())
+            continue;
+        for (int hi = 0; hi < static_cast<int>(columns[pos].size()); ++hi)
+        {
+            const Hyp &hyp = columns[pos][static_cast<size_t>(hi)];
+            if (pos >= edges_by_start.size())
+                continue;
+            for (const auto &edge : edges_by_start[pos])
+            {
+                if (edge.start != pos || edge.end <= pos || edge.end > slot_count)
+                    continue;
+                Hyp next;
+                // penalty 是手误代价（正数，log10），从路径分里扣；与 decode_word_lattice
+                // 的 base_score -= row.penalty 同向。
+                next.score = hyp.score - edge.penalty;
+                if (model)
+                {
+                    next.score += dictionary_tiebreak(edge.weight, options);
+                    const ngram::WordIndex index = model->index(edge.word);
+                    next.score += model->score(hyp.state, index, next.state);
+                }
+                else
+                {
+                    // 无模型时按覆盖槽位数近似短语长度（同 heuristic_log_prob 的长度奖励）；
+                    // 手误代价已在上面扣过，权重只剩一个很小的对数项。
+                    next.score += std::log(edge.weight > 0 ? static_cast<double>(edge.weight) : 1.0) +
+                                  options.phrase_length_bonus * static_cast<double>(edge.end - pos);
+                }
+                next.prev_pos = static_cast<int>(pos);
+                next.prev_idx = static_cast<int>(hi);
+                next.word = edge.word;
+                next.key = edge.key;
+                columns[edge.end].push_back(std::move(next));
+            }
+        }
+    }
+
+    auto &final_col = columns[slot_count];
+    if (final_col.empty())
+        return {};
+    std::sort(final_col.begin(), final_col.end(), [](const Hyp &a, const Hyp &b) { return a.score > b.score; });
+    const int take = (std::min)(options.nbest, static_cast<int>(final_col.size()));
+
+    std::vector<LatticePath> paths;
+    paths.reserve(static_cast<size_t>(take));
+    std::unordered_set<std::string> seen;
+    for (int i = 0; i < static_cast<int>(final_col.size()) && static_cast<int>(paths.size()) < take; ++i)
+    {
+        LatticePath path;
+        path.log_prob = final_col[static_cast<size_t>(i)].score;
+        int pos = static_cast<int>(slot_count);
         int idx = i;
         std::vector<std::string> keys;
         while (pos > 0 && idx >= 0)
@@ -469,16 +578,23 @@ void merge_lattice_candidates(std::vector<WordItem> &candidates, const Segments 
         const auto weight = static_cast<std::int64_t>(path->log_prob * 1000.0);
         WordItem item(typed_pinyin, path->sentence, weight, source, path->key);
         item.sentence_association = true;
+        item.input_domains = path->input_domains;
         return item;
     };
 
-    // Existing rows include Unigram, so Trigram avoids it before the neural models choose their rows.
-    std::optional<WordItem> trigram_item;
+    // Existing rows include Unigram, so the lattice row avoids it before the neural models choose
+    // their rows. The lattice's own best path is shown as Colocation when octagram is on (single
+    // injection: octagram only affects the decode, so paths.front() is its result), otherwise as
+    // Generated. Selecting Collocation first means the shared sentence keeps that label and the
+    // Generated row is deduplicated away.
+    std::optional<WordItem> lattice_item;
     std::optional<WordItem> keyboard_item;
     std::optional<WordItem> desktop_item;
-    if (options.include_lattice_best)
-        trigram_item = select_distinct(paths, CandidateSource::Generated);
-    const bool trigram_consensus = trigram_item && trigram_item->word == paths.front().sentence &&
+    if (options.include_collocation_best)
+        lattice_item = select_distinct(paths, CandidateSource::Collocation);
+    if (!lattice_item && options.include_lattice_best)
+        lattice_item = select_distinct(paths, CandidateSource::Generated);
+    const bool lattice_consensus = lattice_item && lattice_item->word == paths.front().sentence &&
                                    (source_prefers(keyboard_paths, paths.front().sentence) ||
                                     source_prefers(desktop_paths, paths.front().sentence));
     bool keyboard_before_desktop = false;
@@ -525,13 +641,13 @@ void merge_lattice_candidates(std::vector<WordItem> &candidates, const Segments 
         candidates.erase(unigram_position);
     }
 
-    // Consensus from another source promotes Unigram first and Trigram ahead of neural rows. A
-    // shared neural best belongs to keyboard; when the neural best rows differ, desktop goes first.
+    // Consensus from another source promotes Unigram first and the lattice row ahead of neural rows.
+    // A shared neural best belongs to keyboard; when the neural best rows differ, desktop goes first.
     std::vector<WordItem> extra;
     if (promoted_unigram)
         extra.push_back(std::move(*promoted_unigram));
-    if (trigram_consensus)
-        extra.push_back(std::move(*trigram_item));
+    if (lattice_consensus)
+        extra.push_back(std::move(*lattice_item));
     if (keyboard_before_desktop)
     {
         if (keyboard_item)
@@ -547,8 +663,8 @@ void merge_lattice_candidates(std::vector<WordItem> &candidates, const Segments 
             extra.push_back(std::move(*keyboard_item));
     }
     extra.insert(extra.end(), std::make_move_iterator(other_items.begin()), std::make_move_iterator(other_items.end()));
-    if (trigram_item && !trigram_consensus)
-        extra.push_back(std::move(*trigram_item));
+    if (lattice_item && !lattice_consensus)
+        extra.push_back(std::move(*lattice_item));
     if (extra.empty())
         return;
 

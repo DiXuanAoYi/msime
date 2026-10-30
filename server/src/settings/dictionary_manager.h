@@ -5,5 +5,6 @@
 
 namespace SettingsDictionary
 {
+std::string CandidateReading(const std::string &word);
 boost::json::object HandleRequest(const boost::json::object &request);
-}
+} // namespace SettingsDictionary

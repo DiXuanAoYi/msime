@@ -416,11 +416,17 @@ inline CandidateUiState candidate_ui;
 // the handoff is an asynchronous PostMessage, so nothing serialises the two. The worker therefore copies each finished
 // page into one of these immutable snapshots and publishes it atomically, and every UI-thread reader (candidate
 // presenter, its mouse callbacks, the WebView2 payload) loads a snapshot once and reads only from that copy.
+// Written only by the IPC worker; renderers read the immutable page copy.
+inline std::wstring candidate_task_status;
 struct CandidatePageSnapshot
 {
+    std::wstring task_status;
     std::vector<CandidateViewItem> page_views;
     std::vector<std::wstring> page_words;
     std::wstring candidate_string;
+    // HTML slots are transported structurally to the native WebView; the legacy string remains for old TSF clients.
+    std::vector<std::wstring> html_items;
+    int page_index = 0;
     int selected_index_in_page = 0;
     // page_count mirrors current_page_count() and page_item_count mirrors cur_page_item_cnt. Both are carried because
     // the height estimate prefers the derived count and only falls back to the rendered one.

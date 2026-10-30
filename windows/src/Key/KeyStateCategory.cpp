@@ -92,9 +92,6 @@ HRESULT CKeyStateCategory::KeyStateHandler(KEYSTROKE_FUNCTION function, KeyHandl
     case FUNCTION_INSERT_TEXT:
         return _pTextService->_HandleInsertText(dto.ec, dto.pContext, dto.prefetchedText);
 
-    case FUNCTION_CYCLE_INPUT_MODE:
-        return _pTextService->_HandleCycleInputMode(dto.ec, dto.pContext, dto.prefetchedText);
-
     case FUNCTION_UPDATE_VOICE_COMPOSITION:
         return _pTextService->_HandleUpdateVoiceComposition(dto.ec, dto.pContext, dto.prefetchedText);
 
@@ -113,6 +110,9 @@ HRESULT CKeyStateCategory::KeyStateHandler(KEYSTROKE_FUNCTION function, KeyHandl
 
     case FUNCTION_CANCEL:
         return HandleKeyCancel(dto);
+
+    case FUNCTION_CYCLE_INPUT_MODE:
+        return _pTextService->_HandleCycleInputMode(dto.ec, dto.pContext, dto.prefetchedText);
 
     case FUNCTION_TOGGLE_IME_MODE:
         return HandleKeyToogleIMEMode(dto);

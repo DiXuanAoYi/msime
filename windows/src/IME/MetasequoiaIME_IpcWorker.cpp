@@ -1,3 +1,5 @@
+#include "../../../engine/contracts/vocabulary_commit.h"
+#include "../../../engine/contracts/input_runtime_settings.h"
 // Worker pipe side: IpcWorkerThread, which validates and dispatches Server frames, and the
 // token tables that hand its commits, voice snapshots and compartment switches to the TSF thread.
 
@@ -125,7 +127,8 @@ void CMetasequoiaIME::_DispatchUnsolicitedVoiceText(WPARAM wParam, KEYSTROKE_FUN
     }
 }
 
-bool CMetasequoiaIME::_PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text)
+bool CMetasequoiaIME::_PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text,
+                                              uint64_t vocabularyRequestId)
 {
     constexpr size_t maxPendingServerCommits = 64;
     if (!_workerCommitReady.load(std::memory_order_acquire) ||
@@ -157,8 +160,8 @@ bool CMetasequoiaIME::_PostServerTextDelivery(UINT windowMessage, _In_z_ const W
         {
             token = NextWindowMessageToken();
         } while (token == 0 || _pendingServerCommitMessages.count(token) != 0);
-        _pendingServerCommitMessages.emplace(token,
-                                             WorkerCandidateCommit{text ? text : L"", focusToken, compositionEpoch});
+        _pendingServerCommitMessages.emplace(
+            token, WorkerCandidateCommit{text ? text : L"", focusToken, compositionEpoch, vocabularyRequestId});
     }
 
     if (!PostMessage(ownerWindow, windowMessage, static_cast<WPARAM>(token), 0))
@@ -350,7 +353,16 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
         }
 
         bool validFrame = true;
-        if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCurCandidate ||
+        std::optional<FanyImeRuntimeSettings::Snapshot> runtimeSettings;
+        if (buf.msg_type == FanyImeWorkerReplyType::RuntimeSettingsSnapshot)
+        {
+            const auto terminator = std::find(std::begin(buf.data), std::end(buf.data), L'\0');
+            if (terminator != std::end(buf.data))
+                runtimeSettings = FanyImeRuntimeSettings::Decode(std::wstring_view(buf.data, terminator - buf.data));
+            validFrame = runtimeSettings.has_value();
+        }
+        if (buf.msg_type == FanyImeWorkerReplyType::VocabularyCommitCandidate ||
+            buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCurCandidate ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCandidateAndContinue ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::InsertText ||
             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CancelVoiceComposition)
@@ -409,7 +421,6 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
              buf.msg_type == Global::DataToTsfWorkerThreadMsgType::MidSentenceHelpcodeSemicolonChanged ||
              buf.msg_type == Global::DataToTsfWorkerThreadMsgType::MidSentenceHelpcodeUppercaseChanged ||
              buf.msg_type == Global::DataToTsfWorkerThreadMsgType::InputModeChanged ||
-             buf.msg_type == Global::DataToTsfWorkerThreadMsgType::TrilingualCycleChanged ||
              buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CapsLockChanged ||
              buf.msg_type == Global::DataToTsfWorkerThreadMsgType::TsfDiagnosticLogChanged ||
              buf.msg_type == Global::DataToTsfWorkerThreadMsgType::StatisticsEnabledChanged))
@@ -488,7 +499,8 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
                 pIME->_ResetVoiceCompositionAssemble();
             }
             // Soft config/control frames: drop without killing the worker pipe.
-            if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::PagingCommaPeriodChanged ||
+            if (buf.msg_type == FanyImeWorkerReplyType::RuntimeSettingsSnapshot ||
+                buf.msg_type == Global::DataToTsfWorkerThreadMsgType::PagingCommaPeriodChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::SmartPunctuationChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::SmartPunctuationRepeatToChineseChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::SmartPunctuationSpaceConvertChanged ||
@@ -501,7 +513,6 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::DirectHelpcodeChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::MidSentenceHelpcodeUppercaseChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::InputModeChanged ||
-                buf.msg_type == Global::DataToTsfWorkerThreadMsgType::TrilingualCycleChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CapsLockChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::TsfDiagnosticLogChanged ||
                 buf.msg_type == Global::DataToTsfWorkerThreadMsgType::StatisticsEnabledChanged ||
@@ -530,8 +541,30 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
             pIME->_ResetVoiceCompositionAssemble();
         }
 
-        if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::FocusSessionReady)
+        if (buf.msg_type == FanyImeWorkerReplyType::RuntimeSettingsSnapshot && runtimeSettings)
         {
+            // Apply atomically before the ordered focus-ready fence wakes the
+            // first-letter classifier. COM/document work remains on the owner.
+            if (FanyImeRuntimeSettings::ShouldApply(*runtimeSettings, workerGeneration,
+                                                    pIME->_runtimeSettingsPipeGeneration.load(),
+                                                    pIME->_runtimeSettingsRevision.load()))
+            {
+                pIME->_runtimeSettingsPipeGeneration.store(workerGeneration);
+                pIME->_runtimeSettingsFlags.store(runtimeSettings->flags, std::memory_order_release);
+                pIME->_runtimeSettingsRevision.store(runtimeSettings->revision, std::memory_order_release);
+                PostMessage(pIME->_msgWndHandle, WM_ApplyRuntimeSettings, workerGeneration, 0);
+            }
+        }
+        else if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::FocusSessionReady)
+        {
+            if (pIME->_runtimeSettingsPipeGeneration.load() != workerGeneration)
+            {
+                // Legacy peers do not send the optional snapshot. Reset only
+                // their compatibility defaults; modern snapshots precede this fence.
+                pIME->_runtimeSettingsFlags.store(FanyImeRuntimeSettings::EnglishCandidates, std::memory_order_release);
+                pIME->_runtimeSettingsRevision.store(0);
+                pIME->_runtimeSettingsPipeGeneration.store(workerGeneration);
+            }
             const uint64_t expectedToken = pIME->_expectedWorkerFocusToken.load(std::memory_order_acquire);
             if (expectedToken != 0 && focusToken == expectedToken)
             {
@@ -543,6 +576,12 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
                     SetEvent(pIME->_workerAckEvent);
                 }
             }
+        }
+        else if (buf.msg_type == FanyImeWorkerReplyType::VocabularyCommitCandidate)
+        {
+            const auto commit = FanyImeVocabulary::Decode(buf.data);
+            if (pIME->_workerCommitReady.load(std::memory_order_acquire) && commit)
+                pIME->_PostServerTextDelivery(WM_CommitCandidate, commit->text.data(), commit->request);
         }
         else if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::CommitCurCandidate)
         {
@@ -651,10 +690,6 @@ void CMetasequoiaIME::IpcWorkerThread(CMetasequoiaIME *pIME)
             {
                 PostMessage(ownerWindow, WM_RefreshLanguageBarTheme, 0, 0);
             }
-        }
-        else if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::TrilingualCycleChanged)
-        {
-            Global::TrilingualCycleEnabled.store(buf.data[0] == L'1', std::memory_order_relaxed);
         }
         else if (buf.msg_type == Global::DataToTsfWorkerThreadMsgType::TsfDiagnosticLogChanged)
         {

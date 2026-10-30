@@ -26,6 +26,8 @@
 #include "../Utils/PerfTimer.h"
 #include <chrono>
 #include "../../../engine/contracts/ipc_negotiation.h"
+#include "../../../engine/contracts/input_runtime_settings.h"
+#include "../../../engine/contracts/trilingual_input.h"
 #include "../../../engine/contracts/mid_sentence_helpcode.h"
 #include "KeyEventSinkInternal.h"
 
@@ -160,7 +162,9 @@ void ApplyDeferredKeyState(DeferredShadowState &shadow, const _KEYSTROKE_STATE &
         // does not reset a user's punctuation choice either.
         if (shadow.imeOpen != wasImeOpen)
         {
-            shadow.punctuationOpen = Global::ResolvePunctuationOpen(shadow.imeOpen) != FALSE;
+            shadow.punctuationOpen =
+                Global::ResolvePunctuationOpen(shadow.imeOpen &&
+                                               !Global::CapsLockEnabled.load(std::memory_order_relaxed)) != FALSE;
         }
         clearComposition();
         break;
@@ -284,10 +288,10 @@ void CMetasequoiaIME::_EnsureDeferredKeyProjection()
     _deferredKeyProjectionValid = true;
     _deferredProjectedImeOpen = _pCompositionProcessorEngine && _pThreadMgr &&
                                 _pCompositionProcessorEngine->GetIMEMode(_pThreadMgr, _tfClientId) != FALSE;
-    _deferredProjectedJapaneseMode = Global::JapaneseInputModeEnabled.load(std::memory_order_relaxed);
     _deferredProjectedPunctuationOpen =
         _pCompositionProcessorEngine && _pThreadMgr &&
         _pCompositionProcessorEngine->GetPunctuationMode(_pThreadMgr, _tfClientId) != FALSE;
+    _deferredProjectedJapaneseMode = Global::JapaneseInputModeEnabled.load(std::memory_order_relaxed);
     _deferredProjectedDoubleSingleByteOpen =
         _pCompositionProcessorEngine && _pThreadMgr &&
         _pCompositionProcessorEngine->GetDoubleSingleByteMode(_pThreadMgr, _tfClientId) != FALSE;
@@ -423,6 +427,14 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
     keyState->Function = FUNCTION_NONE;
 
     const UINT capturedModifiers = modifiersDown ? *modifiersDown : CaptureIpcModifiers();
+    if (_IsAiTaskShortcut(*classifiedCode, capturedModifiers,
+                          _deferredKeyProjectionValid ? _deferredProjectedInputLength > 0
+                                                      : _IsCompositionActiveForKeyGuard()))
+    {
+        keyState->Category = CATEGORY_CANDIDATE;
+        keyState->Function = FUNCTION_SERVER_CANDIDATE_KEY;
+        return true;
+    }
     const bool projectedImeOpen = _deferredKeyProjectionValid
                                       ? _deferredProjectedImeOpen
                                       : _pCompositionProcessorEngine->GetIMEMode(_pThreadMgr, _tfClientId) != FALSE;
@@ -443,13 +455,22 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
     // 同上：译文上屏也要在这条 Ctrl/Alt 拦截之前分类，否则这颗键会被交还给应用。
     const bool projectedCandidateActive =
         _deferredKeyProjectionValid ? _deferredProjectedCandidateActive : (_candidateMode == CANDIDATE_ORIGINAL);
-    const bool projectedInputActive = _deferredKeyProjectionValid
-                                          ? _deferredProjectedInputLength > 0
-                                          : _pCompositionProcessorEngine->GetVirtualKeyLength() > 0;
-    if (projectedImeOpen && !_IsKeyboardDisabled() &&
-        ((projectedCandidateActive && IsTranslationCommitShortcut(*classifiedCode, capturedModifiers)) ||
-         (!_serverUnavailableFallbackActive && projectedInputActive &&
-          IsPinyinCommitShortcut(*classifiedCode, capturedModifiers))))
+    const bool projectedEnglishComposition =
+        !projectedImeOpen && !_serverUnavailableFallbackActive &&
+        (_deferredKeyProjectionValid ? _deferredProjectedInputLength > 0 : _IsCompositionActiveForKeyGuard());
+    if (!_IsKeyboardDisabled() && (projectedCandidateActive || projectedEnglishComposition) &&
+        IsTranslationCommitShortcut(*classifiedCode, capturedModifiers))
+    {
+        keyState->Category = CATEGORY_CANDIDATE;
+        keyState->Function = FUNCTION_SERVER_CANDIDATE_KEY;
+        return true;
+    }
+
+    const bool pinyinCompositionActive = _deferredKeyProjectionValid
+                                             ? _deferredProjectedInputLength > 0
+                                             : _pCompositionProcessorEngine->GetVirtualKeyLength() > 0;
+    if (projectedImeOpen && !_serverUnavailableFallbackActive && !_IsKeyboardDisabled() && pinyinCompositionActive &&
+        IsPinyinCommitShortcut(*classifiedCode, capturedModifiers))
     {
         keyState->Category = CATEGORY_CANDIDATE;
         keyState->Function = FUNCTION_SERVER_CANDIDATE_KEY;
@@ -540,6 +561,13 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
         return setKeyState(CATEGORY_COMPOSING, FUNCTION_BACKSPACE);
     }
 
+    if (!shadow.imeOpen && !_serverUnavailableFallbackActive &&
+        FanyImeRuntimeSettings::ShouldOfferEnglishCandidates(_runtimeSettingsFlags.load(std::memory_order_acquire),
+                                                             shadow.inputLength > 0 || shadow.candidateActive) &&
+        ClassifyEnglishCandidateKey(*classifiedCode, *classifiedWch, shadow.inputLength > 0 || shadow.candidateActive,
+                                    shadow.candidateActive, (GetKeyState(VK_CAPITAL) & 1) != 0, keyState))
+        return true;
+
     _KEYSTROKE_STATE inputState = {};
     WCHAR inputWch = *classifiedWch;
     bool isInputKey = false;
@@ -547,18 +575,14 @@ bool CMetasequoiaIME::_ClassifyDeferredKeyDown(_In_ ITfContext *pContext, WPARAM
     {
         isInputKey = _pCompositionProcessorEngine->IsVirtualKeyNeedForFreshComposition(*classifiedCode, &inputWch,
                                                                                        &inputState) != FALSE;
-        // A queued cycle can change CN/JP before its settings snapshot arrives.
-        // Only the long-vowel key depends on that language in the fresh helper.
-        if (*classifiedCode == VK_OEM_MINUS && *classifiedWch == L'-')
-        {
-            isInputKey = shadow.japaneseMode;
-        }
         if (!isInputKey && shadow.inputLength > 0 &&
             ((*classifiedWch == L'\'') || (_pCompositionProcessorEngine->IsWildcard() &&
                                            _pCompositionProcessorEngine->IsWildcardChar(*classifiedWch))))
         {
             isInputKey = true;
         }
+        if (*classifiedCode == VK_OEM_MINUS && *classifiedWch == L'-')
+            isInputKey = shadow.japaneseMode;
         // 直接辅助码开着时 ; 韵母不看奇偶（辅码会打乱奇偶），交给下面的 IsDirectHelpcodeInputKey，与同步路径和
         // Server 用同一条规则；这里再按奇偶放行，uiab/; 这类输入两边就会分叉。
         if (!isInputKey && !shadow.japaneseMode && Global::MicrosoftShuangpinEnabled.load(std::memory_order_relaxed) &&
@@ -817,7 +841,6 @@ void CMetasequoiaIME::_ClearDeferredKeyDowns()
     }
     _deferredKeyProjectionValid = false;
     _deferredProjectedImeOpen = false;
-    _deferredProjectedJapaneseMode = false;
     _deferredProjectedPunctuationOpen = false;
     _deferredProjectedDoubleSingleByteOpen = false;
     _deferredProjectedInputLength = 0;
@@ -1092,12 +1115,10 @@ void CMetasequoiaIME::_DrainOneDeferredKeyDown()
         _KEYSTROKE_STATE offlineState = key.keyState;
         if (offlineState.Function == FUNCTION_CYCLE_INPUT_MODE)
         {
-            // Its tail was classified for the projected destination. The
-            // cycle cannot run offline, so discard that tail through the
-            // normal offline failure path while preserving local raw input.
-            _FailDeferredKey(replayToken, DeferredKeyFailureReason::HostEditRejected);
+            _FailDeferredKey(replayToken, DeferredKeyFailureReason::TransportBroken);
             return;
         }
+
         if (offlineState.Function == FUNCTION_TOGGLE_CHARACTER_SET)
         {
             _CompleteDeferredKeyReplay(replayToken);

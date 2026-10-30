@@ -204,6 +204,16 @@ void AppendExternalCandidateColorCss(std::wstring &css, const CandidateSkinCatal
     add(colors.number, L".num, .cand-no, .page-arrow", L"color");
     // 翻译默认继承 .text 的颜色再叠 opacity .62；单独配色时取原值，不再叠透明度。
     add(colors.translation, L".cand-translation", L"color");
+    const auto addRunColor = [&](const std::string &color, const wchar_t *selector) {
+        if (color.empty())
+            return;
+        add(color, selector, L"color");
+        css.append(std::wstring(selector) + L" { opacity: 1 !important; }\n");
+    };
+    addRunColor(colors.translationPos, L".cand-translation .cand-pos");
+    addRunColor(colors.translationSeparator, L".cand-translation .cand-sep");
+    addRunColor(colors.selectedTranslationPos, L".cand.first .cand-translation .cand-pos");
+    addRunColor(colors.selectedTranslationSeparator, L".cand.first .cand-translation .cand-sep");
     if (!colors.translation.empty())
     {
         css.append(L".cand-translation { opacity: 1; }\n");
@@ -355,8 +365,11 @@ std::wstring BuildExternalCandidateSkinCss(const CandidateSkinCatalog::Package &
         css.append(L" width: var(--msime-skin-decoration-width, 0px); "
                    L"height: var(--msime-skin-decoration-top, 0px); background: ");
         css.append(ManifestImageCssUrl(skinsRoot, skin.id, skin.decorationImage));
-        css.append(L" center / contain no-repeat; pointer-events: none; }\n"
-                   L".container { position: relative; z-index: 1; }\n");
+        css.append(
+            L" center / contain no-repeat; pointer-events: none; "
+            L"transform: translateY(var(--msime-decoration-lift,0px)) rotate(var(--msime-decoration-angle,0deg)) "
+            L"scale(var(--msime-decoration-scale,1)); transform-origin: center; }\n"
+            L".container { position: relative; z-index: 1; }\n");
     }
     AppendExternalCandidateCornerCss(css, skin);
     const bool light = ResolveConfiguredTheme(GetConfiguredThemeCand()) == "light";
@@ -397,8 +410,12 @@ bool InjectExternalCandidateSkin(std::wstring &html, const CandidateSkinCatalog:
     }
     const std::wstring vars =
         fmt::format(L"<style id=\"external-candidate-skin-vars\">:root{{--msime-skin-min-width:{}px;"
-                    L"--msime-skin-decoration-top:{}px;--msime-skin-decoration-width:{}px;}}</style>",
-                    skin.minWidthDip, skin.decorationTopDip, skin.decorationWidthDip);
+                    L"--msime-skin-decoration-top:{}px;--msime-skin-decoration-width:{}px;"
+                    L"--msime-skin-decoration-align:{};}}</style>",
+                    skin.minWidthDip, skin.decorationTopDip, skin.decorationWidthDip,
+                    skin.decorationAlign == "left"     ? 0
+                    : skin.decorationAlign == "center" ? 1
+                                                       : 2);
     std::wstring css = BuildExternalCandidateSkinCss(skin, skinsRoot);
     NeutralizeEmbeddedStyleClosers(css);
     std::wstring generated;
@@ -553,6 +570,22 @@ int PrepareHtmlForWnds()
             activeExternalCandidateSkin.reset();
         }
     }
+    const auto &fitMode = GetConfiguredCandidateFitContentMode();
+    const bool fitContent =
+        fitMode == "enabled" ||
+        (fitMode == "follow" && CandidateSkinCatalog::ResolveFitContent(
+                                    std::filesystem::path(assetPath + L"\\skins"), candidateSkin,
+                                    activeExternalCandidateSkin ? &*activeExternalCandidateSkin : nullptr));
+    const auto htmlTag = ::HTMLStringCandWnd.find(L'>', ::HTMLStringCandWnd.find(L"<html"));
+    if (htmlTag != std::wstring::npos)
+        ::HTMLStringCandWnd.insert(htmlTag, fitContent ? L" data-fit-content=\"on\"" : L" data-fit-content=\"off\"");
+    const auto fitHead = ::HTMLStringCandWnd.find(L"</head>");
+    if (fitContent && fitHead != std::wstring::npos)
+        ::HTMLStringCandWnd.insert(
+            fitHead,
+            L"<style id=\"msime-fit-content\">html[data-fit-content=on] "
+            L".container:not(:empty){min-width:var(--msime-skin-decoration-width,0px)!important;}"
+            L"html[data-fit-content=on] .cand,html[data-fit-content=on] .pinyin{min-width:0!important;}</style>");
     std::wstring bodyHtmlPathCandWnd = assetPath + bodyHtmlCandWnd;
     ::BodyStringCandWnd = ReadHtmlFile(bodyHtmlPathCandWnd);
     std::wstring measureHtmlPathCandWnd = assetPath + measureHtmlCandWnd;
@@ -568,16 +601,6 @@ int PrepareHtmlForWnds()
     std::wstring entireHtmlPathMenuWnd = assetPath + htmlMenuWnd;
     ::HTMLStringMenuWnd =
         ReadHtmlFileWithFallback(entireHtmlPathMenuWnd, assetPath + L"/html/webview2/menu/default.html");
-
-    //
-    // settings 窗口
-    // 这里暂时没有用到，因为 settings 窗口使用的是映射 url 导航
-    //
-    /*
-    std::wstring htmlSettingsWnd = L"/html/webview2/settings/default.html";
-    std::wstring entireHtmlPathSettingsWnd = assetPath + htmlSettingsWnd;
-    ::HTMLStringSettingsWnd = ReadHtmlFile(entireHtmlPathSettingsWnd);
-    */
 
     //
     // floating toolbar 窗口

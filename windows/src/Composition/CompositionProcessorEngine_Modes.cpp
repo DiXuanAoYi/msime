@@ -19,6 +19,7 @@
 #include "FanyLog.h"
 #include "EditSession.h"
 #include "TfTextLayoutSink.h"
+#include "CapsLockPunctuationPolicy.h"
 #include <new>
 
 namespace
@@ -321,17 +322,6 @@ void CCompositionProcessorEngine::SetIMEMode(_In_ ITfThreadMgr *pThreadMgr, TfCl
     }
 }
 
-HRESULT CCompositionProcessorEngine::SetKeyboardOpenCompartment(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId,
-                                                                BOOL isOpen)
-{
-    CCompartment compartment(pThreadMgr, tfClientId, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE);
-    const BOOL previousSuppression = _suppressKeyboardCloseCommit;
-    _suppressKeyboardCloseCommit = TRUE;
-    const HRESULT result = compartment._SetCompartmentBOOL(isOpen);
-    _suppressKeyboardCloseCommit = previousSuppression;
-    return result;
-}
-
 HRESULT CCompositionProcessorEngine::SetIMEModeForLanguageCycle(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId,
                                                                 BOOL bOpen)
 {
@@ -360,6 +350,17 @@ HRESULT CCompositionProcessorEngine::SetIMEModeForLanguageCycle(_In_ ITfThreadMg
     return S_OK;
 }
 
+HRESULT CCompositionProcessorEngine::SetKeyboardOpenCompartment(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId,
+                                                                BOOL isOpen)
+{
+    CCompartment compartment(pThreadMgr, tfClientId, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE);
+    const BOOL previousSuppression = _suppressKeyboardCloseCommit;
+    _suppressKeyboardCloseCommit = TRUE;
+    const HRESULT result = compartment._SetCompartmentBOOL(isOpen);
+    _suppressKeyboardCloseCommit = previousSuppression;
+    return result;
+}
+
 void CCompositionProcessorEngine::ReleaseConfiguredImeModeDefense()
 {
     if (!_defendConfiguredImeMode)
@@ -372,7 +373,22 @@ void CCompositionProcessorEngine::ReleaseConfiguredImeModeDefense()
 void CCompositionProcessorEngine::SyncPunctuationWithImeMode(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId,
                                                              BOOL isOpen)
 {
-    SetPunctuationMode(pThreadMgr, tfClientId, isOpen);
+    SetPunctuationMode(pThreadMgr, tfClientId,
+                       FollowedPunctuationOpen(isOpen != FALSE, Global::CapsLockEnabled.load(std::memory_order_relaxed))
+                           ? TRUE
+                           : FALSE);
+}
+
+void CCompositionProcessorEngine::SyncPunctuationWithCapsLock(_In_ ITfThreadMgr *pThreadMgr, TfClientId tfClientId,
+                                                              bool capsLockEnabled)
+{
+    if (!ShouldResyncPunctuationForCapsLock(_capsLockPunctuationKnown, _capsLockPunctuationApplied, capsLockEnabled))
+        return;
+    _capsLockPunctuationKnown = true;
+    _capsLockPunctuationApplied = capsLockEnabled;
+    SetPunctuationMode(pThreadMgr, tfClientId,
+                       FollowedPunctuationOpen(GetIMEMode(pThreadMgr, tfClientId) != FALSE, capsLockEnabled) ? TRUE
+                                                                                                             : FALSE);
 }
 
 void CCompositionProcessorEngine::ApplyPendingImeModeAfterCompositionCommit(_In_ ITfThreadMgr *pThreadMgr,
@@ -531,7 +547,9 @@ void CCompositionProcessorEngine::InitializeMetasequoiaIMECompartment(_In_ ITfTh
                                              Global::MetasequoiaIMEGuidCompartmentDoubleSingleByte);
     CompartmentDoubleSingleByte._SetCompartmentBOOL(FALSE);
 
-    SetPunctuationMode(pThreadMgr, tfClientId, openChinese);
+    _capsLockPunctuationKnown = true;
+    _capsLockPunctuationApplied = Global::CapsLockEnabled.load(std::memory_order_relaxed);
+    SyncPunctuationWithImeMode(pThreadMgr, tfClientId, openChinese);
 
     PrivateCompartmentsUpdated(pThreadMgr);
 }

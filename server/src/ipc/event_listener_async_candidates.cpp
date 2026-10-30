@@ -1,6 +1,8 @@
 // 异步候选结果回到任务线程后的合并：云联想、AI 联想、神经重排、专用英文、译文，以及混输
 // （英文、emoji、颜文字、日期时间）。
 #include "ipc/event_listener_internal.h"
+#include "settings/personal_library.h"
+#include "utils/common_utils.h"
 #include <Windows.h>
 #include <string>
 #include <algorithm>
@@ -10,6 +12,7 @@
 #include <utility>
 #include "ipc.h"
 #include "ipc/candidate_selection_policy.h"
+#include "ipc/ai_candidate_rerank.h"
 #include "ipc/candidate_ui_owner.h"
 #include "global/globals.h"
 #include "engine/japanese/romaji_converter.h"
@@ -23,11 +26,46 @@
 
 using namespace event_listener_detail;
 
+namespace
+{
+AsyncRequestOrigin g_local_rerank_origin;
+std::vector<std::string> g_local_rerank_order;
+} // namespace
+
+namespace event_listener_detail
+{
+void ClearAiRerankForInput(uint64_t client_id, uint64_t activation_epoch, const std::string &raw_input)
+{
+    if (!client_id || g_local_rerank_origin.client_id != client_id ||
+        g_local_rerank_origin.activation_epoch != activation_epoch || g_local_rerank_origin.raw_input != raw_input)
+    {
+        g_local_rerank_origin = {};
+        g_local_rerank_order.clear();
+    }
+}
+
+bool ApplyActiveAiRerank(std::vector<WordItem> &items)
+{
+    if (!g_inputSession || g_local_rerank_order.empty() || !g_local_rerank_origin.local_only ||
+        g_local_rerank_origin.client_id != FanyImeIpc::input_privacy.client ||
+        g_local_rerank_origin.activation_epoch != FanyImeIpc::input_privacy.epoch ||
+        !IsPipeActivationCurrent(g_local_rerank_origin.client_id, g_local_rerank_origin.activation_epoch) ||
+        !FanyImeIpc::AutomaticInputAiAllowed(true) ||
+        g_local_rerank_origin.raw_input != g_inputSession->get_pinyin_sequence_with_cases() ||
+        GlobalIme::composition.creating_word.active || !g_inputSession->is_all_complete_pure_pinyin() ||
+        g_inputSession->has_active_helpcode())
+        return false;
+    return FanyImeIpc::ApplyStableAiRerank(items, g_local_rerank_origin.original_candidates, g_local_rerank_order);
+}
+} // namespace event_listener_detail
+
 namespace FanyNamedPipe
 {
 void ApplyCloudCandidate(const std::string &candidate, const std::string &pinyin, uint64_t generation,
                          const std::optional<metasequoia::OnlineQuery> &query)
 {
+    if (!FanyImeIpc::AutomaticInputNetworkAllowed())
+        return;
     if (!GetConfiguredCloudCandidatesEnabled())
         return;
     // A callback can become stale after enqueueing, while earlier key tasks run.
@@ -140,6 +178,10 @@ void ApplyRescoredOrder()
 void ApplyAiCandidate(const std::string &candidate, const std::string &identity, uint64_t generation,
                       const std::optional<metasequoia::OnlineQuery> &engine_query)
 {
+    const auto config = GetConfiguredAiAssistant();
+    if (!FanyImeIpc::AutomaticInputAiAllowed(config.provider == "local" &&
+                                             AiAssistant::IsLoopbackEndpoint(config.endpoint)))
+        return;
     if (!engine_query || FindAiRequestOrigin(identity, generation).client_id == 0)
         return;
     const bool enabled = GetConfiguredAiAssistant().enabled;
@@ -189,9 +231,130 @@ void ApplyAiCandidate(const std::string &candidate, const std::string &identity,
     RefreshCandidatePageUi(true);
 }
 
+void ApplyAiTaskResult(const AiAssistant::Result &result, const AsyncRequestOrigin &origin)
+{
+    const auto config = GetConfiguredAiAssistant();
+    const auto current_origin = FindAiRequestOrigin(result.identity, result.generation);
+    if ((result.task == AiAssistant::Task::Pinyin && !config.enabled) || !g_inputSession || !current_origin.client_id ||
+        !IsPipeActivationCurrent(origin.client_id, origin.activation_epoch) ||
+        origin.raw_input != g_inputSession->get_pinyin_sequence_with_cases() ||
+        !FanyImeIpc::AutomaticInputAiAllowed(origin.local_only))
+        return;
+    if (!result.error.empty())
+    {
+        if (result.task != AiAssistant::Task::Pinyin)
+        {
+            Global::candidate_task_status = string_to_wstring(
+                (result.task == AiAssistant::Task::Question ? "问字失败：" : "补全失败：") + result.error);
+            RefreshCandidatePageUi(true);
+        }
+        return;
+    }
+    auto &ui = Global::candidate_ui;
+    if (result.task == AiAssistant::Task::Pinyin)
+    {
+        if (!origin.engine_query || IsCandidateSubPageActive() || GlobalIme::composition.creating_word.active ||
+            !g_inputSession->is_all_complete_pure_pinyin() || g_inputSession->has_active_helpcode())
+            return;
+        if (result.rerank_only)
+        {
+            if (!origin.local_only || origin.original_candidates.empty())
+                return;
+            g_local_rerank_origin = origin;
+            g_local_rerank_order.clear();
+            for (const auto &answer : result.candidates)
+                if (!answer.text.empty())
+                    g_local_rerank_order.push_back(answer.text);
+            if (!ApplyActiveAiRerank(ui.items))
+                return;
+        }
+        else
+        {
+            std::vector<WordItem> accepted;
+            for (const auto &answer : result.candidates)
+            {
+                if (answer.text.empty())
+                    continue;
+                (void)g_inputSession->apply_online_candidate(*origin.engine_query, answer.text,
+                                                             CandidateSource::AiSuggestion);
+                const auto &candidates = g_inputSession->get_candidates();
+                const auto found = std::find_if(candidates.begin(), candidates.end(), [&](const auto &item) {
+                    return item.word == answer.text && item.source == CandidateSource::AiSuggestion;
+                });
+                if (found != candidates.end() && std::none_of(accepted.begin(), accepted.end(), [&](const auto &item) {
+                        return item.word == found->word;
+                    }))
+                    accepted.push_back(*found);
+                if (accepted.size() >= static_cast<size_t>(config.candidate_limit))
+                    break;
+            }
+            if (accepted.empty())
+                return;
+            auto &items = ui.items;
+            items.erase(std::remove_if(items.begin(), items.end(),
+                                       [](const auto &item) { return item.source == CandidateSource::AiSuggestion; }),
+                        items.end());
+            for (const auto &item : accepted)
+                if (std::none_of(items.begin(), items.end(),
+                                 [&](const auto &existing) { return existing.word == item.word; }))
+                    items.push_back(item);
+            FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, CurrentEnglishPlacement(items));
+        }
+    }
+    else
+    {
+        if ((result.task == AiAssistant::Task::Question ? !config.question_enabled : !config.completion_enabled) ||
+            IsCandidateSubPageActive())
+            return;
+        std::vector<WordItem> answers;
+        if (result.task == AiAssistant::Task::Completion && !result.completion.empty())
+            answers.emplace_back("", origin.task_text + result.completion, 0, CandidateSource::AiCompletion);
+        else if (result.task == AiAssistant::Task::Question)
+            for (const auto &answer : result.candidates)
+                if (!answer.text.empty())
+                    answers.emplace_back("", answer.text, 0, CandidateSource::AiQuestion, answer.pinyin);
+        if (answers.empty())
+            return;
+        g_translation_saved_items = ui.items;
+        g_translation_saved_page_index = ui.page_index;
+        g_translation_saved_selected_index = ui.selected_index_in_page;
+        g_ai_task_candidates_active = true;
+        Global::candidate_task_status =
+            result.task == AiAssistant::Task::Question ? L"问字结果 · 按数字或空格上屏" : L"补全结果 · 手动选择上屏";
+        if (result.task == AiAssistant::Task::Question && result.candidates.size() == 1 &&
+            !result.candidates[0].explanation.empty())
+        {
+            auto explanation = string_to_wstring(result.candidates[0].explanation);
+            if (explanation.size() > 48)
+            {
+                explanation.resize(48);
+                if (explanation.back() >= 0xd800 && explanation.back() <= 0xdbff)
+                    explanation.pop_back();
+                explanation += L"…";
+            }
+            Global::candidate_task_status += L" · " + explanation;
+        }
+        ui.set_items(std::move(answers));
+    }
+    ui.item_total_count = static_cast<int>(ui.items.size());
+    ui.page_index = 0;
+    ui.select_first_on_page();
+    ui.clear_page();
+    RefreshCandidatePageUi(true);
+}
+
 // 专用英文（英文状态、Shift+Y）的整页英文候选。中文里混进来的英文走 ApplyMixedCandidates。
 void ApplyEnglishCandidates(std::vector<WordItem> candidates, const std::string &input, uint64_t generation)
 {
+    const auto client = FanyImeIpc::input_privacy.client;
+    const int remembered = RecallClientStatusSnapshot(client);
+    if (remembered >= 0 && (remembered & 4) == 0 &&
+        !GetConfiguredEnglishCandidatesForApplication(PersonalLibrary::InputApplication()))
+    {
+        g_dedicated_english_answer_pending = false;
+        HideCandidateWindowAndDropItems();
+        return;
+    }
     const std::string session_input =
         g_inputSession != nullptr ? g_inputSession->get_pinyin_sequence_with_cases() : std::string{};
     const bool y_mode = IsYModeInput(session_input);
@@ -232,6 +395,9 @@ void ApplyEnglishCandidates(std::vector<WordItem> candidates, const std::string 
         // and therefore must not participate in dictionary mutations.
         candidates.emplace_back("", input, 0, CandidateSource::Generated);
     }
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    PersonalLibrary::ApplyApplicationCandidates(application, input, candidates, true);
     items = std::move(candidates);
     Global::candidate_ui.item_total_count = static_cast<int>(items.size());
     Global::candidate_ui.page_index = 0;
@@ -241,10 +407,16 @@ void ApplyEnglishCandidates(std::vector<WordItem> candidates, const std::string 
     RefreshCandidatePageUi(true);
 }
 
-void ApplyCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation, bool merge)
+void ApplyCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation, bool merge,
+                                const std::string &cloud_scope)
 {
-    if (!EnglishIme::IsTranslationCurrent(generation) || !GetConfiguredCandidateTranslationsEnabled() ||
-        IsUiLessMode() || g_candidate_translation_signature.empty() || IsCandidateSubPageActive() ||
+    if (merge && (cloud_scope.empty() || cloud_scope != CloudTranslation::ConfigurationScope()))
+        return;
+    if (!FanyImeIpc::InputLearningAllowed() || (merge && !FanyImeIpc::AutomaticInputNetworkAllowed()))
+        return;
+    if ((merge && !GetConfiguredCandidateTranslationCloudEnabled()) || !EnglishIme::IsTranslationCurrent(generation) ||
+        !GetConfiguredCandidateTranslationsEnabled() || IsUiLessMode() || g_candidate_translation_signature.empty() ||
+        IsCandidateSubPageActive() ||
         (g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji))
         return;
 
@@ -287,7 +459,7 @@ void ApplyCandidateTranslations(std::vector<EnglishIme::TranslationResult> resul
     const FanyImeIpc::CandidateUiOwner owner = SnapshotCandidateUiOwner();
     if (glosses_changed && owner && IsPipeActivationCurrent(owner.client_id, owner.activation_epoch))
         RefreshCandidatePageUi(true);
-    if (!merge)
+    if (!merge && FanyImeIpc::AutomaticInputNetworkAllowed())
         CloudTranslation::RequestMisses(std::move(misses), generation);
 }
 
@@ -399,6 +571,9 @@ void ApplyMixedCandidates(MixedCandidates::Result result, const std::string &inp
     if (!changed && items.size() == size_before)
         return;
     FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, CurrentEnglishPlacement(items));
+    PersonalLibrary::ApplyApplicationCandidates(
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32)), input,
+        items);
 
     Global::candidate_ui.item_total_count = static_cast<int>(items.size());
     Global::candidate_ui.page_index = 0;

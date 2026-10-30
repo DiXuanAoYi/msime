@@ -1,4 +1,5 @@
 #include "settings/dictionary_manager.h"
+#include "english/candidate_reading.h"
 #include "settings/dictionary_page.h"
 #include <set>
 
@@ -74,14 +75,7 @@ std::filesystem::path SettingsExecutableDirectory()
 
 Pinyin::Pinyin &PinyinAnnotator()
 {
-    static std::once_flag once;
-    static std::unique_ptr<Pinyin::Pinyin> engine;
-    std::call_once(once, [] {
-        const auto dict_path = SettingsExecutableDirectory() / "dict";
-        Pinyin::setDictionaryPath(dict_path);
-        engine = std::make_unique<Pinyin::Pinyin>();
-    });
-    return *engine;
+    return CandidatePhonetics::Engine();
 }
 
 std::string NormalizeAnnotatedSyllable(std::string syllable)
@@ -246,22 +240,22 @@ json::object ExportUserDictionary(const std::string &dictionary)
     if (dictionary == "quanpin")
     {
         journal_kind = "pinyin";
-        filename = "水杉IME-拼音用户词库.txt";
+        filename = "知语IME-拼音用户词库.txt";
     }
     else if (dictionary == "wubi")
     {
         journal_kind = "wubi";
-        filename = "水杉IME-五笔用户词库.txt";
+        filename = "知语IME-五笔用户词库.txt";
     }
     else if (dictionary == "english")
     {
         journal_kind = "english";
-        filename = "水杉IME-英文用户词库.txt";
+        filename = "知语IME-英文用户词库.txt";
     }
     else if (dictionary == "quick")
     {
         journal_kind = "quick";
-        filename = "水杉IME-快捷短语用户词库.txt";
+        filename = "知语IME-快捷短语用户词库.txt";
     }
     else
     {

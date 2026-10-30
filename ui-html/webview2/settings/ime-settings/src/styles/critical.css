@@ -12,3 +12,10 @@
 @import './modules/candidate/style-v.css';
 @import './modules/candidate/style-h.css';
 @import './modules/candidate/page-arrows.css';
+
+.settings-operation-error { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 16px; background:var(--control-bg); color:var(--text-color); border-bottom:1px solid var(--control-border); font-size:13px; }
+.settings-operation-error[hidden] { display:none; }
+.settings-operation-error button { flex-shrink:0; color:var(--text-color); background:var(--button-bg); border:1px solid var(--control-border); border-radius:5px; padding:4px 10px; cursor:pointer; }
+
+.temporary-config-notice { padding: 9px 16px; background: var(--accent-soft); color: var(--text-color); border-bottom: 1px solid var(--accent-soft-border); font-size: var(--font-size-caption); line-height: 1.6; }
+.temporary-config-notice[hidden] { display: none; }

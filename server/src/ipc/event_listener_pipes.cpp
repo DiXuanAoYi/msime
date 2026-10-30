@@ -105,8 +105,9 @@ void LogPipeDisconnect(const wchar_t *pipe_name)
 
 void LogPipeEvent(const wchar_t *pipe_name, UINT event_type, UINT keycode, WCHAR wch, UINT modifiers_down)
 {
-    FANY_IPC_LOGF(L"[msime]: [ipc] {} event: type={}, keycode={}, wch={}, modifiers={}", pipe_name, event_type, keycode,
-                  static_cast<unsigned int>(wch), modifiers_down);
+    (void)keycode;
+    (void)wch;
+    FANY_IPC_LOGF(L"[msime]: [ipc] {} event: type={}, modifiers={}", pipe_name, event_type, modifiers_down);
 }
 
 void LogClientLifecycle(const wchar_t *phase, uint64_t client_id, UINT event_type)
@@ -161,6 +162,8 @@ bool IsForegroundInputThreadClient(uint64_t client_id)
     return focus_process_id == process_id && focus_thread_id == client_thread_id;
 }
 
+void SendInputModeState(const PipeClientActivation &activation);
+
 void SendFocusSessionReady(const PipeClientActivation &activation)
 {
     if (!FanyImeIpc::CanSendFocusSessionReady(activation.client_id, activation.epoch, activation.focus_token))
@@ -172,6 +175,8 @@ void SendFocusSessionReady(const PipeClientActivation &activation)
     // endpoint used for candidate commits. The activation request id is a TSF
     // focus token and is echoed verbatim; unlike the Server-only epoch, it lets
     // TSF reject a buffered marker from an older focus session.
+    FanyNamedPipe::SendRuntimeSettingsSnapshot(activation.client_id, activation.epoch);
+    SendInputModeState(activation);
     SendToTsfWorkerThreadClientViaNamedpipe(activation.client_id, activation.epoch,
                                             Global::DataFromServerMsgTypeToTsfWorkerThread::FocusSessionReady,
                                             std::to_wstring(activation.focus_token));
@@ -192,7 +197,6 @@ void SendInputModeState(const PipeClientActivation &activation)
     SendToTsfWorkerThreadClientViaNamedpipe(activation.client_id, activation.epoch,
                                             Global::DataFromServerMsgTypeToTsfWorkerThread::InputModeChanged,
                                             GetActiveInputMode() == "japanese" ? L"1" : L"0");
-    SendTrilingualCycleState(activation.client_id, activation.epoch);
 }
 
 bool IsKnownMainPipeEvent(UINT event_type)
@@ -214,6 +218,9 @@ bool IsKnownMainPipeEvent(UINT event_type)
     case FanyImePipeEventType::ClientSuspended:
     case FanyImePipeEventType::FocusRestored:
     case FanyImePipeEventType::HideCaretState:
+    case FanyImePipeEventType::VocabularyCommitConfirmed:
+    case FanyImePipeEventType::FieldPrivacyChanged:
+    case FanyImePipeEventType::RuntimeSettingsRequest:
         return true;
     default:
         return false;
@@ -558,16 +565,31 @@ void MainPipeClientThread(HANDLE clientPipe, uint64_t handlerId)
         LogPipeEvent(L"main-pipe", pipeData.event_type, pipeData.keycode, pipeData.wch, pipeData.modifiers_down);
         switch (pipeData.event_type)
         {
+        case FanyImePipeEventType::RuntimeSettingsRequest:
+            if (ClientNegotiatedRuntimeSettings(clientId) && pipeData.keycode == 0 && pipeData.wch == 0 &&
+                pipeData.pinyin_length == 0 && pipeData.modifiers_down == 0)
+                SendRuntimeSettingsSnapshot(clientId, activation.epoch);
+            break;
+        case FanyImePipeEventType::FieldPrivacyChanged: {
+            if (ClientNegotiatedFieldPrivacy(clientId) && pipeData.keycode == 0 && pipeData.wch == 0 &&
+                pipeData.pinyin_length == 0 && (pipeData.modifiers_down & ~FanyImeFieldPrivacy::Mask) == 0)
+                EnqueueTask(TaskType::FieldPrivacyChanged, pipeData, activation.epoch);
+            break;
+        }
         case FanyImePipeEventType::KeyEvent: {
             // 与 worker 侧的 dispatch 探针配对：reader 收到键包即记，两边对照可把丢键
             // 精确到「reader 未收到」还是「worker 未派发」。request_id 是 DLL 侧分配的，
             // 可直接与 [msime][issue47] 的 keydown-sent request 对齐。
-            CAND_DIAG_LOGF(L"main-pipe KeyEvent received request={} keycode=0x{:X} wch=U+{:04X}", pipeData.request_id,
-                           pipeData.keycode, static_cast<unsigned>(pipeData.wch));
+            CAND_DIAG_LOGF(L"main-pipe KeyEvent received request={}", pipeData.request_id);
             EnqueueTask(TaskType::ImeKeyEvent, pipeData, activation.epoch);
             break;
         }
 
+        case FanyImePipeEventType::VocabularyCommitConfirmed: {
+            if (ClientNegotiatedVocabularyCommit(clientId) && pipeData.request_id != 0 && pipeData.pinyin_length == 0)
+                EnqueueTask(TaskType::VocabularyCommitConfirmed, pipeData, activation.epoch);
+            break;
+        }
         case FanyImePipeEventType::HideCandidateWnd: {
             EnqueueTask(TaskType::HideCandidate, pipeData, activation.epoch);
             break;
@@ -858,7 +880,6 @@ void RegisteredPipeMonitorThread(HANDLE clientPipe, UINT pipeRole, uint64_t hand
             SendToTsfWorkerThreadClientViaNamedpipe(hello.client_id,
                                                     Global::DataFromServerMsgTypeToTsfWorkerThread::InputModeChanged,
                                                     GetActiveInputMode() == "japanese" ? L"1" : L"0");
-            SendTrilingualCycleState(hello.client_id);
             SendToTsfWorkerThreadClientViaNamedpipe(hello.client_id,
                                                     Global::DataFromServerMsgTypeToTsfWorkerThread::CapsLockChanged,
                                                     GetServerCapsLockState() != 0 ? L"1" : L"0");
@@ -997,6 +1018,7 @@ void AuxPipeEventListenerLoopThread()
                 else if (message == L"ConfigChanged" || message == L"InputSchemeChanged" ||
                          message == L"CandidateSkinRefresh")
                 {
+                    FanyNamedPipe::EnqueueRuntimeSettingsRefresh();
                     const UINT configMessage =
                         message == L"InputSchemeChanged" ? WM_APPLY_IME_INPUT_SCHEME : WM_APPLY_IME_CONFIG;
                     const WPARAM configWParam = message == L"CandidateSkinRefresh" ? 1 : 0;

@@ -1,0 +1,69 @@
+Metasequoia IME local ASR runtime
+
+The installer contains CPU runtimes and a Vulkan-capable Voxtral backend. Model weights are downloaded separately
+from the links and immutable file digests in catalog.json. Original and converted
+models retain their respective upstream licenses; consult each official model card.
+
+Python: PSF License, https://docs.python.org/3/license.html
+sherpa-onnx and sherpa-onnx-core: Apache-2.0, https://github.com/k2-fsa/sherpa-onnx
+ONNX Runtime: MIT, https://github.com/microsoft/onnxruntime
+NumPy: BSD-3-Clause, https://numpy.org/doc/stable/license.html
+uv: MIT OR Apache-2.0, https://github.com/astral-sh/uv
+PyInstaller bootloader: GPL-2.0-or-later with linking exception,
+https://pyinstaller.org/en/stable/license.html
+
+Distribution metadata and bundled license files are preserved in _internal.
+Full Python, sherpa-onnx, ONNX Runtime and PyInstaller license texts are in
+_internal/licenses; ONNX Runtime dependency notices are also included there.
+The optional Qwen 1.7B worker installs qwen-asr and PyTorch into an isolated uv
+environment on first launch. Their licenses and dependency metadata remain there.
+
+MOSS-TTS-Nano ONNX runtime: Apache-2.0, OpenMOSS Team.
+Source commit 8b7bcc9341b3b4ef3a3a58ba1338a7d85ff133eb:
+https://github.com/OpenMOSS/MOSS-TTS-Nano
+The unmodified runtime source and full license are in worker/vendor/moss.
+MOSS model files (including its streaming codec) are separately downloaded from
+the official openmoss ModelScope account and checked against pinned SHA-256.
+
+Optional TTS environments install their own distribution license metadata:
+qwen-tts / qwen-tts-hf: Apache-2.0, https://github.com/QwenLM/Qwen3-TTS
+faster-qwen3-tts: MIT, https://github.com/andimarafioti/faster-qwen3-tts
+edge-tts: LGPL-3.0, https://github.com/rany2/edge-tts (online service client)
+PyAV: BSD-3-Clause, https://github.com/PyAV-Org/PyAV
+SentencePiece: Apache-2.0, https://github.com/google/sentencepiece
+No Qwen, Kokoro or MOSS model weights, CUDA libraries or Edge service credentials
+are bundled in the installer. Online synthesis is explicit opt-in.
+
+Voxtral Windows runtime: audio.cpp, Apache-2.0, ShugoAI LLC.
+Pinned source: https://github.com/0xShug0/audio.cpp
+Commit 96269554d00621fb0fca6b52b58919749eba1c8d.
+Build and modification details are in worker/vendor/voxtral/UPSTREAM.md.
+Voxtral model and reference embeddings: Mistral AI, CC BY-NC 4.0.
+Official model files are downloaded only by an explicit user action. No Voxtral
+model weights are bundled in the installer. Extra CPU conversion dependencies
+are installed in an isolated environment on first explicit startup.
+
+Screenshot stitching uses Pillow (HPND) and OpenCV (Apache-2.0). Their complete
+license and dependency notices are in _internal/licenses. The Vulkan loader
+license is also included there; the optional Voxtral backend uses Vulkan first
+and retains CPU fallback. No SDK development tools are distributed.
+
+MMS minority-language TTS: Meta, CC-BY-NC-4.0 (non-commercial use only).
+https://huggingface.co/facebook/mms-tts-bod
+https://huggingface.co/facebook/mms-tts-kaz
+The model catalog names the language, immutable revision, size and SHA-256.
+Weights are never bundled or automatically downloaded.
+
+Optional OCR environments: GLM-OCR (ZhipuAI), HunyuanOCR (Tencent-Hunyuan),
+PaddleOCR-VL and PP-OCRv6 (PaddlePaddle). See each catalog entry's official model
+card for its license and requirements. Source/model files are individually
+verified before local loading; all weights require an explicit download action.
+
+Optional Hanzhang Tongbian / Zhiwei QJM runtime adapter is derived from the
+qingjian-format and qingjian-neural architecture/container contract,
+qingjian-team/qingjian commit dd9c471766e117c1f8c557042560776179fe9bfe.
+Code and official Hanzhang weights are GPL-3.0-or-later.
+https://github.com/qingjian-team/qingjian
+The corresponding GPL text is licenses/qingjian-GPL-3.0.txt.
+Official weights remain user-requested downloads; none are distributed here.
+Model metadata and source are retained after verified import.

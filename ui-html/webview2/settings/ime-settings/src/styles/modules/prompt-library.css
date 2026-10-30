@@ -1,0 +1,59 @@
+.prompt-library {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+.prompt-library label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  min-width: 0;
+}
+.prompt-library input:not([type="checkbox"]):not([type="radio"]),
+.prompt-library select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  background: var(--surface-raised);
+  color: var(--text-color);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  font: inherit;
+}
+.prompt-library .prompt-library-fields {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px;
+}
+.prompt-library .prompt-library-primary { margin: 0; }
+.prompt-library .prompt-library-management {
+  padding: 10px 12px; border: 1px solid var(--control-border); border-radius: 7px; background: var(--surface-subtle);
+}
+.prompt-library .prompt-library-management summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; }
+.prompt-library .prompt-editor textarea { width: 100%; min-height: 180px; max-height: 55vh; resize: vertical; line-height: 1.6; background: var(--surface-raised); color: var(--text-color); }
+.prompt-library :is(option, optgroup) { background: var(--surface-raised); color: var(--text-color); }
+.prompt-library .local-asr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.prompt-library button {
+  padding: 7px 10px;
+  background: var(--surface-sunken);
+  color: var(--text-color);
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.prompt-library button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.prompt-library [role="status"] {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}

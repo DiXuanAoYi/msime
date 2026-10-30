@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$TargetVersion = '0.0.1',
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
@@ -16,8 +16,7 @@ param(
     # 词格打分用的语言模型不随词库发布下发，而是由 scripts/build-language-model.ps1
     # 从钉住的上游语料现场转换到这个目录。
     [string]$LanguageModelDirectory = 'language-model',
-    # 神经整句模型（chinese-ime-lm 的 safetensors）从这个目录下发，与 sc.lm 同为资源根下的
-    # 只读文件。缺文件时引擎静默不出神经整句，但打包仍然必须带上，故这里断言存在。
+    # 神经整句速度档随包；效果档由设置按需管理，升级保留已有文件。
     [string]$NeuralModelDirectory = 'neural-model',
     # THIRD_PARTY_NOTICES.txt used to sit next to the tip's sources. In the consolidated repository
     # the notice covers the whole product and lives at the root, one level above windows/, so where
@@ -50,13 +49,19 @@ function Copy-DirectoryContents {
 
 function Reset-Directory {
     param([Parameter(Mandatory)][string]$LiteralPath)
+    $resolvedTarget = [IO.Path]::GetFullPath($LiteralPath)
+    $installerRoot = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\', '/')
+    if (-not $resolvedTarget.StartsWith($installerRoot + [IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Packaging reset target must remain inside the installer workspace: $resolvedTarget"
+    }
     if (Test-Path -LiteralPath $LiteralPath) {
-        Remove-Item -LiteralPath $LiteralPath -Recurse -Force
+        Remove-Item -LiteralPath $resolvedTarget -Recurse -Force
     }
     New-Item -ItemType Directory -Path $LiteralPath -Force | Out-Null
 }
 
-$serverRelease = Join-Path $RepoRoot (Join-Path $ServerDirectory 'build-release\bin\Release')
+$serverRelease = [IO.Path]::GetFullPath((Join-Path $RepoRoot (Join-Path $ServerDirectory 'build-release\bin\Release')))
 $dictionaryReplayRelease = Join-Path $serverRelease 'MetasequoiaImeDictionaryReplay.exe'
 $tsf32Release = Join-Path $RepoRoot (Join-Path $TsfDirectory 'build32-release\Release\MetasequoiaImeTsf.dll')
 $tsf64Release = Join-Path $RepoRoot (Join-Path $TsfDirectory 'build64-release\Release\MetasequoiaImeTsf.dll')
@@ -88,13 +93,36 @@ $neuralModelNotice = Join-Path $RepoRoot (Join-Path $NeuralModelDirectory 'NOTIC
 Assert-PathExists -LiteralPath $RepoRoot -Description '源码仓库根目录'
 Assert-PathExists -LiteralPath $serverRelease -Description 'Server Release 输出目录'
 Assert-PathExists -LiteralPath $dictionaryReplayRelease -Description '用户词库回放程序 Release EXE'
+# Frozen Python / sherpa runtime has upstream binaries, not MSVC PDB companions.
+Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\MetasequoiaLocalASR.exe') -Description '本地语音运行组件'
+Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\_internal\catalog.json') -Description '本地模型锁定目录'
+Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\_internal\tts_catalog.json') -Description '本地发音模型目录'
+Assert-PathExists -LiteralPath (Join-Path $serverRelease 'local-asr\_internal\ocr_catalog.json') -Description '本地 OCR 模型目录'
 Assert-PathExists -LiteralPath $tsf32Release -Description '32 位 TSF Release DLL'
 Assert-PathExists -LiteralPath $tsf64Release -Description '64 位 TSF Release DLL'
 Assert-PathExists -LiteralPath $tsf32Pdb -Description '32 位 TSF Release PDB'
 Assert-PathExists -LiteralPath $tsf64Pdb -Description '64 位 TSF Release PDB'
+# Local MSBuild incremental caches can retain an old class layout after a header
+# edit, even when the final DLL itself has just been linked. Check the objects,
+# not the DLL timestamp. Artifact-only CI staging has no intermediate objects.
+$tsfHeader = Join-Path $RepoRoot (Join-Path $TsfDirectory 'src\IME\MetasequoiaIME.h')
+if (Test-Path -LiteralPath $tsfHeader) {
+    $headerTime = (Get-Item -LiteralPath $tsfHeader).LastWriteTimeUtc
+    foreach ($build in @('build32-release', 'build64-release')) {
+        $objects = Join-Path $RepoRoot (Join-Path $TsfDirectory "$build\MetasequoiaImeTsf.dir\Release")
+        if (-not (Test-Path -LiteralPath $objects)) { continue }
+        $stale = @(Get-ChildItem -LiteralPath $objects -Filter '*.obj' -File | Where-Object {
+            $_.BaseName -in @('MetasequoiaIME', 'ThreadMgrEventSink', 'KeyEventSink', 'Composition', 'EndComposition', 'UndoCommit') -and
+            $_.LastWriteTimeUtc -lt $headerTime
+        })
+        if ($stale.Count) {
+            throw "TSF 类布局对象文件过期：$build / $($stale.Name -join ', ')。请使用 cmake --build --clean-first 完整重建后再打包。"
+        }
+    }
+}
 $serverExecutables = @(
     Get-ChildItem -LiteralPath $serverRelease -Recurse -File -Filter '*.exe' |
-        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' }
+        Where-Object { $_.BaseName -notlike '*Tests' -and $_.BaseName -notlike 'test_*' -and $_.BaseName -notin @('MetasequoiaTtsStreamProbe', 'MetasequoiaVisionLiveProbe') -and $_.FullName -notlike (Join-Path $serverRelease 'local-asr\*') }
 )
 $missingServerPdb = @(
     $serverExecutables |
@@ -143,7 +171,6 @@ if 'weight' not in names or pk != ['word', 'display']:
     Assert-PathExists -LiteralPath $languageModel `
         -Description '词格整句语言模型 sc.lm（用 scripts\build-language-model.ps1 生成）'
     Assert-PathExists -LiteralPath $languageModelNotice -Description 'libime 语言模型授权声明 NOTICE.md'
-    Assert-PathExists -LiteralPath $neuralModelDesktop -Description '神经整句模型 sentence-model-desktop.safetensors'
     Assert-PathExists -LiteralPath $neuralModelKeyboard -Description '神经整句模型 sentence-model.safetensors'
     Assert-PathExists -LiteralPath $neuralModelNotice -Description 'chinese-ime-lm 授权声明 NOTICE.md'
 }
@@ -174,6 +201,17 @@ else {
     Copy-Item -LiteralPath $japaneseModel -Destination (Join-Path $targetAppData 'dict_japanese.dat') -Force
     Copy-Item -LiteralPath $japaneseModelLicense -Destination (Join-Path $targetAppData 'MOZC_DICTIONARY_LICENSE.txt') -Force
     Copy-Item -LiteralPath $englishDb -Destination (Join-Path $targetAppData 'english.db') -Force
+    # Pinned source tables remain separate from the immutable base dictionary release.
+    & python (Join-Path $RepoRoot 'scripts/build_bundled_glossary.py') --output (Join-Path $targetAppData 'qingjian-glossary.db')
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to build the pinned Qingjian glossary.' }
+    & python (Join-Path $RepoRoot 'scripts/build_translation_library.py') --output $targetAppData --english-db $englishDb
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to build the translation library.' }
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'assets/qingjian-glossary') -Destination (Join-Path $targetAppData 'qingjian-glossary-sources') -Recurse -Force
+    & python (Join-Path $RepoRoot 'scripts/build_domain_input.py') --output (Join-Path $targetAppData 'domain-input.db')
+    if ($LASTEXITCODE -ne 0) { throw 'Failed to build the pinned Qingjian input domain packs.' }
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'assets/domain-input') -Destination (Join-Path $targetAppData 'domain-input-sources') -Recurse -Force
+    # Verified, prebuilt character facts; no network or model download during packaging.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'assets/hanzi-question') -Destination (Join-Path $targetAppData 'hanzi-question') -Recurse -Force
     Copy-Item -LiteralPath $othersDb -Destination (Join-Path $targetAppData 'others.db') -Force
     # sc.lm 落在资源目录根下，与 msime.db 同级：engine/contracts/assets 的清单就是这么
     # 声明这个资源的路径的，引擎按该清单里的文件名去找。
@@ -183,7 +221,7 @@ else {
     Copy-Item -LiteralPath $languageModelNotice -Destination (Join-Path $targetAppData 'libime-lm-NOTICE.md') -Force
     # 神经整句模型与 sc.lm 一样落在资源目录根下，文件名由 engine/contracts/assets 清单声明。
     # 缺文件时引擎静默不出神经整句候选（shared_sentence_model 返回 nullptr），不影响其它候选。
-    Copy-Item -LiteralPath $neuralModelDesktop -Destination (Join-Path $targetAppData 'sentence-model-desktop.safetensors') -Force
+    # Desktop weights are managed on demand. Old root files are retained by the installer and accepted by the loader.
     Copy-Item -LiteralPath $neuralModelKeyboard -Destination (Join-Path $targetAppData 'sentence-model.safetensors') -Force
     # 权重是 Apache-2.0 的第三方作品，授权声明必须随二进制到用户磁盘上。
     Copy-Item -LiteralPath $neuralModelNotice -Destination (Join-Path $targetAppData 'chinese-ime-lm-NOTICE.md') -Force
@@ -296,6 +334,10 @@ Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter '*Tests.exe' |
     Remove-Item -Force
 Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter 'test_*.exe' |
     Remove-Item -Force
+foreach ($probeName in @('MetasequoiaTtsStreamProbe.exe', 'MetasequoiaTtsStreamProbe.pdb', 'MetasequoiaVisionLiveProbe.exe', 'MetasequoiaVisionLiveProbe.pdb')) {
+    $probePath = Join-Path $targetServer $probeName
+    if (Test-Path -LiteralPath $probePath) { Remove-Item -LiteralPath $probePath -Force }
+}
 if ($IncludeSymbols) {
     Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter '*Tests.pdb' |
         Remove-Item -Force
@@ -318,6 +360,7 @@ if ($IncludeSymbols) {
     Copy-Item -LiteralPath $tsf64Pdb -Destination $targetTsf64 -Force
 }
 Copy-Item -LiteralPath $appIcon -Destination (Join-Path $PSScriptRoot 'MetasequoiaIME.ico') -Force
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'windows/image/msime.ico') -Destination (Join-Path $PSScriptRoot 'MetasequoiaImeTip.ico') -Force
 # rime-ice is GPL-3.0 and requires attribution, and its content forms the bulk of msime.db, so the
 # notice has to reach the user's disk rather than only exist in the source repository.
 Copy-Item -LiteralPath $thirdPartyNotices -Destination (Join-Path $PSScriptRoot 'THIRD_PARTY_NOTICES.txt') -Force

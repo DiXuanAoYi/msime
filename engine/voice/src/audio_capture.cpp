@@ -34,14 +34,14 @@ AudioCapture::~AudioCapture()
 {
     stop();
 }
-bool AudioCapture::start(AudioCallback callback)
+bool AudioCapture::start(AudioCallback callback, Source source)
 {
     stop();
     if (!callback)
         return false;
     impl_->callback = std::move(callback);
     impl_->failed = false;
-    auto config = ma_device_config_init(ma_device_type_capture);
+    auto config = ma_device_config_init(source == Source::SystemPlayback ? ma_device_type_loopback : ma_device_type_capture);
     config.capture.format = ma_format_f32;
     config.capture.channels = 1;
     config.sampleRate = 16000;

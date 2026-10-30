@@ -50,3 +50,12 @@ TEST_CASE(translation_gloss_keeps_a_single_sense_whole)
     REQUIRE_EQ(ragged[0], std::string("apple"));
     REQUIRE_EQ(ragged[1], std::string("pear"));
 }
+
+TEST_CASE(translation_commit_removes_glossary_display_annotations)
+{
+    const auto values = FanyImeIpc::SplitTranslationGloss("v. develop; n. development; v. 開発する (かいはつする)");
+    REQUIRE_EQ(values.size(), size_t{3});
+    REQUIRE_EQ(values[0], "develop");
+    REQUIRE_EQ(values[1], "development");
+    REQUIRE_EQ(values[2], "開発する");
+}

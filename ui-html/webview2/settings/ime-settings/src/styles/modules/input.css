@@ -404,3 +404,34 @@
 .toggle-section-disabled-hint.is-hidden {
   display: none;
 }
+
+
+.personal-glossary-editor textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 130px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border-color, #888);
+  border-radius: 8px;
+  background: var(--control-bg);
+  color: inherit;
+  font: 13px/1.7 Consolas, "Microsoft YaHei", monospace;
+  tab-size: 12;
+  resize: vertical;
+}
+.personal-glossary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+#personalGlossaryStatus { overflow-wrap: anywhere; min-height: 1.5em; }
+
+#translationOnlineProvider[hidden], #translationOnlineCredentials[hidden] { display: none; }
+
+.vocabulary-table { max-height: 320px; overflow: auto; }
+.vocabulary-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.vocabulary-table th, .vocabulary-table td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color, #ddd); overflow-wrap: anywhere; }
+#vocabularyPanel summary { cursor: pointer; padding: 8px 0; }
+
+.input-app-rule { display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;align-items:center; }
+.input-app-rule input,.input-app-rule select,.advanced-text {background:var(--control-bg);color:var(--text-color);border:1px solid var(--control-border);border-radius:6px;padding:8px;box-sizing:border-box;min-width:0;}
+.input-app-rule input {flex:1;}
+.advanced-text {width:100%;resize:vertical;}

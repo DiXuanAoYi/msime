@@ -1,0 +1,310 @@
+[
+  {
+    "id": "glm-ocr",
+    "name": "GLM-OCR · 0.9B",
+    "engine": "ocr",
+    "official": "https://modelscope.cn/models/ZhipuAI/GLM-OCR",
+    "downloadUrl": "https://modelscope.cn/models/ZhipuAI/GLM-OCR",
+    "features": "官方文字、表格、公式任务；HTML / LaTeX 可编辑导出。长图按原像素分块，混合版式与代码缩进需对照原图核对。",
+    "hardware": "CUDA 优先，失败回退 CPU；复杂页建议分区识别。",
+    "format": "官方原版 · 按需下载并校验",
+    "downloadBytes": 2657427471,
+    "diskBytes": 7972282413,
+    "files": [
+      {
+        "name": "chat_template.jinja",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4ef9fafb5f9a2397f6927ea48f2260492461af71&FilePath=chat_template.jinja",
+        "bytes": 4606,
+        "sha256": "062e7ee4cc8defa88a5938b5d456dc60366ffd80647f918946ee747bf09ddc7c"
+      },
+      {
+        "name": "config.json",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4fc71b7cf3eb2c7f81c1e0f051de6f8532805a81&FilePath=config.json",
+        "bytes": 1737,
+        "sha256": "ad537817b2becde827cbb23569a1dd83a352ee64cc34ce751a4ef000ecce4b5f"
+      },
+      {
+        "name": "configuration.json",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=befbbc3bd6790fc6eed9a5616e9cd2949fdea6d3&FilePath=configuration.json",
+        "bytes": 51,
+        "sha256": "2d4464e2ead06bc9bc718c781309ad1e7baded626d66e8dcdc8b469ba185faf0"
+      },
+      {
+        "name": "generation_config.json",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4ef9fafb5f9a2397f6927ea48f2260492461af71&FilePath=generation_config.json",
+        "bytes": 165,
+        "sha256": "4e2a3412f65b2a21d315d928986c55723d3e60dfb92c3982a5b9fd56835b0aa5"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4ef9fafb5f9a2397f6927ea48f2260492461af71&FilePath=model.safetensors",
+        "bytes": 2650579464,
+        "sha256": "a16eb0de98d199293371c560f95f83130d2a2c9612449df16839f08ff9498815"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4ef9fafb5f9a2397f6927ea48f2260492461af71&FilePath=preprocessor_config.json",
+        "bytes": 367,
+        "sha256": "02cc50c36240882ae35e8cd4077a25a379664108185d728d261cb785aefeccff"
+      },
+      {
+        "name": "processor_config.json",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4fc71b7cf3eb2c7f81c1e0f051de6f8532805a81&FilePath=processor_config.json",
+        "bytes": 1334,
+        "sha256": "a56fbd559186fefd6c22a3acc6a393a18a9fe52c264692a122a143d24042112b"
+      },
+      {
+        "name": "tokenizer.json",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4ef9fafb5f9a2397f6927ea48f2260492461af71&FilePath=tokenizer.json",
+        "bytes": 6838609,
+        "sha256": "aa0fd058c73a5718bb191f6672dc16d122ee0147b20c123d1726514298f9968a"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://modelscope.cn/api/v1/models/ZhipuAI/GLM-OCR/repo?Revision=4fc71b7cf3eb2c7f81c1e0f051de6f8532805a81&FilePath=tokenizer_config.json",
+        "bytes": 1138,
+        "sha256": "95abd49942be9cdc6e2653528aed7b4c1cb9e180828421d3488ab38da3057016"
+      }
+    ]
+  },
+  {
+    "id": "hunyuan-ocr",
+    "name": "HunyuanOCR · 1B",
+    "engine": "ocr",
+    "official": "https://modelscope.cn/models/Tencent-Hunyuan/HunyuanOCR",
+    "downloadUrl": "https://modelscope.cn/models/Tencent-Hunyuan/HunyuanOCR",
+    "features": "混元原版文档识别，适合复杂版面与多语言；输出可编辑。",
+    "hardware": "CUDA 优先，失败回退 CPU；CPU 较慢。",
+    "format": "官方原版 · 按需下载并校验",
+    "downloadBytes": 1998778055,
+    "diskBytes": 5996334165,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=3d1046d76ecea2a4f6ebc2a53f18ad418cb8f504&FilePath=config.json",
+        "bytes": 1893,
+        "sha256": "57d825203dbe1317eab32d16dc8b36c06892062765e9c5718dd740ab936cc245"
+      },
+      {
+        "name": "configuration.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=5875278a8f4e3433dc65e1b55abbf046ba653c56&FilePath=configuration.json",
+        "bytes": 51,
+        "sha256": "2d4464e2ead06bc9bc718c781309ad1e7baded626d66e8dcdc8b469ba185faf0"
+      },
+      {
+        "name": "generation_config.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=eb6310fa37f7e8343d04901c1adb6803343af475&FilePath=generation_config.json",
+        "bytes": 204,
+        "sha256": "ffd5f09e1d57b14b3e0130de5be1aa6b4475b0f97fee442c3e2c8a6d68ba0de1"
+      },
+      {
+        "name": "model-00001-of-00004.safetensors",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=34db9272821046bf69e35459b308a3bf452affdb&FilePath=model-00001-of-00004.safetensors",
+        "bytes": 439600816,
+        "sha256": "e7a0f4cb7fdfe4dc2686f8554310a34b4859ae464ec948f89d954318e382382d"
+      },
+      {
+        "name": "model-00002-of-00004.safetensors",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=559cb0537d698eb8c21379f763365be7abdce885&FilePath=model-00002-of-00004.safetensors",
+        "bytes": 453346288,
+        "sha256": "fbfd70bed291d7920c65aacf4f07c8ea55e60dda253a529860880c5a7e4c00bd"
+      },
+      {
+        "name": "model-00003-of-00004.safetensors",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=8283dc2cc4c54f563be7fcc8cbac3e90ca0a6393&FilePath=model-00003-of-00004.safetensors",
+        "bytes": 461590008,
+        "sha256": "53d0b9f9a85aa21b3454f16f19845294fff7bab8e13aeaf3f7992b85fd35c473"
+      },
+      {
+        "name": "model-00004-of-00004.safetensors",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=5de618243b0fc1c8c64c4382b087253d8b4d067d&FilePath=model-00004-of-00004.safetensors",
+        "bytes": 637958736,
+        "sha256": "fd82d09583ee16037f04532808d0f00332301fc6ed18aa0b75b902fa014402aa"
+      },
+      {
+        "name": "model.safetensors.index.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=90460cb2db281e5bfb1365232f52bc14e97fb3dc&FilePath=model.safetensors.index.json",
+        "bytes": 58249,
+        "sha256": "95bbfecda15d05905ec85fc32ada5c6c4867952b5b379d85a2208c7e050a5cf6"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=9d8082d87e0f38a1d9c8d417124e3bd354828ee4&FilePath=preprocessor_config.json",
+        "bytes": 370,
+        "sha256": "bb37f765bf675500b9a8de70a27b1d973347ee1315c7abbfd231783b64a2f322"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=a44e749272f22da356d7d39afd5a8a5bb5d7ec09&FilePath=special_tokens_map.json",
+        "bytes": 146,
+        "sha256": "eb0954f10121cee77ba00c41d4b2715880c81a3356c98bb513045dc9fb556c22"
+      },
+      {
+        "name": "tokenizer.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=6f8df9ebb8042374ecf1eab505cb9763fda24e5a&FilePath=tokenizer.json",
+        "bytes": 6054315,
+        "sha256": "cde511cfdf641d7340731f174362d6ab7329ac4b7543cf41f42457aa84e25484"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://modelscope.cn/api/v1/models/Tencent-Hunyuan/HunyuanOCR/repo?Revision=4c9af165c946e14ae073a9135402eaac13f929f0&FilePath=tokenizer_config.json",
+        "bytes": 166979,
+        "sha256": "357154e936de39b89efff49cf06a25bd0c10fd55b60f1933142e45d1e26d833c"
+      }
+    ]
+  },
+  {
+    "id": "paddle-ocr-vl",
+    "name": "PaddleOCR-VL · 0.9B",
+    "engine": "ocr",
+    "official": "https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL",
+    "downloadUrl": "https://modelscope.cn/models/PaddlePaddle/PaddleOCR-VL",
+    "features": "官方元素级文字、表格、公式与多语种识别；长图按原像素分块。完整页面版式与代码缩进需核对，未额外下载布局模型。",
+    "hardware": "CUDA 优先，失败回退 CPU；使用 Transformers 原生适配，不执行下载仓库的 Python 代码。",
+    "format": "官方原版 · 按需下载并校验",
+    "downloadBytes": 1930423850,
+    "diskBytes": 5791271550,
+    "files": [
+      {
+        "name": "added_tokens.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=added_tokens.json",
+        "bytes": 25381,
+        "sha256": "f59f889088e0fe21c523e7cf121bb6dca3b0bb148cb7159fbb4572c74dfc5644"
+      },
+      {
+        "name": "chat_template.jinja",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=ae2ef13e1e6d10d1789986e9f1715b31e3ada0bc&FilePath=chat_template.jinja",
+        "bytes": 1472,
+        "sha256": "ab4f984a185809daf6d36ebb6efa7a27c5fe7772ed7b0f0cabd3a1b30a2069cd"
+      },
+      {
+        "name": "config.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=ae2ef13e1e6d10d1789986e9f1715b31e3ada0bc&FilePath=config.json",
+        "bytes": 2059,
+        "sha256": "ce7f4565f8b1db78532ad5d1b9ebe55c2139d49bd4cb04778b580a08a598f171"
+      },
+      {
+        "name": "configuration_paddleocr_vl.py",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=configuration_paddleocr_vl.py",
+        "bytes": 8104,
+        "sha256": "753dd93654c3a9c8c85a3eaee1e3092dd12591b0f2dce0305e1abfb7a41ff160"
+      },
+      {
+        "name": "generation_config.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=552b4a5fb252df6a3f3b0ea63987255fc7d56f8f&FilePath=generation_config.json",
+        "bytes": 133,
+        "sha256": "a6701d78ab3b4d972307cdec3b69d4c13f46e0d5140514f50ab7d84259324b94"
+      },
+      {
+        "name": "image_processing_paddleocr_vl.py",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=ae2ef13e1e6d10d1789986e9f1715b31e3ada0bc&FilePath=image_processing_paddleocr_vl.py",
+        "bytes": 25032,
+        "sha256": "a4fa521b9cb16e207f94b7f2d16427771776dfc634420d319fc4916ee58049ec"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=model.safetensors",
+        "bytes": 1917255968,
+        "sha256": "3085f1042e184f68f8a412aa0f64f2c4b8562989598bbfba326aaa11fc685de8"
+      },
+      {
+        "name": "modeling_paddleocr_vl.py",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=ae2ef13e1e6d10d1789986e9f1715b31e3ada0bc&FilePath=modeling_paddleocr_vl.py",
+        "bytes": 103889,
+        "sha256": "556398ac4b9e1879066f4589dd45c3142037eea616e47d82011402206fbda28f"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=ae2ef13e1e6d10d1789986e9f1715b31e3ada0bc&FilePath=preprocessor_config.json",
+        "bytes": 641,
+        "sha256": "0c349d1210abce664bdba8986dc0637e94679b1fe90f13fcb18616a6466c4618"
+      },
+      {
+        "name": "processing_paddleocr_vl.py",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=processing_paddleocr_vl.py",
+        "bytes": 12253,
+        "sha256": "e29cb1e5f275f2bd3ce051bd5c9983a33894e693b2823a0e13d4c07c8c4f9e13"
+      },
+      {
+        "name": "processor_config.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=processor_config.json",
+        "bytes": 137,
+        "sha256": "1568858960a9760c54431dae693a6152e601ff55cdf6d2eab97a4a99958faea0"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=special_tokens_map.json",
+        "bytes": 1152,
+        "sha256": "215bf3a1b155fafe3497f8790bedf280af92d29c2f0286c2f87a5c78baff8f7c"
+      },
+      {
+        "name": "tokenizer.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=tokenizer.json",
+        "bytes": 11187679,
+        "sha256": "f90f04fd8e5eb6dfa380f37d10c87392de8438dccb6768a2486b5a96ee76dba6"
+      },
+      {
+        "name": "tokenizer.model",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=f172aef5acc28eedbe8fe33b252466008cf7a887&FilePath=tokenizer.model",
+        "bytes": 1614363,
+        "sha256": "34ef7db83df785924fb83d7b887b6e822a031c56e15cff40aaf9b982988180df"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PaddleOCR-VL/repo?Revision=ae2ef13e1e6d10d1789986e9f1715b31e3ada0bc&FilePath=tokenizer_config.json",
+        "bytes": 185587,
+        "sha256": "2eb86166750a1ce6aaeb60d12ef7d88a68e5545ee986a2d266bf143ff8d26f3c"
+      }
+    ]
+  },
+  {
+    "id": "pp-ocrv6",
+    "name": "PP-OCRv6 · 轻量文字检测与识别",
+    "engine": "ocr",
+    "official": "https://modelscope.cn/models/PaddlePaddle/PP-OCRv6_small_rec",
+    "downloadUrl": "https://modelscope.cn/models/PaddlePaddle/PP-OCRv6_small_rec",
+    "features": "轻量中文与英文文字识别；返回文字框和置信度。表格结构和复杂公式请选文档视觉模型。",
+    "hardware": "Windows CPU 轻量运行；安装 Paddle 运行依赖后可用。",
+    "format": "官方原版 · 按需下载并校验",
+    "downloadBytes": 31481281,
+    "diskBytes": 94443843,
+    "files": [
+      {
+        "name": "det/inference.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PP-OCRv6_small_det/repo?Revision=0dbd8262eddcc29a186bd90a458324626974e782&FilePath=inference.json",
+        "bytes": 229307,
+        "sha256": "89240f689a4a77aad75ef55a8df0a15c8e1d4980a327d17e58f24bbadde5aeab"
+      },
+      {
+        "name": "det/inference.pdiparams",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PP-OCRv6_small_det/repo?Revision=0dbd8262eddcc29a186bd90a458324626974e782&FilePath=inference.pdiparams",
+        "bytes": 9817888,
+        "sha256": "5043d4ccc8d63402ccea8feefcee4db57077431a873e78d2191836a178a492da"
+      },
+      {
+        "name": "det/inference.yml",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PP-OCRv6_small_det/repo?Revision=0dbd8262eddcc29a186bd90a458324626974e782&FilePath=inference.yml",
+        "bytes": 885,
+        "sha256": "193f435274bf9f0b5f71a929bbfbcf148282df7e633b34e7c373e8f44741b516"
+      },
+      {
+        "name": "rec/inference.json",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PP-OCRv6_small_rec/repo?Revision=d87f3059c99df3e9242467f4df23027414f332aa&FilePath=inference.json",
+        "bytes": 208004,
+        "sha256": "f0bf53c853937a917affdd74467472167727f8ab0f0f7bded01c4a16c27e46e6"
+      },
+      {
+        "name": "rec/inference.pdiparams",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PP-OCRv6_small_rec/repo?Revision=d87f3059c99df3e9242467f4df23027414f332aa&FilePath=inference.pdiparams",
+        "bytes": 21074618,
+        "sha256": "406e1e689c9a7fbb04178007a3fe10cf852afe7bf8bb3bc6dbb9d532b13bd907"
+      },
+      {
+        "name": "rec/inference.yml",
+        "url": "https://modelscope.cn/api/v1/models/PaddlePaddle/PP-OCRv6_small_rec/repo?Revision=d87f3059c99df3e9242467f4df23027414f332aa&FilePath=inference.yml",
+        "bytes": 150579,
+        "sha256": "ab078671bb49f06228eadccd34f1bb501e157f7a047095ffb943ba81512c77d1"
+      }
+    ]
+  }
+]

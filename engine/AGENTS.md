@@ -50,6 +50,7 @@ ctest --test-dir build --output-on-failure --timeout 20
 - 权重要留在出货词典的量级内（`kManagedWeightCeiling`）。曾经有过一次局部 rebalance 写出 10^12 级数值，以及拿权重为 1 的生僻词当阶梯基准写出负权重到邻近 key 上
 - 一个上下文里可能混着多个 `entry_key`（单字母简拼 `y` 会同时出现 `yi` 的「一」和 `you` 的「有」）。按 `entry_key` 过滤候选列表会让选中项 rank 恒为 0，早退分支直接返回，一个权重都不写
 - 但写入必须按各候选自己的 key 走，否则会把权重写到别的 key 的行上
+- 日志存的是绝对权重，只在同一份出厂词库上有意义。安装时的 `replay` 用数据目录里 `dictionary-manifest.json` 记的 `msime.db` SHA-256 认词库，回放到哪份记在日志的 `dictionary_state` 表：同一份词库原样写回；换了词库，自动调频的行只在高过新出厂权重时写回，否则保留新权重并把日志改记成新权重。用户手动加的词（`user_inserted`）和设置页亲手改的权重（`weight_edited`，由 `record_weight_edit` 写）不受影响。设置页改权重要走 `record_weight_edit`，不要用 `record_upsert`，否则换词库时会被当成自动调频让位
 
 改这里之前先读懂现有的护栏注释，它们每一条都对应一个修过的缺陷。
 

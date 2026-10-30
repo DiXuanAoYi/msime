@@ -45,3 +45,87 @@ TEST_CASE(voice_batch_protocol_preserves_polish_prompt_and_thinking_settings)
     REQUIRE_EQ(body["enable_thinking"].get<bool>(), false);
     REQUIRE(!body.contains("thinking"));
 }
+
+TEST_CASE(voice_cloud_asr_uses_provider_specific_wire_protocols)
+{
+    VoiceInputConfig c;
+    c.asr_provider = "aliyun";
+    c.asr_endpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+    c.asr_model = "qwen3-asr-flash";
+    c.asr_tokens["aliyun"] = "fixture-key";
+    auto req = VoiceInput::BuildAsrHttpRequest(std::vector<float>(160, 0), c, 1700000000);
+    auto body = nlohmann::json::parse(req.body);
+    REQUIRE_EQ(req.content_type, "application/json");
+    REQUIRE(body["messages"][0]["content"][0]["input_audio"]["data"].get<std::string>().rfind(
+                "data:audio/wav;base64,UklGR", 0) == 0);
+    REQUIRE(req.body.find("fixture-key") == std::string::npos);
+    c.asr_provider = "tencent";
+    c.asr_endpoint = "https://asr.tencentcloudapi.com";
+    c.asr_model = "16k_zh";
+    c.tencent_secret_id = "fixture-id";
+    c.asr_tokens["tencent"] = "fixture-secret";
+    req = VoiceInput::BuildAsrHttpRequest(std::vector<float>(160, 0), c, 1700000000);
+    body = nlohmann::json::parse(req.body);
+    REQUIRE_EQ(body["DataLen"].get<int>(), 364);
+    REQUIRE_EQ(body["SourceType"].get<int>(), 1);
+    REQUIRE(req.headers[0].find("TC3-HMAC-SHA256") != std::string::npos);
+    REQUIRE(req.headers[0].find("/2023-11-14/asr/tc3_request") != std::string::npos);
+    REQUIRE(req.headers[0].find("fixture-secret") == std::string::npos);
+    bool rejected = false;
+    try
+    {
+        VoiceInput::BuildAsrHttpRequest(std::vector<float>(61 * 16000, 0), c, 1700000000);
+    }
+    catch (...)
+    {
+        rejected = true;
+    }
+    REQUIRE(rejected);
+    c.asr_endpoint = "https://wrong.example";
+    rejected = false;
+    try
+    {
+        VoiceInput::BuildAsrHttpRequest(std::vector<float>(160, 0), c, 1700000000);
+    }
+    catch (...)
+    {
+        rejected = true;
+    }
+    REQUIRE(rejected);
+}
+
+TEST_CASE(voice_cloud_asr_parses_business_errors_even_on_http_success)
+{
+    REQUIRE_EQ(VoiceInput::ParseAsrHttpResponse(R"({"Response":{"Result":"测试"}})", "tencent"), "测试");
+    REQUIRE_EQ(VoiceInput::ParseAsrHttpResponse(R"({"choices":[{"message":{"content":"hello"}}]})", "aliyun"), "hello");
+    bool rejected = false;
+    try
+    {
+        VoiceInput::ParseAsrHttpResponse(R"({"Response":{"Error":{"Code":"AuthFailure"}}})", "tencent");
+    }
+    catch (...)
+    {
+        rejected = true;
+    }
+    REQUIRE(rejected);
+}
+
+TEST_CASE(voice_polish_thinking_levels_keep_the_user_prompt_and_raise_only_deepseek_budget)
+{
+    VoiceInputConfig config;
+    config.polish_provider = "deepseek";
+    config.polish_prompt = "保留原用户模板";
+    for (const std::string mode : {"low", "high", "max"})
+    {
+        config.polish_thinking = mode;
+        auto body = nlohmann::json::parse(VoiceInput::BuildBatchPolish("自有测试文本", config));
+        REQUIRE(body["thinking"]["type"] == "enabled");
+        REQUIRE(body["reasoning_effort"] == mode);
+        REQUIRE(body["max_tokens"] == 8192);
+        REQUIRE(body["messages"][0]["content"] == config.polish_prompt);
+    }
+    config.polish_provider = "openai";
+    auto body = nlohmann::json::parse(VoiceInput::BuildBatchPolish("测试", config));
+    REQUIRE(!body.contains("thinking"));
+    REQUIRE(!body.contains("reasoning_effort"));
+}

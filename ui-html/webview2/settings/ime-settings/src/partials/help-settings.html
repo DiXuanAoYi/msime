@@ -2,21 +2,50 @@
   <div class="content-header"><span>帮助</span></div>
 
   <div class="section help-document help-simple-document">
-    <p>水杉输入法是一款 Windows 平台的中文输入法。目前支持 Windows11/Windows10 平台。</p>
+    <div class="document-eyebrow">知语输入法 · Windows 10 / 11</div>
+    <h2 class="document-hero-title">从输入到表达，一处完成</h2>
+    <p>本页对应当前本地版本。输入、资料管理可以离线使用；语音、OCR 和 AI 的可用能力取决于你选择的模型或服务。已有配置、聊天上下文及已下载模型继续保留。</p>
+    <div class="help-topic-links" aria-label="常用功能入口"><button type="button" data-help-target="input">输入设置</button><button type="button" data-help-target="voice">语音与发音</button><button type="button" data-help-target="personal-library">剪贴板与资料库</button><button type="button" data-help-target="reply-studio">嘴替 · 回复</button><button type="button" data-help-target="vision">截图 · OCR · 翻译</button><button type="button" data-help-target="vision-bench">翻译工具</button></div>
 
     <div class="help-simple-section">
-      <div class="section-title">快速上手</div>
-      <p>安装输入法后，可以使用 Win + Space 快捷键切换到水杉输入法。默认是全拼输入法。</p>
+      <h3 class="section-title">开始输入与升级后使用</h3>
+      <p>按 Win + Space 在系统输入法中选择“知语输入法”。支持全拼、双拼、五笔和辅助码；使用已经设置好的中英文切换键切到“英”后，也可以显示英文单词、句子和中文释义。中文候选上方的带调拼音可在“输入”中开关。</p>
+      <p>首次安装或更新 TSF 组件后，请保存工作，将原先打开的软件完整退出后重开；聊天软件可能需要从托盘退出。日常切换中英文、词库开关和设置调整无需反复重启。旧版本仍可能显示“水杉”，重开软件后加载新名称；不必卸载或清空用户数据。</p>
     </div>
-
     <div class="help-simple-section">
-      <div class="section-title">基本功能</div>
-      <p>支持全拼、双拼和五笔。可以在设置窗口下的输入功能分区进行切换。全拼和双拼均支持辅助码。辅助码方案目前支持自然码辅助码、蓝天小雨点、首右2.0、首右plus、小鹤和拼音加加，也可以把自己的辅助码文件放进数据目录下的 helpcodes\custom 文件夹导入。可以在设置的辅助码分区进行辅助码的开关和切换。打字过程中，全拼使用辅助码需要用大写的字母唤起单码和双码辅助。双拼在开启辅助码的状态下默认使用单码辅助，第二个码是大写字母的情况下，则会使用完整双码进行筛选。</p>
-      <p>语音识别和 AI 联想需要自行填入 API 和 token。内测期间，将默认使用开发者个人的 api 和 token，仅供测试使用。云联想目前支持谷歌的云接口，请用户注意网络问题，需要时可在下方设置网络代理。</p>
-      <p>更多功能欢迎自由探索~</p>
+      <h3 class="section-title">剪贴板、常用语与语录</h3>
+      <p>在任意输入框按 Ctrl + Alt + V（可在“剪贴板与资料库”或“快捷键”里改）呼出剪贴板，光标旁出现列表，按数字键直接粘贴，Tab 切到常用语。悬浮工具栏也能打开设置里的完整列表：左栏当前分类会高亮，所有资料均以滚动列表显示。剪贴内容相同文字合并，末尾 +N 是复制次数；默认最近复制的排在最前，可改成常用优先。右键可复制、加入常用语、编辑或删除；双击剪贴内容、常用语、语录可编辑。</p>
+      <p>在“管理分组 · 添加、重命名和转移”中点“新建”添加常用语或自定义语录，也可添加独立分组。语录包含经典语录、名人语录与青简诗词名句，可编辑后另存为自己的语录。剪贴板隐私可在“设置”标签里调整：遵守密码管理器的“不要记录”标记、排除指定软件、锁屏暂停。语音收藏在“语音与发音 › 语音消息”；生词复习、学习记录和软件词库在“词库”页进入。</p>
+    </div>
+    <div class="help-simple-section">
+      <h3 class="section-title">问字、整句与候选发音</h3>
+      <p>启用问字后，在拼音组词状态按 Ctrl + Alt + Q。例如 sangeshui 查询“淼”，caozitoujiarijiashi 查询“草”（草字头 + 日 + 十）。本地整句模型及整句补全在 AI 辅助中设置；启用补全后可按 Ctrl + Alt + Enter 触发。</p>
+      <p>按住 Ctrl 点击候选中文或旁边英文可发音，不会选词上屏。发音提供商、音色与模型参数在“语音与发音”中设置。上屏后立即按 Ctrl + Alt + Backspace，可在当前输入框、光标和文字仍匹配时撤销最近一次上屏。</p>
+    </div>
+    <div class="help-simple-section">
+      <h3 class="section-title">本地语音、发音与方言</h3>
+      <p>在“语音与发音”中选本地模型，查看下载大小后按需下载，再点“启动并使用”；正在使用的模型可直接停止或切换。不会自动下载其他模型。支持的本地 TTS 优先使用可用 GPU，无法使用时回退 CPU；首次加载与预热通常比后续播放耗时。</p>
+      <p>按 Ctrl + F9 开始或结束语音输入。“语音与发音”分语音输入、朗读发音、语音消息、本地模型四页：语音输入页可以按住说话试一遍录音和本机识别，并选择识别引擎和润色；语音消息支持试听、音色选择、保存音频、收藏及导入识别；所有本地识别和发音模型都在“本地模型”页下载和管理。方言与民族语言按模型真实能力标注。完全离线时请选择本地识别和本地发音，并关闭云端润色。云端服务需要你自行填写 API 凭据；没有发布权重或不满足运行条件的模型会显示相应说明。</p>
+    </div>
+    <div class="help-simple-section">
+      <h3 class="section-title">嘴替回复、润色与 AI 联想</h3>
+      <p>在聊天输入框里按 Ctrl + Alt + R（帮我回）读取对方的话并给出几种回复，按数字键填入；按 Ctrl + Alt + G（帮我改）把输入框里的草稿改成几种说法。只填入输入框，不会自动发送。面板里的语气、说话习惯和联系人记忆在“嘴替 · 回复”页设置，读取聊天需要在那里开启；长消息和多轮对话在该页的“工作台”里处理。使用云端模型时，所选上下文和请求内容会发往你配置的服务。</p>
+      <p>文本润色及 AI 辅助的提示词模板支持自定义添加、删除、导入、导出，修改自动保存。聊天上下文按会话管理；使用云端模型时，所选上下文和请求内容会发往你配置的服务。</p>
+    </div>
+    <div class="help-simple-section">
+      <h3 class="section-title">截图、OCR 与翻译</h3>
+      <p>按快捷键直接用：Ctrl + Alt + X 截图，Ctrl + Alt + O 识字，Ctrl + Alt + T 截图翻译，Ctrl + Alt + Y 划词翻译，Ctrl + Alt + Shift + T 实时翻译，都可以在“快捷键”页或各功能页里改。识别引擎、排版、翻译服务和历史记录在“截图 · OCR · 翻译”页。选择本地模型或自配云 OCR 可提取文字、表格、公式及代码；公式、表格与代码请结合原图核对，模型未识别正确时可更换服务或手动修正。</p>
+      <p>“翻译工具”页放需要在窗口里操作的功能：图片识别工作台（含长截图，支持横向、纵向或双向拼接和导入照片）、对话翻译、声音转字幕和字幕文件翻译，以及云 OCR 凭据和本地 OCR 模型。对话支持并排/面对面、翻转及双方位置对调；字幕支持识别、翻译、编辑与导出。字幕编辑保护用于避免新结果覆盖正在修改的文字。</p>
+    </div>
+    <div class="help-simple-section">
+      <h3 class="section-title">词库、备份与问题排查</h3>
+      <p>词库页集中管理学习词典、行业词典、青简领域输入词库和中译英词典，支持独立开关及导出。生词复习、学习记录和按软件独立词库在本页的“学习与按软件词库”进入。完整退出重开软件仍不能加载新版时，可保存工作后注销 Windows 再登录。</p>
+      <p>网络服务连接失败时先检查提供商地址、凭据、模型列表和下方代理设置；本地模型问题先检查下载状态及启动提示。关于页可按需启用诊断日志。升级会保留已有用户数据；卸载、手动清理或换电脑前，请额外备份用户数据目录与模型。</p>
+      <p><a href="https://github.com/DiXuanAoYi/msime" target="_blank" rel="noopener noreferrer">本项目源码</a> · <a href="https://github.com/DiXuanAoYi/msime/issues" target="_blank" rel="noopener noreferrer">反馈问题</a> · <a href="https://github.com/metasequoiaime/msime-windows/wiki" target="_blank" rel="noopener noreferrer">水杉上游基础输入资料</a>。当前本地改动以安装后的功能为准，尚未发布的改动不会出现在 GitHub Release 中。</p>
     </div>
   </div>
 
+<div class="section"><h3 class="section-title">默认输入法 · 中文（简体）</h3><p class="input-setting-description">点击后只把知语移到中文键盘列表首位，保留其他语言顺序与界面语言。启动或升级不会自动修改。</p><p id="defaultImeStatus" role="status">正在检查…</p><div class="ai-actions"><button id="defaultImeSetButton" type="button" disabled>设为中文默认</button><button id="defaultImeSystemButton" type="button">打开系统设置</button></div></div>
   <div class="section network-proxy-section">
     <div class="section-title">网络代理</div>
     <div class="input-setting-description">云输入、语法模型下载、AI 联想、翻译和语音识别等联网功能共用这里的设置，修改后立即生效</div>

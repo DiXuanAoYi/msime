@@ -1,3 +1,4 @@
+#include "english/candidate_speech.h"
 // 候选窗 WebView：内容与测量区的脚本更新、悬停锁与粘性卡片脚本、候选槽位增量更新、
 // 测量用 bounds，以及候选窗 controller 的创建与页面消息处理。
 #include "webview2/windows_webview2_internal.h"
@@ -235,6 +236,18 @@ void ResetContainerHoverCandWnd(ComPtr<ICoreWebView2> webview)
 }
 
 constexpr wchar_t kEnsureApplyCandidateFrameScript[] = LR"(
+if (!window.__msimeSpeechInstalled) {
+  window.__msimeSpeechInstalled = true;
+  let pressed = null;
+  document.addEventListener('mousedown', e => { pressed = e.ctrlKey ? e.target.closest('.cand') : null; }, true);
+  document.addEventListener('click', e => {
+    const cand = e.target.closest('.cand'); const held = pressed; pressed = null;
+    if (!cand || (!e.ctrlKey && held !== cand)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const index = Array.from(document.querySelectorAll('#realContainer .cand')).indexOf(cand)+1;
+    if (index > 0 && index <= 10) window.chrome.webview.postMessage(JSON.stringify({protocolVersion:1,type:'candidateSpeak',data:{index,translation:!!e.target.closest('.cand-translation')}}));
+  }, true);
+}
 window.ApplyCandidateFrame = function (payload) {
     const container = document.getElementById('realContainer');
     const parent = document.getElementById('realContainerParent');
@@ -433,7 +446,8 @@ std::wstring BuildCandidateSlotPayloadJson(const std::wstring &commaSeparated, b
                        contentOnly ? 1 : 0, words[0].size());
     }
     payload["selected"] = Global::candidate_ui.selected_index_in_page;
-    payload["preeditVisible"] = GetConfiguredCandidateWindowPreeditStyle() != "empty";
+    payload["preeditVisible"] = (GetConfiguredCandidateWindowPreeditStyle() != "empty" ||
+                                 !Global::LoadCandidatePageSnapshot()->task_status.empty());
     payload["applyMargins"] = !contentOnly;
     payload["resetHover"] = !contentOnly;
     if (!contentOnly)
@@ -494,7 +508,10 @@ void UpdateHtmlContentWithJavaScript(ComPtr<ICoreWebView2> webview, const std::w
     script.append(std::to_wstring(Global::candidate_ui.selected_index_in_page));
     script.append(L"); }\n");
     script.append(L"if (window.SetCandidatePreeditVisible) { window.SetCandidatePreeditVisible(");
-    script.append(GetConfiguredCandidateWindowPreeditStyle() == "empty" ? L"false" : L"true");
+    script.append((GetConfiguredCandidateWindowPreeditStyle() == "empty" &&
+                   Global::LoadCandidatePageSnapshot()->task_status.empty())
+                      ? L"false"
+                      : L"true");
     script.append(L"); }\n");
     script.append(L"if (window.SetPreeditCaret) { window.SetPreeditCaret(); }\n");
     {
@@ -512,8 +529,8 @@ void UpdateHtmlContentWithJavaScript(ComPtr<ICoreWebView2> webview, const std::w
     }
     else
     {
-        const nlohmann::json stickyKey =
-            wstring_to_string(GetPreeditWithCaretMarker()) + "#" + std::to_string(Global::candidate_ui.page_index);
+        const nlohmann::json stickyKey = wstring_to_string(GetCandidatePreeditWithTaskStatus()) + "#" +
+                                         std::to_string(Global::candidate_ui.page_index);
         script.append(L"window.MsimeStickyCandidateCard(false, ");
         script.append(string_to_wstring(stickyKey.dump()));
         script.append(L");\n");
@@ -647,7 +664,10 @@ void UpdateMeasureContentWithJavaScript(ComPtr<ICoreWebView2> webview, const std
     script.append(escaped);
     script.append(L"`;\n");
     script.append(L"if (window.SetCandidatePreeditVisible) { window.SetCandidatePreeditVisible(");
-    script.append(GetConfiguredCandidateWindowPreeditStyle() == "empty" ? L"false" : L"true");
+    script.append((GetConfiguredCandidateWindowPreeditStyle() == "empty" &&
+                   Global::LoadCandidatePageSnapshot()->task_status.empty())
+                      ? L"false"
+                      : L"true");
     script.append(L"); }\n");
     // 测量容器也要带上翻页箭头，量出的卡片尺寸才包含它；不带参数表示不改真实容器里的可用状态。
     script.append(L"if (window.SetCandidatePager) { window.SetCandidatePager(); }\n");
@@ -735,6 +755,12 @@ HRESULT OnControllerCreatedCandWnd(     //
     ICoreWebView2Controller *controller //
 )
 {
+    if (UseD2dSmallWindowUi())
+    {
+        if (controller)
+            controller->Close();
+        return S_OK;
+    }
     CAND_DIAG_LOGF(L"webview controller callback hr={:#x} controller_present={} hwnd_valid={}",
                    static_cast<unsigned>(result), controller != nullptr, IsWindow(hwnd) != FALSE);
     if (!controller || FAILED(result))
@@ -1070,11 +1096,15 @@ HRESULT OnControllerCreatedCandWnd(     //
                         }
                         else if (type == "contextMenuClosed")
                         {
-                            const std::wstring preedit = GetConfiguredCandidateWindowPreeditStyle() == "empty"
-                                                             ? std::wstring{}
-                                                             : GetPreeditWithCaretMarker();
+                            const std::wstring preedit = GetCandidatePreeditWithTaskStatus();
                             std::wstring measurement = preedit + L"," + Global::CandidateString;
                             InflateMeasureDivCandWnd(measurement, [hwnd]() { FineTuneWindow(hwnd); });
+                        }
+                        else if (type == "candidateSpeak")
+                        {
+                            const auto &data = val.at("data").as_object();
+                            CandidateSpeech::Speak(json::value_to<int>(data.at("index")) - 1,
+                                                   json::value_to<bool>(data.at("translation")));
                         }
                         else if (type == "candidate")
                         {
@@ -1153,9 +1183,7 @@ HRESULT OnControllerCreatedCandWnd(     //
                 }
                 if (success && ::is_global_wnd_cand_shown)
                 {
-                    const std::wstring preedit = GetConfiguredCandidateWindowPreeditStyle() == "empty"
-                                                     ? std::wstring{}
-                                                     : GetPreeditWithCaretMarker();
+                    const std::wstring preedit = GetCandidatePreeditWithTaskStatus();
                     std::wstring str = preedit + L"," + Global::CandidateString;
                     InflateMeasureDivCandWnd(str, [hwnd]() {
                         if (!::is_global_wnd_cand_shown)

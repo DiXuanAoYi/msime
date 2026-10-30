@@ -74,7 +74,7 @@ export function setupHelpcode(): void {
     updateCandidatePreviewHelpcode({ shuangpin_helpcode: active });
   });
 
-  // 双拼句中辅助码与直接辅助码互斥：开一个就关另一个。宿主写配置时同样会关掉另一个并回推
+  // 双拼句中辅助码与直接辅助码（万象式）互斥：开一个就关另一个。宿主写配置时同样会关掉另一个并回推
   // 快照，这里先在页面上关掉，免得两个开关同时亮着一瞬。
   setupToggleButton('midSentenceHelpcodeToggleBtn', (active) => {
     if (active) applyToggleState('directHelpcodeToggleBtn', false);

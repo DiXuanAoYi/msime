@@ -5,6 +5,8 @@
 #include "window/candidate_presenter.h"
 #include "window/floating_toolbar_presenter.h"
 #include "window/tray_menu_presenter.h"
+#include "window/ime_windows.h"
+#include "webview2/native_small_window_recovery.h"
 #include <nlohmann/json.hpp>
 #include <string>
 #include <windows.h>
@@ -127,8 +129,6 @@ ICoreWebView2Controller *ControllerForHost(HWND hwnd)
         return webviewControllerMenuWnd.Get();
     if (hwnd == ::global_hwnd_ftb)
         return webviewControllerFtbWnd.Get();
-    if (hwnd == ::global_hwnd_settings)
-        return webviewControllerSettingsWnd.Get();
     return nullptr;
 }
 
@@ -413,6 +413,8 @@ void CALLBACK SmallWindowWebviewRetryTimerProc(HWND hwnd, UINT /*msg*/, UINT_PTR
 
 void ScheduleSmallWindowWebviewRetry(DWORD delay_ms)
 {
+    if (UseD2dSmallWindowUi())
+        return;
     HWND timer_hwnd = smallWindowCandHwnd ? smallWindowCandHwnd : ::global_hwnd;
     if (!timer_hwnd)
     {
@@ -447,6 +449,82 @@ enum class SmallWindowWebviewFailure
 // while a host that keeps failing does not raise a box on every exhausted budget.
 bool smallWindowUnavailableReported = false;
 
+bool RecoverWithNativeSmallWindows(HRESULT error)
+{
+    if (UseD2dSmallWindowUi())
+        return true;
+    if (!smallWindowCandHwnd || !smallWindowFtbHwnd || !smallWindowMenuHwnd)
+        return false;
+    const bool showMenu = pendingTrayMenuShow || IsTrayMenuOpenToUser();
+    const bool showCandidate = ::is_global_wnd_cand_shown;
+    NativeSmallWindowRecovery::HostTransition candidateHost(smallWindowCandHwnd);
+    NativeSmallWindowRecovery::HostTransition toolbarHost(smallWindowFtbHwnd);
+    NativeSmallWindowRecovery::HostTransition menuHost(smallWindowMenuHwnd);
+    if (!candidateHost.Prepare() || !toolbarHost.Prepare() || !menuHost.Prepare())
+        return false;
+    const int toolbarWidth = ::FTB_WND_WIDTH;
+    const int toolbarHeight = ::FTB_WND_HEIGHT;
+    const double toolbarContentWidth = ::FTB_CONTENT_WIDTH_DIP;
+    const double toolbarContentHeight = ::FTB_CONTENT_HEIGHT_DIP;
+    const RECT toolbarInsets = ::FTB_HOST_INSETS_PX;
+    const bool toolbarInsetsValid = ::FTB_HOST_INSETS_VALID;
+    const bool candidate = CandidatePresenter::Instance().Bind(smallWindowCandHwnd);
+    const bool toolbar = FloatingToolbarPresenter::Instance().Bind(smallWindowFtbHwnd);
+    const bool menu = TrayMenuPresenter::Instance().Bind(smallWindowMenuHwnd);
+    if (!candidate || !toolbar || !menu || !candidateHost.Uncloak() || !toolbarHost.Uncloak() || !menuHost.Uncloak())
+    {
+        CandidatePresenter::Instance().Bind(nullptr);
+        FloatingToolbarPresenter::Instance().Bind(nullptr);
+        TrayMenuPresenter::Instance().Bind(nullptr);
+        ::FTB_WND_WIDTH = toolbarWidth;
+        ::FTB_WND_HEIGHT = toolbarHeight;
+        ::FTB_CONTENT_WIDTH_DIP = toolbarContentWidth;
+        ::FTB_CONTENT_HEIGHT_DIP = toolbarContentHeight;
+        ::FTB_HOST_INSETS_PX = toolbarInsets;
+        ::FTB_HOST_INSETS_VALID = toolbarInsetsValid;
+        return false; // The host guards restore the original renderer state.
+    }
+    candidateHost.Commit();
+    toolbarHost.Commit();
+    menuHost.Commit();
+    ActivateNativeSmallWindowFallback();
+    KillTimer(smallWindowCandHwnd, kRetrySmallWindowWebviewTimerId);
+    ResetSmallWindowTopmostGate();
+    for (auto *controller :
+         {webviewControllerCandWnd.Get(), webviewControllerFtbWnd.Get(), webviewControllerMenuWnd.Get()})
+        if (controller)
+            controller->Close();
+    webviewControllerCandWnd.Reset();
+    webviewControllerFtbWnd.Reset();
+    webviewControllerMenuWnd.Reset();
+    webviewCandWnd.Reset();
+    webviewFtbWnd.Reset();
+    webviewMenuWnd.Reset();
+    smallWindowWebviewEnvironment.Reset();
+    smallWindowControllerRequestInFlight = false;
+    smallWindowInitState = SmallWindowInitState::Ready;
+    pendingCandidateShow = false;
+    pendingTrayMenuShow = false;
+    // The controller band restriction no longer applies after Close. Native hosts should be
+    // usable immediately, rather than waiting another 1.4 seconds for the WebView warmup timers.
+    bool pinned = true;
+    for (HWND host : {smallWindowCandHwnd, smallWindowFtbHwnd, smallWindowMenuHwnd})
+        pinned =
+            (SetWindowPos(host, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) != FALSE) && pinned;
+    smallWindowTopmostRequested = true;
+    smallWindowTopmostApplied = pinned;
+    TraceSmallWindowWebview(
+        fmt::format(L"WebView2 recovery: native small windows active, hr={:#x}; requested backend retained",
+                    static_cast<unsigned>(error)));
+    FloatingToolbarPresenter::Instance().RelayoutHost();
+    ReconcileFloatingToolbarVisibilityAfterReady(L"native-fallback");
+    if (showCandidate)
+        PostMessageW(smallWindowCandHwnd, WM_SHOW_MAIN_WINDOW, 0, 0);
+    if (showMenu)
+        PostMessageW(smallWindowMenuHwnd, WM_LANGBAR_RIGHTCLICK, 0, 0);
+    return true;
+}
+
 // The three small windows are shown DWM-cloaked and only uncloaked once the WebView2 controller has
 // painted, so a start-up that never completes looks exactly like a broken engine: no candidate
 // window, no error, nothing on screen. Once the retry budget is spent nothing retries on its own
@@ -456,6 +534,8 @@ bool smallWindowUnavailableReported = false;
 // out on its own thread.
 void ReportSmallWindowWebviewUnavailable(HRESULT last_hr, SmallWindowWebviewFailure failure)
 {
+    if (RecoverWithNativeSmallWindows(last_hr))
+        return;
     if (smallWindowUnavailableReported)
     {
         return;
@@ -491,8 +571,8 @@ void ReportSmallWindowWebviewUnavailable(HRESULT last_hr, SmallWindowWebviewFail
 
     const std::wstring message =
         environment
-            ? fmt::format(L"水杉输入法没能启动 WebView2 运行时，{}暂时无法显示。\r\n"
-                          L"Metasequoia IME could not start the WebView2 Runtime, so the following cannot be "
+            ? fmt::format(L"知语输入法没能启动 WebView2 运行时，{}暂时无法显示。\r\n"
+                          L"Zhiyu IME could not start the WebView2 Runtime, so the following cannot be "
                           L"shown for now: {}.\r\n\r\n"
                           L"请安装或修复 Microsoft Edge WebView2 Runtime 后重新登录：\r\n"
                           L"Install or repair the Microsoft Edge WebView2 Runtime, then sign in again:\r\n"
@@ -508,7 +588,7 @@ void ReportSmallWindowWebviewUnavailable(HRESULT last_hr, SmallWindowWebviewFail
                           L"错误码 / error: {:#x}",
                           hosts_zh, hosts_en, static_cast<unsigned>(last_hr));
     std::thread([message]() {
-        MessageBoxW(nullptr, message.c_str(), L"水杉输入法 / Metasequoia IME",
+        MessageBoxW(nullptr, message.c_str(), L"知语输入法 / Zhiyu IME",
                     MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST);
     }).detach();
 }
@@ -571,6 +651,8 @@ int lastFailedSmallWindowHostIndex = -1;
 // persistently failing host cannot starve its siblings.
 void RequestNextSmallWindowController()
 {
+    if (UseD2dSmallWindowUi())
+        return;
     ICoreWebView2Environment *env = smallWindowWebviewEnvironment.Get();
     if (!env)
     {
@@ -648,6 +730,8 @@ namespace windows_webview2_detail
 // once the previous creation has fully settled.
 void OnSmallWindowControllerSettled(HRESULT hr)
 {
+    if (UseD2dSmallWindowUi())
+        return;
     smallWindowControllerRequestInFlight = false;
     if (FAILED(hr))
     {
@@ -667,6 +751,8 @@ namespace
 {
 void BeginSmallWindowWebviewEnvironmentCreate()
 {
+    if (UseD2dSmallWindowUi())
+        return;
     if (!smallWindowCandHwnd || !smallWindowMenuHwnd || !smallWindowFtbHwnd)
     {
         return;
@@ -706,6 +792,8 @@ void BeginSmallWindowWebviewEnvironmentCreate()
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([](HRESULT result,
                                                                                 ICoreWebView2Environment *env)
                                                                                  -> HRESULT {
+            if (UseD2dSmallWindowUi())
+                return S_OK; // A late completion must not resurrect a released environment.
             if (FAILED(result) || !env)
             {
                 OnSmallWindowWebviewInitFailed(FAILED(result) ? result : E_FAIL);
@@ -1368,35 +1456,23 @@ void ShutdownWebviews()
     {
         webviewControllerFtbWnd->Close();
     }
-    if (webviewControllerSettingsWnd)
-    {
-        webviewControllerSettingsWnd->Close();
-    }
 
     webviewController2CandWnd.Reset();
     webviewController3CandWnd.Reset();
     webviewController2MenuWnd.Reset();
     webviewController2FtbWnd.Reset();
-    webviewController2SettingsWnd.Reset();
 
     webview3CandWnd.Reset();
     webview3MenuWnd.Reset();
     webview3FtbWnd.Reset();
-    webview3SettingsWnd.Reset();
 
     webviewCandWnd.Reset();
     webviewMenuWnd.Reset();
     webviewFtbWnd.Reset();
-    webviewSettingsWnd.Reset();
 
-    webviewCompositionControllerSettingsWnd.Reset();
     webviewControllerCandWnd.Reset();
     webviewControllerMenuWnd.Reset();
     webviewControllerFtbWnd.Reset();
-    webviewControllerSettingsWnd.Reset();
 
-    dcompRootVisualSettingsWnd.Reset();
-    dcompTargetSettingsWnd.Reset();
-    dcompDeviceSettingsWnd.Reset();
     smallWindowWebviewEnvironment.Reset();
 }

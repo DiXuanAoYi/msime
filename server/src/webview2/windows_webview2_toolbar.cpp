@@ -7,6 +7,7 @@
 #include "ipc/ipc.h"
 #include "ipc/event_listener.h"
 #include "settings/settings_launcher.h"
+#include "voice-input/voice_input_service.h"
 #include "utils/common_utils.h"
 #include "utils/window_utils.h"
 #include "window/floating_toolbar_presenter.h"
@@ -172,8 +173,17 @@ void RenderFloatingToolbarState(ICoreWebView2 *webview)
                               : L"window.setToolbarItem('emoji-panel',false);");
     script.append(items.screen_keyboard ? L"window.setToolbarItem('screen-keyboard',true);"
                                         : L"window.setToolbarItem('screen-keyboard',false);");
+    script.append(items.voice ? L"window.setToolbarItem('voice-input',true);"
+                              : L"window.setToolbarItem('voice-input',false);");
+    script.append(items.clipboard ? L"window.setToolbarItem('clipboard-library',true);"
+                                  : L"window.setToolbarItem('clipboard-library',false);");
+    script.append(items.reply ? L"window.setToolbarItem('reply-studio',true);"
+                              : L"window.setToolbarItem('reply-studio',false);");
     script.append(items.settings ? L"window.setToolbarItem('settings',true);"
                                  : L"window.setToolbarItem('settings',false);");
+    script.append(GetConfiguredFloatingToolbarShadow()
+                      ? L"if(window.setToolbarShadowEnabled)window.setToolbarShadowEnabled(true);"
+                      : L"if(window.setToolbarShadowEnabled)window.setToolbarShadowEnabled(false);");
     script.append(L"if(window.CheckContentTruncation)window.CheckContentTruncation();");
 
     webview->ExecuteScript(script.c_str(), nullptr);
@@ -200,6 +210,12 @@ HRESULT OnControllerCreatedFtbWnd(      //
     ICoreWebView2Controller *controller //
 )
 {
+    if (UseD2dSmallWindowUi())
+    {
+        if (controller)
+            controller->Close();
+        return S_OK;
+    }
     if (!controller || FAILED(result))
     {
         OnSmallWindowControllerSettled(FAILED(result) ? result : E_FAIL);
@@ -387,21 +403,12 @@ HRESULT OnControllerCreatedFtbWnd(      //
                     {
                         std::string mode = json::value_to<std::string>(val.at("data"));
 
-                        if (mode == "cn") // Change to CN
+                        // "en" is sent from the 中/日 icon, "cn" from the English one.
+                        // The Server picks the destination, so the trilingual cycle
+                        // applies to clicks as it does to the hotkey.
+                        if (mode == "cn" || mode == "en")
                         {
-#ifdef FANY_DEBUG
-                            (void)0;
-#endif
-                            SendToTsfWorkerThreadViaNamedpipe(
-                                Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToCn, L"");
-                        }
-                        else if (mode == "en") // Change to EN
-                        {
-#ifdef FANY_DEBUG
-                            (void)0;
-#endif
-                            SendToTsfWorkerThreadViaNamedpipe(
-                                Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToEn, L"");
+                            FanyNamedPipe::EnqueueToolbarLanguageToggleTask(mode == "en");
                         }
                     }
                     else if (type == "exitEnglishInputMode")
@@ -452,10 +459,7 @@ HRESULT OnControllerCreatedFtbWnd(      //
                     {
                         const std::string next =
                             GetConfiguredCharacterSet() == "traditional" ? "simplified" : "traditional";
-                        if (SetConfiguredCharacterSet(next))
-                        {
-                            PostSettingsConfig();
-                        }
+                        SetConfiguredCharacterSet(next);
                     }
                     else if (type == "openSettings")
                     {
@@ -470,6 +474,18 @@ HRESULT OnControllerCreatedFtbWnd(      //
                         (void)0;
 #endif
                         OpenEmojiPanelApplication();
+                    }
+                    else if (type == "voiceInput")
+                    {
+                        VoiceInput::ToggleRecording();
+                    }
+                    else if (type == "openPersonalLibrary")
+                    {
+                        OpenPersonalLibraryApplication();
+                    }
+                    else if (type == "openReplyStudio")
+                    {
+                        OpenReplyStudioApplication();
                     }
                     else if (type == "openKeyboardPanel")
                     {

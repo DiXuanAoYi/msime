@@ -146,6 +146,9 @@ endif()
 
 set(SRC_FILES
     "./src/ai/ai_assistant.cpp"
+    "./src/ai/ai_task.cpp"
+    "./src/ai/character_question.cpp"
+    "./src/ai/ai_assistant_request.cpp"
     "./src/ai/ai_assistant.h"
     "./src/ai/ai_assistant_cache.cpp"
     "./src/ai/ai_assistant_cache.h"
@@ -164,25 +167,52 @@ set(SRC_FILES
     "./src/cloud/tencent_tmt.cpp"
     "./src/cloud/tencent_tmt.h"
     "./src/cloud/translation_gloss.cpp"
+    "./src/cloud/ai_translation.cpp"
     "./src/cloud/translation_gloss.h"
     "./src/config/ime_config.cpp"
     "./src/config/ime_config.h"
     "./src/config/ime_config_appearance.cpp"
     "./src/config/ime_config_fonts.cpp"
     "./src/config/ime_config_general.cpp"
+    "./src/english/personal_glossary.cpp"
     "./src/config/ime_config_input.cpp"
     "./src/config/ime_config_internal.h"
     "./src/config/ime_config_keys.cpp"
     "./src/config/ime_config_services.cpp"
+    "./src/config/ime_config_candidate_translation.cpp"
+    "./src/config/ime_config_speech.cpp"
+    "./src/english/speech_service.cpp"
+    "./src/english/voice_studio.cpp"
+    "./src/english/candidate_reading.cpp"
+    "./src/settings/personal_library.cpp"
+    "./src/settings/config_update_dispatch.cpp"
+    "./src/settings/config_update_dispatch.h"
+    "./src/settings/vision_config.cpp"
+    "./src/settings/feature_config.cpp"
+    "./src/quick/quick_thread.cpp"
+    "./src/quick/quick_actions.cpp"
+    "./src/quick/list_panel.cpp"
+    "./src/quick/text_io.cpp"
+    "./src/settings/vision_capture.cpp"
+    "./src/settings/vision_protocol.cpp"
+    "./src/settings/vision_service.cpp"
+    "./src/settings/ocr_table.cpp"
+    "./src/companion/companion_feed.cpp"
+    "./src/settings/vision_subtitles.cpp"
+    "./src/settings/local_ocr_models.cpp"
     "./src/config/ime_config_shuangpin.cpp"
     "./src/config/ime_config_template.cpp"
     "./src/config/ime_config_theme.cpp"
     "./src/config/ime_config_toml.cpp"
     "./src/config/ime_config_toolbar.cpp"
     "./src/config/ime_config_write.cpp"
+    "./src/config/credential_protection.cpp"
+    "./src/config/ime_config_credentials.cpp"
+    "./src/config/ime_config_runtime.cpp"
     "./src/conversion/chinese_converter.cpp"
     "./src/conversion/chinese_converter.h"
     "./src/defines/defines.h"
+    "./src/ipc/event_listener_vocabulary.cpp"
     "./src/english/english_ime.cpp"
     "./src/english/english_ime.h"
     "./src/global/globals.h"
@@ -214,8 +244,13 @@ set(SRC_FILES
     "./src/settings/settings_launcher.cpp"
     "./src/settings/settings_launcher.h"
     "./src/settings/api_credential_test.cpp"
+    "./src/settings/ai_workbench.cpp"
+    "./src/settings/neural_models.cpp"
+    "./src/settings/default_input_method.cpp"
     "./src/settings/api_credential_test.h"
     "./src/settings/collocation_model.cpp"
+    "./src/settings/local_asr_models.cpp"
+    "./src/settings/local_tts_models.cpp"
     "./src/settings/collocation_model.h"
     "./src/skin/candidate_skin_catalog.cpp"
     "./src/skin/candidate_skin_catalog.h"
@@ -230,6 +265,15 @@ set(SRC_FILES
     "./src/statistics/stats_frames.h"
     "./src/statistics/stats_pipe.cpp"
     "./src/statistics/stats_pipe.h"
+    "./src/english/vocabulary_store.cpp"
+    "./src/english/vocabulary_service.cpp"
+    "./src/assistant/modes.cpp"
+    "./src/assistant/protocol.cpp"
+    "./src/assistant/context_store.cpp"
+    "./src/assistant/service.cpp"
+    "./src/assistant/chat_reader.cpp"
+    "./src/assistant/profile_store.cpp"
+
     "./src/statistics/stats_store.cpp"
     "./src/statistics/stats_store.h"
     "./src/statistics/stats_types.h"
@@ -254,7 +298,6 @@ set(SRC_FILES
     "./src/webview2/windows_webview2_candidate.cpp"
     "./src/webview2/windows_webview2_internal.h"
     "./src/webview2/windows_webview2_menu.cpp"
-    "./src/webview2/windows_webview2_settings.cpp"
     "./src/webview2/windows_webview2_skin.cpp"
     "./src/webview2/windows_webview2_toolbar.cpp"
     "./src/webview2/skin_css_policy.cpp"
@@ -278,7 +321,6 @@ set(SRC_FILES
     "./src/window/ime_windows_candidate_show.cpp"
     "./src/window/ime_windows_internal.h"
     "./src/window/ime_windows_menu.cpp"
-    "./src/window/ime_windows_settings.cpp"
     "./src/window/ime_windows_toolbar.cpp"
     "./src/window/window_hook.cpp"
     "./src/window/window_hook.h"
@@ -314,7 +356,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PRIVATE MetasequoiaIme::Engine MetasequoiaIme::Voice MetasequoiaIme::VoiceCapture)
 target_link_libraries(${PROJECT_NAME} PRIVATE unofficial::sqlite3::sqlite3 fmt::fmt spdlog::spdlog Boost::locale Boost::json nlohmann_json::nlohmann_json)
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenCC::OpenCC)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenCC::OpenCC cpp-pinyin::cpp-pinyin)
 add_dependencies(${PROJECT_NAME} Dictionaries)
 target_link_libraries(${PROJECT_NAME} PRIVATE winhttp)
 target_link_libraries(${PROJECT_NAME} PRIVATE CURL::libcurl)
@@ -439,9 +481,20 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 set(SETTINGS_EXECUTABLE_NAME "MetasequoiaImeSettings")
 add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/settings/settings_app.cpp"
+    "./src/ai/ai_assistant.cpp"
+    "./src/ai/ai_task.cpp"
+    "./src/ai/character_question.cpp"
+    "./src/ai/ai_assistant_request.cpp"
+    "./src/ai/ai_assistant_cache_key.cpp"
     "./src/settings/api_credential_test.cpp"
+    "./src/settings/ai_workbench.cpp"
+    "./src/settings/neural_models.cpp"
+    "./src/settings/default_input_method.cpp"
+    "./src/voice-input/voice_batch_protocol.cpp"
     "./src/settings/api_credential_test.h"
     "./src/settings/collocation_model.cpp"
+    "./src/settings/local_asr_models.cpp"
+    "./src/settings/local_tts_models.cpp"
     "./src/settings/collocation_model.h"
     "./src/settings/settings_splash.cpp"
     "./src/settings/settings_splash.h"
@@ -455,6 +508,15 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/settings/dictionary_validation.h"
     "./src/statistics/stats_overview.cpp"
     "./src/statistics/stats_overview.h"
+    "./src/english/vocabulary_store.cpp"
+    "./src/english/vocabulary_service.cpp"
+    "./src/assistant/modes.cpp"
+    "./src/assistant/protocol.cpp"
+    "./src/assistant/context_store.cpp"
+    "./src/assistant/service.cpp"
+    "./src/assistant/chat_reader.cpp"
+    "./src/assistant/profile_store.cpp"
+
     "./src/statistics/stats_store.cpp"
     "./src/statistics/stats_store.h"
     "./src/config/ime_config.cpp"
@@ -462,16 +524,41 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/config/ime_config_appearance.cpp"
     "./src/config/ime_config_fonts.cpp"
     "./src/config/ime_config_general.cpp"
+    "./src/english/personal_glossary.cpp"
     "./src/config/ime_config_input.cpp"
     "./src/config/ime_config_internal.h"
     "./src/config/ime_config_keys.cpp"
     "./src/config/ime_config_services.cpp"
+    "./src/config/ime_config_candidate_translation.cpp"
+    "./src/config/ime_config_speech.cpp"
+    "./src/english/speech_service.cpp"
+    "./src/english/voice_studio.cpp"
+    "./src/english/candidate_reading.cpp"
+    "./src/settings/personal_library.cpp"
+    "./src/settings/config_update_dispatch.cpp"
+    "./src/settings/config_update_dispatch.h"
+    "./src/settings/vision_config.cpp"
+    "./src/settings/feature_config.cpp"
+    "./src/quick/quick_thread.cpp"
+    "./src/quick/quick_actions.cpp"
+    "./src/quick/list_panel.cpp"
+    "./src/quick/text_io.cpp"
+    "./src/settings/vision_capture.cpp"
+    "./src/settings/vision_protocol.cpp"
+    "./src/settings/vision_service.cpp"
+    "./src/settings/ocr_table.cpp"
+    "./src/companion/companion_feed.cpp"
+    "./src/settings/vision_subtitles.cpp"
+    "./src/settings/local_ocr_models.cpp"
     "./src/config/ime_config_shuangpin.cpp"
     "./src/config/ime_config_template.cpp"
     "./src/config/ime_config_theme.cpp"
     "./src/config/ime_config_toml.cpp"
     "./src/config/ime_config_toolbar.cpp"
     "./src/config/ime_config_write.cpp"
+    "./src/config/credential_protection.cpp"
+    "./src/config/ime_config_credentials.cpp"
+    "./src/config/ime_config_runtime.cpp"
     "./src/cloud/custom_translation.cpp"
     "./src/cloud/custom_translation.h"
     "./src/cloud/niutrans_translation.cpp"
@@ -479,6 +566,7 @@ add_executable(${SETTINGS_EXECUTABLE_NAME} WIN32
     "./src/cloud/tencent_tmt.cpp"
     "./src/cloud/tencent_tmt.h"
     "./src/cloud/translation_gloss.cpp"
+    "./src/cloud/ai_translation.cpp"
     "./src/cloud/translation_gloss.h"
     "./src/voice-input/doubao_asr_client.cpp"
     "./src/voice-input/doubao_asr_client.h"
@@ -560,3 +648,20 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
+
+# Isolated read-only UI Automation collector. No input or messaging APIs.
+add_executable(MetasequoiaImeChatCapture "src/assistant/chat_capture.cpp" "src/assistant/chat_reader.cpp")
+target_link_libraries(MetasequoiaImeChatCapture PRIVATE nlohmann_json::nlohmann_json ole32 oleaut32 user32 uiautomationcore gdi32 windowsapp)
+target_compile_features(MetasequoiaImeChatCapture PRIVATE cxx_std_17)
+target_compile_definitions(MetasequoiaImeChatCapture PRIVATE NOMINMAX)
+target_compile_options(MetasequoiaImeChatCapture PRIVATE /utf-8)
+set_target_properties(MetasequoiaImeChatCapture PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+add_dependencies(${PROJECT_NAME} MetasequoiaImeChatCapture)
+add_dependencies(${SETTINGS_EXECUTABLE_NAME} MetasequoiaImeChatCapture)
+
+
+if(TARGET MetasequoiaImeServerTests)
+    add_dependencies(MetasequoiaImeServerTests MetasequoiaImeChatCapture)
+endif()
+
+target_link_libraries(${SETTINGS_EXECUTABLE_NAME} PRIVATE MetasequoiaIme::Voice MetasequoiaIme::VoiceCapture)

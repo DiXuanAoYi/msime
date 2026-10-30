@@ -4,6 +4,7 @@
 #include <string>
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 enum class CandidateSource
 {
@@ -29,6 +30,9 @@ enum class CandidateSource
     // 万象语法模型（octagram .gram）在词格 n-best 上重排挑中的那一句。句子仍是词格
     // 解出来的，搭配强度表只负责挑；落库/学习判定与 NeuralDesktop/NeuralKeyboard 同类。
     Collocation,
+    AppDictionary,
+    AiCompletion,
+    AiQuestion,
 };
 
 struct WordItem
@@ -60,6 +64,8 @@ struct WordItem
     // Generated/Fallback 同时被原样上屏、英文、日期、Unicode、假名、译文等合成候选借用，
     // 候选窗的〔Trigram〕/〔Unigram〕来源标签只认这个标记，不能单凭 source 判断。
     bool sentence_association = false;
+    // Immutable phonetic input dictionaries contributing this lexical candidate (separate from glossaries).
+    std::vector<std::string> input_domains;
 
     WordItem() = default;
     WordItem(std::string pinyin_value, std::string word_value, std::int64_t weight_value,

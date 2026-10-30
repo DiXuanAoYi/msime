@@ -32,7 +32,7 @@ Windows 端的全部一方源码在本仓。**合仓改变的是仓库数量，�
 - **窗口归 `server/`，页面归 `ui-html/`**。HWND、尺寸、位置、DPI、Z-order 和 WebView2 controller 的生命周期在 `server/src/window/` 与 `server/src/webview2/`；页面结构、样式和浏览器端交互在 `ui-html/webview2/`。改消息 `type`、JSON 字段或页面导出的 JS 函数时两侧要一起改。
 - **候选与输入状态的权威在 Server 和引擎**，页面只负责展示和发出用户动作，不要在网页侧复制状态机。
 - `ui-html/webview2/shared/` 是引擎 web 契约的副本，由 `ui-html/scripts/sync-contracts.py` 生成，CI 用 `--check` 验证它和 `engine/contracts/webview/` 一致。手改这个目录会被 CI 拦下来，改契约要改 `engine/contracts/`，然后在同一个提交里重新生成。
-- **新增配置项必须同时写进出厂模板 `installer/default_config/config.default.toml`。** 这个文件是安装包真正打进去的那一份，Server 升级时用 `MergeConfigIntoTemplate` 以它为骨架重建用户配置：**模板里没有的键会被丢弃**。只在 `ime_config.cpp` 里加读取和默认值，代码本身能跑，但用户在设置页改过的值会在下次升级时静默消失，而且没有任何编译期或运行期报错。同一个提交里要一并更新的还有 `server/assets/config/config.toml`（开发和 CI 测试用的工作配置），以及两个设置窗口宿主的读写映射——`server/src/settings/settings_app.cpp` 和 `server/src/webview2/windows_webview2_settings.cpp` 各有一份 `PostSettingsConfig` 的字段列表和一份 `path == "..."` 的分发，漏掉任一侧的表现都是「设置页能点，重开就回退」。
+- **新增配置项必须同时写进出厂模板 `installer/default_config/config.default.toml`。** 这个文件是安装包真正下发的模板。升级保留所有已有配置值（包括旧默认值和未知扩展键），只补新增项；不能用新默认覆盖用户选择。同一个提交还应更新 `server/assets/config/config.toml`、独立设置宿主 `server/src/settings/settings_app.cpp` 的快照和 `server/src/settings/config_update_dispatch.cpp` 的写入映射，以及前端/消息契约。旧同进程 Settings 宿主已移除；跨进程回读由文件通知和独立设置的重载计时器完成。新增字段需要保存、回读、升级和失败保留验证。
 - **`engine/` 是本仓的一等代码，不是 vendored 第三方。** 需要为 Windows 改引擎就直接改，和改 `server/` 一样评审和测试，不用绕上游。唯一例外是 `engine/` 下的 `ngram/kenlm/`、`ngram/octagram/darts.h`、`utfcpp/` 和 `voice/third_party/`，那几个是上游副本，保留原格式与许可；`darts.h` 按精确路径单独排除，同目录的 `octagram_gram.{h,cpp}` 是我们的代码，仍受格式门禁管。`googlepinyinime-rev/` 已与上游解绑，可以直接改，但保留它原有的格式与许可，本地改动记在 UPSTREAM.md。来源与裁剪清单见 [engine/UPSTREAM.md](engine/UPSTREAM.md)。
 
 Server 当前仍使用引擎的兼容 `InputSession`，尚未迁移公共 `Session` facade。
@@ -148,5 +148,7 @@ release workflow 里的每一段 shell 都抽在 `scripts/ci/` 下，workflow �
 改走 SignPath 要把仓库变量 `WINDOWS_SIGNING_PROVIDER` 设为 `signpath`，并配齐 `SIGNPATH_ORGANIZATION_ID`、`SIGNPATH_PROJECT_SLUG`（`msime-windows`）、`SIGNPATH_SIGNING_POLICY_SLUG` 三个变量和组织 secret `SIGNPATH_TOKEN`，缺任何一项 `detect-release-signing.ps1` 都会让发布失败，不会退回证书或未签名。SignPath 项目里还要有 slug 为 `payload` 和 `installer` 的两个 artifact configuration，内容照抄 `installer/signpath/` 下的同名 XML，那两份文件是评审过的副本，SignPath 只读它自己后台里的那份。SignPath 的开源计划只接受「签名请求之前的每个 job 都跑在 GitHub 托管 runner 上」的请求，所以设为 `signpath` 时 `tsf`、`server`、`package` 三个 job 从自托管的发布机换到 `windows-2025`，依赖和编译缓存沿用 `ci.yml` 的做法（同一个 vcpkg 缓存 scope，Server 走 Ninja Multi-Config 加 sccache）；证书路径仍跑在发布机上，那里才有证书。
 
 ## 提交
+
+本个人分支的后续交付默认只在本机修改、编译、测试和安装，保留用户配置、聊天上下文和模型。只有用户明确要求推送时，才向 GitHub 推送代码；创建或发布 Release、上传发行资产需要对应的明确授权。单纯推送代码不代表发布 Release；“继续”、本地验收或确认功能正常不代表推送授权。
 
 提交信息用 `type(scope): 摘要`，scope 用目录名（`windows`、`server`、`engine`、`ui`、`ui-html`、`installer`）。不要添加 `Co-Authored-By`、`Generated with` 或其他 AI 生成标记。

@@ -130,6 +130,14 @@ void Image::LoadNaturalSize()
     }
 }
 
+void Image::SetRenderPose(float angleDegrees, float offsetY, float scale)
+{
+    angleDegrees_ = std::isfinite(angleDegrees) ? std::clamp(angleDegrees, -5.0f, 5.0f) : 0.0f;
+    offsetY_ = std::isfinite(offsetY) ? std::clamp(offsetY, -5.0f, 5.0f) : 0.0f;
+    scale_ = std::isfinite(scale) ? std::clamp(scale, 0.95f, 1.05f) : 1.0f;
+    InvalidateVisual();
+}
+
 SizeF Image::Measure(const SizeF &availableSize)
 {
     LoadNaturalSize();
@@ -200,7 +208,18 @@ void Image::Render(DeviceResources &deviceResources)
                                                 bounds_.y + snap.y + bounds_.height),
                                     D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
     }
+    D2D1_MATRIX_3X2_F originalTransform;
+    target->GetTransform(&originalTransform);
+    if (angleDegrees_ != 0.0f || offsetY_ != 0.0f || scale_ != 1.0f)
+    {
+        const auto center =
+            D2D1::Point2F(destination.x + destination.width / 2, destination.y + destination.height / 2);
+        target->SetTransform(D2D1::Matrix3x2F::Scale(scale_, scale_, center) *
+                             D2D1::Matrix3x2F::Rotation(angleDegrees_, center) *
+                             D2D1::Matrix3x2F::Translation(0.0f, offsetY_) * originalTransform);
+    }
     target->DrawBitmap(bitmap, destinationRect, opacity_, interpolationMode_, &sourceRect);
+    target->SetTransform(originalTransform);
     if (stretch_ == ImageStretch::UniformToFill || stretch_ == ImageStretch::None)
     {
         target->PopAxisAlignedClip();

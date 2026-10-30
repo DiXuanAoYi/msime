@@ -1,14 +1,36 @@
+#include "settings/vision_service.h"
+#include "english/speech_service.h"
+#include "english/voice_studio.h"
+#include "settings/personal_library.h"
+#include "quick/quick_actions.h"
+#include "settings/feature_config.h"
+#include "settings/vision_config.h"
+#include "settings/local_ocr_models.h"
+#include "settings/translation_library.h"
+#include "settings/local_asr_models.h"
+#include "settings/local_tts_models.h"
+#include "assistant/service.h"
+#include "assistant/profile_store.h"
+#include "english/vocabulary_service.h"
 #include "engine/contracts/webview/validator.h"
 #include "config/ime_config.h"
 #include "engine/core/data_path.h"
 #include "global/globals.h"
 #include "resource/resource.h"
 #include "settings/settings_launcher.h"
+#include "settings/config_update_dispatch.h"
+#include "settings/settings_environment.h"
+#include "settings/ai_workbench.h"
+#include "settings/neural_models.h"
+#include "settings/webview_reply.h"
+#include "settings/default_input_method.h"
 #include "settings/api_credential_test.h"
 #include "settings/collocation_model.h"
 #include "settings/settings_splash.h"
+#include "settings/settings_webview_error.h"
 #include "settings/dictionary_manager.h"
 #include "settings/serial_task_queue.h"
+#include "settings/settings_task_diagnostics.h"
 #include "statistics/stats_overview.h"
 #include "statistics/stats_store.h"
 #include <chrono>
@@ -53,10 +75,14 @@ namespace json = boost::json;
 namespace
 {
 constexpr wchar_t kWindowClass[] = L"MetasequoiaImeSettingsWindow";
-constexpr wchar_t kWindowTitle[] = L"Metasequoia IME Settings";
+constexpr wchar_t kWindowTitle[] = L"知语输入法 · 设置";
+constexpr wchar_t kTestWindowTitle[] = L"知语输入法 · 临时测试配置";
+bool g_temporary_configuration = false;
 constexpr wchar_t kSingleInstanceMutex[] = L"Local\\MetasequoiaImeSettings.SingleInstance";
 constexpr UINT kActivateExistingWindow = WM_APP + 1;
 constexpr UINT kOpenAboutSection = WM_APP + 2;
+constexpr UINT kOpenReplyStudioSection = WM_APP + 6;
+constexpr UINT kOpenPersonalSection = WM_APP + 7;
 constexpr UINT kScanSkinCatalog = WM_APP + 3;
 constexpr UINT kWorkerCompleted = WM_APP + 4;
 constexpr UINT kQuitSettings = WM_APP + 5;
@@ -77,11 +103,16 @@ bool g_maximize_button_hover = false;
 bool g_window_active = true;
 bool g_window_minimized = false;
 bool g_open_about_on_ready = false;
+bool g_open_reply_on_ready = false;
+bool g_open_personal_on_ready = false;
 bool g_webview_content_started = false;
 HWND g_settings_hwnd = nullptr;
 std::optional<CandidateSkinCatalog::ScanResult> g_candidate_skin_catalog;
 uint64_t g_candidate_skin_catalog_revision = 0;
 std::unique_ptr<SerialTaskQueue> g_worker;
+std::unique_ptr<ReplyStudio::Host> g_reply_studio;
+std::unique_ptr<ReplyStudio::Host> g_chat_model;
+std::unique_ptr<ReplyStudio::Host> g_chat_reader;
 bool g_closing = false;
 bool g_lingering = false;
 bool g_reload_pending = false;
@@ -95,13 +126,13 @@ void HideSettings(HWND hwnd);
 
 // 冷启动打点：设置 METASEQUOIA_IME_SETTINGS_TRACE=1 后，各阶段距进程启动的毫秒数追加到
 // %TEMP%\metasequoia-settings-startup.log。UI 线程和 worker 都会调用。
-void TraceStartup(const char *stage)
+void TraceStartup(const char *stage, bool force_diagnostic = false)
 {
     static const bool enabled = [] {
         wchar_t value[8]{};
         return GetEnvironmentVariableW(L"METASEQUOIA_IME_SETTINGS_TRACE", value, 8) > 0 && value[0] == L'1';
     }();
-    if (!enabled)
+    if (!enabled && !force_diagnostic)
         return;
     static const LONGLONG start = [] {
         FILETIME creation{}, exit{}, kernel{}, user{};
@@ -125,6 +156,17 @@ void TraceStartup(const char *stage)
     }
 }
 
+void TraceSettingsTask(const SettingsTaskDiagnostics::Context &context, const char *stage,
+                       const SettingsTaskDiagnostics::Failure *failure)
+{
+    std::string text = "operation=" + std::string(SettingsTaskDiagnostics::Operation(context.operation)) +
+                       " action=" + SettingsTaskDiagnostics::Action(context.action) + " stage=" + stage;
+    if (failure)
+        text += " exception=" + std::string(failure->category) + " json_id=" + std::to_string(failure->json_id);
+    TraceStartup(text.c_str(), failure != nullptr);
+}
+void SubmitSettingsTask(SettingsTaskDiagnostics::Context context, SerialTaskQueue::Task task);
+
 nlohmann::json CandidateColorsToJson(const CandidateSkinCatalog::CandidateColors &colors)
 {
     nlohmann::json json = nlohmann::json::object();
@@ -147,10 +189,18 @@ nlohmann::json CandidateColorsToJson(const CandidateSkinCatalog::CandidateColors
     if (colors.showSelectedBar.has_value())
         json["showSelectedBar"] = *colors.showSelectedBar;
     const std::pair<const char *, const std::string *> optional[] = {
-        {"candidateText", &colors.candidateText},   {"preeditText", &colors.preeditText},
-        {"preeditCaret", &colors.preeditCaret},     {"selectedText", &colors.selectedText},
-        {"selectedNumber", &colors.selectedNumber}, {"selectedTranslation", &colors.selectedTranslation},
-        {"selectedBar", &colors.selectedBar},       {"preeditBackground", &colors.preeditBackground},
+        {"candidateText", &colors.candidateText},
+        {"preeditText", &colors.preeditText},
+        {"preeditCaret", &colors.preeditCaret},
+        {"selectedText", &colors.selectedText},
+        {"selectedNumber", &colors.selectedNumber},
+        {"selectedTranslation", &colors.selectedTranslation},
+        {"translationPos", &colors.translationPos},
+        {"translationSeparator", &colors.translationSeparator},
+        {"selectedTranslationPos", &colors.selectedTranslationPos},
+        {"selectedTranslationSeparator", &colors.selectedTranslationSeparator},
+        {"selectedBar", &colors.selectedBar},
+        {"preeditBackground", &colors.preeditBackground},
         {"preeditDivider", &colors.preeditDivider},
     };
     for (const auto &[key, value] : optional)
@@ -200,6 +250,54 @@ void ShowAboutSection()
             if (!item) return false;
             if (!item.classList.contains('active')) item.click();
             const section = document.getElementById('about-settings');
+            if (!item.classList.contains('active') || !section || getComputedStyle(section).display === 'none')
+                return false;
+            item.scrollIntoView({ block: 'nearest' });
+            return true;
+        };
+        if (selectAbout()) return;
+        const retry = setInterval(() => {
+            if (selectAbout()) clearInterval(retry);
+        }, 50);
+        setTimeout(() => clearInterval(retry), 10000);
+    })())JS",
+                             nullptr);
+}
+
+void ShowReplyStudioSection()
+{
+    if (!g_webview)
+        return;
+    g_webview->ExecuteScript(LR"JS((() => {
+        const selectAbout = () => {
+            const item = document.querySelector('.sidebar .item[data-target="reply-studio"]');
+            if (!item) return false;
+            if (!item.classList.contains('active')) item.click();
+            const section = document.getElementById('reply-studio-settings');
+            if (!item.classList.contains('active') || !section || getComputedStyle(section).display === 'none')
+                return false;
+            item.scrollIntoView({ block: 'nearest' });
+            return true;
+        };
+        if (selectAbout()) return;
+        const retry = setInterval(() => {
+            if (selectAbout()) clearInterval(retry);
+        }, 50);
+        setTimeout(() => clearInterval(retry), 10000);
+    })())JS",
+                             nullptr);
+}
+
+void ShowPersonalSection()
+{
+    if (!g_webview)
+        return;
+    g_webview->ExecuteScript(LR"JS((() => {
+        const selectAbout = () => {
+            const item = document.querySelector('.sidebar .item[data-target="personal-library"]');
+            if (!item) return false;
+            if (!item.classList.contains('active')) item.click();
+            const section = document.getElementById('personal-library');
             if (!item.classList.contains('active') || !section || getComputedStyle(section).display === 'none')
                 return false;
             item.scrollIntoView({ block: 'nearest' });
@@ -360,7 +458,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
 {
 
     const VoiceInputConfig &voice = GetConfiguredVoiceInput();
-    const AiAssistantConfig &ai = GetConfiguredAiAssistant();
+    const AiAssistantConfig ai = GetConfiguredAiAssistantSnapshot();
     const TencentTmtConfig &tencent_tmt = GetConfiguredTencentTmt();
     const CustomTranslationConfig &custom_translation = GetConfiguredCustomTranslation();
     const NiuTransConfig &niutrans = GetConfiguredNiuTrans();
@@ -411,6 +509,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
                   skin.toolbarCornerRadiusDip ? nlohmann::json(*skin.toolbarCornerRadiusDip) : nlohmann::json()},
                  // 已按 base 的默认皮肤清单解析好，页面预览直接用。
                  {"pageArrows", CandidateSkinCatalog::ResolvePageArrows(skins_root, skin.id, &skin)},
+                 {"fitContent", CandidateSkinCatalog::ResolveFitContent(skins_root, skin.id, &skin)},
                  {"compatible", CandidateSkinCatalog::Supports(skin, skin_layout, skin_theme)}});
         }
     }
@@ -418,6 +517,9 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
     nlohmann::json builtin_page_arrows = nlohmann::json::object();
     for (const auto &id : CandidateSkinCatalog::BuiltInIds())
         builtin_page_arrows[id] = CandidateSkinCatalog::ResolvePageArrows(skins_root, id, nullptr);
+    nlohmann::json builtin_fit_content = nlohmann::json::object();
+    for (const auto &id : CandidateSkinCatalog::BuiltInIds())
+        builtin_fit_content[id] = CandidateSkinCatalog::ResolveFitContent(skins_root, id, nullptr);
     nlohmann::json skin_issues = nlohmann::json::array();
     if (g_candidate_skin_catalog)
     {
@@ -447,6 +549,13 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"shuangpin_schema", GetConfiguredShuangpinSchema()},
             {"wubi_schema", GetConfiguredWubiSchema()},
             {"wubi_mixed_pinyin", GetConfiguredWubiMixedPinyin()},
+            {"english_candidates", GetConfiguredEnglishCandidates()},
+            {"english_candidate_app_rules", *GetConfiguredEnglishCandidateAppRules()},
+            {"wubi_four_code_auto_commit", GetConfiguredWubiFourCodeAutoCommit()},
+            {"wubi_fifth_code_top_commit", GetConfiguredWubiFifthCodeTopCommit()},
+            {"vim_mode_apps", *GetConfiguredVimModeApps()},
+            {"enabled_domain_dictionaries", *GetConfiguredEnabledDomainDictionaries()},
+
             {"escape_keeps_selected_word", GetConfiguredEscapeKeepsSelectedWord()},
             {"enter_learns_english_word", GetConfiguredEnterLearnsEnglishWord()},
             {"wubi_z_mode", GetConfiguredWubiZMode()},
@@ -478,6 +587,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"candidate_window_diagnostic_log", GetConfiguredDiagnosticLogEnabled()},
             {"tsf_diagnostic_log", GetConfiguredTsfDiagnosticLogEnabled()},
             {"floating_toolbar", GetConfiguredFloatingToolbarEnabled()},
+            {"floating_toolbar_shadow", GetConfiguredFloatingToolbarShadow()},
             {"caret_state_indicator", GetConfiguredCaretStateIndicatorEnabled()},
             {"caret_state_indicator_on_focus", GetConfiguredCaretStateIndicatorOnFocus()},
             {"caret_state_indicator_position", GetConfiguredCaretStateIndicatorPosition()},
@@ -486,6 +596,9 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"floating_toolbar_character_set", toolbar.character_set},
             {"floating_toolbar_emoji", toolbar.emoji},
             {"floating_toolbar_screen_keyboard", toolbar.screen_keyboard},
+            {"floating_toolbar_voice", toolbar.voice},
+            {"floating_toolbar_reply", toolbar.reply},
+            {"floating_toolbar_clipboard", toolbar.clipboard},
             {"floating_toolbar_settings", toolbar.settings},
             {"floating_toolbar_scale", GetConfiguredFloatingToolbarScale()},
             {"floating_toolbar_font_size", GetConfiguredFloatingToolbarFontSize()},
@@ -493,6 +606,9 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"floating_toolbar_auto_hide_delay", GetConfiguredFloatingToolbarAutoHideDelay()},
             {"cn_en_mixed_input", GetConfiguredEnglishCandidatesEnabled()},
             {"candidate_translations", GetConfiguredCandidateTranslationsEnabled()},
+            {"candidate_translation_cloud", GetConfiguredCandidateTranslationCloudEnabled()},
+            {"personal_translation_glossary", GetConfiguredPersonalTranslationGlossary()->Source()},
+            {"disabled_translation_dictionaries", *GetConfiguredDisabledTranslationDictionaries()},
             {"cn_en_mixed_input_min_chars", GetConfiguredEnglishMixedInputMinChars()},
             {"emoji_mixed_input", GetConfiguredEmojiMixedInputEnabled()},
             {"kaomoji_mixed_input", GetConfiguredKaomojiMixedInputEnabled()},
@@ -534,7 +650,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
                  return catalog;
              }()}}},
           {"keybindings",
-           {{"switch_language_shift", GetConfiguredSwitchLanguageShiftEnabled()},
+           {{"trilingual_cycle", GetConfiguredTrilingualCycleEnabled()},
+            {"switch_language_shift", GetConfiguredSwitchLanguageShiftEnabled()},
             {"switch_language_ctrl", GetConfiguredSwitchLanguageCtrlEnabled()},
             {"switch_language_ctrl_alt_space", GetConfiguredSwitchLanguageCtrlAltSpaceEnabled()},
             {"toggle_character_set_ctrl_shift_f", GetConfiguredCharacterSetShortcutEnabled()},
@@ -561,12 +678,14 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"clipboard_history", GetConfiguredClipboardHistoryEnabled()}}},
           {"appearance",
            {{"ui_backend", GetConfiguredUiBackend()},
+            {"candidate_fit_content", GetConfiguredCandidateFitContentMode()},
             {"settings_window_linger", GetConfiguredSettingsWindowLinger()},
             {"candidate_window_layout", GetConfiguredCandidateWindowLayout()},
             {"candidate_window_follow_cursor", GetConfiguredCandidateWindowFollowCursor()},
             {"candidate_skin", GetConfiguredCandidateSkin()},
             {"candidate_window_preedit_style", GetConfiguredCandidateWindowPreeditStyle()},
             {"candidate_window_preedit_shuangpin_quanpin", GetConfiguredCandidateWindowPreeditShuangpinQuanpin()},
+            {"candidate_show_pinyin", GetConfiguredCandidateShowPinyin()},
             {"candidate_fixed_badge", GetConfiguredCandidateFixedBadge()},
             {"candidate_fixed_badge_style", GetConfiguredCandidateFixedBadgeStyle()},
             {"tsf_preedit_style", GetConfiguredTsfPreeditStyle()},
@@ -594,6 +713,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"cand_text_color", GetConfiguredCandidateTextColor()},
             {"system_fonts", GetSystemFontFamilies()},
             {"builtin_skin_page_arrows", std::move(builtin_page_arrows)},
+            {"builtin_skin_fit_content", std::move(builtin_fit_content)},
             {"external_candidate_skins", std::move(external_skins)},
             {"candidate_skin_scan_issues", std::move(skin_issues)},
             {"candidate_skin_catalog_scanned", g_candidate_skin_catalog.has_value()},
@@ -609,6 +729,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"asr_provider", voice.asr_provider},
             {"doubao_auth_mode", voice.doubao_auth_mode},
             {"asr_app_key", voice.asr_app_key},
+            {"tencent_secret_id", voice.tencent_secret_id},
             {"asr_token", voice.asr_token},
             {"asr_tokens", voice.asr_tokens},
             {"asr_endpoint", voice.asr_endpoint},
@@ -622,12 +743,13 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"polish_token", voice.polish_token},
             {"polish_tokens", voice.polish_tokens},
             {"polish_endpoint", voice.polish_endpoint},
-            {"polish_model", voice.polish_model},
+            {"polish_model", voice.polish_model},{"polish_thinking",voice.polish_thinking},
             {"polish_prompt_id", voice.polish_prompt_id},
             {"polish_prompt", voice.polish_prompt},
             {"polish_prompt_custom_1", voice.polish_prompt_custom_1},
             {"polish_prompt_custom_2", voice.polish_prompt_custom_2},
             {"polish_prompt_custom_3", voice.polish_prompt_custom_3},
+            {"prompt_library", voice.prompt_library},
             {"language", voice.language},
             {"start_sound", voice.start_sound},
             {"end_sound", voice.end_sound},
@@ -639,6 +761,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
           {"ai_assistant",
            {{"enabled", ai.enabled},
             {"provider", ai.provider},
+            {"thinking", ai.thinking},{"task", ai.task},
+            {"completion_enabled",ai.completion_enabled},{"question_enabled",ai.question_enabled},
             {"token", ai.token},
             {"tokens", ai.tokens},
             {"endpoint", ai.endpoint},
@@ -650,7 +774,7 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"prompt_id", ai.prompt_id},
             {"prompt_custom_1", ai.prompt_custom_1},
             {"prompt_custom_2", ai.prompt_custom_2},
-            {"prompt_custom_3", ai.prompt_custom_3}}},
+            {"prompt_custom_3", ai.prompt_custom_3}, {"prompt_library", ai.prompt_library}}},
           {"tencent_tmt",
            {{"secret_id", tencent_tmt.secret_id},
             {"secret_key", tencent_tmt.secret_key},
@@ -679,14 +803,28 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
           {"quanpin",
            {{"autocorrect_transposition", GetConfiguredQuanpinAutocorrectTransposition()},
             {"autocorrect_neighbor", GetConfiguredQuanpinAutocorrectNeighbor()},
+            {"autocorrect_deletion", GetConfiguredQuanpinAutocorrectDeletion()},
+            {"autocorrect_insertion", GetConfiguredQuanpinAutocorrectInsertion()},
             {"autocorrect_marker", GetConfiguredQuanpinAutocorrectMarker()}}},
+          {"vocabulary", {{"enabled", GetConfiguredVocabularyEnabled()}, {"retention_days", GetConfiguredVocabularyRetentionDays()}}},
           {"statistics",
            {{"enabled", GetConfiguredStatisticsEnabled()}, {"retention", GetConfiguredStatisticsRetention()}}}}}};
+    const auto candidate_translation = GetConfiguredCandidateTranslationSnapshot();
+    payload["data"]["candidate_translation"] = {
+        {"provider", candidate_translation.provider},   {"ai_provider", candidate_translation.ai_provider},
+        {"endpoint", candidate_translation.endpoint},   {"model", candidate_translation.model},
+        {"token", candidate_translation.token},         {"tokens", candidate_translation.tokens},
+        {"endpoints", candidate_translation.endpoints}, {"models", candidate_translation.models}};
+    payload["data"]["speech"] = Speech::GetConfig();
+    payload["data"]["vision"] = VisionConfig::Get();
+    for (const char *section : {"hotkeys", "reply", "clipboard"})
+        payload["data"][section] = FeatureConfig::Get(section);
     payload["data"]["voice_input"]["polish_presets"] = std::move(polish_presets);
     payload["data"]["helpcode"]["custom_schemas"] = CustomHelpcodeSchemasJson();
     payload["data"]["helpcode"]["custom_directory"] = GetCustomHelpcodeDirectory();
     payload["data"]["input"]["custom_shuangpin_schemas"] = CustomShuangpinSchemasJson();
     payload["data"]["input"]["custom_shuangpin_directory"] = GetCustomShuangpinDirectory();
+    payload["data"]["environment"] = {{"temporary_configuration", g_temporary_configuration}};
     payload["protocolVersion"] = metasequoia::webview::Version;
     const std::string serialized = payload.dump();
     if (!metasequoia::webview::Validate(json::parse(serialized), "server"))
@@ -724,7 +862,8 @@ void PostConfig(bool refresh_skin_catalog = false)
 {
     if (!g_worker || g_closing)
         return;
-    g_worker->Submit([refresh_skin_catalog] { return ConfigCompletion(refresh_skin_catalog); });
+    SubmitSettingsTask({refresh_skin_catalog ? "skinCatalogRequest" : "configRequest", true},
+                       [refresh_skin_catalog] { return ConfigCompletion(refresh_skin_catalog); });
 }
 
 void PostValidatedServerMessage(json::object payload)
@@ -736,6 +875,41 @@ void PostValidatedServerMessage(json::object payload)
         return;
     const std::wstring message = string_to_wstring(json::serialize(payload));
     g_webview->PostWebMessageAsJson(message.c_str());
+}
+
+void ReportSettingsTaskError(const SettingsTaskDiagnostics::Context &context, const SettingsTaskDiagnostics::Failure &)
+{
+    if (std::string_view(context.operation) == "initialConfig" && !g_webview)
+    {
+        MessageBoxW(g_settings_hwnd, L"设置加载失败，请重试。诊断已记录，输入法仍可使用。", L"知语输入法",
+                    MB_OK | MB_ICONWARNING);
+        return;
+    }
+    // A native Save As dialog runs a nested message loop. Background status failures must not open another modal.
+    PostValidatedServerMessage(
+        {{"type", "settingsOperationError"},
+         {"automatic", context.automatic},
+         {"message", context.automatic ? "后台状态刷新失败，请点击相应刷新按钮重试。当前编辑内容保留。"
+                                       : "本次设置操作失败，请重试。当前编辑内容保留。"}});
+}
+void SubmitSettingsTask(SettingsTaskDiagnostics::Context context, SerialTaskQueue::Task task)
+{
+    if (g_worker)
+        g_worker->Submit(
+            SettingsTaskDiagnostics::Wrap(context, std::move(task), TraceSettingsTask, ReportSettingsTaskError));
+}
+SettingsTaskDiagnostics::Context SettingsMessageContext(const std::string &type, const json::value &message)
+{
+    const char *action = "-";
+    if (const auto *data = message.as_object().if_contains("data"); data && data->is_object())
+        if (const auto *value = data->as_object().if_contains("action"); value && value->is_string())
+            action =
+                SettingsTaskDiagnostics::Action(std::string_view(value->as_string().data(), value->as_string().size()));
+    const bool automatic = type == "configRequest" || type == "skinCatalogRequest" ||
+                           type == "collocationModelStatusRequest" || std::string_view(action) == "status" ||
+                           std::string_view(action) == "overview" || std::string_view(action) == "catalog" ||
+                           std::string_view(action) == "domainCatalog";
+    return {SettingsTaskDiagnostics::Operation(type), automatic, action};
 }
 
 void PostWindowState(HWND hwnd)
@@ -752,331 +926,6 @@ void PostMaximizeButtonEvent(const char *event_name)
         {"type", "maxButtonEvent"},
         {"data", {{"event", event_name}}},
     });
-}
-
-bool ApplyConfigUpdate(const json::object &data)
-{
-    const std::string path = json::value_to<std::string>(data.at("path"));
-    if (path == "input.mode")
-        return SetConfiguredInputMode(json::value_to<std::string>(data.at("value")));
-    if (path == "input.schema")
-        return SetConfiguredInputScheme(json::value_to<std::string>(data.at("value")));
-    if (path == "input.japanese_schema")
-        return SetConfiguredJapaneseSchema(json::value_to<std::string>(data.at("value")));
-    if (path == "input.character_set")
-        return SetConfiguredCharacterSet(json::value_to<std::string>(data.at("value")));
-    if (path == "input.default_ime_mode")
-        return SetConfiguredDefaultImeMode(json::value_to<std::string>(data.at("value")));
-    if (path == "input.ime_mode_scope")
-        return SetConfiguredImeModeScope(json::value_to<std::string>(data.at("value")));
-    if (path == "input.shuangpin_schema")
-        return SetConfiguredShuangpinSchema(json::value_to<std::string>(data.at("value")));
-    if (path == "input.wubi_schema")
-        return SetConfiguredWubiSchema(json::value_to<std::string>(data.at("value")));
-    if (path == "input.wubi_mixed_pinyin")
-        return SetConfiguredWubiMixedPinyin(json::value_to<bool>(data.at("value")));
-    if (path == "input.escape_keeps_selected_word")
-        return SetConfiguredEscapeKeepsSelectedWord(json::value_to<bool>(data.at("value")));
-    if (path == "input.enter_learns_english_word")
-        return SetConfiguredEnterLearnsEnglishWord(json::value_to<bool>(data.at("value")));
-    if (path == "input.wubi_z_mode")
-        return SetConfiguredWubiZMode(json::value_to<std::string>(data.at("value")));
-    if (path == "input.wubi_four_code_auto_commit")
-        return SetConfiguredWubiFourCodeAutoCommit(json::value_to<bool>(data.at("value")));
-    if (path == "input.wubi_fifth_code_top_commit")
-        return SetConfiguredWubiFifthCodeTopCommit(json::value_to<bool>(data.at("value")));
-    if (path == "input.word_to_character")
-        return SetConfiguredWordToCharacterEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "input.word_to_character_keys")
-        return SetConfiguredWordToCharacterKeys(json::value_to<std::string>(data.at("value")));
-    if (path == "input.smart_punctuation")
-        return SetConfiguredSmartPunctuationEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "input.smart_punctuation_space_convert")
-        return SetConfiguredSmartPunctuationSpaceConvertEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "input.smart_punctuation_direct_digit")
-        return SetConfiguredSmartPunctuationDirectDigitEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "input.smart_punctuation_direct_letter")
-        return SetConfiguredSmartPunctuationDirectLetterEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "input.smart_punctuation_repeat_to_chinese")
-        return SetConfiguredSmartPunctuationRepeatToChineseEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "input.paired_punctuation")
-        return SetConfiguredPairedPunctuationEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "input.punctuation_lock")
-        return SetConfiguredPunctuationLock(json::value_to<std::string>(data.at("value")));
-    constexpr std::string_view input_section_prefix = "input.";
-    constexpr std::string_view fuzzy_prefix = "input.fuzzy_";
-    // 精确分支必须在前：总开关键同样命中 fuzzy_ 前缀，不能靠 prefix setter 拒绝它。
-    if (path == "input.fuzzy_pinyin")
-        return SetConfiguredFuzzyPinyinEnabled(json::value_to<bool>(data.at("value")));
-    if (path.rfind(fuzzy_prefix, 0) == 0)
-        return SetConfiguredFuzzyPinyinRule(path.substr(input_section_prefix.size()),
-                                            json::value_to<bool>(data.at("value")));
-    if (path == "appearance.tsf_preedit_style")
-        return SetConfiguredTsfPreeditStyle(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.tsf_preedit_shuangpin_quanpin")
-        return SetConfiguredTsfPreeditShuangpinQuanpin(json::value_to<bool>(data.at("value")));
-    if (path == "appearance.ui_backend")
-        return SetConfiguredUiBackend(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.settings_window_linger")
-        return SetConfiguredSettingsWindowLinger(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.candidate_window_layout")
-        return SetConfiguredCandidateWindowLayout(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.candidate_window_follow_cursor")
-        return SetConfiguredCandidateWindowFollowCursor(json::value_to<bool>(data.at("value")));
-    if (path == "appearance.candidate_skin")
-        return SetConfiguredCandidateSkin(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.candidate_window_preedit_style")
-        return SetConfiguredCandidateWindowPreeditStyle(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.candidate_window_preedit_shuangpin_quanpin")
-        return SetConfiguredCandidateWindowPreeditShuangpinQuanpin(json::value_to<bool>(data.at("value")));
-    if (path == "appearance.candidate_fixed_badge")
-        return SetConfiguredCandidateFixedBadge(json::value_to<bool>(data.at("value")));
-    if (path == "appearance.candidate_fixed_badge_style")
-        return SetConfiguredCandidateFixedBadgeStyle(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.page_size")
-        return SetConfiguredCandidatePageSize(static_cast<int>(data.at("value").as_int64()));
-    if (path == "appearance.font")
-        return SetConfiguredCandidateFont(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.fallback_fonts")
-        return SetConfiguredCandidateFallbackFonts(
-            json::value_to<std::vector<std::string>>(json::parse(json::value_to<std::string>(data.at("value")))));
-    if (path == "appearance.english_font")
-        return SetConfiguredCandidateEnglishFont(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.font_size")
-        return SetConfiguredCandidateFontSize(static_cast<int>(data.at("value").as_int64()));
-    if (path == "appearance.candidate_window_preedit_font_size")
-        return SetConfiguredCandidateWindowPreeditFontSize(static_cast<int>(data.at("value").as_int64()));
-    if (path == "appearance.cand_text_color")
-        return SetConfiguredCandidateTextColor(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_mode")
-        return SetConfiguredThemeMode(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_settings")
-        return SetConfiguredThemeSettings(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_cand")
-        return SetConfiguredThemeCand(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_ftb")
-        return SetConfiguredThemeFtb(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_menu")
-        return SetConfiguredThemeMenu(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_emoji")
-        return SetConfiguredThemeEmoji(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_screen_keyboard")
-        return SetConfiguredThemeScreenKeyboard(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_handwriting")
-        return SetConfiguredThemeHandwriting(json::value_to<std::string>(data.at("value")));
-    if (path == "appearance.theme_voice")
-        return SetConfiguredThemeVoice(json::value_to<std::string>(data.at("value")));
-    if (path == "general.floating_toolbar")
-        return SetConfiguredFloatingToolbarEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.caret_state_indicator")
-        return SetConfiguredCaretStateIndicatorEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.caret_state_indicator_on_focus")
-        return SetConfiguredCaretStateIndicatorOnFocus(json::value_to<bool>(data.at("value")));
-    if (path == "general.caret_state_indicator_position")
-        return SetConfiguredCaretStateIndicatorPosition(json::value_to<std::string>(data.at("value")));
-    if (path == "general.diagnostic_log" || path == "general.candidate_window_diagnostic_log")
-        return SetConfiguredDiagnosticLogEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.tsf_diagnostic_log")
-        return SetConfiguredTsfDiagnosticLogEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "statistics.enabled")
-        return SetConfiguredStatisticsEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "statistics.retention")
-        return SetConfiguredStatisticsRetention(json::value_to<std::string>(data.at("value")));
-    if (path == "general.floating_toolbar_scale")
-    {
-        const json::value &value = data.at("value");
-        const double scale = value.is_double() ? value.as_double() : static_cast<double>(value.as_int64());
-        return SetConfiguredFloatingToolbarScale(scale);
-    }
-    if (path == "general.floating_toolbar_font_size")
-        return SetConfiguredFloatingToolbarFontSize(static_cast<int>(data.at("value").as_int64()));
-    // Must precede the item prefix below, which would reject these as unknown items.
-    if (path == "general.floating_toolbar_auto_hide")
-        return SetConfiguredFloatingToolbarAutoHide(json::value_to<bool>(data.at("value")));
-    if (path == "general.floating_toolbar_auto_hide_delay")
-        return SetConfiguredFloatingToolbarAutoHideDelay(static_cast<int>(data.at("value").as_int64()));
-    constexpr std::string_view toolbar_prefix = "general.floating_toolbar_";
-    if (path.rfind(toolbar_prefix, 0) == 0)
-        return SetConfiguredFloatingToolbarItemEnabled(path.substr(toolbar_prefix.size()),
-                                                       json::value_to<bool>(data.at("value")));
-    if (path == "general.cn_en_mixed_input")
-        return SetConfiguredEnglishCandidatesEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_translations")
-        return SetConfiguredCandidateTranslationsEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.cn_en_mixed_input_min_chars")
-        return SetConfiguredEnglishMixedInputMinChars(static_cast<int>(data.at("value").as_int64()));
-    if (path == "general.emoji_mixed_input")
-        return SetConfiguredEmojiMixedInputEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.kaomoji_mixed_input")
-        return SetConfiguredKaomojiMixedInputEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.cloud_candidates")
-        return SetConfiguredCloudCandidatesEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_wordlattice")
-        return SetConfiguredAssocSentenceWordLattice(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_google")
-        return SetConfiguredAssocSentenceGoogle(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_neural_desktop")
-        return SetConfiguredAssocSentenceNeuralDesktop(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_neural_keyboard")
-        return SetConfiguredAssocSentenceNeuralKeyboard(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_show_next_on_duplicate")
-        return SetConfiguredAssocSentenceShowNextOnDuplicate(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_source_badge")
-        return SetConfiguredAssocSentenceSourceBadge(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_collocation_enabled")
-        return SetConfiguredAssocSentenceCollocationEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "association.sentence_collocation_model")
-        return SetConfiguredAssocSentenceCollocationModel(json::value_to<std::string>(data.at("value")));
-    if (path == "utility.unicode_mode")
-        return SetConfiguredUnicodeModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.quick_phrase")
-        return SetConfiguredQuickPhraseEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.quick_phrase_candidates")
-        return SetConfiguredQuickPhraseCandidatesEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.quick_phrase_frequency")
-        return SetConfiguredQuickPhraseFrequencyEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.mixed_candidates")
-        return SetConfiguredMixedCandidatesEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.date_time_candidates")
-        return SetConfiguredDateTimeCandidatesEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.date_time_menu")
-        return SetConfiguredDateTimeMenuEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.date_time_mode")
-        return SetConfiguredDateTimeModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.emoji_mode")
-        return SetConfiguredEmojiModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.kaomoji_mode")
-        return SetConfiguredKaomojiModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.jianpin_mode")
-        return SetConfiguredJianpinModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.y_mode")
-        return SetConfiguredYModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.r_mode")
-        return SetConfiguredRModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.v_mode")
-        return SetConfiguredVModeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "utility.clipboard_history")
-        return SetConfiguredClipboardHistoryEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.paging_minus_equal")
-        return SetConfiguredPagingMinusEqualEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.paging_tab")
-        return SetConfiguredPagingTabEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.paging_comma_period")
-        return SetConfiguredPagingCommaPeriodEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.paging_brackets")
-        return SetConfiguredPagingBracketsEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.paging_page_up_down")
-        return SetConfiguredPagingPageUpDownEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.paging_mouse_wheel")
-        return SetConfiguredPagingMouseWheelEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "general.candidate_arrow_navigation")
-        return SetConfiguredCandidateArrowNavigationEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "keybindings.switch_language_shift")
-        return SetConfiguredSwitchLanguageShiftEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "keybindings.switch_language_ctrl")
-        return SetConfiguredSwitchLanguageCtrlEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "keybindings.switch_language_ctrl_alt_space")
-        return SetConfiguredSwitchLanguageCtrlAltSpaceEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "keybindings.toggle_character_set_ctrl_shift_f")
-        return SetConfiguredCharacterSetShortcutEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "keybindings.trilingual_cycle")
-        return SetConfiguredTrilingualCycleEnabled(json::value_to<bool>(data.at("value")));
-    if (path.rfind("frequency_adjustment.", 0) == 0)
-    {
-        const std::string key = path.substr(21);
-        const json::value &value = data.at("value");
-        if (value.is_string())
-            return SetConfiguredFrequencyAdjustmentString(key, json::value_to<std::string>(value));
-        if (value.is_int64())
-            return SetConfiguredFrequencyAdjustmentInt(key, static_cast<int>(value.as_int64()));
-        return false;
-    }
-    if (path.rfind("voice_input.", 0) == 0)
-    {
-        const std::string key = path.substr(12);
-        const json::value &value = data.at("value");
-        if (value.is_bool())
-        {
-            return SetConfiguredVoiceInputBool(key, json::value_to<bool>(value));
-        }
-        if (value.is_string())
-            return SetConfiguredVoiceInputString(key, json::value_to<std::string>(value));
-        return false;
-    }
-    if (path.rfind("ai_assistant.", 0) == 0)
-    {
-        const std::string key = path.substr(13);
-        const json::value &value = data.at("value");
-        if (value.is_bool())
-            return SetConfiguredAiAssistantBool(key, json::value_to<bool>(value));
-        if (value.is_string())
-            return SetConfiguredAiAssistantString(key, json::value_to<std::string>(value));
-        if (value.is_int64())
-            return SetConfiguredAiAssistantInt(key, static_cast<int>(value.as_int64()));
-        return false;
-    }
-    if (path.rfind("tencent_tmt.", 0) == 0)
-    {
-        const json::value &value = data.at("value");
-        return value.is_string() && SetConfiguredTencentTmtString(path.substr(std::string("tencent_tmt.").size()),
-                                                                  json::value_to<std::string>(value));
-    }
-    if (path == "custom_translation.enabled")
-        return SetConfiguredCustomTranslationBool("enabled", json::value_to<bool>(data.at("value")));
-    if (path.rfind("custom_translation.", 0) == 0)
-    {
-        const json::value &value = data.at("value");
-        return value.is_string() &&
-               SetConfiguredCustomTranslationString(path.substr(std::string("custom_translation.").size()),
-                                                    json::value_to<std::string>(value));
-    }
-    if (path == "niutrans.enabled")
-        return SetConfiguredNiuTransBool("enabled", json::value_to<bool>(data.at("value")));
-    if (path.rfind("niutrans.", 0) == 0)
-    {
-        const json::value &value = data.at("value");
-        return value.is_string() && SetConfiguredNiuTransString(path.substr(std::string("niutrans.").size()),
-                                                                json::value_to<std::string>(value));
-    }
-    if (path.rfind("network.", 0) == 0)
-    {
-        const json::value &value = data.at("value");
-        return value.is_string() && SetConfiguredNetworkString(path.substr(std::string("network.").size()),
-                                                               json::value_to<std::string>(value));
-    }
-    if (path == "helpcode.show_sp_helpcode_in_candidate_window")
-        return SetConfiguredShowShuangpinHelpcodeInCandidateWindow(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_helpcode")
-        return SetConfiguredShuangpinHelpcodeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_mid_sentence_helpcode")
-        return SetConfiguredShuangpinMidSentenceHelpcodeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_mid_sentence_helpcode_backtick")
-        return SetConfiguredShuangpinMidSentenceHelpcodeBacktick(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_mid_sentence_helpcode_semicolon")
-        return SetConfiguredShuangpinMidSentenceHelpcodeSemicolon(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_mid_sentence_helpcode_uppercase")
-        return SetConfiguredShuangpinMidSentenceHelpcodeUppercase(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_direct_helpcode")
-        return SetConfiguredShuangpinDirectHelpcodeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_direct_helpcode_slash")
-        return SetConfiguredShuangpinDirectHelpcodeSlash(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_direct_helpcode_uppercase")
-        return SetConfiguredShuangpinDirectHelpcodeUppercase(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.shuangpin_helpcode_schema")
-        return SetConfiguredShuangpinHelpcodeSchema(json::value_to<std::string>(data.at("value")));
-    if (path == "helpcode.quanpin_helpcode")
-        return SetConfiguredQuanpinHelpcodeEnabled(json::value_to<bool>(data.at("value")));
-    if (path == "helpcode.quanpin_helpcode_schema")
-        return SetConfiguredQuanpinHelpcodeSchema(json::value_to<std::string>(data.at("value")));
-    if (path == "helpcode.show_qp_helpcode_in_candidate_window")
-        return SetConfiguredShowQuanpinHelpcodeInCandidateWindow(json::value_to<bool>(data.at("value")));
-    if (path == "quanpin.autocorrect_transposition")
-        return SetConfiguredQuanpinAutocorrectTransposition(json::value_to<bool>(data.at("value")));
-    if (path == "quanpin.autocorrect_neighbor")
-        return SetConfiguredQuanpinAutocorrectNeighbor(json::value_to<bool>(data.at("value")));
-    if (path == "quanpin.autocorrect_marker")
-        return SetConfiguredQuanpinAutocorrectMarker(json::value_to<bool>(data.at("value")));
-    return false;
 }
 
 int HitTestName(const std::string &name)
@@ -1307,12 +1156,15 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
     if (FAILED(args->TryGetWebMessageAsString(&raw)) || !raw)
         return;
 
+    SettingsTaskDiagnostics::Context diagnostic{"unknown", true, "-"};
     try
     {
         json::value value = json::parse(wstring_to_string(raw.get()));
         if (!metasequoia::webview::Validate(value, "client", "settings"))
             return;
         const std::string type = json::value_to<std::string>(value.at("type"));
+        diagnostic = SettingsMessageContext(type, value);
+        TraceSettingsTask(diagnostic, "dispatch.begin", nullptr);
         if (type == "dragStart")
         {
             ReleaseCapture();
@@ -1370,7 +1222,7 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
         }
         else if (type == "skinCatalogRequest")
         {
-            g_worker->Submit([] {
+            SubmitSettingsTask(diagnostic, [] {
                 auto completion = ConfigCompletion(true);
                 NotifyImeServerCandidateSkinRefresh();
                 return completion;
@@ -1430,13 +1282,81 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
         else if (type == "configUpdate")
         {
             const auto data = value.at("data").as_object();
-            g_worker->Submit([data] {
-                const bool saved = ApplyConfigUpdate(data);
+            SubmitSettingsTask(diagnostic, [data] {
+                TraceStartup("worker: configUpdate begin");
+                const bool saved = SettingsConfig::ApplyConfigUpdate(data);
+                TraceStartup(saved ? "worker: configUpdate saved" : "worker: configUpdate failed");
                 auto completion = ConfigCompletion();
                 return [saved, completion = std::move(completion)] {
                     completion();
                     if (!saved)
-                        MessageBoxW(g_settings_hwnd, L"设置保存失败，请重试。", L"水杉输入法", MB_OK | MB_ICONWARNING);
+                        MessageBoxW(g_settings_hwnd, L"设置保存失败，请重试。", L"知语输入法", MB_OK | MB_ICONWARNING);
+                };
+            });
+        }
+        else if (type == "defaultImeRequest")
+        {
+            const auto &data = value.at("data").as_object();
+            const std::string requestId = json::value_to<std::string>(data.at("requestId"));
+            const std::string action = json::value_to<std::string>(data.at("action"));
+            if (action == "openSystemSettings")
+                default_input_method::OpenSystemSettings(hwnd);
+            SubmitSettingsTask(diagnostic, [requestId, action]() -> SerialTaskQueue::Completion {
+                bool ok = true;
+                std::string message;
+                if (action == "setDefault")
+                {
+                    ok = default_input_method::SetAsDefault(message);
+                    if (ok)
+                        message = "知语输入法已排在中文（简体）键盘的第一位；其他语言顺序保留。";
+                }
+                const auto status = default_input_method::QueryStatus();
+                json::object response = {{"type", "defaultImeResponse"},
+                                         {"requestId", requestId},
+                                         {"action", action},
+                                         {"ok", ok},
+                                         {"message", message},
+                                         {"enabled", status.enabled},
+                                         {"isDefault", status.is_default},
+                                         {"protocolVersion", metasequoia::webview::Version}};
+                if (!metasequoia::webview::Validate(response, "server"))
+                    throw std::runtime_error("Invalid default IME response");
+                const auto text = string_to_wstring(json::serialize(response));
+                return [text] {
+                    if (g_webview)
+                        g_webview->PostWebMessageAsJson(text.c_str());
+                };
+            });
+        }
+        else if (type == "neuralModelsRequest")
+        {
+            auto request = nlohmann::json::parse(json::serialize(value.at("data")));
+            const auto source = request.value("action", "") == "import"
+                                    ? NeuralModels::PromptForModelFile(hwnd, request.value("id", ""))
+                                    : std::filesystem::path();
+            SubmitSettingsTask(diagnostic, [request = std::move(request), source]() -> SerialTaskQueue::Completion {
+                const auto response = NeuralModels::Handle(request, source);
+                const auto message = string_to_wstring(SettingsWebView::SerializeReply(response));
+                auto config = ConfigCompletion();
+                return [message, config = std::move(config)] {
+                    config();
+                    if (g_webview)
+                        g_webview->PostWebMessageAsJson(message.c_str());
+                };
+            });
+        }
+        else if (type == "apiModelList" || type == "aiTaskRequest")
+        {
+            auto request = nlohmann::json::parse(json::serialize(value.at("data")));
+            if (type == "aiTaskRequest" && request.value("action", "") == "cancel")
+                AiWorkbench::Cancel();
+            SubmitSettingsTask(diagnostic, [type, request = std::move(request)]() -> SerialTaskQueue::Completion {
+                auto response =
+                    type == "apiModelList" ? AiWorkbench::HandleModelList(request) : AiWorkbench::Handle(request);
+                const auto message = string_to_wstring(SettingsWebView::SerializeReply(response));
+                return [message] {
+                    if (g_webview)
+                        g_webview->PostWebMessageAsJson(message.c_str());
                 };
             });
         }
@@ -1451,7 +1371,7 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 if (item.is_string())
                     request.config.emplace(std::string(key), json::value_to<std::string>(item));
             }
-            g_worker->Submit([request_id, request = std::move(request)]() -> SerialTaskQueue::Completion {
+            SubmitSettingsTask(diagnostic, [request_id, request = std::move(request)]() -> SerialTaskQueue::Completion {
                 ApiCredentialTest::Result result;
                 try
                 {
@@ -1526,7 +1446,7 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
         {
             if (!NotifyImeServerRestart())
             {
-                MessageBoxW(g_settings_hwnd, L"未能重启输入法进程，请稍后重试。", L"水杉输入法",
+                MessageBoxW(g_settings_hwnd, L"未能重启输入法进程，请稍后重试。", L"知语输入法",
                             MB_OK | MB_ICONWARNING);
             }
         }
@@ -1543,7 +1463,7 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
         else if (type == "dictionaryRequest")
         {
             const auto data = value.at("data").as_object();
-            g_worker->Submit([data]() -> SerialTaskQueue::Completion {
+            SubmitSettingsTask(diagnostic, [data]() -> SerialTaskQueue::Completion {
                 json::value response;
                 try
                 {
@@ -1569,10 +1489,129 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 };
             });
         }
+        else if (type == "speechRequest")
+        {
+            auto response = Speech::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "personalLibraryRequest")
+        {
+            auto response = PersonalLibrary::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "voiceStudioRequest")
+        {
+            auto response = VoiceStudio::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "visionRequest")
+        {
+            auto response = Vision::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "localOcrRequest")
+        {
+            auto response = LocalOcr::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "localTtsRequest")
+        {
+            auto response = LocalTts::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "localAsrRequest")
+        {
+            auto response = LocalAsr::Handle(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "chatRequest")
+        {
+            const auto action = json::value_to<std::string>(value.at("data").at("action"));
+            if ((action == "scan" || action == "poll") && !IsWindowVisible(hwnd))
+                return;
+            if (!g_chat_reader)
+                g_chat_reader =
+                    std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); }, true);
+            g_chat_reader->Submit(nlohmann::json::parse(json::serialize(value.at("data"))),
+                                  [](const nlohmann::json &response) {
+                                      if (g_webview)
+                                          g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+                                  });
+        }
+        else if (type == "assistantRequest")
+        {
+            auto request = nlohmann::json::parse(json::serialize(value.at("data")));
+            if (request.value("origin", "") == "chat" && request.value("action", "") != "cancel" &&
+                !IsWindowVisible(hwnd))
+                return;
+            auto &host = request.value("origin", "") == "chat" ? g_chat_model : g_reply_studio;
+            if (!host)
+                host = std::make_unique<ReplyStudio::Host>([hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); });
+            host->Submit(std::move(request), [](const nlohmann::json &response) {
+                if (g_webview)
+                    g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+            });
+        }
+        else if (type == "replyProfileRequest")
+        {
+            auto response = ReplyStudio::HandleProfileRequest(nlohmann::json::parse(json::serialize(value.at("data"))));
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "quickActionRequest")
+        {
+            const auto request = nlohmann::json::parse(json::serialize(value.at("data")));
+            const auto action = request.value("action", "");
+            nlohmann::json response = {{"type", "quickActionResponse"},
+                                       {"requestId", request.value("requestId", "")},
+                                       {"action", action},
+                                       {"ok", true},
+                                       {"message", ""}};
+            if (action == "run")
+            {
+                // The settings window steps aside so the action sees the app the user was working in.
+                if (Quick::Actions::Run(request.value("id", "")))
+                    ShowWindow(hwnd, SW_MINIMIZE);
+                else
+                {
+                    response["ok"] = false;
+                    response["message"] = "未知的快捷操作";
+                }
+            }
+            response["hotkeys"] = Quick::Actions::HotkeyStatus().value("hotkeys", nlohmann::json::object());
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "dictionaryLibraryRequest")
+        {
+            const auto response =
+                TranslationLibrary::Handle(nlohmann::json::parse(json::serialize(value.at("data"))), hwnd);
+            if (g_webview)
+                g_webview->PostWebMessageAsJson(string_to_wstring(response.dump()).c_str());
+        }
+        else if (type == "vocabularyRequest")
+        {
+            const auto data = value.at("data").as_object();
+            SubmitSettingsTask(diagnostic, [data]() -> SerialTaskQueue::Completion {
+                const auto response = Vocabulary::HandleRequest(data);
+                auto message = string_to_wstring(json::serialize(response));
+                return [message = std::move(message)] {
+                    if (g_webview)
+                        g_webview->PostWebMessageAsJson(message.c_str());
+                };
+            });
+        }
         else if (type == "statsRequest")
         {
             const auto data = value.at("data").as_object();
-            g_worker->Submit([data, hwnd]() -> SerialTaskQueue::Completion {
+            SubmitSettingsTask(diagnostic, [data, hwnd]() -> SerialTaskQueue::Completion {
                 json::object response;
                 try
                 {
@@ -1596,10 +1635,19 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                 };
             });
         }
+        TraceSettingsTask(diagnostic, "dispatch.end", nullptr);
+    }
+    catch (const nlohmann::json::exception &error)
+    {
+        const SettingsTaskDiagnostics::Failure failure{"json", error.id};
+        TraceSettingsTask(diagnostic, "dispatch.failed", &failure);
+        ReportSettingsTaskError(diagnostic, failure);
     }
     catch (const std::exception &)
     {
-        // Ignore malformed messages from the page; the next snapshot restores its state.
+        const SettingsTaskDiagnostics::Failure failure{"standard", 0};
+        TraceSettingsTask(diagnostic, "dispatch.failed", &failure);
+        ReportSettingsTaskError(diagnostic, failure);
     }
 }
 
@@ -1621,19 +1669,36 @@ HRESULT EnsureCompositionTree(HWND hwnd)
     return g_dcomp_device->Commit();
 }
 
+bool g_webview_failed = false;
+HRESULT FailWebView(HWND hwnd, const wchar_t *stage, HRESULT result)
+{
+    SettingsSplash::Dismiss();
+    if (!g_webview_failed && !g_closing)
+    {
+        g_webview_failed = true;
+        const auto message = SettingsWebView::FailureMessage(stage, FAILED(result) ? result : E_FAIL);
+        MessageBoxW(hwnd, message.c_str(), L"知语输入法 · 设置页面", MB_OK | MB_ICONERROR);
+        ShowWindow(hwnd, SW_HIDE);
+        PostMessageW(hwnd, kQuitSettings, 0, 0);
+    }
+    return FAILED(result) ? result : E_FAIL;
+}
 HRESULT OnControllerCreated(HWND hwnd, HRESULT result, ICoreWebView2CompositionController *controller)
 {
     TraceStartup("ui: controller created");
+    if (g_closing || !IsWindow(hwnd))
+        return E_ABORT;
     if (FAILED(result) || !controller)
     {
-        SettingsSplash::Dismiss();
-        return FAILED(result) ? result : E_FAIL;
+        return FailWebView(hwnd, L"创建 WebView2 控制器（异步）", result);
     }
     g_composition_controller = controller;
-    if (FAILED(g_composition_controller.As(&g_controller)))
-        return E_NOINTERFACE;
-    if (FAILED(g_controller->get_CoreWebView2(&g_webview)) || !g_webview)
-        return E_FAIL;
+    HRESULT query = g_composition_controller.As(&g_controller);
+    if (FAILED(query))
+        return FailWebView(hwnd, L"获取 WebView2 控制器接口", query);
+    query = g_controller->get_CoreWebView2(&g_webview);
+    if (FAILED(query) || !g_webview)
+        return FailWebView(hwnd, L"获取 WebView2 页面对象", query);
 
     ComPtr<ICoreWebView2Settings> settings;
     if (SUCCEEDED(g_webview->get_Settings(&settings)))
@@ -1647,14 +1712,19 @@ HRESULT OnControllerCreated(HWND hwnd, HRESULT result, ICoreWebView2CompositionC
     }
     g_controller->put_ZoomFactor(1.0);
 
-    if (SUCCEEDED(g_webview.As(&g_webview3)))
+    query = g_webview.As(&g_webview3);
+    if (FAILED(query))
+        return FailWebView(hwnd, L"获取本机页面映射接口", query);
+    if (g_webview3)
     {
         // 虚拟主机名必须带保留 TLD `.example`。不带点的单标签主机名会先走一轮网络名称解析，
         // 实测导航前要空等约 2 秒才开始加载内容。
         const std::filesystem::path assets =
             std::filesystem::path(CommonUtils::get_ime_data_path_w()) / "html/webview2/settings/ime-settings/dist";
-        g_webview3->SetVirtualHostNameToFolderMapping(L"imesettings.example", assets.c_str(),
-                                                      COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+        query = g_webview3->SetVirtualHostNameToFolderMapping(L"imesettings.example", assets.c_str(),
+                                                              COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+        if (FAILED(query))
+            return FailWebView(hwnd, L"映射本机设置页面", query);
         const std::filesystem::path skins = std::filesystem::path(CommonUtils::get_ime_data_path_w()) / L"skins";
         std::error_code ec;
         std::filesystem::create_directories(skins, ec);
@@ -1668,10 +1738,10 @@ HRESULT OnControllerCreated(HWND hwnd, HRESULT result, ICoreWebView2CompositionC
 
     HRESULT hr = EnsureCompositionTree(hwnd);
     if (FAILED(hr))
-        return hr;
+        return FailWebView(hwnd, L"创建 DirectComposition 视觉树", hr);
     hr = g_composition_controller->put_RootVisualTarget(g_dcomp_root.Get());
     if (FAILED(hr))
-        return hr;
+        return FailWebView(hwnd, L"连接 WebView2 视觉树", hr);
     g_dcomp_device->Commit();
 
     RECT bounds{};
@@ -1697,12 +1767,24 @@ HRESULT OnControllerCreated(HWND hwnd, HRESULT result, ICoreWebView2CompositionC
             args->get_IsSuccess(&success);
             TraceStartup("ui: NavigationCompleted");
             SettingsSplash::Dismiss();
+            if (!success)
+                return FailWebView(hwnd, L"加载本机设置页面", HRESULT_FROM_WIN32(ERROR_BAD_NET_RESP));
             if (success)
             {
                 PostWindowState(hwnd);
                 PostConfig();
                 ApplyWindowActivationAppearance();
                 SetFocus(hwnd);
+                if (g_open_personal_on_ready)
+                {
+                    ShowPersonalSection();
+                    g_open_personal_on_ready = false;
+                }
+                if (g_open_reply_on_ready)
+                {
+                    ShowReplyStudioSection();
+                    g_open_reply_on_ready = false;
+                }
                 if (g_open_about_on_ready)
                 {
                     ShowAboutSection();
@@ -1720,7 +1802,8 @@ HRESULT OnControllerCreated(HWND hwnd, HRESULT result, ICoreWebView2CompositionC
             return S_OK;
         }).Get(),
         &token);
-    return g_webview->Navigate(L"https://imesettings.example/index.html");
+    hr = g_webview->Navigate(L"https://imesettings.example/index.html");
+    return FAILED(hr) ? FailWebView(hwnd, L"开始导航设置页面", hr) : hr;
 }
 
 void InitWebView(HWND hwnd)
@@ -1730,6 +1813,11 @@ void InitWebView(HWND hwnd)
     TraceStartup("ui: get_webview2_user_data_path end");
     std::error_code ec;
     std::filesystem::create_directories(user_data, ec);
+    if (ec)
+    {
+        FailWebView(hwnd, L"创建设置缓存目录", HRESULT_FROM_WIN32(ec.value()));
+        return;
+    }
     auto options = Make<CoreWebView2EnvironmentOptions>();
     options->put_AdditionalBrowserArguments(L"--disable-features=TranslateUI "
                                             L"--disable-background-networking "
@@ -1737,31 +1825,33 @@ void InitWebView(HWND hwnd)
                                             L"--disable-sync "
                                             L"--disable-prompt-on-repost "
                                             L"--no-first-run");
-    CreateCoreWebView2EnvironmentWithOptions(
+    const HRESULT start = CreateCoreWebView2EnvironmentWithOptions(
         nullptr, user_data.c_str(), options.Get(),
         Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
             [hwnd](HRESULT result, ICoreWebView2Environment *environment) -> HRESULT {
                 TraceStartup("ui: environment created");
+                if (g_closing || !IsWindow(hwnd))
+                    return E_ABORT;
                 if (FAILED(result) || !environment)
                 {
-                    SettingsSplash::Dismiss();
-                    return FAILED(result) ? result : E_FAIL;
+                    return FailWebView(hwnd, L"创建 WebView2 环境（异步）", result);
                 }
                 ComPtr<ICoreWebView2Environment3> environment3;
-                if (FAILED(environment->QueryInterface(IID_PPV_ARGS(&environment3))))
-                {
-                    SettingsSplash::Dismiss();
-                    return E_NOINTERFACE;
-                }
-                return environment3->CreateCoreWebView2CompositionController(
+                const HRESULT query = environment->QueryInterface(IID_PPV_ARGS(&environment3));
+                if (FAILED(query))
+                    return FailWebView(hwnd, L"获取 WebView2 环境接口", query);
+                const HRESULT create = environment3->CreateCoreWebView2CompositionController(
                     hwnd,
                     Callback<ICoreWebView2CreateCoreWebView2CompositionControllerCompletedHandler>(
                         [hwnd](HRESULT controller_result, ICoreWebView2CompositionController *controller) -> HRESULT {
                             return OnControllerCreated(hwnd, controller_result, controller);
                         })
                         .Get());
+                return FAILED(create) ? FailWebView(hwnd, L"开始创建 WebView2 控制器（同步）", create) : create;
             })
             .Get());
+    if (FAILED(start))
+        FailWebView(hwnd, L"开始创建 WebView2 环境（同步）", start);
 }
 
 UINT32 MouseKeys(WPARAM w_param)
@@ -1949,8 +2039,16 @@ std::optional<UINT> SettingsLingerTimeoutMs(const std::string &linger)
 // 首帧还没出来就被关掉，说明用户不想等这次冷启动，直接退出，别留一个半初始化的进程。
 void HideSettings(HWND hwnd)
 {
+    Vision::Stop();
+    VoiceStudio::Stop();
     if (g_closing)
         return;
+    if (g_chat_reader)
+        g_chat_reader->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
+    if (g_chat_model)
+        g_chat_model->Submit({{"action", "cancel"}}, [](const nlohmann::json &) {});
+    if (g_webview)
+        g_webview->ExecuteScript(L"window.dispatchEvent(new Event('msime-chat-hidden'));", nullptr);
     const std::optional<UINT> linger_ms = SettingsLingerTimeoutMs(g_settings_window_linger);
     if (!g_webview_content_started || linger_ms == 0u)
     {
@@ -1984,6 +2082,8 @@ void HideSettings(HWND hwnd)
 
 void CloseSettings(HWND hwnd)
 {
+    Vision::Stop();
+    VoiceStudio::Stop();
     if (g_closing)
         return;
     g_closing = true;
@@ -1992,6 +2092,12 @@ void CloseSettings(HWND hwnd)
     KillTimer(hwnd, kConfigReloadTimer);
     SettingsSplash::Dismiss();
     ShowWindow(hwnd, SW_HIDE);
+    if (g_reply_studio)
+        g_reply_studio->Stop();
+    if (g_chat_model)
+        g_chat_model->Stop();
+    if (g_chat_reader)
+        g_chat_reader->Stop();
     if (g_worker)
         g_worker->Stop();
     else
@@ -2002,12 +2108,26 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
 {
     switch (message)
     {
+    case WM_THEMECHANGED:
+    case WM_SETTINGCHANGE:
+        // Keep native chrome aligned with the page's system-theme media query.
+        // Do not rewrite any global or independent theme preference.
+        PostConfig(false);
+        break;
     case kActivateExistingWindow:
         ActivateWindow(hwnd);
         return 0;
     case kOpenAboutSection:
         ActivateWindow(hwnd);
         ShowAboutSection();
+        return 0;
+    case kOpenPersonalSection:
+        ActivateWindow(hwnd);
+        ShowPersonalSection();
+        return 0;
+    case kOpenReplyStudioSection:
+        ActivateWindow(hwnd);
+        ShowReplyStudioSection();
         return 0;
     case kScanSkinCatalog:
         PostConfig(true);
@@ -2155,15 +2275,22 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
         if (w_param == kConfigReloadTimer && g_worker && !g_closing && !g_reload_pending)
         {
             g_reload_pending = true;
-            g_worker->Submit([] {
+            SubmitSettingsTask({"configReload", true}, [] {
                 SerialTaskQueue::Completion completion;
                 try
                 {
                     if (ReloadImeConfigIfChanged())
                         completion = ConfigCompletion();
                 }
+                catch (const nlohmann::json::exception &error)
+                {
+                    const SettingsTaskDiagnostics::Failure failure{"json", error.id};
+                    TraceSettingsTask({"configReload", true}, "reload.retry", &failure);
+                }
                 catch (...)
-                { /* Retry on the next timer tick; do not poison the queue. */
+                {
+                    const SettingsTaskDiagnostics::Failure failure{"standard", 0};
+                    TraceSettingsTask({"configReload", true}, "reload.retry", &failure);
                 }
                 return [completion = std::move(completion)] {
                     g_reload_pending = false;
@@ -2175,19 +2302,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
         return 0;
     case kWorkerCompleted:
         if (g_worker)
-        {
             g_worker->Drain(!g_closing);
-            if (g_closing && g_worker->Stopped())
-                DestroyWindow(hwnd);
-        }
+        if (g_reply_studio)
+            g_reply_studio->Drain(!g_closing);
+        if (g_chat_model)
+            g_chat_model->Drain(!g_closing);
+        if (g_chat_reader)
+            g_chat_reader->Drain(!g_closing);
+        if (g_closing && (!g_worker || g_worker->Stopped()) && (!g_reply_studio || g_reply_studio->Stopped()) &&
+            (!g_chat_reader || g_chat_reader->Stopped()) && (!g_chat_model || g_chat_model->Stopped()))
+            DestroyWindow(hwnd);
         return 0;
     case WM_CLOSE:
+        Vision::Stop();
         HideSettings(hwnd);
         return 0;
     case kQuitSettings:
         CloseSettings(hwnd);
         return 0;
     case WM_DESTROY:
+        AiWorkbench::Cancel();
+        Vision::Stop();
+        if (g_reply_studio)
+            g_reply_studio->Stop();
+        if (g_chat_model)
+            g_chat_model->Stop();
+        if (g_chat_reader)
+            g_chat_reader->Stop();
         g_closing = true;
         g_lingering = false;
         if (g_worker)
@@ -2211,27 +2352,43 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_pa
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command_line, int show_command)
 {
+    g_temporary_configuration = SettingsEnvironment::HasTemporaryConfiguration();
     TraceStartup("wWinMain");
+    g_open_personal_on_ready =
+        command_line && std::wstring(command_line).find(L"--personal-library") != std::wstring::npos;
+    g_open_reply_on_ready = command_line && std::wstring(command_line).find(L"--reply-studio") != std::wstring::npos;
     g_open_about_on_ready = command_line && std::wstring(command_line).find(L"--about") != std::wstring::npos;
+    TraceStartup("ui: DPI begin");
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    TraceStartup("ui: DPI end; COM begin");
     const HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    TraceStartup(SUCCEEDED(com_result) ? "ui: COM complete" : "ui: COM failed");
     if (FAILED(com_result))
         return 1;
 
+    TraceStartup("ui: single-instance mutex begin");
     CommonUtils::SingleInstanceGuard single_instance(kSingleInstanceMutex);
+    TraceStartup("ui: single-instance mutex complete");
     if (!single_instance.is_valid())
         return 1;
     if (single_instance.already_running())
     {
+        TraceStartup("ui: existing Settings instance detected");
         HWND existing = FindWindowW(kWindowClass, nullptr);
         if (existing)
         {
-            PostMessageW(existing, g_open_about_on_ready ? kOpenAboutSection : kActivateExistingWindow, 0, 0);
+            PostMessageW(existing,
+                         g_open_personal_on_ready ? kOpenPersonalSection
+                         : g_open_reply_on_ready
+                             ? kOpenReplyStudioSection
+                             : (g_open_about_on_ready ? kOpenAboutSection : kActivateExistingWindow),
+                         0, 0);
             SetForegroundWindow(existing);
         }
         return 0;
     }
 
+    TraceStartup("ui: window class begin");
     WNDCLASSEXW window_class{sizeof(window_class)};
     window_class.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
     window_class.lpfnWndProc = WindowProc;
@@ -2243,27 +2400,34 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR command_line, int show_
     window_class.lpszClassName = kWindowClass;
     if (!RegisterClassExW(&window_class))
         return 1;
+    TraceStartup("ui: window class complete");
 
     const UINT dpi = GetDpiForSystem();
     const int width = MulDiv(900, dpi, 96);
     const int height = MulDiv(710, dpi, 96);
     const int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
     const int y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
-    HWND hwnd = CreateWindowExW(0, kWindowClass, kWindowTitle, WS_OVERLAPPEDWINDOW, x, y, width, height, nullptr,
-                                nullptr, instance, nullptr);
+    TraceStartup("ui: CreateWindow begin");
+    HWND hwnd = CreateWindowExW(0, kWindowClass, g_temporary_configuration ? kTestWindowTitle : kWindowTitle,
+                                WS_OVERLAPPEDWINDOW, x, y, width, height, nullptr, nullptr, instance, nullptr);
+    TraceStartup(hwnd ? "ui: CreateWindow complete" : "ui: CreateWindow failed");
     if (!hwnd)
         return 1;
     g_settings_hwnd = hwnd;
-    g_worker = std::make_unique<SerialTaskQueue>(
-        [hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); },
-        [] { MessageBoxW(g_settings_hwnd, L"设置操作失败，请重试。", L"水杉输入法", MB_OK | MB_ICONWARNING); },
-        [] {
-            if (g_worker_com_initialized)
-                CoUninitialize();
-        });
+    g_worker = std::make_unique<SerialTaskQueue>([hwnd] { PostMessageW(hwnd, kWorkerCompleted, 0, 0); },
+                                                 [] {
+                                                     const SettingsTaskDiagnostics::Context context{"unknown", true};
+                                                     const SettingsTaskDiagnostics::Failure failure;
+                                                     TraceSettingsTask(context, "queue.unwrappedFailure", &failure);
+                                                     ReportSettingsTaskError(context, failure);
+                                                 },
+                                                 [] {
+                                                     if (g_worker_com_initialized)
+                                                         CoUninitialize();
+                                                 });
     auto initial_theme = std::make_shared<std::promise<bool>>();
     std::future<bool> initial_light = initial_theme->get_future();
-    g_worker->Submit([initial_theme] {
+    SubmitSettingsTask({"initialConfig", false}, [initial_theme] {
         g_worker_com_initialized = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
         TraceStartup("worker: InitImeConfig begin");
         InitImeConfig();

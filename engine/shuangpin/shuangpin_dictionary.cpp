@@ -17,6 +17,7 @@
 #include <utility>
 #include <cstdlib>
 #include <climits>
+#include <cmath>
 #include <boost/algorithm/string.hpp>
 #include <fmt/xchar.h>
 #include <utf8/cpp17.h>
@@ -52,10 +53,10 @@ std::string escape_sql_text(std::string text)
 } // namespace
 
 ShuangpinDictionary::ShuangpinDictionary(const ShuangpinProfile &profile, metasequoia::RuntimePaths paths)
-    : profile_(profile), paths_(std::move(paths)), decoder_(paths_.resource(metasequoia::assets::pinyin_model),
-                                                            paths_.user(metasequoia::assets::pinyin_user_dictionary)),
+    : profile_(profile), paths_(std::move(paths)), domain_(paths_.resource("domain-input.db")),
+      decoder_(paths_.resource(metasequoia::assets::pinyin_model),
+               paths_.user(metasequoia::assets::pinyin_user_dictionary)),
       language_model_(&ngram::shared_language_model(paths_.resource(metasequoia::assets::language_model))),
-      neural_desktop_model_(metasequoia::path_to_utf8(paths_.resource(metasequoia::assets::neural_model_desktop))),
       neural_keyboard_model_(metasequoia::path_to_utf8(paths_.resource(metasequoia::assets::neural_model_keyboard))),
       helpcodes_(HelpcodeUtils::load_helpcode_keymap(paths_.resources, HelpcodeUtils::selected_helpcode_schema())),
       _kb_input_sequence(100), _cached_buffer(128), _cached_buffer_sgl(128), _cached_buffer_sgl_reversed(128),
@@ -243,25 +244,23 @@ vector<ShuangpinDictionary::WordItem> ShuangpinDictionary::generateSeries( //
             neural_rerankers.push_back({quanpin::make_neural_reranker(neural_desktop_model_.get(), rescoring_context_),
                                         CandidateSource::NeuralDesktop});
         }
-        // 万象语法模型重排，与全拼同构，见 QuanpinDictionary::query_series。
-        if (sentence_association_.collocation_rerank && collocation_db_ != nullptr && collocation_db_->valid())
-        {
-            neural_rerankers.push_back(
-                {quanpin::make_octagram_reranker(collocation_db_, sentence_association_.collocation_rerank_weight),
-                 CandidateSource::Collocation});
-        }
+        // 万象语法模型不再单独重排，与全拼同构，见 QuanpinDictionary::query_series。
         quanpin::WordLatticeOptions lattice_options;
+        const bool has_collocation =
+            collocation_db_ != nullptr && collocation_db_->valid() && sentence_association_.collocation_weight != 0.0;
         const bool needs_alternatives = !neural_rerankers.empty() || (sentence_association_.word_lattice &&
                                                                       sentence_association_.show_next_on_duplicate);
         lattice_options.nbest = needs_alternatives ? static_cast<int>(neural::RerankOptions{}.max_paths) : 1;
         lattice_options.include_lattice_best = sentence_association_.word_lattice;
+        lattice_options.include_collocation_best = sentence_association_.collocation_rerank && has_collocation;
         lattice_options.show_next_on_duplicate = sentence_association_.show_next_on_duplicate;
         lattice_options.language_model = language_model_;
-        if (collocation_db_ != nullptr && collocation_db_->valid() && sentence_association_.collocation_weight != 0.0)
+        if (has_collocation)
         {
-            lattice_options.collocation_scorer = [db = collocation_db_](std::string_view tail, std::string_view word,
-                                                                        bool is_rear) {
-                return db->query(std::string(tail), std::string(word), is_rear, gram::GrammarConfig{});
+            lattice_options.collocation_scorer = [db = collocation_db_,
+                                                  config = sentence_association_.collocation_grammar](
+                                                     std::string_view tail, std::string_view word, bool is_rear) {
+                return db->query(std::string(tail), std::string(word), is_rear, config) * quanpin::kLnToLog10;
             };
             lattice_options.collocation_weight = sentence_association_.collocation_weight;
         }
@@ -284,7 +283,7 @@ vector<ShuangpinDictionary::WordItem> ShuangpinDictionary::generateSeries( //
             constexpr int kConstrainedSpanLimit = 4096;
             lattice_options.constrained_lookup = lattice_lookup(kConstrainedSpanLimit);
         }
-        if (sentence_association_.word_lattice || !neural_rerankers.empty())
+        if (sentence_association_.word_lattice || !neural_rerankers.empty() || lattice_options.include_collocation_best)
         {
             quanpin::merge_lattice_candidates(candidate_list, quanpin_syllables,
                                               lattice_lookup(lattice_options.span_limit), pinyin_sequence,
@@ -803,7 +802,7 @@ int ShuangpinDictionary::update_weight_by_word(string word)
 
 int ShuangpinDictionary::update_weight_by_pinyin_and_word(string pinyin, string word)
 {
-    const auto direct_cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction");
+    const auto direct_cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction", true);
     // 只有“完整合法拼读”的直切才可信：correction 模式的 greedy 后备允许单声母
     // 等不完整段，会把双拼原始串（如 qbtmuo → q'b't'mu'o）切成恰好能拼回原串
     // 的碎片，导致归一化被跳过、置顶更新落在错误 key 上静默失败（0 行更新
@@ -813,7 +812,7 @@ int ShuangpinDictionary::update_weight_by_pinyin_and_word(string pinyin, string 
     {
         pinyin = normalize_shuangpin_to_quanpin_input(pinyin);
     }
-    const auto cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction", true);
     if (cuts.empty())
         return ERROR_CODE;
     auto segments = cuts.front();
@@ -833,9 +832,9 @@ int ShuangpinDictionary::update_weight_by_pinyin_and_word(string pinyin, string 
 
 int ShuangpinDictionary::delete_by_pinyin_and_word(string pinyin, string word)
 {
-    const auto direct_cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction");
+    const auto direct_cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction", true);
     const auto normalized_shuangpin = normalize_shuangpin_to_quanpin_input(pinyin);
-    const auto shuangpin_cuts = quanpin::cut_pinyin_by_mode(normalized_shuangpin, "correction");
+    const auto shuangpin_cuts = quanpin::cut_pinyin_by_mode(normalized_shuangpin, "correction", true);
     const size_t han_count = HelpcodeUtils::count_han_chars(word);
     const bool direct_key_matches_word = !direct_cuts.empty() && direct_cuts.front().size() == han_count;
     const bool shuangpin_key_matches_word = !shuangpin_cuts.empty() && shuangpin_cuts.front().size() == han_count;
@@ -845,7 +844,7 @@ int ShuangpinDictionary::delete_by_pinyin_and_word(string pinyin, string word)
     {
         pinyin = normalized_shuangpin;
     }
-    const auto cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction", true);
     if (cuts.empty())
         return ERROR_CODE;
     const std::string normalized = quanpin::join_segments(cuts.front());
@@ -900,6 +899,8 @@ vector<ShuangpinDictionary::WordItem> ShuangpinDictionary::query_from_quanpin_da
         {
             candidate_list.emplace_back(pinyin_sequence, item.value, item.weight, CandidateSource::Database, item.key);
         }
+        domain_dictionary::Dictionary::merge(
+            candidate_list, domain_.query(segments, pinyin_sequence, 128, quanpin::QuerySource::Shuangpin));
     }
     catch (const std::exception &)
     {
@@ -943,6 +944,8 @@ vector<ShuangpinDictionary::WordItem> ShuangpinDictionary::query_initial_from_qu
     {
         candidate_list.emplace_back(code, item.value, item.weight, CandidateSource::Database, item.key);
     }
+    domain_dictionary::Dictionary::merge(candidate_list,
+                                         domain_.query({initial}, code, limit, quanpin::QuerySource::Shuangpin));
     return candidate_list;
 }
 
@@ -1029,7 +1032,7 @@ std::string ShuangpinDictionary::normalize_shuangpin_to_quanpin_input(const std:
 std::string ShuangpinDictionary::build_quanpin_sql_for_creating_word(const std::string &pinyin) const
 {
     const std::string normalized = normalize_shuangpin_to_quanpin_input(pinyin);
-    const auto cuts = quanpin::cut_pinyin_by_mode(normalized, "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(normalized, "correction", true);
     if (cuts.empty())
     {
         return "";
@@ -1051,7 +1054,7 @@ std::string ShuangpinDictionary::build_quanpin_sql_for_creating_word(const std::
 std::string ShuangpinDictionary::build_quanpin_sql_for_checking_word(const std::string &key,
                                                                      const std::string &value) const
 {
-    const auto cuts = quanpin::cut_pinyin_by_mode(key, "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(key, "correction", true);
     if (cuts.empty())
     {
         return "";
@@ -1064,7 +1067,7 @@ std::string ShuangpinDictionary::build_quanpin_sql_for_checking_word(const std::
 std::string ShuangpinDictionary::build_quanpin_sql_for_inserting_word(const std::string &key, const std::string &jp,
                                                                       const std::string &value) const
 {
-    const auto cuts = quanpin::cut_pinyin_by_mode(key, "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(key, "correction", true);
     if (cuts.empty())
     {
         return "";
@@ -1085,7 +1088,7 @@ std::string ShuangpinDictionary::build_quanpin_sql_for_updating_word(std::string
     // 是全拼）。这里不能再过 normalize_shuangpin_to_quanpin_input：双拼 profile
     // 会把它当作双拼码重切，qin'tian'shuo 被搧成 qi'n'ti'an'sang'shuo，UPDATE
     // 永远落在错误 key 上静默失败（0 行更新仍返回 OK）。
-    const auto cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(remove_delimiters(pinyin), "correction", true);
     if (cuts.empty())
     {
         return "";
@@ -1114,7 +1117,7 @@ std::string ShuangpinDictionary::build_quanpin_sql_for_updating_word(std::string
 std::string ShuangpinDictionary::build_quanpin_sql_for_deleting_canonical_word(const std::string &canonical_pinyin,
                                                                                const std::string &word) const
 {
-    const auto cuts = quanpin::cut_pinyin_by_mode(canonical_pinyin, "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(canonical_pinyin, "correction", true);
     if (cuts.empty())
     {
         return "";
@@ -1145,7 +1148,7 @@ bool ShuangpinDictionary::do_validate(string key, string jp, string value) const
         return false;
     }
 
-    const auto cuts = quanpin::cut_pinyin_by_mode(pure_key, "correction");
+    const auto cuts = quanpin::cut_pinyin_by_mode(pure_key, "correction", true);
     if (!cuts.empty())
     {
         return cuts.front().size() == han_count;
@@ -1187,9 +1190,48 @@ void ShuangpinDictionary::reset_cache()
     }
 }
 
+void ShuangpinDictionary::set_fuzzy_pinyin(metasequoia::FuzzyPinyinOptions options)
+{
+    if (fuzzy_pinyin_.rules == options.rules)
+    {
+        return;
+    }
+    fuzzy_pinyin_ = options;
+    reset_cache();
+}
+
+void ShuangpinDictionary::set_enabled_domain_dictionaries(const std::string &csv)
+{
+    if (domain_.set_enabled(csv))
+        reset_cache();
+}
+
 quanpin::WordLatticeLookup ShuangpinDictionary::lattice_lookup(int limit)
 {
-    auto lookup = quanpin::make_lattice_db_lookup(quanpin_db_, quanpin_statement_cache_, limit);
+    if (!char_reading_totals_)
+    {
+        char_reading_totals_ = quanpin::load_char_reading_totals(quanpin_db_);
+    }
+    auto lookup = [this, limit](const quanpin::Segments &span) {
+        auto rows = quanpin::make_lattice_db_lookup(quanpin_db_, quanpin_statement_cache_, limit, fuzzy_pinyin_,
+                                                    char_reading_totals_)(span);
+        for (auto &extra : domain_.lattice(limit, fuzzy_pinyin_)(span))
+        {
+            auto duplicate = std::find_if(rows.begin(), rows.end(), [&](const auto &row) {
+                return row.key == extra.key && row.value == extra.value;
+            });
+            if (duplicate == rows.end())
+                rows.push_back(std::move(extra));
+            else
+                duplicate->input_domains = extra.input_domains;
+        }
+        std::stable_sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) {
+            return a.weight * std::pow(10.0, -a.penalty) > b.weight * std::pow(10.0, -b.penalty);
+        });
+        if (rows.size() > static_cast<size_t>(limit))
+            rows.resize(static_cast<size_t>(limit));
+        return rows;
+    };
     if (!direct_span_cache_enabled_)
     {
         return lookup;
@@ -1237,9 +1279,9 @@ bool ShuangpinDictionary::resolve_direct_helpcode(QueryRequest &request)
     context.options.language_model = language_model_;
     if (collocation_db_ != nullptr && collocation_db_->valid() && sentence_association_.collocation_weight != 0.0)
     {
-        context.options.collocation_scorer = [db = collocation_db_](std::string_view tail, std::string_view word,
-                                                                    bool is_rear) {
-            return db->query(std::string(tail), std::string(word), is_rear, gram::GrammarConfig{});
+        context.options.collocation_scorer = [db = collocation_db_, config = sentence_association_.collocation_grammar](
+                                                 std::string_view tail, std::string_view word, bool is_rear) {
+            return db->query(std::string(tail), std::string(word), is_rear, config) * quanpin::kLnToLog10;
         };
         context.options.collocation_weight = sentence_association_.collocation_weight;
     }
@@ -1312,6 +1354,10 @@ void ShuangpinDictionary::set_sentence_association(const SentenceAssociationOpti
         sentence_association_.collocation_model.empty()
             ? nullptr
             : gram::shared_gram_db(metasequoia::path_from_utf8(sentence_association_.collocation_model.c_str()));
+    neural_desktop_model_ = neural::LazySentenceModel(
+        sentence_association_.neural_desktop_model.empty()
+            ? metasequoia::path_to_utf8(paths_.resource(metasequoia::assets::neural_model_desktop))
+            : sentence_association_.neural_desktop_model);
     // 开关变了就清缓存，否则打开/关闭要等缓存过期才见效。见 generateSeries 的整句块。
     reset_cache();
 }

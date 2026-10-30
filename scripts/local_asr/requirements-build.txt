@@ -1,0 +1,6 @@
+sherpa-onnx==1.13.8
+numpy==2.3.5
+pyinstaller==6.22.3
+uv==0.10.12
+pillow==12.1.0
+opencv-python-headless==5.0.0.93

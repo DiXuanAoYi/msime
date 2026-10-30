@@ -2,16 +2,23 @@
   <div class="content-header"><span>关于</span></div>
 
   <div class="section document-hero about-hero">
-    <div class="about-mark"><img src="./assets/msime.svg" alt="水杉 IME"></div>
-    <div><div class="document-eyebrow">Metasequoia IME</div><div class="document-hero-title">水杉 IME</div>
-    <p>为现代 Windows 桌面体验打造的开放中文输入法。</p></div>
+    <div class="about-mark"><img src="./assets/msime.svg" alt="知语输入法"></div>
+    <div><div class="document-eyebrow">ZHIYU IME · Windows</div><div class="document-hero-title">知语输入法</div>
+    <p>输入、语音、翻译与聊天表达，按自己的方式使用。</p></div>
+  </div>
+
+  <div class="section help-simple-document">
+    <div class="section-title">本次更新 · 2026-10-15</div>
+    <p>产品显示名称更新为“知语输入法”，沿用原来的配置、聊天上下文、词库与模型。剪贴板资料各分类使用受限渲染的连续滚动列表；常用语、语录、语音收藏、软件词库及学习记录统一紧凑行高，保留分类高亮、右键操作和双击编辑。帮助页已整理为本项目当前功能的操作指南。</p>
+    <p>下方检查更新只查询本仓库已发布的个人分支版本。模型由用户按需下载；更新检查不会上传本地配置、聊天资料或模型文件。</p>
   </div>
 
   <div class="section about-links">
     <div class="about-link-row about-version-row">
       <div>
         <div class="about-link-title">当前版本</div>
-        <div class="about-version">v0.0.6</div>
+        <div class="about-version">v0.10.4</div>
+        <p>个人分支版 · 保留原有配置</p>
         <div id="about-update-status" class="about-update-status" role="status" aria-live="polite"></div>
       </div>
       <button id="about-check-update" type="button" class="about-update-button">检查更新</button>
@@ -22,13 +29,23 @@
     <button id="about-privacy-link" type="button" class="about-link-row about-document-link">
       <span class="about-link-title">隐私政策</span><span class="about-link-arrow" aria-hidden="true">↗</span>
     </button>
+    <button id="about-source-link" type="button" class="about-link-row about-document-link"><span class="about-link-title">知语项目源码 · DiXuanAoYi/msime</span><span class="about-link-arrow" aria-hidden="true">↗</span></button>
+    <button id="about-notices-link" type="button" class="about-link-row about-document-link"><span class="about-link-title">第三方组件、词库与许可说明</span><span class="about-link-arrow" aria-hidden="true">↗</span></button>
+  </div>
+
+  <div class="section help-simple-document">
+    <div class="section-title">项目来源与使用方式</div>
+    <p>知语基于水杉输入法 Windows 版继续开发，借鉴青简输入法的候选释义、词库和输入体验。感谢上游作者、开源模型与词库维护者；各组件继续遵循其原有许可。</p>
+    <p>本地识别、发音和 OCR 模型按需下载，程序不会自动下载其他模型；未公开权重的项目不能直接下载使用。云服务由用户选择并配置 API，提供商、音色和语言能力以设置中的实际支持情况为准。</p>
+    <p>聊天按个人或群聊保存上下文，回复由你审阅后复制或上屏，不会自动发送。剪贴板和学习资料保存在本机；使用云服务时，相关请求内容会发送到所选提供商。</p>
+    <p><a href="https://github.com/metasequoiaime/msime-windows" target="_blank" rel="noopener noreferrer">水杉上游</a> · <a href="https://github.com/qingjian-team/qingjian" target="_blank" rel="noopener noreferrer">青简输入法</a></p>
   </div>
 
   <div class="section candidate-window-diagnostic-section">
     <div class="section-header">
       <div>
         <div class="section-title">Server 端日志</div>
-        <div class="quick-phrase-description">排查 Server 通信和输入延迟时开启。记录慢请求阶段、候选窗、悬浮工具栏、菜单、焦点会话和通信状态，不记录按键、输入内容或候选文本。日志默认保存到桌面的“水杉IME诊断日志.log”，复现后可直接发送该文件。</div>
+        <div class="quick-phrase-description">排查 Server 通信和输入延迟时开启。记录慢请求阶段、候选窗、悬浮工具栏、菜单、焦点会话和通信状态，不记录按键、输入内容或候选文本。日志默认保存到桌面的“知语IME诊断日志.log”，复现后可直接发送该文件。</div>
       </div>
       <div class="ftb-toggle-btn" id="serverDiagnosticLogToggleBtn" role="switch" aria-checked="false" tabindex="0">
         <div class="ftb-toggle-knob"></div>
@@ -40,7 +57,7 @@
     <div class="section-header">
       <div>
         <div class="section-title">TSF 端日志</div>
-        <div class="quick-phrase-description">排查应用内预编辑和输入延迟时开启。TSF 日志会在内存中限量缓冲，并通过独立管道批量汇总到桌面的“水杉IME诊断日志.log”；不记录按键、输入内容或候选文本。</div>
+        <div class="quick-phrase-description">排查应用内预编辑和输入延迟时开启。TSF 日志会在内存中限量缓冲，并通过独立管道批量汇总到桌面的“知语IME诊断日志.log”；不记录按键、输入内容或候选文本。</div>
       </div>
       <div class="ftb-toggle-btn" id="tsfDiagnosticLogToggleBtn" role="switch" aria-checked="false" tabindex="0">
         <div class="ftb-toggle-knob"></div>
@@ -51,12 +68,11 @@
   <dialog id="about-update-dialog" class="about-update-dialog" aria-labelledby="about-update-dialog-title">
     <div class="about-update-dialog-body">
       <div id="about-update-dialog-title" class="about-update-dialog-title">发现新版本</div>
-      <p>水杉 IME <strong id="about-update-dialog-version"></strong> 已发布，是否前往下载？</p>
+      <p>知语输入法项目 <strong id="about-update-dialog-version"></strong> 已发布，是否前往 GitHub Releases 下载？</p>
       <div id="about-update-dialog-trust" class="about-update-trust"></div>
     </div>
     <div class="about-update-dialog-actions">
       <button id="about-update-cancel" type="button" class="about-dialog-button">稍后</button>
-      <button id="about-update-mirror" type="button" class="about-dialog-button" hidden>国内镜像下载</button>
       <button id="about-update-download" type="button" class="about-dialog-button about-dialog-primary">前往下载</button>
     </div>
   </dialog>

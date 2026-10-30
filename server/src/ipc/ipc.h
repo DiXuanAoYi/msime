@@ -128,7 +128,12 @@ uint64_t RegisterToTsfPipeClient(uint64_t client_id, HANDLE pipe);
 bool ClientNegotiatedCompositionRestore(uint64_t client_id);
 // True only for a versioned client that advertised CaretStateIndicator, i.e.
 // its character-set shortcut KeyEvent carries a caret anchor in point[].
+bool ClientNegotiatedVocabularyCommit(uint64_t client_id);
 bool ClientNegotiatedCaretStateIndicator(uint64_t client_id);
+bool ClientNegotiatedFieldPrivacy(uint64_t client_id);
+bool ClientNegotiatedTrilingualCycle(uint64_t client_id);
+bool ClientNegotiatedRuntimeSettings(uint64_t client_id);
+std::vector<uint64_t> SnapshotRuntimeSettingsClients();
 // Only clients that advertised the dedicated cycle reply can receive it.
 bool ClientNegotiatedTrilingualCycle(uint64_t client_id);
 uint64_t RegisterToTsfWorkerThreadPipeClient(uint64_t client_id, HANDLE pipe);

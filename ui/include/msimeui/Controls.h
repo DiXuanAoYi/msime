@@ -29,6 +29,8 @@ class Image : public Visual
     void SetStretch(ImageStretch stretch);
     void SetOpacity(float opacity);
     void SetInterpolationMode(D2D1_BITMAP_INTERPOLATION_MODE interpolationMode);
+    // A drawing-only pose: layout and hit bounds remain unchanged.
+    void SetRenderPose(float angleDegrees, float offsetY, float scale);
 
     SizeF Measure(const SizeF &availableSize) override;
     void Arrange(const RectF &finalRect) override;
@@ -42,6 +44,9 @@ class Image : public Visual
     bool naturalSizeLoaded_ = false;
     ImageStretch stretch_ = ImageStretch::Uniform;
     float opacity_ = 1.0f;
+    float angleDegrees_ = 0.0f;
+    float offsetY_ = 0.0f;
+    float scale_ = 1.0f;
     D2D1_BITMAP_INTERPOLATION_MODE interpolationMode_ = D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
 };
 
@@ -499,12 +504,21 @@ class ListView : public Visual
 class CandidateList : public Visual
 {
   public:
+    struct TextSpan
+    {
+        uint32_t start = 0, length = 0;
+        float opacity = 1.0f;
+        D2D1_COLOR_F color = {};         // alpha zero inherits the surrounding text color
+        D2D1_COLOR_F selectedColor = {}; // alpha zero follows the normal span color
+    };
     struct Item
     {
         std::wstring label;
         std::wstring text;
         std::wstring annotation;
         std::wstring translation;
+        std::vector<TextSpan> translationSpans;
+        std::wstring overline;
     };
 
     enum class Orientation
@@ -537,6 +551,7 @@ class CandidateList : public Visual
         // Horizontal only: items narrower than this are widened to it, content
         // stays leading. 0 keeps every item at its natural width.
         float minItemWidth = 0.0f;
+        bool fitContent = false;
         float contentPadLeft = 5.0f;
         float contentPadRight = 5.0f;
         // Part of itemHeight that is the row's bottom padding. Lines stacked
@@ -576,6 +591,7 @@ class CandidateList : public Visual
 
     using SelectionChangedHandler = std::function<void(size_t selectedIndex)>;
     using ItemActivatedHandler = std::function<void(size_t selectedIndex)>;
+    using ModifiedItemHandler = std::function<bool(size_t index, WPARAM modifiers, bool annotation)>;
     using ContextMenuHandler = std::function<void(size_t selectedIndex, const POINT &clientPoint)>;
 
     explicit CandidateList(float itemHeight = 40.0f);
@@ -590,6 +606,7 @@ class CandidateList : public Visual
     RectF GetItemBounds(size_t index) const;
     void SetOnSelectionChanged(SelectionChangedHandler handler);
     void SetOnItemActivated(ItemActivatedHandler handler);
+    void SetOnModifiedItemActivated(ModifiedItemHandler handler);
     void SetOnContextMenu(ContextMenuHandler handler);
     void SetAppearance(Appearance appearance);
     void SetOrientation(Orientation orientation);
@@ -618,6 +635,7 @@ class CandidateList : public Visual
         RectF text;
         RectF annotation;
         RectF translation;
+        RectF overline;
     };
 
     float MeasureTextHeight(const std::wstring &text, float fontSize, float width) const;
@@ -657,6 +675,8 @@ class CandidateList : public Visual
     size_t selectedIndex_ = 0;
     SelectionChangedHandler onSelectionChanged_;
     ItemActivatedHandler onItemActivated_;
+    ModifiedItemHandler onModifiedItemActivated_;
+    WPARAM pressedModifiers_ = 0;
     ContextMenuHandler onContextMenu_;
 };
 

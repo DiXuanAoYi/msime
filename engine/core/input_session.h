@@ -171,9 +171,10 @@ class InputSession
     // recompute_candidates() or key handling.
     void set_caret(std::optional<std::size_t> caret);
     // Raw length consumed by the current decode: the caret moved onto the last complete
-    // syllable-unit boundary at or before it (floor). The caret being unset, or a scheme
-    // without the unit model (segment_raw_boundaries() empty), decodes the whole string and
-    // this equals the raw length.
+    // syllable-unit boundary at or before it (floor). A caret inside the first unit rounds up to
+    // the end of that unit instead, so prefix_end() == 0 means caret == 0. The caret being
+    // unset, or a scheme without the unit model (segment_raw_boundaries() empty), decodes the
+    // whole string and this equals the raw length.
     std::size_t prefix_end() const;
     // raw[prefix_end, size) with its original casing: the pending input this decode did not
     // consume. Empty unless the caret prefix is strictly shorter than the raw string.
@@ -262,6 +263,13 @@ class InputSession
     {
         engine_.set_sentence_association(options);
     }
+    void set_enabled_domain_dictionaries(const std::string &csv)
+    {
+        engine_.set_enabled_domain_dictionaries(csv);
+        prefix_query_input_.clear();
+        prefix_candidates_.clear();
+        refresh_prefix_candidates();
+    }
     void set_rescoring_context(std::string context)
     {
         engine_.set_rescoring_context(std::move(context));
@@ -282,6 +290,9 @@ class InputSession
   private:
     const QueryRequest &request() const;
     // 拼音类方案的预编辑切分；shuangpin_raw 决定双拼显示按键原串还是转换后的全拼。
+    // 容错仲裁给出了分段显示时（QuanpinDictionary::fault_preedit_with_cases_ 非空，
+    // 经 QuanpinEngine::fault_segmentation_with_cases 读出），直接返回它：
+    // 读音与敲的字母不再逐音节相同，重建式比对永远过不了，只会退回字面切分。
     std::string build_pinyin_segmentation_with_cases(bool shuangpin_raw) const;
     bool is_shuangpin() const;
     bool is_wubi() const;
@@ -304,7 +315,8 @@ class InputSession
     KeyResult replace_editing_text(std::string text, std::size_t caret);
     std::optional<std::size_t> caret_;
     // Last complete unit boundary at or before the caret; only consumes segment_raw_boundaries()
-    // (segmentation contract #187). caret unset or no unit model yields the full raw length.
+    // (segmentation contract #187). A caret inside the first unit rounds up to that unit's end,
+    // so only caret == 0 yields 0. Caret unset or no unit model yields the full raw length.
     std::size_t quantized_prefix_end() const;
     // Decodes the quantized caret prefix into prefix_candidates_ when it is strictly shorter
     // than the raw string, caching by prefix so unchanged keystrokes skip the extra query.
@@ -343,6 +355,8 @@ class InputSession
     CreatingWordProgress immediate_phrase_progress_;
     bool shuangpin_preedit_uses_raw_ = true;
     std::unique_ptr<QuanpinEngine> canonical_phrase_engine_;
+    // 容错仲裁的分段显示串在 QuanpinDictionary::fault_preedit_with_cases_（经
+    // QuanpinEngine::fault_segmentation_with_cases 读出），会话侧不另存一份。
     std::string pending_pinyin_sequence_;
     std::string pending_pinyin_sequence_with_cases_;
     bool has_pending_pinyin_sequence_ = false;

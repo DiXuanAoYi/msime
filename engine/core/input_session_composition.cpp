@@ -209,16 +209,15 @@ std::string ResolveQuanpinCloudCacheKey(const QueryRequest &request)
     return quanpin::strip_active_helpcodes(request.raw_input, request.raw_input_with_cases);
 }
 
-// Same four-bit mapping as autocorrect_types_from_request (engine.cpp): the
-// request only carries the two legacy bools, and either one on also enables
-// deletion and insertion so the preedit rebuild sees the same correction space
-// as the query.
+// Adapter over the request fields: the switch -> mask rule itself lives in
+// quanpin::autocorrect_types_from_switches (quanpin_utils.h), shared with
+// engine.cpp and the server session so the preedit rebuild always sees the same
+// correction space as the query.
 unsigned QuanpinAutocorrectTypes(const QueryRequest &request)
 {
-    const unsigned legacy =
-        (request.enable_quanpin_autocorrect_transposition ? quanpin::kAutocorrectTransposition : 0u) |
-        (request.enable_quanpin_autocorrect_neighbor ? quanpin::kAutocorrectNeighbor : 0u);
-    return legacy == 0 ? 0u : legacy | quanpin::kAutocorrectDeletion | quanpin::kAutocorrectInsertion;
+    return quanpin::autocorrect_types_from_switches(
+        request.enable_quanpin_autocorrect_transposition, request.enable_quanpin_autocorrect_neighbor,
+        request.enable_quanpin_autocorrect_deletion, request.enable_quanpin_autocorrect_insertion);
 }
 
 std::string QuanpinLettersWithoutDelimiters(const std::string &text)
@@ -346,9 +345,10 @@ std::string RebuildQuanpinDisplayFromLegalSpelling(const std::string &cased_inpu
 // BFS (shabg -> shang, which only re-separates). Both are rebuilt here from
 // the raw letters with separators at the actual cut positions; when the BFS
 // cannot explain a rewrite (length-changing aliases such as mihng -> ming) the
-// input is shown as typed, with no scheme separators. The rebuild is deliberately
-// switch-independent: the alias layer rewrites letters regardless of the
-// autocorrect switches, and AC1 only constrains the candidate list.
+// input is shown as typed, with no scheme separators. With the correction
+// switches off the scheme alias table no longer rewrites letters, so `base` is
+// already the literal cut and this rebuild is a no-op fast path; the rebuild
+// matters while correction is on, and AC1 only constrains the candidate list.
 std::string BuildQuanpinAutocorrectDisplay(const QueryRequest &request)
 {
     const std::string &cased = request.raw_input_with_cases.empty() ? request.raw_input : request.raw_input_with_cases;
@@ -371,11 +371,11 @@ std::string BuildQuanpinAutocorrectDisplay(const QueryRequest &request)
     }
 
     // Jianpin guard, mirroring resolve_series_query in the dictionary layer: a
-    // legal syllable plus at most one trailing letter is user intent, never a
-    // typo. The deletion table explains shapes like "zheg" -> zheng, so without
-    // this guard the preedit would lose the scheme separators once the deletion
-    // bit rides along with the legacy switches.
-    if (quanpin::looks_like_syllable_with_jianpin_tail(request.raw_input))
+    // leading initial plus complete syllables, or legal syllables plus at most
+    // one trailing initial, expresses user intent rather than a typo
+    // Corrections like "ywen" -> wen and "zheg" -> zheng would otherwise erase
+    // the original syllable boundaries from the preedit
+    if (quanpin::looks_like_jianpin_spelling(request.raw_input))
     {
         // The typed spelling is legal, but the scheme alias table may still
         // have re-segmented it into a reading with copied letters (dongan ->
@@ -410,6 +410,46 @@ std::string BuildQuanpinAutocorrectDisplay(const QueryRequest &request)
     // were rewritten, otherwise keep the scheme segmentation untouched. Manual
     // delimiters are part of what was typed, so they stay ("mihng'").
     return letters_rewritten ? cased : base;
+}
+
+// 首选是同一串字母的另一种字面切分时（yibananzhao 由 yi'ban'an'zhao 的「一般按照」领衔，
+// fangan 由 fang'an 的「方案」领衔），预编辑跟着首选分，而不是停在方案层的最少音节切分上，
+// 否则用户看着 yi'ba'nan'zhao 选「一般按照」。只认读音字母与敲的字母逐个相同、盖住整串、
+// 不带纠错标记的首选（辅助码、手动分隔符都不满足），而且音节数与方案层切分相同：那正是
+// 只差一处 n/ng 边界的等长歧义；音节数不同的读法（nue 的字面整词「怒鹅」nu'e）不在此列，
+// 预编辑照旧。否则返回空串。
+std::string BuildQuanpinDisplayFromLiteralHead(const QueryRequest &request, const WordItem &head)
+{
+    const std::string &cased = request.raw_input_with_cases.empty() ? request.raw_input : request.raw_input_with_cases;
+    if (!head.corrected_from.empty() || request.raw_input.find('\'') != std::string::npos ||
+        cased.size() != request.raw_input.size())
+    {
+        return {};
+    }
+    const auto syllables = quanpin::split_segments(head.pinyin);
+    const std::string &scheme_segmentation =
+        request.normalized_segmentation.empty() ? request.segmentation : request.normalized_segmentation;
+    if (syllables.size() < 2 || syllables.size() != quanpin::split_segments(scheme_segmentation).size())
+    {
+        return {};
+    }
+    std::vector<size_t> boundaries;
+    size_t end = 0;
+    for (const auto &syllable : syllables)
+    {
+        if (request.raw_input.compare(end, syllable.size(), syllable) != 0)
+        {
+            return {};
+        }
+        end += syllable.size();
+        boundaries.push_back(end);
+    }
+    if (end != request.raw_input.size())
+    {
+        return {};
+    }
+    boundaries.pop_back();
+    return RebuildQuanpinDisplayAtBoundaries(cased, boundaries);
 }
 
 // 合法输入上的纠错领衔时（ziazheliya 出「在这里呀」、jiuzheeyang 出「就这样」），预编辑
@@ -601,9 +641,43 @@ std::string InputSession::build_pinyin_segmentation_with_cases(bool shuangpin_ra
     }
     if (current_scheme_type() == SchemeType::Quanpin)
     {
+        // 容错仲裁选中的读音（句中简拼展开、槽内漏字变体）与敲的字母不逐音节相同，
+        // 下面几条按首选重建显示的路径都会比对失败、退回字面切分；那时预编辑会和
+        // 首选候选对不上（layout-and-unit-boundaries：切分即编辑单元）。仲裁已经把
+        // 分段显示按原串大小写算好，直接用。全拼方案下 shuangpin_raw 也会是 true
+        // （宿主默认取原串形态），所以这里只能按方案判断，不能用它当门。
+        if (!is_shuangpin())
+        {
+            const std::string &fault_display = engine_.fault_segmentation_with_cases();
+            if (!fault_display.empty())
+            {
+                return decorate(fault_display);
+            }
+        }
         if (!candidates().empty())
         {
-            std::string display = BuildQuanpinDisplayFromLeadingCorrection(request(), candidates().front());
+            const auto &head = candidates().front();
+            if (quanpin::literal_mixed_pinyin_match(request().raw_input, head.pinyin, head.canonical_pinyin))
+            {
+                std::vector<size_t> boundaries;
+                size_t consumed = 0;
+                for (const auto &segment : quanpin::split_segments(head.pinyin))
+                {
+                    consumed += segment.size();
+                    boundaries.push_back(consumed);
+                }
+                if (consumed == request().raw_input.size())
+                    boundaries.pop_back();
+                return RebuildQuanpinDisplayAtBoundaries(typed, boundaries);
+            }
+        }
+        if (!candidates().empty())
+        {
+            std::string display = BuildQuanpinDisplayFromLiteralHead(request(), candidates().front());
+            if (display.empty())
+            {
+                display = BuildQuanpinDisplayFromLeadingCorrection(request(), candidates().front());
+            }
             if (!display.empty())
             {
                 return display;
@@ -933,12 +1007,24 @@ InputSession::SelectionTransition InputSession::advance_composition_after_select
     // 长度消耗会剩下或多吞字母（buuhui 选「不会」剩个 i）。
     size_t consumed_letters = selected_pure_pinyin.size();
     const unsigned autocorrect_types = QuanpinAutocorrectTypes(request());
-    if (autocorrect_types != 0 && raw_input_without_helpcodes.find('\'') == std::string::npos)
+    const bool literal_mixed_prefix =
+        current_scheme_type() == SchemeType::Quanpin && !candidates().empty() &&
+        quanpin::literal_mixed_pinyin_match(raw_input_without_helpcodes, candidates().front().pinyin,
+                                            candidates().front().canonical_pinyin) &&
+        raw_input_without_helpcodes.compare(0, consumed_letters, selected_pure_pinyin) == 0;
+    if (autocorrect_types != 0 && !literal_mixed_prefix && raw_input_without_helpcodes.find('\'') == std::string::npos)
     {
         if (const auto aligned = quanpin::corrected_reading_raw_length(
                 raw_input_without_helpcodes, quanpin::split_segments(selected_pinyin), autocorrect_types))
         {
             consumed_letters = *aligned;
+        }
+        else if (const auto fault_aligned = quanpin::fault_reading_raw_length(raw_input_without_helpcodes,
+                                                                              quanpin::split_segments(selected_pinyin)))
+        {
+            // 长句容错仲裁的读音（句中简拼展开、槽内漏字变体）不在 k-best 切分里，
+            // corrected_reading_raw_length 对不上；按槽位模型对回原始字母。
+            consumed_letters = *fault_aligned;
         }
     }
 

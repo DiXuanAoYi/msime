@@ -1,5 +1,26 @@
 set(TEST_EXECUTABLE_NAME "MetasequoiaImeServerTests")
 
+# Explicit manual probe exercises the shipped PCM parser/player and real device.
+add_executable(MetasequoiaTtsStreamProbe tts_stream_probe.cpp)
+target_include_directories(MetasequoiaTtsStreamProbe PRIVATE ../src "${MSIME_ENGINE_DIR}/..")
+target_compile_features(MetasequoiaTtsStreamProbe PRIVATE cxx_std_20)
+target_link_libraries(MetasequoiaTtsStreamProbe PRIVATE CURL::libcurl winmm)
+
+# Manual native renderer integration probe: synthetic owned windows only.
+add_executable(MetasequoiaVisionLiveProbe vision_live_probe.cpp
+    ../src/settings/vision_capture.cpp ../src/utils/common_utils.cpp ../src/utils/ime_paths.cpp)
+target_include_directories(MetasequoiaVisionLiveProbe PRIVATE ../src)
+target_compile_features(MetasequoiaVisionLiveProbe PRIVATE cxx_std_20)
+target_compile_definitions(MetasequoiaVisionLiveProbe PRIVATE NOMINMAX=1 WIN32_LEAN_AND_MEAN=1)
+target_link_libraries(MetasequoiaVisionLiveProbe PRIVATE nlohmann_json::nlohmann_json Boost::locale
+    user32 gdi32 shell32 advapi32 ole32 dwmapi windowsapp windowscodecs)
+
+# Server intentionally builds Engine with BUILD_TESTING=OFF. Execute the public
+# English API regressions against the same linked Engine, including learning isolation.
+add_executable(test_english_learning_isolation "${MSIME_ENGINE_DIR}/tests/src/test_english_input_session.cpp")
+target_link_libraries(test_english_learning_isolation PRIVATE MetasequoiaIme::Engine)
+add_test(NAME english_learning_isolation COMMAND test_english_learning_isolation)
+
 add_executable(test_voice_control_dispatch src/test_voice_control_dispatch.cpp
     ../src/ipc/voice_control_dispatch.cpp)
 target_include_directories(test_voice_control_dispatch PRIVATE ../src "${MSIME_ENGINE_DIR}")
@@ -7,6 +28,14 @@ target_compile_features(test_voice_control_dispatch PRIVATE cxx_std_17)
 add_test(NAME voice_control_dispatch COMMAND test_voice_control_dispatch)
 
 set(TEST_SOURCE_FILES
+    src/test_ai_tasks.cpp
+    src/test_settings_task_diagnostics.cpp
+    src/ai_task_fixture_probe.cpp
+    src/candidate_translation_fixture_probe.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_app_dictionary.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vision.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vision_workbench.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/vision_audio_fixture_probe.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_date_time_query.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_v_mode_query.cpp"
@@ -25,8 +54,11 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_caret_prefix_input_session.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_english_dictionary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_translation_gloss.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_translation.cpp"
+    "${CMAKE_SOURCE_DIR}/src/cloud/cloud_translation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_default_config_credentials.cpp"
     "${CMAKE_SOURCE_DIR}/src/cloud/translation_gloss.cpp"
+    "${CMAKE_SOURCE_DIR}/src/cloud/ai_translation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_custom_translation.cpp"
     "${CMAKE_SOURCE_DIR}/src/cloud/custom_translation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_niutrans_translation.cpp"
@@ -39,10 +71,33 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_async_request_origin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_assistant_cache_key.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_cache_key.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/ai_task.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/character_question.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_request.cpp"
+    "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/api_credential_test.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/ai_workbench.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/neural_models.cpp"
+    "${CMAKE_SOURCE_DIR}/src/voice-input/doubao_asr_client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ai_assistant_cache.cpp"
     "${CMAKE_SOURCE_DIR}/src/ai/ai_assistant_cache.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_ui_action_policy.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_translation_policy.cpp"
+    "${CMAKE_SOURCE_DIR}/src/assistant/modes.cpp"
+    "${CMAKE_SOURCE_DIR}/src/assistant/protocol.cpp"
+    "${CMAKE_SOURCE_DIR}/src/assistant/context_store.cpp"
+    "${CMAKE_SOURCE_DIR}/src/assistant/service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/assistant/chat_reader.cpp"
+    "${CMAKE_SOURCE_DIR}/src/assistant/profile_store.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_chat_reader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_reply_studio.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_quick_features.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_vocabulary.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/english/vocabulary_store.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_personal_glossary.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_english_ime_translations.cpp"
+    "${CMAKE_SOURCE_DIR}/src/english/english_ime.cpp"
+    "${CMAKE_SOURCE_DIR}/src/english/personal_glossary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_ui_state.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_expansion_policy.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_composition_selection_history.cpp"
@@ -63,8 +118,10 @@ set(TEST_SOURCE_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_ipc_protocol_constants.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_composition_pipe.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_providers.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_speech_service.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_voice_batch_protocol.cpp"
     "${CMAKE_SOURCE_DIR}/src/voice-input/voice_batch_protocol.cpp"
+    "${CMAKE_SOURCE_DIR}/src/cloud/tencent_tmt.cpp"
     "${CMAKE_SOURCE_DIR}/src/voice-input/voice_providers.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_floating_toolbar_visibility_policy.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_caret_state_indicator_policy.cpp"
@@ -85,6 +142,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/skin/candidate_skin_catalog.cpp"
     "${CMAKE_SOURCE_DIR}/src/window/candidate_skin_palette.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_floating_toolbar_skin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_toolbar_placement.cpp"
     "${CMAKE_SOURCE_DIR}/src/window/floating_toolbar_skin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_system_font_family.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_dictionary_validation.cpp"
@@ -99,18 +157,41 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/statistics/stats_overview.cpp"
     "${CMAKE_SOURCE_DIR}/src/statistics/stats_store.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/ime_config_speech.cpp"
+    "${CMAKE_SOURCE_DIR}/src/english/speech_service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/english/voice_studio.cpp"
+    "${CMAKE_SOURCE_DIR}/src/english/candidate_reading.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/personal_library.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/config_update_dispatch.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_config.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/feature_config.cpp"
+    "${CMAKE_SOURCE_DIR}/src/quick/quick_thread.cpp"
+    "${CMAKE_SOURCE_DIR}/src/quick/quick_actions.cpp"
+    "${CMAKE_SOURCE_DIR}/src/quick/list_panel.cpp"
+    "${CMAKE_SOURCE_DIR}/src/quick/text_io.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_capture.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_protocol.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_service.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/ocr_table.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/vision_subtitles.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/local_ocr_models.cpp"
+    "${CMAKE_SOURCE_DIR}/src/settings/local_tts_models.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_appearance.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_fonts.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_general.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_input.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_keys.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_services.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/ime_config_candidate_translation.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_shuangpin.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_template.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_theme.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_toml.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_toolbar.cpp"
     "${CMAKE_SOURCE_DIR}/src/config/ime_config_write.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/credential_protection.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/ime_config_credentials.cpp"
+    "${CMAKE_SOURCE_DIR}/src/config/ime_config_runtime.cpp"
     "${CMAKE_SOURCE_DIR}/src/session/engine_input_session.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/common_utils.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/ime_paths.cpp"
@@ -153,12 +234,15 @@ target_link_libraries(${TEST_EXECUTABLE_NAME}
     PRIVATE
     MetasequoiaIme::Engine
     MetasequoiaIme::Voice
+    MetasequoiaIme::VoiceCapture
     nlohmann_json::nlohmann_json
     fmt::fmt
     spdlog::spdlog
     Boost::locale
     Boost::json
     CURL::libcurl
+    ZLIB::ZLIB
+    winhttp
     unofficial::sqlite3::sqlite3
     # dictionary_manager.cpp annotates pure-Chinese imports with cpp-pinyin and clears the
     # candidate cache through user32 window messages.

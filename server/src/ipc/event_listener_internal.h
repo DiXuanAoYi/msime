@@ -16,6 +16,7 @@
 #include "ipc/async_request_origin.h"
 #include "ipc/candidate_selection_policy.h"
 #include "ipc/candidate_ui_owner.h"
+#include "ipc/input_privacy_policy.h"
 #include "ipc/event_listener.h"
 #include "engine/contracts/v_mode_input.h"
 #include "window/caret_state_indicator_policy.h"
@@ -41,10 +42,6 @@ extern bool g_jianpin_mode_triggered;
 extern bool g_y_mode_triggered;
 extern bool g_r_mode_triggered;
 extern std::shared_ptr<IInputSession> g_r_mode_original_session;
-// The other native language's session, parked by a language cycle so switching
-// back neither rebuilds the engine nor reopens msime.db on the key path. Worker
-// thread only, like g_inputSession; a task that recreates the session from
-// config drops it, since a scheme or profile change makes it stale.
 extern std::shared_ptr<IInputSession> g_language_cycle_parked_session;
 extern bool g_english_input_mode;
 // Glosses are a cache keyed by TranslationIdentity, not the current page's
@@ -56,6 +53,7 @@ constexpr size_t kMaxCandidateTranslationGlosses = 2048;
 extern std::unordered_map<std::string, std::string> g_candidate_translation_glosses;
 extern std::string g_candidate_translation_signature;
 extern bool g_translation_candidates_active;
+extern bool g_ai_task_candidates_active;
 // 日期页：选中混输里的「📅日期」入口后，候选框换成整组日期时间格式。和译文页一样不动输入串，
 // 两者互斥，共用下面这份保存的候选与页码，退出时原样放回。
 extern bool g_date_time_page_active;
@@ -103,12 +101,23 @@ void UpdateEnglishInput(const std::string &input, uint64_t client_id = 0, uint64
 // 混输（英文、emoji、颜文字、日期时间）的查询请求；request.input 为空表示取消。
 void UpdateMixedInput(MixedCandidates::Request request, uint64_t client_id = 0, uint64_t activation_epoch = 0);
 void UpdateAiInput(const std::string &identity, uint64_t client_id = 0, uint64_t activation_epoch = 0);
+void ClearAiRerankForInput(uint64_t client_id, uint64_t activation_epoch, const std::string &raw_input);
+bool ApplyActiveAiRerank(std::vector<WordItem> &items);
+void UpdateAiTaskInput(AiAssistant::Task task, uint64_t client_id, uint64_t activation_epoch);
 AsyncRequestOrigin FindCloudRequestOrigin(const std::string &input, uint64_t generation);
 AsyncRequestOrigin FindEnglishRequestOrigin(const std::string &input, uint64_t generation);
 AsyncRequestOrigin FindMixedRequestOrigin(const std::string &input, uint64_t generation);
 AsyncRequestOrigin FindAiRequestOrigin(const std::string &input, uint64_t generation);
 std::string CandidateTextForOutput(const std::string &text);
 void AppendAiContext(const std::string &committed_word);
+void BindInputFieldPrivacy(uint64_t client, uint64_t epoch, FanyImeFieldPrivacy::State state,
+                           bool force_boundary = false);
+void BeginVocabularySelection();
+void CaptureVocabularySelection(int index, bool use_translation = false);
+void BeginVocabularyTranslationPage(int index);
+void ArmVocabularySelection(uint64_t client, uint64_t epoch, uint64_t request);
+void ConfirmVocabularySelection(uint64_t client, uint64_t epoch, uint64_t request);
+void ResetVocabularySelections();
 std::wstring BuildCreateWordPipePayload(const std::string &remaining_raw_input_with_cases,
                                         const std::string &current_word);
 // segmented_pinyin 定下来之后调用：双拼组合时把原串切分和全拼切分记进 GlobalIme::composition，
@@ -133,6 +142,9 @@ enum class TaskType
     HideCaretState,
     MoveCandidate,
     ImeKeyEvent,
+    VocabularyCommitConfirmed,
+    FieldPrivacyChanged,
+    RefreshRuntimeSettings,
     LangbarRightClick,
     IMESwitch,
     PuncSwitch,
@@ -162,6 +174,8 @@ enum class TaskType
     ExitEnglishInputMode,
     // 神经整句重排在后台线程里算完了，候选顺序需要就地更新一次。
     ApplyRescoredOrder,
+    ToolbarLanguageToggle,
+    ApplyAiTaskResult,
 };
 
 enum class PageMoveResult
@@ -193,6 +207,8 @@ void EnqueueAdjustCandidateRankingTask(bool english, bool wubi, const std::strin
                                        uint64_t activation_epoch,
                                        const std::vector<WordItem> *ranking_candidates = nullptr);
 void EnqueueLearnEnteredEnglishWordTask(const std::string &word);
+void EnqueueApplicationSelectionTask(const std::string &code, const std::string &word, bool english,
+                                     uint64_t client_id);
 // 快捷短语组的调频。word 非空：选中了组里的这一条，first_in_group 表示它本来就排在组首；
 // word 为空：越过整组选了普通候选，ordinary_rank 是它在普通候选里的名次。
 void EnqueueLearnQuickPhraseOrderTask(const std::string &code, const std::string &word, bool first_in_group,
@@ -218,6 +234,7 @@ bool SendUiLessCompositionToClient(uint64_t client_id, uint64_t activation_epoch
 // 拆分前 event_listener.cpp 里的前置声明，定义分布在各个 event_listener*.cpp。
 void PrepareCandidateList(uint64_t client_id, uint64_t activation_epoch);
 void HandleImeKey(uint64_t client_id, uint64_t activation_epoch, uint64_t request_id);
+void HandleToolbarLanguageToggle(bool from_ime_enabled);
 void ClearState();
 void ProcessSelectionKey(UINT keycode, uint64_t client_id, uint64_t activation_epoch, int forced_index_in_page = -1);
 void WaitForCandidateRenderSync(UINT keycode);
@@ -226,8 +243,10 @@ void ApplyCloudCandidate(const std::string &candidate, const std::string &pinyin
 void ApplyRescoredOrder();
 void ApplyAiCandidate(const std::string &candidate, const std::string &identity, uint64_t generation,
                       const std::optional<metasequoia::OnlineQuery> &query);
+void ApplyAiTaskResult(const AiAssistant::Result &result, const FanyImeIpc::AsyncRequestOrigin &origin);
 void ApplyEnglishCandidates(std::vector<WordItem> candidates, const std::string &input, uint64_t generation);
-void ApplyCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation, bool merge);
+void ApplyCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation, bool merge,
+                                const std::string &cloud_scope);
 void ApplyMixedCandidates(MixedCandidates::Result result, const std::string &input, uint64_t generation);
 void EnqueueStoreUserPhraseTask(const std::string &pinyin, const std::string &word, bool pinyin_is_canonical = false);
 bool ResolveCandidateItem(int one_based_index, WordItem &item);

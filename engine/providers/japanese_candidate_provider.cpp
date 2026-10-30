@@ -33,12 +33,21 @@ SharedDecoder SharedSentenceDecoder(const std::string &path)
     return model;
 }
 
+// WordItem 默认带 Quanpin。日文候选必须标上自己的方案，否则调频、置顶、造词会把罗马音当拼音键，
+// 把日文词写进拼音词库的日志，升级回放时它们就成了中文候选（#869）。
+WordItem JapaneseItem(const std::string &code, const std::string &value, std::int64_t weight, CandidateSource source)
+{
+    WordItem item(code, value, weight, source, code);
+    item.scheme = SchemeType::JapaneseRomaji;
+    return item;
+}
+
 void AppendUnique(std::vector<WordItem> &items, std::unordered_set<std::string> &seen, const std::string &code,
                   const std::string &value, std::int64_t weight, CandidateSource source = CandidateSource::Database)
 {
     if (!value.empty() && seen.insert(value).second)
     {
-        items.emplace_back(code, value, weight, source, code);
+        items.push_back(JapaneseItem(code, value, weight, source));
     }
 }
 
@@ -107,14 +116,12 @@ std::vector<WordItem> JapaneseCandidateProvider::query(const QueryRequest &reque
         const auto pending_kana = japanese::KanaForRomajiPrefix(conversion.pending);
         if (!conversion.hiragana.empty() && !conversion.pending.empty())
         {
-            const std::string typed = request.raw_input;
             for (const auto &kana : pending_kana)
             {
+                // The kana prefix already matches the typed reading. Converting it
+                // back to one romaji spelling would reject nn/n' and other aliases.
                 for (const auto &lemma : sentence_decoder_->PrefixLemmas(conversion.hiragana + kana, 24))
                 {
-                    const std::string romaji = japanese::HiraganaToRomaji(lemma.reading);
-                    if (romaji.size() < typed.size() || romaji.compare(0, typed.size(), typed) != 0)
-                        continue;
                     AppendUnique(candidates, seen, request.raw_input_with_cases, lemma.surface,
                                  980000 - lemma.word_cost, CandidateSource::Database);
                 }
@@ -218,8 +225,7 @@ std::optional<WordItem> JapaneseCandidateProvider::find_candidate(SchemeType sch
         const auto *code = reinterpret_cast<const char *>(sqlite3_column_text(query_statement_, 0));
         const auto *candidate = reinterpret_cast<const char *>(sqlite3_column_text(query_statement_, 1));
         if (code && candidate && value == candidate)
-            return WordItem(code, candidate, sqlite3_column_int64(query_statement_, 2), CandidateSource::Database,
-                            code);
+            return JapaneseItem(code, candidate, sqlite3_column_int64(query_statement_, 2), CandidateSource::Database);
     }
     return std::nullopt;
 }
@@ -256,7 +262,7 @@ int JapaneseCandidateProvider::cache_dynamic_candidate(SchemeType scheme, const 
     items.erase(
         std::remove_if(items.begin(), items.end(), [source](const WordItem &item) { return item.source == source; }),
         items.end());
-    items.emplace_back(code, word, 1, source, code);
+    items.push_back(JapaneseItem(code, word, 1, source));
     dynamic_candidates_.insert(code, items);
     return kNoMutation;
 }

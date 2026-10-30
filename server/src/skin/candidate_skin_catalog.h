@@ -18,6 +18,10 @@ struct CandidateColors
     std::string number;
     // 候选后的翻译文本。留空时沿用候选文字色并降到 62% 不透明度；设置后按原值绘制，选中行也不改。
     std::string translation;
+    std::string translationPos;
+    std::string translationSeparator;
+    std::string selectedTranslationPos;
+    std::string selectedTranslationSeparator;
     std::optional<bool> showSelectedBar;
     // 以下各项留空时的回退：candidate_text / preedit_text 用 text；preedit_caret / selected_bar 用 accent；
     // selected_text / selected_number 用基础皮肤的选中行配色；selected_translation 用 translation，
@@ -80,6 +84,7 @@ struct Package
     std::string decorationAlign = "right"; // left / center / right，相对卡片
     // 候选框里的翻页箭头；未设置时沿用 base 默认皮肤的设置（见 ResolvePageArrows）。
     std::optional<bool> pageArrows;
+    std::optional<bool> fitContent;
     CandidateColors dark;
     CandidateColors light;
     // 覆盖基础皮肤的悬浮工具栏外框圆角；未设置时沿用基础皮肤。
@@ -107,6 +112,7 @@ struct DefaultSkin
     std::string id;
     std::string name;
     std::optional<bool> pageArrows;
+    std::optional<bool> fitContent;
 };
 
 // 默认皮肤清单所在的子目录名，Scan 跳过它，外部皮肤也不能占用这个 ID。
@@ -129,4 +135,5 @@ std::optional<DefaultSkin> LoadDefault(const std::filesystem::path &skinsRoot, c
 // skinId 是配置里的候选皮肤：内置皮肤读自己的默认清单；外部皮肤先看自己的 page_arrows，
 // 没写再看 base 的默认清单。package 为外部皮肤已加载的清单，内置皮肤传 nullptr。
 bool ResolvePageArrows(const std::filesystem::path &skinsRoot, const std::string &skinId, const Package *package);
+bool ResolveFitContent(const std::filesystem::path &skinsRoot, const std::string &skinId, const Package *package);
 } // namespace CandidateSkinCatalog

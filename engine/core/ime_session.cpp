@@ -1,4 +1,5 @@
 #include "ime_session.h"
+#include "../domain_dictionary/domain_dictionary.h"
 #include "../schemes/quanpin_scheme.h"
 #include "../schemes/shuangpin_scheme.h"
 #include "../schemes/wubi_scheme.h"
@@ -45,6 +46,7 @@ ImeSession::ImeSession(SchemeType scheme_type, const ShuangpinProfile &shuangpin
 {
     bind_wubi_scheme();
     bind_shuangpin_scheme();
+    bind_quanpin_scheme();
 }
 
 void ImeSession::configure_shuangpin_scheme(IInputScheme *scheme) const
@@ -56,9 +58,24 @@ void ImeSession::configure_shuangpin_scheme(IInputScheme *scheme) const
     }
 }
 
+void ImeSession::configure_quanpin_scheme(IInputScheme *scheme) const
+{
+    // build_request 在 apply_request_options 之前跑，纠错掩码必须先落到方案上，
+    // 否则切分会用方案自己的默认值（关）而不是会话的开关状态。
+    if (auto *quanpin_scheme = dynamic_cast<QuanpinScheme *>(scheme))
+    {
+        quanpin_scheme->set_autocorrect_types(quanpin_autocorrect_types_);
+    }
+}
+
 void ImeSession::bind_shuangpin_scheme()
 {
     configure_shuangpin_scheme(scheme_.get());
+}
+
+void ImeSession::bind_quanpin_scheme()
+{
+    configure_quanpin_scheme(scheme_.get());
 }
 
 void ImeSession::set_direct_helpcode_enabled(bool enabled)
@@ -125,6 +142,7 @@ void ImeSession::switch_scheme(SchemeType scheme_type)
     scheme_ = create_scheme(scheme_type);
     bind_wubi_scheme();
     bind_shuangpin_scheme();
+    bind_quanpin_scheme();
     state_ = CompositionState{};
 }
 
@@ -141,6 +159,7 @@ void ImeSession::set_quanpin_helpcode_enabled(bool enabled)
 void ImeSession::set_quanpin_autocorrect_types(unsigned autocorrect_types)
 {
     quanpin_autocorrect_types_ = autocorrect_types;
+    bind_quanpin_scheme();
 }
 
 void ImeSession::replace_shuangpin_raw_input(const std::string &raw_input, const std::string &raw_input_with_cases)
@@ -248,6 +267,7 @@ std::vector<WordItem> ImeSession::query_raw_candidates(const std::string &raw_in
     const std::unique_ptr<IInputScheme> query_scheme = create_scheme(scheme_->type());
     // 临时方案要按同样的触发规则解析原串（大写段），否则前缀查询与正式查询切得不一样。
     configure_shuangpin_scheme(query_scheme.get());
+    configure_quanpin_scheme(query_scheme.get());
     query_scheme->set_raw_input(raw_input, raw_input_with_cases);
     QueryRequest request = query_scheme->build_request();
     apply_request_options(request);
@@ -366,9 +386,21 @@ void ImeSession::apply_request_options(QueryRequest &request) const
     request.enable_quanpin_autocorrect_transposition =
         (quanpin_autocorrect_types_ & quanpin::kAutocorrectTransposition) != 0;
     request.enable_quanpin_autocorrect_neighbor = (quanpin_autocorrect_types_ & quanpin::kAutocorrectNeighbor) != 0;
+    request.enable_quanpin_autocorrect_deletion = (quanpin_autocorrect_types_ & quanpin::kAutocorrectDeletion) != 0;
+    request.enable_quanpin_autocorrect_insertion = (quanpin_autocorrect_types_ & quanpin::kAutocorrectInsertion) != 0;
     request.fuzzy_pinyin = fuzzy_pinyin_;
     request.sentence_association = sentence_association_;
+    request.enabled_domain_dictionaries = enabled_domain_dictionaries_;
     request.rescoring_context = rescoring_context_;
+}
+
+void ImeSession::set_enabled_domain_dictionaries(const std::string &csv)
+{
+    const auto normalized = domain_dictionary::normalize_enabled(csv);
+    if (enabled_domain_dictionaries_ == normalized)
+        return;
+    enabled_domain_dictionaries_ = normalized;
+    reset_cache();
 }
 
 void ImeSession::refresh_candidates()
@@ -413,6 +445,7 @@ void ImeSession::refresh_candidates()
     // 两个表都答得出的词只留五笔那份。这是业界惯例的「候选词优先五笔，兼容拼音」，而不是
     // 只在码表失手时才转拼音的兜底。
     QuanpinScheme pinyin;
+    configure_quanpin_scheme(&pinyin);
     pinyin.set_raw_input(state_.request.raw_input, state_.request.raw_input_with_cases);
     QueryRequest pinyin_request = pinyin.build_request();
     apply_request_options(pinyin_request);

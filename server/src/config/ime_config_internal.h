@@ -11,6 +11,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <string_view>
@@ -64,7 +65,11 @@ class ConfigFileLock
         {
             const DWORD result = WaitForSingleObject(handle_, 5000);
             locked_ = result == WAIT_OBJECT_0 || result == WAIT_ABANDONED;
+            if (!locked_)
+                error_ = result == WAIT_FAILED ? GetLastError() : result;
         }
+        else
+            error_ = GetLastError();
     }
 
     ~ConfigFileLock()
@@ -80,9 +85,15 @@ class ConfigFileLock
         return locked_;
     }
 
+    DWORD error() const
+    {
+        return error_;
+    }
+
   private:
     HANDLE handle_ = nullptr;
     bool locked_ = false;
+    DWORD error_ = ERROR_SUCCESS;
 };
 
 SchemeType ParseScheme(const std::string &value);
@@ -110,11 +121,13 @@ enum class ActiveInputMode
     Chinese,
     Japanese
 };
-// The key thread reads the language without the config lock. These mirror
-// g_input_mode and [keybindings] trilingual_cycle for those lock-free reads.
-extern std::atomic<bool> g_configured_input_mode_japanese;
 extern std::atomic<ActiveInputMode> g_active_input_mode;
-extern std::atomic<bool> g_trilingual_cycle_enabled;
+extern std::atomic_bool g_configured_input_mode_japanese;
+extern std::atomic_bool g_trilingual_cycle_enabled;
+extern std::atomic_bool g_wubi_four_code_auto_commit;
+extern std::atomic_bool g_wubi_fifth_code_top_commit;
+extern std::shared_ptr<const std::string> g_vim_mode_apps;
+void LoadConfiguredCollocationGrammar(const toml::table &table);
 extern std::string g_japanese_schema;
 extern std::string g_character_set;
 extern std::string g_default_ime_mode;
@@ -132,6 +145,8 @@ extern int g_candidate_font_size;
 extern int g_candidate_window_preedit_font_size;
 extern std::atomic_bool g_diagnostic_log_enabled;
 extern std::atomic_bool g_tsf_diagnostic_log_enabled;
+extern std::atomic_bool g_vocabulary_enabled;
+extern std::atomic_int g_vocabulary_retention_days;
 extern std::atomic_bool g_statistics_enabled;
 extern std::string g_statistics_retention;
 extern std::string g_candidate_text_color;
@@ -141,8 +156,6 @@ extern bool g_wubi_mixed_pinyin;
 extern bool g_escape_keeps_selected_word;
 extern bool g_enter_learns_english_word;
 extern std::string g_wubi_z_mode;
-extern bool g_wubi_four_code_auto_commit;
-extern bool g_wubi_fifth_code_top_commit;
 extern std::string g_shuangpin_preedit_mode;
 extern std::string g_tsf_preedit_style;
 extern bool g_tsf_preedit_shuangpin_quanpin;
@@ -162,11 +175,15 @@ extern bool g_show_shuangpin_helpcode_in_candidate_window;
 extern bool g_show_quanpin_helpcode_in_candidate_window;
 extern bool g_quanpin_autocorrect_transposition;
 extern bool g_quanpin_autocorrect_neighbor;
+extern bool g_quanpin_autocorrect_deletion;
+extern bool g_quanpin_autocorrect_insertion;
 extern bool g_quanpin_autocorrect_marker;
 extern std::uint32_t g_fuzzy_pinyin_rules;
 extern bool g_fuzzy_pinyin_enabled;
 extern bool g_fuzzy_seeded;
 extern bool g_floating_toolbar_enabled;
+extern std::atomic_bool g_floating_toolbar_shadow;
+extern std::atomic_int g_candidate_fit_content_mode;
 extern bool g_caret_state_indicator_enabled;
 extern bool g_caret_state_indicator_on_focus;
 extern std::string g_caret_state_indicator_position;
@@ -177,6 +194,9 @@ extern bool g_floating_toolbar_auto_hide;
 extern int g_floating_toolbar_auto_hide_delay;
 extern bool g_english_candidates_enabled;
 extern bool g_candidate_translations_enabled;
+extern std::atomic<bool> g_candidate_translation_cloud_enabled;
+extern std::shared_ptr<const EnglishIme::PersonalGlossary> g_personal_translation_glossary;
+extern std::atomic<uint64_t> g_personal_translation_glossary_revision;
 extern int g_english_mixed_input_min_chars;
 extern bool g_cloud_candidates_enabled;
 extern bool g_assoc_sentence_wordlattice;
@@ -228,6 +248,7 @@ extern std::string g_ui_backend;
 extern std::string g_ui_backend_active;
 extern std::string g_candidate_skin;
 extern std::string g_candidate_window_preedit_style;
+extern bool g_candidate_show_pinyin;
 extern bool g_candidate_fixed_badge;
 extern std::string g_candidate_fixed_badge_style;
 extern std::string g_settings_window_linger;
@@ -243,6 +264,10 @@ extern std::string g_theme_voice;
 extern std::shared_mutex g_voice_input_mutex;
 extern VoiceInputConfig g_voice_input;
 extern AiAssistantConfig g_ai_assistant;
+extern std::shared_mutex g_ai_assistant_mutex;
+extern std::atomic_bool g_english_runtime_candidates;
+extern std::shared_ptr<const std::string> g_english_candidate_app_rules;
+extern std::shared_ptr<const std::string> g_enabled_domain_dictionaries;
 extern TencentTmtConfig g_tencent_tmt;
 extern CustomTranslationConfig g_custom_translation;
 extern NiuTransConfig g_niutrans;
@@ -265,6 +290,12 @@ bool IsValidCandidateFixedBadgeStyle(const std::string &style);
 bool IsValidSettingsWindowLinger(const std::string &linger);
 bool IsValidTranslationTargetLanguage(const std::string &language);
 std::string AiAssistantTokenSlotKey(std::string_view provider);
+bool IsCredentialKey(const std::string &key);
+std::optional<std::string> ProtectCredentialLiteral(const std::string &key, const std::string &literal);
+void RevealStoredCredentials(toml::table &table);
+void ProtectPlaintextCredentials();
+bool IsValidAiThinking(const std::string &value);
+bool IsValidAiTask(const std::string &value);
 void RememberConfigWriteTime();
 
 // ime_config_toml.cpp
@@ -290,3 +321,8 @@ bool WriteConfiguredValues(const std::vector<ConfigValueUpdate> &updates);
 bool WriteConfiguredValue(const std::string &section, const std::string &key, const std::string &replacement);
 void NotifyImeServer(UINT windowMessage, const wchar_t *auxMessage, WPARAM wParam = 0);
 } // namespace ime_config_detail
+
+namespace ime_config_detail
+{
+extern std::shared_ptr<const std::string> g_disabled_translation_dictionaries;
+}

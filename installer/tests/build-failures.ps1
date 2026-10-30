@@ -78,6 +78,7 @@ try {
     New-Item -ItemType Directory -Force $settings | Out-Null
     [IO.File]::WriteAllText((Join-Path $settings 'package.json'), '{}')
     $installer = Join-Path $fixture 'installer'
+    [IO.File]::WriteAllText((Join-Path $fixture 'scripts/EnsureBuildDeps.ps1'), '# dependencies prepared by fixture')
     New-Item -ItemType Directory -Force $installer | Out-Null
     [IO.File]::WriteAllText((Join-Path $installer 'Prepare-PackageFiles.ps1'), "throw 'Reached package staging after failure'")
     function global:pnpm { $global:LASTEXITCODE = 23 }

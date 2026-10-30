@@ -110,7 +110,10 @@ constexpr std::uint32_t ClientSuspended = 14;   // temporary focus route reset; 
 // the Server may have re-routed to another client meanwhile; without the
 // ownership claim the Server would discard it as an inactive-client event.
 constexpr std::uint32_t FocusRestored = 15;
-constexpr std::uint32_t HideCaretState = 16; // focus-context boundary; never clears candidate state
+constexpr std::uint32_t VocabularyCommitConfirmed = 17; // request_id only; no text
+constexpr std::uint32_t RuntimeSettingsRequest = 18;
+constexpr std::uint32_t FieldPrivacyChanged = 19; // flags only; never document text
+constexpr std::uint32_t HideCaretState = 16;      // focus-context boundary; never clears candidate state
 // Caret-badge notifications (FanyImeProtocol::CaretStateIndicator). keycode is
 // the resulting mode (1 = Chinese / Chinese punctuation / fullwidth); point[]
 // is the physical caret anchor or {0, INVALID_Y} when none was resolved.
@@ -437,7 +440,10 @@ constexpr std::uint32_t VModeChanged = 32;
 // Whether language-switch hotkeys commit raw composition, then cycle Chinese/Japanese/English. Payload "0"/"1".
 // Separate from InputModeChanged so old DLLs retain its active-language meaning and ignore this switch.
 constexpr std::uint32_t TrilingualCycleChanged = 33;
-constexpr std::uint32_t MaxKnown = TrilingualCycleChanged;
+// Optional VocabularyCommit capability: decimal request id, tab, committed text.
+constexpr std::uint32_t VocabularyCommitCandidate = 34;
+constexpr std::uint32_t RuntimeSettingsSnapshot = 35;
+constexpr std::uint32_t MaxKnown = RuntimeSettingsSnapshot;
 // Source compatibility for the Server's historical spellings.
 constexpr std::uint32_t SwitchToEn = SwitchToEnglish;
 constexpr std::uint32_t SwitchToCn = SwitchToChinese;

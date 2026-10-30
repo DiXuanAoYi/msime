@@ -2,6 +2,7 @@
 
 #include "config/ime_config.h"
 
+#include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,6 +49,22 @@ std::string DefaultPolishModel(std::string_view provider);
 std::string ResolveAsrModel(const VoiceInputConfig &config);
 std::string ResolvePolishModel(const VoiceInputConfig &config);
 const std::vector<PolishPromptPreset> &BuiltinPolishPromptPresets();
+bool IsPolishPromptId(std::string_view id);
 std::string ResolvePolishSystemPrompt(const VoiceInputConfig &config);
 std::string WrapAsrUserMessage(const std::string &asr_text);
+
+// One chat-completions connection. Voice polish, reply generation and screen translation all draw
+// their credential from the same per-provider token slots, so a key is entered once.
+struct TextModelConnection
+{
+    std::string provider, endpoint, model, token;
+    bool ready() const
+    {
+        return !endpoint.empty() && !model.empty() && !token.empty();
+    }
+};
+// An empty provider_override means "the provider selected for voice polish".
+TextModelConnection ResolveTextModel(const VoiceInputConfig &config, std::string_view provider_override);
+// Adds the provider-specific switches that turn thinking off, so replies stay fast.
+void ApplyTextModelDefaults(const TextModelConnection &connection, nlohmann::json &payload);
 } // namespace VoiceInput

@@ -1,4 +1,6 @@
 #include "english_ime.h"
+#include "english_phrases.h"
+#include "config/ime_config.h"
 
 #include "engine/english/english_dictionary.h"
 #include <algorithm>
@@ -26,7 +28,8 @@ std::atomic<uint64_t> g_generation{0};
 std::atomic<uint64_t> g_translation_generation{0};
 std::string g_latest_input;
 std::vector<EnglishIme::TranslationQuery> g_latest_translation_queries;
-bool g_use_local_translation_dictionary = true;
+std::string g_translation_language = "en";
+std::shared_ptr<const EnglishIme::PersonalGlossary> g_personal_glossary;
 bool g_dedicated_mode = false;
 size_t g_mixed_min_prefix = kDefaultMixedMinPrefix;
 std::string g_db_path;
@@ -55,11 +58,9 @@ std::string NormalizeInput(const std::string &input)
     return normalized;
 }
 
-void WorkerLoop()
+void WorkerLoop(uint64_t observed_generation, uint64_t observed_translation_generation)
 {
     EnglishDictionary dictionary(g_db_path);
-    uint64_t observed_generation = g_generation.load();
-    uint64_t observed_translation_generation = g_translation_generation.load();
 
     while (g_running)
     {
@@ -81,13 +82,15 @@ void WorkerLoop()
         observed_translation_generation = next_translation_generation;
         const std::string input = g_latest_input;
         const auto translation_queries = g_latest_translation_queries;
-        const bool use_local_translation_dictionary = g_use_local_translation_dictionary;
+        const auto translation_language = g_translation_language;
+        const auto personal_glossary = g_personal_glossary;
         const bool dedicated_mode = g_dedicated_mode;
         const size_t mixed_min_prefix = g_mixed_min_prefix;
         lock.unlock();
 
         if (run_translations)
         {
+            dictionary.set_disabled_dictionaries(*GetConfiguredDisabledTranslationDictionaries());
             std::vector<EnglishIme::TranslationResult> results;
             results.reserve(translation_queries.size());
             for (const auto &query : translation_queries)
@@ -95,7 +98,16 @@ void WorkerLoop()
                 if (!g_running || g_translation_generation.load() != observed_translation_generation)
                     break;
                 std::string gloss;
-                if (use_local_translation_dictionary)
+                if (query.direction == EnglishIme::TranslationDirection::EnglishToChinese)
+                    gloss = EnglishIme::PhraseGloss(query.key);
+                if (personal_glossary && query.direction == EnglishIme::TranslationDirection::ChineseToEnglish)
+                    gloss = personal_glossary->Lookup(translation_language, query.key);
+                if (gloss.empty() && translation_language != "en" &&
+                    query.direction == EnglishIme::TranslationDirection::ChineseToEnglish)
+                    gloss = dictionary.query_translation_gloss(query.key, translation_language);
+                // English candidates still get Chinese glosses while learning Japanese, etc.
+                if (gloss.empty() && (translation_language == "en" ||
+                                      query.direction == EnglishIme::TranslationDirection::EnglishToChinese))
                 {
                     gloss = query.direction == EnglishIme::TranslationDirection::EnglishToChinese
                                 ? dictionary.query_chinese_gloss(query.key)
@@ -127,6 +139,25 @@ void WorkerLoop()
 
         auto candidates =
             dictionary.query_prefix(prefix, dedicated_mode ? kDedicatedCandidateLimit : kMixedCandidateLimit);
+        if (dedicated_mode && prefix.size() >= 2)
+        {
+            std::vector<WordItem> phrases;
+            for (const auto &[phrase, gloss] : EnglishIme::kPhrases)
+            {
+                std::string key;
+                for (unsigned char c : std::string(phrase))
+                    if (c >= 'a' && c <= 'z')
+                        key += char(c);
+                    else if (c >= 'A' && c <= 'Z')
+                        key += char(c + 32);
+                if (key.rfind(prefix, 0) == 0)
+                    phrases.emplace_back(phrase, phrase, 0, CandidateSource::EnglishDictionary);
+                if (phrases.size() == 3)
+                    break;
+            }
+            candidates.insert(candidates.begin() + (std::min)(size_t{3}, candidates.size()), phrases.begin(),
+                              phrases.end());
+        }
         if (!g_running || g_generation.load() != observed_generation)
         {
             continue;
@@ -151,8 +182,12 @@ void Start(const std::string &db_path, ApplyCallback apply_callback, Translation
     g_db_path = db_path;
     g_apply_callback = std::move(apply_callback);
     g_translation_callback = std::move(translation_callback);
+    // Capture before publishing running: a request immediately after Start
+    // returns must not become the worker's initial "already handled" version.
+    const auto initial_generation = g_generation.load();
+    const auto initial_translation_generation = g_translation_generation.load();
     g_running = true;
-    g_worker = std::thread(WorkerLoop);
+    g_worker = std::thread(WorkerLoop, initial_generation, initial_translation_generation);
 }
 
 void Stop()
@@ -200,12 +235,14 @@ bool IsCurrent(const std::string &input, uint64_t generation, bool dedicated_mod
            g_dedicated_mode == dedicated_mode;
 }
 
-void RequestTranslations(std::vector<TranslationQuery> queries, bool use_local_dictionary)
+void RequestTranslations(std::vector<TranslationQuery> queries, const std::string &target_language,
+                         std::shared_ptr<const PersonalGlossary> personal_glossary)
 {
     {
         std::lock_guard lock(g_mutex);
         g_latest_translation_queries = std::move(queries);
-        g_use_local_translation_dictionary = use_local_dictionary;
+        g_translation_language = target_language;
+        g_personal_glossary = std::move(personal_glossary);
         g_translation_generation.fetch_add(1);
     }
     g_cv.notify_one();

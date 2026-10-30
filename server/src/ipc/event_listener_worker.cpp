@@ -1,14 +1,19 @@
+#include "engine/contracts/vocabulary_commit.h"
+#include "engine/contracts/input_runtime_settings.h"
+#include "cloud/cloud_translation.h"
 // 任务队列与任务线程：Task 定义、WorkerThread 的分发循环，以及各个 Enqueue* 入口。
 #include "ipc/event_listener_internal.h"
 #include <Windows.h>
 #include <string>
 #include <cstdint>
 #include <utility>
+#include <algorithm>
 #include "ipc.h"
 #include "ipc/selection_replay_guard.h"
 #include "ipc/async_request_origin.h"
 #include "ipc/candidate_ui_owner.h"
 #include "ipc/input_key_policy.h"
+#include "ipc/candidate_ui_action_policy.h"
 #include "defines/defines.h"
 #include "defines/globals.h"
 #include "utils/common_utils.h"
@@ -22,6 +27,7 @@
 #include "config/ime_config.h"
 #include "window/window_hook.h"
 #include "session/session_factory.h"
+#include "settings/personal_library.h"
 #include "log/candidate_diag_log.h"
 #include "log/ftb_diag_log.h"
 #include "voice-input/voice_input_service.h"
@@ -46,6 +52,36 @@ uint64_t g_last_status_snapshot_client_id = 0;
 // After switching away from this IME, the next StatusSnapshot must restore the
 // configured default mode even when the same process/thread client_id reconnects.
 bool g_force_global_ime_sync = false;
+
+std::atomic<uint64_t> g_runtime_settings_revision{1};
+
+void RefreshRuntimeSettings()
+{
+    ReloadImeConfigIfChanged();
+    UpdateAiInput("");
+    UpdateCloudInput("");
+    CloudTranslation::Clear();
+    EnglishIme::ClearTranslations();
+    g_candidate_translation_glosses.clear();
+    g_candidate_translation_signature.clear();
+    const bool japanese = GetActiveInputMode() == "japanese";
+    if (::global_hwnd_ftb)
+        PostMessage(::global_hwnd_ftb, UPDATE_FTB_INPUT_MODE, japanese ? 1 : 0, 0);
+    BroadcastToTsfWorkerThreadViaNamedpipe(FanyImeWorkerReplyType::InputModeChanged, japanese ? L"1" : L"0");
+    g_runtime_settings_revision.fetch_add(1, std::memory_order_acq_rel);
+    for (const auto client : SnapshotRuntimeSettingsClients())
+        FanyNamedPipe::SendRuntimeSettingsSnapshot(client);
+    if (g_inputSession)
+        g_inputSession->recompute_candidates();
+    const auto active = GetActivePipeClient();
+    if (active.client_id && (RecallClientStatusSnapshot(active.client_id) & 4) == 0 && g_english_input_mode &&
+        !GetConfiguredEnglishCandidatesForApplication(PersonalLibrary::InputApplication()))
+    {
+        // Preserve the raw word until its next user commit boundary.
+        HideCandidateWindowAndDropItems();
+        PostMessage(::global_hwnd, WM_HIDE_MAIN_WINDOW, 0, 0);
+    }
+}
 
 int EnsureAuthoritativeCnMode()
 {
@@ -128,6 +164,7 @@ struct Task
 {
     TaskType type;
     bool has_pipe_data = false;
+    bool toolbar_ime_enabled = false;
     FanyImeNamedpipeData pipe_data = {};
     uint64_t client_id = 0;
     uint64_t activation_epoch = 0;
@@ -138,6 +175,8 @@ struct Task
     std::string ai_candidate;
     std::string ai_identity;
     uint64_t ai_generation = 0;
+    AiAssistant::Result ai_result;
+    AsyncRequestOrigin ai_origin;
     std::optional<metasequoia::OnlineQuery> online_query;
     std::vector<WordItem> english_candidates;
     std::string english_input;
@@ -145,6 +184,7 @@ struct Task
     std::vector<EnglishIme::TranslationResult> translation_results;
     uint64_t translation_generation = 0;
     bool translation_merge = false;
+    std::string translation_scope;
     MixedCandidates::Result mixed_result;
     std::string mixed_input;
     uint64_t mixed_generation = 0;
@@ -255,14 +295,34 @@ void WorkerThread()
             continue;
         }
 
+        if (task.client_id != 0)
+            PersonalLibrary::BindInputApplication(
+                PersonalLibrary::ProcessApplication(static_cast<uint32_t>(task.client_id >> 32)));
         if (task.has_pipe_data)
         {
             namedpipeData = task.pipe_data;
             ApplyUiLessFromPacket(namedpipeData);
+            if (task.type == TaskType::ImeKeyEvent || task.type == TaskType::FieldPrivacyChanged)
+                BindInputFieldPrivacy(task.client_id, task.activation_epoch,
+                                      FanyImeFieldPrivacy::Decode(task.pipe_data.modifiers_down,
+                                                                  ClientNegotiatedFieldPrivacy(task.client_id)));
         }
 
         switch (task.type)
         {
+        case TaskType::RefreshRuntimeSettings:
+            RefreshRuntimeSettings();
+            break;
+        case TaskType::ToolbarLanguageToggle:
+            HandleToolbarLanguageToggle(task.toolbar_ime_enabled);
+            break;
+        case TaskType::FieldPrivacyChanged:
+            if (!FanyImeIpc::InputLearningAllowed())
+            {
+                ClearState();
+                PostMessage(::global_hwnd, WM_HIDE_MAIN_WINDOW, 0, 0);
+            }
+            break;
         case TaskType::ShowCandidate: {
             static int cnt = 0;
             // A TSF ShowCandidate packet owns a complete candidate payload,
@@ -338,6 +398,9 @@ void WorkerThread()
             break;
         }
 
+        case TaskType::VocabularyCommitConfirmed:
+            ConfirmVocabularySelection(task.client_id, task.activation_epoch, task.pipe_data.request_id);
+            break;
         case TaskType::ImeKeyEvent: {
             const ULONGLONG queue_elapsed_ms = task.enqueued_at_ms == 0 ? 0 : GetTickCount64() - task.enqueued_at_ms;
             if (queue_elapsed_ms >= 8)
@@ -347,9 +410,9 @@ void WorkerThread()
             }
             // 顶字后第 4 码丢失的定位探针：DLL 侧 keydown-sent 已确认发出，若这里没打出来，
             // 说明任务根本没进队列（reader 未收到/未入队）；打出来了但组合没变，才是 HandleImeKey 内部问题。
-            CAND_DIAG_LOGF(L"task ImeKeyEvent dispatch request={} keycode=0x{:X} wch=U+{:04X} epoch={}",
-                           task.pipe_data.request_id, task.pipe_data.keycode, static_cast<unsigned>(task.pipe_data.wch),
-                           task.activation_epoch);
+            CAND_DIAG_LOGF(L"task ImeKeyEvent dispatch request={} client={} epoch={}", task.pipe_data.request_id,
+                           task.client_id, task.activation_epoch);
+            BeginVocabularySelection();
             HandleImeKey(task.client_id, task.activation_epoch, task.pipe_data.request_id);
             break;
         }
@@ -372,6 +435,8 @@ void WorkerThread()
             const bool imeEnabled = task.pipe_data.keycode != 0;
             const auto capsLockSnapshot =
                 FanyImePipeFlags::DecodeImeSwitchCapsLockSnapshot(task.pipe_data.modifiers_down);
+            if (capsLockSnapshot.has_value())
+                SyncServerCapsLockState(*capsLockSnapshot);
             const bool capsLockEnabled =
                 capsLockSnapshot.has_value() ? *capsLockSnapshot : GetServerCapsLockState() != 0;
             const bool japaneseMode = GetActiveInputMode() == "japanese";
@@ -408,6 +473,10 @@ void WorkerThread()
             break;
         }
 
+        case TaskType::ApplyAiTaskResult:
+            ApplyAiTaskResult(task.ai_result, task.ai_origin);
+            break;
+
         case TaskType::ApplyEnglishCandidates: {
             ApplyEnglishCandidates(std::move(task.english_candidates), task.english_input, task.english_generation);
             break;
@@ -415,7 +484,7 @@ void WorkerThread()
 
         case TaskType::ApplyCandidateTranslations: {
             ApplyCandidateTranslations(std::move(task.translation_results), task.translation_generation,
-                                       task.translation_merge);
+                                       task.translation_merge, task.translation_scope);
             break;
         }
 
@@ -439,6 +508,7 @@ void WorkerThread()
         }
 
         case TaskType::ClientActivated: {
+            BindInputFieldPrivacy(task.client_id, task.activation_epoch, FanyImeFieldPrivacy::State::Unknown, true);
             CAND_DIAG_LOGF(L"client activated client={} epoch={} hwnd_present={}", task.client_id,
                            task.activation_epoch, ::global_hwnd != nullptr);
             VoiceInput::SetImeActive(true);
@@ -473,12 +543,14 @@ void WorkerThread()
                 {
                     remembered = (EnsureAuthoritativeCnMode() << 2) | (remembered & 0x3);
                 }
+                SetEnglishInputMode((remembered & 4) == 0);
                 PublishStatusSnapshotValue(remembered);
             }
             break;
         }
 
         case TaskType::ClientDeactivated: {
+            BindInputFieldPrivacy(0, 0, FanyImeFieldPrivacy::State::Unknown, true);
             CAND_DIAG_LOGF(L"client deactivated client={} epoch={}", task.client_id, task.activation_epoch);
             VoiceInput::SetImeActive(false);
             PostHideCaretState();
@@ -503,6 +575,7 @@ void WorkerThread()
         }
 
         case TaskType::ClientSuspended: {
+            BindInputFieldPrivacy(0, 0, FanyImeFieldPrivacy::State::Unknown, true);
             CAND_DIAG_LOGF(L"client suspended client={} epoch={}", task.client_id, task.activation_epoch);
             PostHideCaretState();
             // A suspension rotates the IPC focus session while the TIP may
@@ -569,19 +642,24 @@ void WorkerThread()
             const int caps_state = GetServerCapsLockState();
             const int packed_state =
                 (caps_state << 3) | (effective_cn << 2) | (fullwidth_state << 1) | punctuation_state;
-            if (FanyImeIpc::ShouldResetCompositionForImeMode(effective_cn != 0))
+            const int previous_mode = RecallClientStatusSnapshot(task.client_id);
+            const bool mode_changed = FanyImeIpc::ShouldResetCompositionForImeMode(previous_mode, effective_cn != 0);
+            if (mode_changed)
             {
-                if (effective_cn == 0)
-                    SetEnglishInputMode(false);
+                SetEnglishInputMode(effective_cn == 0);
                 PostMessage(::global_hwnd, WM_HIDE_MAIN_WINDOW, 0, 0);
                 ClearState();
             }
+            else if (effective_cn == 0 && !g_english_input_mode)
+                SetEnglishInputMode(true);
             RememberClientStatusSnapshot(task.client_id, packed_state);
             PublishStatusSnapshotValue(packed_state);
             break;
         }
 
         case TaskType::ExitEnglishInputMode: {
+            if (g_authoritative_cn_mode == 0)
+                SendToTsfWorkerThreadViaNamedpipe(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToCn, L"");
             if (g_english_input_mode)
             {
                 SetEnglishInputMode(false);
@@ -592,16 +670,27 @@ void WorkerThread()
         }
 
         case TaskType::UiCommitCandidate: {
+            BeginVocabularySelection();
             ProcessSelectionKey(0, task.client_id, task.activation_epoch, task.candidate_one_based_index - 1);
             if (Global::MsgTypeToTsf == Global::DataFromServerMsgType::Normal)
             {
                 // The worker packet is the complete edit-session-owned commit
                 // for a normal UI click. Do not also leave an unsolicited
                 // request-id-0 reply on the normal reverse pipe.
+                static uint64_t vocabulary_token = uint64_t{1} << 63;
+                const uint64_t token = ++vocabulary_token;
+                const auto payload =
+                    GetConfiguredVocabularyEnabled() && ClientNegotiatedVocabularyCommit(task.client_id)
+                        ? FanyImeVocabulary::Encode(token, Global::candidate_ui.selected_text)
+                        : std::nullopt;
+                const bool tracked = payload.has_value();
+                if (tracked)
+                    ArmVocabularySelection(task.client_id, task.activation_epoch, token);
                 if (SendToTsfWorkerThreadClientViaNamedpipe(
                         task.client_id, task.activation_epoch,
-                        Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidate,
-                        Global::candidate_ui.selected_text))
+                        tracked ? FanyImeWorkerReplyType::VocabularyCommitCandidate
+                                : Global::DataFromServerMsgTypeToTsfWorkerThread::CommitCandidate,
+                        tracked ? *payload : Global::candidate_ui.selected_text))
                 {
                     ClearState();
                 }
@@ -641,12 +730,36 @@ void WorkerThread()
                 RequestShowCandidateWindow();
                 break;
             }
-            if (item.source == CandidateSource::QuickPhrase || item.source == CandidateSource::Emoji ||
-                item.source == CandidateSource::Kaomoji || item.source == CandidateSource::Generated)
+            if (!FanyImeIpc::SupportsCandidateDictionaryMutation(item.source))
             {
                 break;
             }
 
+            const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(task.client_id >> 32));
+            if (PersonalLibrary::Policy(application).isolated)
+            {
+                const std::string action = task.type == TaskType::UiPinCandidate           ? "pin"
+                                           : task.type == TaskType::UiDeleteCandidate      ? "delete"
+                                           : task.type == TaskType::UiFixCandidatePosition ? "fix"
+                                                                                           : "clear";
+                auto localCode = g_inputSession->get_pinyin_sequence_with_cases();
+                if (IsYModeInput(localCode))
+                    localCode = localCode.substr(1);
+                try
+                {
+                    PersonalLibrary::SetCandidatePreference(
+                        application, localCode, item.word,
+                        g_english_input_mode || IsYModeInput(g_inputSession->get_pinyin_sequence_with_cases()) ||
+                            item.source == CandidateSource::EnglishDictionary,
+                        action, task.fixed_position);
+                }
+                catch (...)
+                { /* A failed application preference must never modify the shared DB. */
+                }
+                PrepareCandidateList(task.client_id, task.activation_epoch);
+                RequestShowCandidateWindow();
+                break;
+            }
             const bool english_candidate = item.source == CandidateSource::EnglishDictionary;
             const auto ranking_keys = RankingKeysForCandidate(item);
             const std::string context_key = english_candidate ? EnglishRankingContextKey() : ranking_keys.first;
@@ -740,6 +853,7 @@ void WorkerThread()
         }
 
         case TaskType::ReloadInputSession: {
+            RefreshRuntimeSettings();
             ClearState();
             Global::candidate_ui.page_size = GetConfiguredCandidatePageSize();
             g_language_cycle_parked_session.reset();
@@ -750,6 +864,7 @@ void WorkerThread()
         }
 
         case TaskType::EnsureInputSessionMatchesConfig: {
+            RefreshRuntimeSettings();
             const SchemeType wanted = GetConfiguredActiveInputScheme();
             const bool has_session = g_inputSession != nullptr;
             const bool configured_scheme_matches = has_session && g_inputSession->current_scheme_type() == wanted;
@@ -799,6 +914,7 @@ void WorkerThread()
         }
 
         case TaskType::ResetInputSessionCache: {
+            RefreshRuntimeSettings();
             const auto session = PersistentInputSession();
             if (session)
             {
@@ -892,6 +1008,24 @@ void EnqueueAiCandidate(const std::string &candidate, const std::string &identit
     pipe_queueCv.notify_one();
 }
 
+void EnqueueAiTaskResult(const AiAssistant::Result &result)
+{
+    const auto origin = FindAiRequestOrigin(result.identity, result.generation);
+    if (!origin.client_id || !origin.activation_epoch)
+        return;
+    {
+        std::lock_guard lock(queueMutex);
+        Task task;
+        task.type = TaskType::ApplyAiTaskResult;
+        task.ai_result = result;
+        task.ai_origin = origin;
+        task.client_id = origin.client_id;
+        task.activation_epoch = origin.activation_epoch;
+        taskQueue.push(std::move(task));
+    }
+    pipe_queueCv.notify_one();
+}
+
 void EnqueueEnglishCandidates(std::vector<WordItem> candidates, const std::string &input, uint64_t generation)
 {
     const AsyncRequestOrigin origin = FindEnglishRequestOrigin(input, generation);
@@ -913,7 +1047,8 @@ void EnqueueEnglishCandidates(std::vector<WordItem> candidates, const std::strin
     pipe_queueCv.notify_one();
 }
 
-void EnqueueCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation, bool merge)
+void EnqueueCandidateTranslations(std::vector<EnglishIme::TranslationResult> results, uint64_t generation, bool merge,
+                                  const std::string &cloud_scope)
 {
     {
         std::lock_guard lock(queueMutex);
@@ -922,6 +1057,7 @@ void EnqueueCandidateTranslations(std::vector<EnglishIme::TranslationResult> res
         task.translation_results = std::move(results);
         task.translation_generation = generation;
         task.translation_merge = merge;
+        task.translation_scope = cloud_scope;
         taskQueue.push(std::move(task));
     }
     pipe_queueCv.notify_one();
@@ -948,8 +1084,49 @@ void EnqueueMixedCandidates(MixedCandidates::Result result, const std::string &i
     pipe_queueCv.notify_one();
 }
 
+namespace
+{
+SerialTaskRunner &DictionaryWriter();
+}
+void EnqueueApplicationSelectionTask(const std::string &code, const std::string &word, bool english, uint64_t client_id)
+{
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (!PersonalLibrary::Policy(application).isolated)
+        return;
+    const auto localCode = english && IsYModeInput(code) ? code.substr(1) : code;
+    DictionaryWriter().Post([application, localCode, word, english] {
+        try
+        {
+            PersonalLibrary::RecordSelection(application, localCode, word, english ? "en" : "zh");
+        }
+        catch (...)
+        { /* Never fall through to the shared dictionary on an overlay failure. */
+        }
+    });
+}
 void EnqueueStoreUserPhraseTask(const std::string &pinyin, const std::string &word, bool pinyin_is_canonical)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+    {
+        std::string code = pinyin;
+        code.erase(std::remove(code.begin(), code.end(), '\''), code.end());
+        DictionaryWriter().Post([application, code, word] {
+            try
+            {
+                PersonalLibrary::RecordSelection(application, code, word, "zh", true);
+            }
+            catch (...)
+            {
+            }
+        });
+        return;
+    }
     {
         std::lock_guard lock(queueMutex);
         Task task;
@@ -987,6 +1164,11 @@ void EnqueueAdjustCandidateRankingTask(bool english, bool wubi, const std::strin
                                        const std::string &entry_key, const std::string &word, uint64_t client_id,
                                        uint64_t activation_epoch, const std::vector<WordItem> *ranking_candidates)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string replay_key =
         std::string(english ? "e" : (wubi ? "w" : "p")) + '\x1f' + context_key + '\x1f' + entry_key + '\x1f' + word;
@@ -1023,6 +1205,11 @@ void EnqueueAdjustCandidateRankingTask(bool english, bool wubi, const std::strin
 void EnqueueLearnQuickPhraseOrderTask(const std::string &code, const std::string &word, bool first_in_group,
                                       int ordinary_rank, uint64_t client_id, uint64_t activation_epoch)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string replay_key = "q\x1f" + code + '\x1f' + (word.empty() ? std::to_string(ordinary_rank) : word);
     if (code.empty() || !replay_guard.should_apply(replay_key, client_id, activation_epoch, GetTickCount64()))
@@ -1047,6 +1234,11 @@ void EnqueueLearnQuickPhraseOrderTask(const std::string &code, const std::string
 void EnqueueLearnEnglishSlotTask(const std::string &code, int english_index, std::optional<int> selected_index,
                                  uint64_t client_id, uint64_t activation_epoch)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string replay_key = "s\x1f" + code + '\x1f' + std::to_string(english_index) + '\x1f' +
                                    (selected_index ? std::to_string(*selected_index) : std::string("english"));
@@ -1071,6 +1263,11 @@ void EnqueueLearnEnglishSlotTask(const std::string &code, int english_index, std
 // 日期时间格式的顺序同样每次现查，写完不用清缓存。
 void EnqueueLearnDateTimeOrderTask(const std::string &format_id, uint64_t client_id, uint64_t activation_epoch)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+        return;
     static FanyImeIpc::SelectionRankingReplayGuard replay_guard;
     const std::string keyword = DateTimeKeywordForFormat(format_id);
     if (keyword.empty() ||
@@ -1088,6 +1285,23 @@ void EnqueueLearnDateTimeOrderTask(const std::string &format_id, uint64_t client
 
 void EnqueueLearnEnteredEnglishWordTask(const std::string &word)
 {
+    if (!FanyImeIpc::InputLearningAllowed())
+        return;
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    if (PersonalLibrary::Policy(application).isolated)
+    {
+        DictionaryWriter().Post([application, word] {
+            try
+            {
+                PersonalLibrary::RecordSelection(application, word, word, "en", true);
+            }
+            catch (...)
+            {
+            }
+        });
+        return;
+    }
     if (word.empty())
         return;
     DictionaryWriter().Post([word] {
@@ -1234,6 +1448,60 @@ void EnqueueEnsureInputSessionMatchesConfigTask()
         taskQueue.push(std::move(task));
     }
     pipe_queueCv.notify_one();
+}
+
+void EnqueueRuntimeSettingsRefresh()
+{
+    if (!pipe_running)
+        return;
+    {
+        std::lock_guard lock(queueMutex);
+        Task task;
+        task.type = TaskType::RefreshRuntimeSettings;
+        taskQueue.push(std::move(task));
+    }
+    pipe_queueCv.notify_one();
+}
+
+void EnqueueToolbarLanguageToggleTask(bool from_ime_enabled)
+{
+    if (!pipe_running)
+        return;
+    {
+        std::lock_guard lock(queueMutex);
+        Task task;
+        task.type = TaskType::ToolbarLanguageToggle;
+        task.toolbar_ime_enabled = from_ime_enabled;
+        taskQueue.push(std::move(task));
+    }
+    pipe_queueCv.notify_one();
+}
+
+void SendRuntimeSettingsSnapshot(uint64_t client, uint64_t epoch)
+{
+    if (!ClientNegotiatedRuntimeSettings(client))
+        return;
+    if (ReloadImeConfigIfChanged())
+        g_runtime_settings_revision.fetch_add(1, std::memory_order_acq_rel);
+    const auto application = PersonalLibrary::ProcessApplication(static_cast<uint32_t>(client >> 32));
+    uint32_t flags = 0;
+    if (GetConfiguredEnglishCandidatesForApplication(application))
+        flags |= FanyImeRuntimeSettings::EnglishCandidates;
+    if (GetConfiguredTrilingualCycleEnabled())
+        flags |= FanyImeRuntimeSettings::TrilingualCycle;
+    if (GetConfiguredVimModeForApplication(application))
+        flags |= FanyImeRuntimeSettings::VimMode;
+    const auto ai = GetConfiguredAiAssistant();
+    if (ai.completion_enabled)
+        flags |= FanyImeRuntimeSettings::AiCompletion;
+    if (ai.question_enabled)
+        flags |= FanyImeRuntimeSettings::AiQuestion;
+    const auto payload = FanyImeRuntimeSettings::Encode({g_runtime_settings_revision.load(), flags});
+    if (epoch)
+        SendToTsfWorkerThreadClientViaNamedpipe(client, epoch, FanyImeWorkerReplyType::RuntimeSettingsSnapshot,
+                                                payload);
+    else
+        SendToTsfWorkerThreadClientViaNamedpipe(client, FanyImeWorkerReplyType::RuntimeSettingsSnapshot, payload);
 }
 
 void EnqueueApplyCandidatePageSizeTask()

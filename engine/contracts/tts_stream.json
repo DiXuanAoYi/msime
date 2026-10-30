@@ -1,0 +1,10 @@
+{
+  "magic": "MSIPCM1\n",
+  "content_type": "application/x-msime-pcm",
+  "min_rate": 8000,
+  "max_rate": 48000,
+  "max_channels": 2,
+  "max_chunk_bytes": 65536,
+  "max_audio_seconds": 90,
+  "format": "Little-endian: magic[8], sample_rate:u32, channels:u32; repeated length:u32 + interleaved signed PCM16 bytes. Zero length is successful completion. EOF without zero is failure."
+}

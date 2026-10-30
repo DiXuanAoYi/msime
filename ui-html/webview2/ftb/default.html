@@ -59,7 +59,7 @@
       gap: calc(var(--ftb-gap) * var(--ftb-scale));
 
       border: 1.4px solid rgba(255, 255, 255, 0.15);
-      box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.4);
+      box-shadow: var(--msime-ftb-shadow, 4px 4px 4px rgba(0, 0, 0, 0.4));
       backdrop-filter: blur(8px);
     }
 
@@ -232,6 +232,13 @@
       <div class="icon" id="screen-keyboard" data-toolbar-item="screen_keyboard" style="display: none">
         <span class="icon-glyph" data-fallback="键">&#xE765;</span>
       </div>
+      <div class="icon" id="voice-input" data-toolbar-item="voice" title="语音输入 · 点击开始 / 停止录音" aria-label="语音输入">
+        <span class="icon-glyph" data-fallback="音">&#xE720;</span>
+      </div>
+      <div class="icon" id="clipboard-library" data-toolbar-item="clipboard" title="剪贴板与分组资料" aria-label="剪贴板"><span class="icon-glyph" data-fallback="剪">&#xE77F;</span></div>
+      <div class="icon" id="reply-studio" data-toolbar-item="reply" title="嘴替 · 回复工作台" aria-label="嘴替">
+        <span class="icon-glyph" data-fallback="嘴">&#xE8F2;</span>
+      </div>
       <div class="icon" id="settings" data-toolbar-item="settings">
         <span class="icon-glyph" data-fallback="设">&#xE713;</span>
       </div>
@@ -356,6 +363,13 @@
   //
   // 设置按钮
   //
+  document.getElementById('voice-input').addEventListener('click', () => {
+    window.chrome.webview.postMessage(serializeHostMessage({ type: 'voiceInput' }));
+  });
+  document.getElementById('clipboard-library').addEventListener('click', () => { window.chrome.webview.postMessage(serializeHostMessage({type:'openPersonalLibrary'})); });
+  document.getElementById('reply-studio').addEventListener('click', () => {
+    window.chrome.webview.postMessage(serializeHostMessage({ type: 'openReplyStudio' }));
+  });
   document.getElementById('settings').addEventListener('click', () => {
     window.chrome.webview.postMessage(serializeHostMessage({ type: 'openSettings' }));
   });
@@ -391,6 +405,7 @@
 
   // Tell the host the first frame is ready so it can stop the paint-grace show
   // and apply the real visibility decision (IME active / configured / etc.).
+  window.setToolbarShadowEnabled = function (enabled) {document.documentElement.style.setProperty('--msime-ftb-shadow',enabled === false ? 'none' : '4px 4px 4px rgba(0,0,0,.4)');};
   function notifyToolbarReady() {
     if (!window.chrome || !window.chrome.webview) return;
     window.chrome.webview.postMessage(serializeHostMessage({ type: 'ready' }));

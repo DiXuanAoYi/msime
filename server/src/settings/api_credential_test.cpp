@@ -1,10 +1,13 @@
 #include "api_credential_test.h"
+#include "ai/ai_task.h"
 
 #include "cloud/custom_translation.h"
 #include "cloud/niutrans_translation.h"
 #include "cloud/tencent_tmt.h"
 #include "cloud/translation_gloss.h"
 #include "voice-input/doubao_asr_client.h"
+#include "voice-input/voice_batch_protocol.h"
+#include <ctime>
 
 #include "utils/network_proxy.h"
 #include <curl/curl.h>
@@ -20,8 +23,7 @@ namespace
 constexpr long kConnectTimeoutMs = 5000;
 constexpr long kRequestTimeoutMs = 15000;
 constexpr std::size_t kMaxResponseBytes = 256 * 1024;
-// OpenRouter 等聚合服务的 /models 带描述和价格，能到数 MB。
-constexpr std::size_t kMaxModelListBytes = 16 * 1024 * 1024;
+constexpr std::size_t kMaxModelListBytes = 8 * 1024 * 1024;
 
 struct HttpResponse
 {
@@ -29,7 +31,7 @@ struct HttpResponse
     long status = 0;
     std::string body;
     std::string error;
-    std::size_t max_bytes = kMaxResponseBytes;
+    std::size_t limit = kMaxResponseBytes;
 };
 
 std::string Value(const ApiCredentialTest::Request &request, const char *key)
@@ -40,9 +42,11 @@ std::string Value(const ApiCredentialTest::Request &request, const char *key)
 
 size_t WriteResponse(char *data, size_t size, size_t count, void *user)
 {
+    if (size && count > SIZE_MAX / size)
+        return 0;
     const size_t bytes = size * count;
     auto *response = static_cast<HttpResponse *>(user);
-    if (bytes > response->max_bytes - (std::min)(response->body.size(), response->max_bytes))
+    if (bytes > response->limit - (std::min)(response->body.size(), response->limit))
         return 0;
     response->body.append(data, bytes);
     return bytes;
@@ -85,23 +89,29 @@ std::string ErrorDetail(const HttpResponse &response)
     return "HTTP " + std::to_string(response.status);
 }
 
-// payload 为空指针时发 GET，否则以 JSON body 发 POST。
 HttpResponse PerformJsonRequest(const std::string &endpoint, const std::string &token, const std::string *payload,
-                                std::size_t max_bytes = kMaxResponseBytes)
+                                std::size_t limit = kMaxResponseBytes)
 {
     InitCurl();
     HttpResponse response;
-    response.max_bytes = max_bytes;
+    response.limit = limit;
     CURL *curl = curl_easy_init();
     if (!curl)
         return response;
     char error[CURL_ERROR_SIZE] = {};
     curl_slist *headers = nullptr;
-    headers = curl_slist_append(headers, payload ? "Content-Type: application/json" : "Accept: application/json");
+    headers = curl_slist_append(headers, "Content-Type: application/json");
     const std::string authorization = "Authorization: Bearer " + token;
-    headers = curl_slist_append(headers, authorization.c_str());
+    if (!token.empty())
+        headers = curl_slist_append(headers, authorization.c_str());
     curl_easy_setopt(curl, CURLOPT_URL, endpoint.c_str());
-    NetworkProxy::ApplyToCurl(curl);
+    if (AiAssistant::IsLoopbackEndpoint(endpoint))
+    {
+        curl_easy_setopt(curl, CURLOPT_PROXY, "");
+        curl_easy_setopt(curl, CURLOPT_NOPROXY, "*");
+    }
+    else
+        NetworkProxy::ApplyToCurl(curl);
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     if (payload)
     {
@@ -109,9 +119,7 @@ HttpResponse PerformJsonRequest(const std::string &endpoint, const std::string &
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(payload->size()));
     }
     else
-    {
         curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
-    }
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteResponse);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error);
@@ -126,24 +134,9 @@ HttpResponse PerformJsonRequest(const std::string &endpoint, const std::string &
     return response;
 }
 
-// 由 Chat Completions 地址或 base URL 推出 OpenAI 兼容的 /models 地址。
-// 查询串（如 Azure 的 api-version）原样保留，只改写路径部分。
-std::string ModelListEndpoint(const std::string &endpoint)
+HttpResponse PerformJsonPost(const std::string &endpoint, const std::string &token, const std::string &payload)
 {
-    const std::size_t query_at = endpoint.find_first_of("?#");
-    std::string path = endpoint.substr(0, query_at);
-    const std::string query = query_at == std::string::npos ? std::string() : endpoint.substr(query_at);
-    while (!path.empty() && path.back() == '/')
-        path.pop_back();
-    const auto ends_with = [&path](std::string_view suffix) {
-        return path.size() >= suffix.size() && path.compare(path.size() - suffix.size(), suffix.size(), suffix) == 0;
-    };
-    constexpr std::string_view kChatSuffix = "/chat/completions";
-    if (ends_with(kChatSuffix))
-        path.resize(path.size() - kChatSuffix.size());
-    if (!ends_with("/models"))
-        path += "/models";
-    return path + query;
+    return PerformJsonRequest(endpoint, token, &payload);
 }
 
 ApiCredentialTest::Result TestChat(const ApiCredentialTest::Request &request)
@@ -151,7 +144,10 @@ ApiCredentialTest::Result TestChat(const ApiCredentialTest::Request &request)
     const std::string token = Value(request, "token");
     const std::string endpoint = Value(request, "endpoint");
     const std::string model = Value(request, "model");
-    if (!CloudTranslation::IsUsableSecret(token))
+    const bool loopback = AiAssistant::IsLoopbackEndpoint(endpoint);
+    if (Value(request, "provider") == "local" && !loopback)
+        return {false, "本地服务必须使用回环地址，不允许外网。"};
+    if (!loopback && !CloudTranslation::IsUsableSecret(token))
         return {false, "请先填写有效的 API Key。"};
     if (!IsHttpEndpoint(endpoint) || model.empty())
         return {false, "请填写有效的 HTTPS 接口地址和模型名。"};
@@ -164,11 +160,11 @@ ApiCredentialTest::Result TestChat(const ApiCredentialTest::Request &request)
         body["thinking"] = {{"type", "disabled"}};
     else if (provider == "siliconflow")
         body["enable_thinking"] = false;
-    const std::string payload = body.dump();
-    const HttpResponse response = PerformJsonRequest(endpoint, token, &payload);
+    const HttpResponse response = PerformJsonPost(endpoint, token, body.dump());
     if (response.code == CURLE_OK && response.status >= 200 && response.status < 300)
-        return {true, "连接成功，API Key 和模型配置有效。"};
-    return {false, "测试失败：" + ErrorDetail(response)};
+        return {true, loopback ? "连接成功，本地服务和模型配置有效；本地连接可不填 Token。"
+                               : "连接成功，API Key 和模型配置有效。"};
+    return {false, "测试失败：连接错误或 HTTP " + std::to_string(response.status) + "，请核对地址、模型和凭据。"};
 }
 
 void AppendLe16(std::vector<unsigned char> &out, std::uint16_t value)
@@ -210,7 +206,7 @@ ApiCredentialTest::Result TestBatchAsr(const ApiCredentialTest::Request &request
     const std::string token = Value(request, "token");
     const std::string endpoint = Value(request, "endpoint");
     const std::string model = Value(request, "model");
-    if (!CloudTranslation::IsUsableSecret(token))
+    if (Value(request, "provider") != "local" && !CloudTranslation::IsUsableSecret(token))
         return {false, "请先填写有效的 API Key。"};
     if (!IsHttpEndpoint(endpoint) || model.empty())
         return {false, "请填写有效的 HTTPS 接口地址和模型名。"};
@@ -221,24 +217,34 @@ ApiCredentialTest::Result TestBatchAsr(const ApiCredentialTest::Request &request
     if (!curl)
         return {false, "无法初始化网络请求。"};
     char error[CURL_ERROR_SIZE] = {};
-    const auto wav = SilentWav();
-    curl_mime *mime = curl_mime_init(curl);
-    curl_mimepart *file = curl_mime_addpart(mime);
-    curl_mime_name(file, "file");
-    curl_mime_filename(file, "credential-test.wav");
-    curl_mime_type(file, "audio/wav");
-    curl_mime_data(file, reinterpret_cast<const char *>(wav.data()), wav.size());
-    curl_mimepart *model_part = curl_mime_addpart(mime);
-    curl_mime_name(model_part, "model");
-    curl_mime_data(model_part, model.c_str(), CURL_ZERO_TERMINATED);
+    VoiceInputConfig config;
+    config.asr_provider = Value(request, "provider");
+    config.asr_tokens[config.asr_provider] = token;
+    config.asr_endpoint = endpoint;
+    config.asr_model = model;
+    config.tencent_secret_id = Value(request, "secretId");
+    VoiceInput::AsrHttpRequest payload;
+    try
+    {
+        payload = VoiceInput::BuildAsrHttpRequest(std::vector<float>(16000, 0), config, std::time(nullptr));
+    }
+    catch (const std::exception &e)
+    {
+        curl_easy_cleanup(curl);
+        return {false, e.what()};
+    }
     curl_slist *headers = nullptr;
-    const std::string authorization = "Authorization: Bearer " + token;
-    headers = curl_slist_append(headers, authorization.c_str());
+    for (const auto &h : payload.headers)
+        headers = curl_slist_append(headers, h.c_str());
+    headers = curl_slist_append(headers, ("Content-Type: " + payload.content_type).c_str());
     headers = curl_slist_append(headers, "Expect:");
     curl_easy_setopt(curl, CURLOPT_URL, endpoint.c_str());
     NetworkProxy::ApplyToCurl(curl);
+    if (config.asr_provider == "local")
+        curl_easy_setopt(curl, CURLOPT_PROXY, "");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.body.data());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(payload.body.size()));
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteResponse);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, error);
@@ -249,10 +255,19 @@ ApiCredentialTest::Result TestBatchAsr(const ApiCredentialTest::Request &request
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status);
     response.error = error;
     curl_slist_free_all(headers);
-    curl_mime_free(mime);
     curl_easy_cleanup(curl);
     if (response.code == CURLE_OK && response.status >= 200 && response.status < 300)
-        return {true, "连接成功，API Key 和模型配置有效。"};
+    {
+        try
+        {
+            VoiceInput::ParseAsrHttpResponse(response.body, config.asr_provider);
+        }
+        catch (const std::exception &e)
+        {
+            return {false, e.what()};
+        }
+        return {true, "服务已接受测试音频，配置有效。"};
+    }
     return {false, "测试失败：" + ErrorDetail(response)};
 }
 
@@ -290,8 +305,78 @@ ApiCredentialTest::Result TestTranslation(const ApiCredentialTest::Request &requ
 
 namespace ApiCredentialTest
 {
+std::string ModelListEndpoint(const std::string &endpoint)
+{
+    const auto query = endpoint.find_first_of("?#");
+    std::string path = endpoint.substr(0, query);
+    while (!path.empty() && path.back() == '/')
+        path.pop_back();
+    constexpr std::string_view suffix = "/chat/completions";
+    if (path.size() >= suffix.size() && path.compare(path.size() - suffix.size(), suffix.size(), suffix) == 0)
+        path.resize(path.size() - suffix.size());
+    if (path.size() < 7 || path.compare(path.size() - 7, 7, "/models") != 0)
+        path += "/models";
+    return path + (query == std::string::npos ? std::string() : endpoint.substr(query));
+}
+ModelListResult FetchModels(const Request &request)
+{
+    if (request.service != "ai.assistant" && request.service != "voice.polish" && request.service != "translation.ai")
+        return {false, "当前任务不支持查询模型名", {}};
+    const auto endpoint = Value(request, "endpoint"), token = Value(request, "token");
+    const bool loopback = AiAssistant::IsLoopbackEndpoint(endpoint);
+    if (Value(request, "provider") == "local" && !loopback)
+        return {false, "本地服务必须使用回环地址", {}};
+    if (!IsHttpEndpoint(endpoint))
+        return {false, "请填写有效的接口地址", {}};
+    if (!loopback && !CloudTranslation::IsUsableSecret(token))
+        return {false, "请先填写有效 API Key", {}};
+    const auto response = PerformJsonRequest(ModelListEndpoint(endpoint), token, nullptr, kMaxModelListBytes);
+    if (response.code != CURLE_OK || response.status < 200 || response.status >= 300)
+        return {false, "模型查询失败（HTTP " + std::to_string(response.status) + "）；请检查接口、凭据和网络", {}};
+    return ParseModelList(response.body);
+}
+ModelListResult ParseModelList(const std::string &body)
+{
+    try
+    {
+        const auto root = nlohmann::json::parse(body);
+        const auto &rows = root.is_array() ? root : root.at("data");
+        if (!rows.is_array())
+            throw std::runtime_error("models");
+        std::vector<std::string> models;
+        std::vector<ModelListResult::Detail> details;
+        for (const auto &row : rows)
+        {
+            if (!row.is_string() && (!row.is_object() || !row.contains("id") || !row["id"].is_string()))
+                continue;
+            const auto id = row.is_string() ? row.get<std::string>() : row["id"].get<std::string>();
+            if (id.empty() || id.size() > 200 || id.find_first_of("\r\n\0", 0, 3) != std::string::npos)
+                continue;
+            models.push_back(id);
+            if (row.is_object() && row.contains("name") && row["name"].is_string())
+            {
+                const auto name = row["name"].get<std::string>();
+                if (!name.empty() && name.size() <= 200 && name.find_first_of("\r\n\0", 0, 3) == std::string::npos)
+                    details.push_back({id, name});
+            }
+            if (models.size() >= 5000)
+                break;
+        }
+        std::sort(models.begin(), models.end());
+        models.erase(std::unique(models.begin(), models.end()), models.end());
+        if (models.empty())
+            return {false, "服务没有返回可用模型名，仍可手动填写", {}};
+        return {true, "已读取服务返回的模型；选择时保存 API 名称，不下载权重", std::move(models), std::move(details)};
+    }
+    catch (...)
+    {
+        return {false, "模型列表格式无效，仍可手动填写模型名", {}};
+    }
+}
 Result Run(const Request &request)
 {
+    if (request.service == "translation.ai")
+        return TestChat(request);
     if (request.service.rfind("translation.", 0) == 0)
         return TestTranslation(request);
     if (request.service == "voice.polish" || request.service == "ai.assistant")
@@ -310,66 +395,5 @@ Result Run(const Request &request)
         return error.empty() ? Result{true, "连接成功，豆包语音识别凭据有效。"} : Result{false, "测试失败：" + error};
     }
     return {false, "不支持的配置测试类型。"};
-}
-
-ModelListResult FetchModels(const Request &request)
-{
-    if (request.service != "ai.assistant")
-        return {false, "不支持的模型列表类型。", {}};
-    const std::string token = Value(request, "token");
-    const std::string endpoint = Value(request, "endpoint");
-    if (!CloudTranslation::IsUsableSecret(token))
-        return {false, "请先填写有效的 API Key。", {}};
-    if (!IsHttpEndpoint(endpoint))
-        return {false, "请先填写以 http:// 或 https:// 开头的接口地址。", {}};
-
-    const HttpResponse response = PerformJsonRequest(ModelListEndpoint(endpoint), token, nullptr, kMaxModelListBytes);
-    if (response.code != CURLE_OK || response.status < 200 || response.status >= 300)
-    {
-        return {false, "获取模型列表失败：" + ErrorDetail(response), {}};
-    }
-
-    try
-    {
-        const auto root = nlohmann::json::parse(response.body);
-        std::vector<std::string> model_ids;
-        if (root.contains("data") && root.at("data").is_array())
-        {
-            for (const auto &item : root.at("data"))
-            {
-                if (item.is_object() && item.contains("id") && item.at("id").is_string())
-                {
-                    model_ids.push_back(item.at("id").get<std::string>());
-                }
-            }
-        }
-        else if (root.is_array())
-        {
-            for (const auto &item : root)
-            {
-                if (item.is_object() && item.contains("id") && item.at("id").is_string())
-                {
-                    model_ids.push_back(item.at("id").get<std::string>());
-                }
-                else if (item.is_string())
-                {
-                    model_ids.push_back(item.get<std::string>());
-                }
-            }
-        }
-
-        if (model_ids.empty())
-        {
-            return {false, "获取成功但未解析到可用模型。", {}};
-        }
-
-        std::sort(model_ids.begin(), model_ids.end());
-        model_ids.erase(std::unique(model_ids.begin(), model_ids.end()), model_ids.end());
-        return {true, "获取成功", std::move(model_ids)};
-    }
-    catch (...)
-    {
-        return {false, "解析服务返回的模型列表失败。", {}};
-    }
 }
 } // namespace ApiCredentialTest

@@ -1,0 +1,4049 @@
+[
+  {
+    "id": "kokoro",
+    "name": "Kokoro · 82M（中英）",
+    "official": "https://huggingface.co/hexgrad/Kokoro-82M",
+    "downloadUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
+    "engine": "kokoro",
+    "directory": "kokoro-int8-multi-lang-v1_1",
+    "format": "sherpa-onnx INT8 中英运行包",
+    "features": "轻量多语言模型；此运行包内置中文和英文发音。量化包体积小，CPU 即可运行。",
+    "hardware": "优先尝试 NVIDIA CUDA；驱动、运行组件或算子不兼容时自动回退 CPU。首次启动另需运行依赖，GPU 环境可能需要数 GB；短词仍可能慢于 Windows 本机语音。",
+    "downloadBytes": 147031220,
+    "diskBytes": 3000000000,
+    "files": [
+      {
+        "name": "kokoro-int8-multi-lang-v1_1.tar.bz2",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
+        "bytes": 147031220,
+        "sha256": "a1e94694776049035c4f2c6529f003aaece993c76aae9a78995831c3c4dcafc6"
+      }
+    ],
+    "voices": [
+      {
+        "id": "zf_xiaobei",
+        "name": "小北 · 中文女声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zf_xiaoni",
+        "name": "小妮 · 中文女声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zm_yunjian",
+        "name": "云健 · 中文男声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "af_heart",
+        "name": "Heart · 英语女声",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "0",
+        "name": "运行包音色 #0（原包编号）"
+      },
+      {
+        "id": "1",
+        "name": "运行包音色 #1（原包编号）"
+      },
+      {
+        "id": "2",
+        "name": "运行包音色 #2（原包编号）"
+      },
+      {
+        "id": "3",
+        "name": "运行包音色 #3（原包编号）"
+      },
+      {
+        "id": "4",
+        "name": "运行包音色 #4（原包编号）"
+      },
+      {
+        "id": "5",
+        "name": "运行包音色 #5（原包编号）"
+      },
+      {
+        "id": "6",
+        "name": "运行包音色 #6（原包编号）"
+      },
+      {
+        "id": "7",
+        "name": "运行包音色 #7（原包编号）"
+      },
+      {
+        "id": "8",
+        "name": "运行包音色 #8（原包编号）"
+      },
+      {
+        "id": "9",
+        "name": "运行包音色 #9（原包编号）"
+      },
+      {
+        "id": "10",
+        "name": "运行包音色 #10（原包编号）"
+      },
+      {
+        "id": "11",
+        "name": "运行包音色 #11（原包编号）"
+      },
+      {
+        "id": "12",
+        "name": "运行包音色 #12（原包编号）"
+      },
+      {
+        "id": "13",
+        "name": "运行包音色 #13（原包编号）"
+      },
+      {
+        "id": "14",
+        "name": "运行包音色 #14（原包编号）"
+      },
+      {
+        "id": "15",
+        "name": "运行包音色 #15（原包编号）"
+      },
+      {
+        "id": "16",
+        "name": "运行包音色 #16（原包编号）"
+      },
+      {
+        "id": "17",
+        "name": "运行包音色 #17（原包编号）"
+      },
+      {
+        "id": "18",
+        "name": "运行包音色 #18（原包编号）"
+      },
+      {
+        "id": "19",
+        "name": "运行包音色 #19（原包编号）"
+      },
+      {
+        "id": "20",
+        "name": "运行包音色 #20（原包编号）"
+      },
+      {
+        "id": "21",
+        "name": "运行包音色 #21（原包编号）"
+      },
+      {
+        "id": "22",
+        "name": "运行包音色 #22（原包编号）"
+      },
+      {
+        "id": "23",
+        "name": "运行包音色 #23（原包编号）"
+      },
+      {
+        "id": "24",
+        "name": "运行包音色 #24（原包编号）"
+      },
+      {
+        "id": "25",
+        "name": "运行包音色 #25（原包编号）"
+      },
+      {
+        "id": "26",
+        "name": "运行包音色 #26（原包编号）"
+      },
+      {
+        "id": "27",
+        "name": "运行包音色 #27（原包编号）"
+      },
+      {
+        "id": "28",
+        "name": "运行包音色 #28（原包编号）"
+      },
+      {
+        "id": "29",
+        "name": "运行包音色 #29（原包编号）"
+      },
+      {
+        "id": "30",
+        "name": "运行包音色 #30（原包编号）"
+      },
+      {
+        "id": "31",
+        "name": "运行包音色 #31（原包编号）"
+      },
+      {
+        "id": "32",
+        "name": "运行包音色 #32（原包编号）"
+      },
+      {
+        "id": "33",
+        "name": "运行包音色 #33（原包编号）"
+      },
+      {
+        "id": "34",
+        "name": "运行包音色 #34（原包编号）"
+      },
+      {
+        "id": "35",
+        "name": "运行包音色 #35（原包编号）"
+      },
+      {
+        "id": "36",
+        "name": "运行包音色 #36（原包编号）"
+      },
+      {
+        "id": "37",
+        "name": "运行包音色 #37（原包编号）"
+      },
+      {
+        "id": "38",
+        "name": "运行包音色 #38（原包编号）"
+      },
+      {
+        "id": "39",
+        "name": "运行包音色 #39（原包编号）"
+      },
+      {
+        "id": "40",
+        "name": "运行包音色 #40（原包编号）"
+      },
+      {
+        "id": "41",
+        "name": "运行包音色 #41（原包编号）"
+      },
+      {
+        "id": "42",
+        "name": "运行包音色 #42（原包编号）"
+      },
+      {
+        "id": "43",
+        "name": "运行包音色 #43（原包编号）"
+      },
+      {
+        "id": "44",
+        "name": "运行包音色 #44（原包编号）"
+      },
+      {
+        "id": "45",
+        "name": "运行包音色 #45（原包编号）"
+      },
+      {
+        "id": "46",
+        "name": "运行包音色 #46（原包编号）"
+      },
+      {
+        "id": "47",
+        "name": "运行包音色 #47（原包编号）"
+      },
+      {
+        "id": "48",
+        "name": "运行包音色 #48（原包编号）"
+      },
+      {
+        "id": "49",
+        "name": "运行包音色 #49（原包编号）"
+      },
+      {
+        "id": "50",
+        "name": "运行包音色 #50（原包编号）"
+      },
+      {
+        "id": "51",
+        "name": "运行包音色 #51（原包编号）"
+      },
+      {
+        "id": "52",
+        "name": "运行包音色 #52（原包编号）"
+      },
+      {
+        "id": "53",
+        "name": "运行包音色 #53（原包编号）"
+      },
+      {
+        "id": "54",
+        "name": "运行包音色 #54（原包编号）"
+      },
+      {
+        "id": "55",
+        "name": "运行包音色 #55（原包编号）"
+      },
+      {
+        "id": "56",
+        "name": "运行包音色 #56（原包编号）"
+      },
+      {
+        "id": "57",
+        "name": "运行包音色 #57（原包编号）"
+      },
+      {
+        "id": "58",
+        "name": "运行包音色 #58（原包编号）"
+      },
+      {
+        "id": "59",
+        "name": "运行包音色 #59（原包编号）"
+      },
+      {
+        "id": "60",
+        "name": "运行包音色 #60（原包编号）"
+      },
+      {
+        "id": "61",
+        "name": "运行包音色 #61（原包编号）"
+      },
+      {
+        "id": "62",
+        "name": "运行包音色 #62（原包编号）"
+      },
+      {
+        "id": "63",
+        "name": "运行包音色 #63（原包编号）"
+      },
+      {
+        "id": "64",
+        "name": "运行包音色 #64（原包编号）"
+      },
+      {
+        "id": "65",
+        "name": "运行包音色 #65（原包编号）"
+      },
+      {
+        "id": "66",
+        "name": "运行包音色 #66（原包编号）"
+      },
+      {
+        "id": "67",
+        "name": "运行包音色 #67（原包编号）"
+      },
+      {
+        "id": "68",
+        "name": "运行包音色 #68（原包编号）"
+      },
+      {
+        "id": "69",
+        "name": "运行包音色 #69（原包编号）"
+      },
+      {
+        "id": "70",
+        "name": "运行包音色 #70（原包编号）"
+      },
+      {
+        "id": "71",
+        "name": "运行包音色 #71（原包编号）"
+      },
+      {
+        "id": "72",
+        "name": "运行包音色 #72（原包编号）"
+      },
+      {
+        "id": "73",
+        "name": "运行包音色 #73（原包编号）"
+      },
+      {
+        "id": "74",
+        "name": "运行包音色 #74（原包编号）"
+      },
+      {
+        "id": "75",
+        "name": "运行包音色 #75（原包编号）"
+      },
+      {
+        "id": "76",
+        "name": "运行包音色 #76（原包编号）"
+      },
+      {
+        "id": "77",
+        "name": "运行包音色 #77（原包编号）"
+      },
+      {
+        "id": "78",
+        "name": "运行包音色 #78（原包编号）"
+      },
+      {
+        "id": "79",
+        "name": "运行包音色 #79（原包编号）"
+      },
+      {
+        "id": "80",
+        "name": "运行包音色 #80（原包编号）"
+      },
+      {
+        "id": "81",
+        "name": "运行包音色 #81（原包编号）"
+      },
+      {
+        "id": "82",
+        "name": "运行包音色 #82（原包编号）"
+      },
+      {
+        "id": "83",
+        "name": "运行包音色 #83（原包编号）"
+      },
+      {
+        "id": "84",
+        "name": "运行包音色 #84（原包编号）"
+      },
+      {
+        "id": "85",
+        "name": "运行包音色 #85（原包编号）"
+      },
+      {
+        "id": "86",
+        "name": "运行包音色 #86（原包编号）"
+      },
+      {
+        "id": "87",
+        "name": "运行包音色 #87（原包编号）"
+      },
+      {
+        "id": "88",
+        "name": "运行包音色 #88（原包编号）"
+      },
+      {
+        "id": "89",
+        "name": "运行包音色 #89（原包编号）"
+      },
+      {
+        "id": "90",
+        "name": "运行包音色 #90（原包编号）"
+      },
+      {
+        "id": "91",
+        "name": "运行包音色 #91（原包编号）"
+      },
+      {
+        "id": "92",
+        "name": "运行包音色 #92（原包编号）"
+      },
+      {
+        "id": "93",
+        "name": "运行包音色 #93（原包编号）"
+      },
+      {
+        "id": "94",
+        "name": "运行包音色 #94（原包编号）"
+      },
+      {
+        "id": "95",
+        "name": "运行包音色 #95（原包编号）"
+      },
+      {
+        "id": "96",
+        "name": "运行包音色 #96（原包编号）"
+      },
+      {
+        "id": "97",
+        "name": "运行包音色 #97（原包编号）"
+      },
+      {
+        "id": "98",
+        "name": "运行包音色 #98（原包编号）"
+      },
+      {
+        "id": "99",
+        "name": "运行包音色 #99（原包编号）"
+      },
+      {
+        "id": "100",
+        "name": "运行包音色 #100（原包编号）"
+      },
+      {
+        "id": "101",
+        "name": "运行包音色 #101（原包编号）"
+      },
+      {
+        "id": "102",
+        "name": "运行包音色 #102（原包编号）"
+      }
+    ],
+    "controls": [],
+    "languages": [
+      "zh",
+      "en"
+    ],
+    "dialectNote": "当前中英运行包没有可核实的方言音色。"
+  },
+  {
+    "id": "qwen-0.6b",
+    "name": "Qwen3-TTS 0.6B",
+    "official": "https://github.com/QwenLM/Qwen3-TTS",
+    "downloadUrl": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/tree/85e237c12c027371202489a0ec509ded67b5e4b5",
+    "revision": "85e237c12c027371202489a0ec509ded67b5e4b5",
+    "engine": "qwen",
+    "format": "原版",
+    "features": "10 种语言及多方言；内置运行 CustomVoice 音色。Base 版的 3 秒克隆、VoiceDesign 版的音色设计需使用对应官方模型。 Dual-Track 双轨架构；本运行组件对接分块生成与 PCM 流式播放。",
+    "hardware": "建议独显；CPU 可运行但生成较慢。首次启动另行下载 Python / PyTorch 依赖。",
+    "downloadBytes": 2498383610,
+    "diskBytes": 7495150830,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/config.json",
+        "bytes": 4908,
+        "sha256": "81aca2b6fac304944d8acf345272d8a9a727d5fc2e2e66b222ab4729340c7455"
+      },
+      {
+        "name": "generation_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/generation_config.json",
+        "bytes": 245,
+        "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa"
+      },
+      {
+        "name": "merges.txt",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/merges.txt",
+        "bytes": 1671839,
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/model.safetensors",
+        "bytes": 1811626576,
+        "sha256": "bc3c7e785eb961179c25450d1acff03f839e0002f2f3a5aeb67b5735c0fa2adb"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/preprocessor_config.json",
+        "bytes": 127,
+        "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119"
+      },
+      {
+        "name": "speech_tokenizer/config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/config.json",
+        "bytes": 2336,
+        "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167"
+      },
+      {
+        "name": "speech_tokenizer/configuration.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/configuration.json",
+        "bytes": 76,
+        "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd"
+      },
+      {
+        "name": "speech_tokenizer/model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/model.safetensors",
+        "bytes": 682293092,
+        "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258"
+      },
+      {
+        "name": "speech_tokenizer/preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/speech_tokenizer/preprocessor_config.json",
+        "bytes": 234,
+        "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/tokenizer_config.json",
+        "bytes": 7344,
+        "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/resolve/85e237c12c027371202489a0ec509ded67b5e4b5/vocab.json",
+        "bytes": 2776833,
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ],
+    "voices": [
+      {
+        "id": "Vivian",
+        "name": "Vivian · 明亮女声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Serena",
+        "name": "Serena · 温柔女声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Uncle_Fu",
+        "name": "Uncle Fu · 醇厚男声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Dylan",
+        "name": "Dylan · 北京青年男声",
+        "language": "zh",
+        "dialect": "北京话"
+      },
+      {
+        "id": "Eric",
+        "name": "Eric · 成都男声",
+        "language": "zh",
+        "dialect": "四川话"
+      },
+      {
+        "id": "Ryan",
+        "name": "Ryan · 活力男声",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Aiden",
+        "name": "Aiden · 美式男声",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Ono_Anna",
+        "name": "Ono Anna · 日语女声",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Sohee",
+        "name": "Sohee · 韩语女声",
+        "language": "ko",
+        "dialect": ""
+      }
+    ],
+    "controls": [
+      {
+        "id": "temperature",
+        "label": "采样温度",
+        "type": "float",
+        "default": 0.9,
+        "step": 0.05,
+        "min": 0.1,
+        "max": 1.5
+      },
+      {
+        "id": "top_k",
+        "label": "Top K",
+        "type": "int",
+        "default": 50,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "id": "top_p",
+        "label": "Top P",
+        "type": "float",
+        "default": 1,
+        "step": 0.05,
+        "min": 0.05,
+        "max": 1
+      },
+      {
+        "id": "do_sample",
+        "label": "启用随机采样",
+        "type": "bool",
+        "default": true
+      },
+      {
+        "id": "repetition_penalty",
+        "label": "重复惩罚",
+        "type": "float",
+        "default": 1.05,
+        "step": 0.05,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "id": "max_new_tokens",
+        "label": "最长音频 token 数",
+        "type": "int",
+        "default": 1024,
+        "min": 16,
+        "max": 1080
+      },
+      {
+        "id": "chunk_size",
+        "label": "每次输出的 codec 帧数",
+        "type": "int",
+        "default": 6,
+        "min": 3,
+        "max": 24
+      }
+    ],
+    "languages": [
+      "zh",
+      "en",
+      "ja",
+      "ko",
+      "de",
+      "fr",
+      "ru",
+      "es",
+      "it",
+      "pt"
+    ],
+    "dialectNote": "北京话选择 Dylan，四川话选择 Eric。属于模型内置方言音色；不自动改写原文。"
+  },
+  {
+    "id": "qwen-1.7b",
+    "name": "Qwen3-TTS 1.7B",
+    "official": "https://github.com/QwenLM/Qwen3-TTS",
+    "downloadUrl": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/tree/0c0e3051f131929182e2c023b9537f8b1c68adfe",
+    "revision": "0c0e3051f131929182e2c023b9537f8b1c68adfe",
+    "engine": "qwen",
+    "format": "原版",
+    "features": "10 种语言；CustomVoice 支持表达指令。最低延迟为官方特定环境指标，本机速度视硬件而定。 Dual-Track 双轨架构；本运行组件对接分块生成与 PCM 流式播放。",
+    "hardware": "建议 CUDA 独显与充足显存；首次启动需额外运行依赖。",
+    "downloadBytes": 4520159586,
+    "diskBytes": 13560478758,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/config.json",
+        "bytes": 4908,
+        "sha256": "17a07f527a1c25ea30b4e023a184482a23d3e279d697b1dc81b1bde498d29cf9"
+      },
+      {
+        "name": "generation_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/generation_config.json",
+        "bytes": 245,
+        "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa"
+      },
+      {
+        "name": "merges.txt",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/merges.txt",
+        "bytes": 1671839,
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/model.safetensors",
+        "bytes": 3833402552,
+        "sha256": "38b1d5971bdbd982b561cccec982669a53b0537c3cf5e9bd4778ed07bb2f5137"
+      },
+      {
+        "name": "preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/preprocessor_config.json",
+        "bytes": 127,
+        "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119"
+      },
+      {
+        "name": "speech_tokenizer/config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/config.json",
+        "bytes": 2336,
+        "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167"
+      },
+      {
+        "name": "speech_tokenizer/configuration.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/configuration.json",
+        "bytes": 76,
+        "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd"
+      },
+      {
+        "name": "speech_tokenizer/model.safetensors",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/model.safetensors",
+        "bytes": 682293092,
+        "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258"
+      },
+      {
+        "name": "speech_tokenizer/preprocessor_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/speech_tokenizer/preprocessor_config.json",
+        "bytes": 234,
+        "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/tokenizer_config.json",
+        "bytes": 7344,
+        "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/0c0e3051f131929182e2c023b9537f8b1c68adfe/vocab.json",
+        "bytes": 2776833,
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ],
+    "voices": [
+      {
+        "id": "Vivian",
+        "name": "Vivian · 明亮女声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Serena",
+        "name": "Serena · 温柔女声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Uncle_Fu",
+        "name": "Uncle Fu · 醇厚男声",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Dylan",
+        "name": "Dylan · 北京青年男声",
+        "language": "zh",
+        "dialect": "北京话"
+      },
+      {
+        "id": "Eric",
+        "name": "Eric · 成都男声",
+        "language": "zh",
+        "dialect": "四川话"
+      },
+      {
+        "id": "Ryan",
+        "name": "Ryan · 活力男声",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Aiden",
+        "name": "Aiden · 美式男声",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Ono_Anna",
+        "name": "Ono Anna · 日语女声",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Sohee",
+        "name": "Sohee · 韩语女声",
+        "language": "ko",
+        "dialect": ""
+      }
+    ],
+    "controls": [
+      {
+        "id": "temperature",
+        "label": "采样温度",
+        "type": "float",
+        "default": 0.9,
+        "step": 0.05,
+        "min": 0.1,
+        "max": 1.5
+      },
+      {
+        "id": "top_k",
+        "label": "Top K",
+        "type": "int",
+        "default": 50,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "id": "top_p",
+        "label": "Top P",
+        "type": "float",
+        "default": 1,
+        "step": 0.05,
+        "min": 0.05,
+        "max": 1
+      },
+      {
+        "id": "do_sample",
+        "label": "启用随机采样",
+        "type": "bool",
+        "default": true
+      },
+      {
+        "id": "repetition_penalty",
+        "label": "重复惩罚",
+        "type": "float",
+        "default": 1.05,
+        "step": 0.05,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "id": "max_new_tokens",
+        "label": "最长音频 token 数",
+        "type": "int",
+        "default": 1024,
+        "min": 16,
+        "max": 1080
+      },
+      {
+        "id": "chunk_size",
+        "label": "每次输出的 codec 帧数",
+        "type": "int",
+        "default": 6,
+        "min": 3,
+        "max": 24
+      },
+      {
+        "id": "instruct",
+        "label": "风格 / 情感指令",
+        "type": "text",
+        "default": "",
+        "maxBytes": 1000
+      }
+    ],
+    "languages": [
+      "zh",
+      "en",
+      "ja",
+      "ko",
+      "de",
+      "fr",
+      "ru",
+      "es",
+      "it",
+      "pt"
+    ],
+    "dialectNote": "北京话选择 Dylan，四川话选择 Eric。属于模型内置方言音色；不自动改写原文。"
+  },
+  {
+    "id": "cosyvoice2",
+    "name": "CosyVoice 2 · 0.5B",
+    "official": "https://github.com/FunAudioLLM/CosyVoice",
+    "downloadUrl": "https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B/tree/eec1ae6c79877dbd9379285cf8789c9e0879293d",
+    "revision": "eec1ae6c79877dbd9379285cf8789c9e0879293d",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "流式零样本、多语言和跨语言合成，适合中文自然韵律。",
+    "hardware": "官方环境依赖较多；下载后按官方指南部署，接入本机 WAV 服务。",
+    "downloadBytes": 4856505002,
+    "diskBytes": 14569515006,
+    "files": [],
+    "voices": [],
+    "controls": [],
+    "languages": []
+  },
+  {
+    "id": "csm",
+    "name": "Sesame CSM · 1B",
+    "official": "https://github.com/SesameAILabs/csm",
+    "downloadUrl": "https://huggingface.co/sesame/csm-1b/tree/c92a71e1c419772e25be7dc14d952c2521a740ab",
+    "revision": "c92a71e1c419772e25be7dc14d952c2521a740ab",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "上下文对话语音，保留停顿、强调和情绪。",
+    "hardware": "模型需要 Hugging Face 授权登录；建议 CUDA。仓库总量含多个权重变体。",
+    "downloadBytes": 19589168489,
+    "diskBytes": 58767505467,
+    "files": [],
+    "voices": [],
+    "controls": [],
+    "languages": []
+  },
+  {
+    "id": "dia",
+    "name": "Dia · 1.6B",
+    "official": "https://github.com/nari-labs/dia",
+    "downloadUrl": "https://huggingface.co/nari-labs/Dia-1.6B-0626/tree/ef2795fcc29c5abe6ffc91fd33808588b49bbc66",
+    "revision": "ef2795fcc29c5abe6ffc91fd33808588b49bbc66",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "多说话人对话，支持笑声与停顿等非语言表达。",
+    "hardware": "建议独显；完整对话生成并非低延迟候选朗读。仓库总量含多个权重变体。",
+    "downloadBytes": 19334302562,
+    "diskBytes": 58002907686,
+    "files": [],
+    "voices": [],
+    "controls": [],
+    "languages": []
+  },
+  {
+    "id": "vibevoice",
+    "name": "VibeVoice · 1.5B",
+    "official": "https://github.com/microsoft/VibeVoice",
+    "downloadUrl": "https://huggingface.co/microsoft/VibeVoice-1.5B/tree/c00898d257e6b46004e3e2866a47534085fb685a",
+    "revision": "c00898d257e6b46004e3e2866a47534085fb685a",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "长文本、多说话人内容。官方已撤下此版 TTS 推理代码；仅列出权重，不提供一键启动。",
+    "hardware": "可另选官方 Realtime 0.5B；请查阅官方当前发布说明。",
+    "downloadBytes": 5408491036,
+    "diskBytes": 16225473108,
+    "files": [],
+    "voices": [],
+    "controls": [],
+    "languages": []
+  },
+  {
+    "id": "vibevoice-realtime",
+    "name": "VibeVoice Realtime · 0.5B",
+    "official": "https://github.com/microsoft/VibeVoice",
+    "downloadUrl": "https://huggingface.co/microsoft/VibeVoice-Realtime-0.5B/tree/6bce5f06044837fe6d2c5d7a71a84f0416bd57e4",
+    "revision": "6bce5f06044837fe6d2c5d7a71a84f0416bd57e4",
+    "engine": "external",
+    "format": "官方仓库（外部部署）",
+    "features": "实时流式语音版本，适合较低延迟输出；与长文本多说话人版能力不同。",
+    "hardware": "按官方指南单独部署，再填写本机兼容接口。",
+    "downloadBytes": 2035470640,
+    "diskBytes": 6106411920,
+    "files": [],
+    "voices": [],
+    "controls": [],
+    "languages": []
+  },
+  {
+    "id": "moss-nano",
+    "name": "MOSS-TTS-Nano · 100M",
+    "official": "https://github.com/OpenMOSS/MOSS-TTS-Nano",
+    "downloadUrl": "https://modelscope.cn/models/openmoss/MOSS-TTS-Nano-100M-ONNX",
+    "revision": "44502f80dbf9743528fa921cc544d662c685ebec",
+    "engine": "moss",
+    "format": "官方 ONNX 流式运行包（内置音色）",
+    "features": "100M，多语言、48 kHz 双声道；逐帧生成并流式播放。此运行包使用内置音色，不包含录音克隆编码器。",
+    "hardware": "GPU 优先；不支持的 ONNX 算子回退 CPU，无独显也可运行。首次启动另需运行依赖，CUDA 依赖可能需要数 GB。",
+    "downloadBytes": 717153306,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/browser_poc_manifest.json",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=browser_poc_manifest.json",
+        "bytes": 470720,
+        "sha256": "803716e58b71fe2a770af1495ca74797d38c181b41cfeeaf9e524adc15910a20"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_decode_step.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_decode_step.onnx",
+        "bytes": 291483,
+        "sha256": "698cbc2fc1c2feca16e5895614ed52bbb32ded10f236c076f477b2e69abf32d8"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_global_shared.data",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_global_shared.data",
+        "bytes": 440813568,
+        "sha256": "bce8312c3df6a44545302cae229b61054fe0672e0b252ba59cba47adeed831dc"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_cached_step.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_cached_step.onnx",
+        "bytes": 53685,
+        "sha256": "aa9035fefc1c138a951a8bcfc0374fb03a25f1ece67f7f7f53bce349b84a1dd5"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_decoder.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_decoder.onnx",
+        "bytes": 49231,
+        "sha256": "51aa754301b38550a5f9adda0ad93bd3dc95819afb511e6dcabf4a90b345a454"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_fixed_sampled_frame.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_fixed_sampled_frame.onnx",
+        "bytes": 471262,
+        "sha256": "40cdb00efc171c450cf91468e01429caa41b0252222cd308e978f58fe354afa8"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_local_shared.data",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_local_shared.data",
+        "bytes": 229678080,
+        "sha256": "bae7782032c0fb12490ab42afe009f87ae6c75a0f0596fc7b5c08e4d5ee93916"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/moss_tts_prefill.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=moss_tts_prefill.onnx",
+        "bytes": 283305,
+        "sha256": "d56126dcd0574c2f15d98fc6b35eda68d0386b5bd9c5e38e28548d6f2ea8f3db"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/tokenizer.model",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=tokenizer.model",
+        "bytes": 470897,
+        "sha256": "c353ee1479b536bf414c1b247f5542b6607fb8ae91320e5af1781fee200fddff"
+      },
+      {
+        "name": "MOSS-TTS-Nano-100M-ONNX/tts_browser_onnx_meta.json",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-TTS-Nano-100M-ONNX/repo?Revision=0badeaff90722f01b5c727d991d750531cb802e0&FilePath=tts_browser_onnx_meta.json",
+        "bytes": 4302,
+        "sha256": "1dacbf4d59732ae1fb1253139b70a4ca07415246fb6473919c9947d489a59e04"
+      },
+      {
+        "name": "MOSS-Audio-Tokenizer-Nano-ONNX/codec_browser_onnx_meta.json",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-Audio-Tokenizer-Nano-ONNX/repo?Revision=82a897035d9ff72803df10a06c1a5aa6691be0f8&FilePath=codec_browser_onnx_meta.json",
+        "bytes": 16461,
+        "sha256": "c40eb144a4f50453ac0437944cbdeee1467845b886e90197ff1eada1353303db"
+      },
+      {
+        "name": "MOSS-Audio-Tokenizer-Nano-ONNX/moss_audio_tokenizer_decode_shared.data",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-Audio-Tokenizer-Nano-ONNX/repo?Revision=82a897035d9ff72803df10a06c1a5aa6691be0f8&FilePath=moss_audio_tokenizer_decode_shared.data",
+        "bytes": 44198912,
+        "sha256": "e69d52e0f4e84ca27850557ee54face46632d3a5a16c89bd246c7c408466dcad"
+      },
+      {
+        "name": "MOSS-Audio-Tokenizer-Nano-ONNX/moss_audio_tokenizer_decode_step.onnx",
+        "url": "https://modelscope.cn/api/v1/models/openmoss/MOSS-Audio-Tokenizer-Nano-ONNX/repo?Revision=82a897035d9ff72803df10a06c1a5aa6691be0f8&FilePath=moss_audio_tokenizer_decode_step.onnx",
+        "bytes": 351400,
+        "sha256": "9527c86a29e1837edec1f74db57d5eeaadb3a715af3382703566460afed25855"
+      }
+    ],
+    "voices": [
+      {
+        "id": "Junhao",
+        "name": "Junhao · CN 欢迎关注模思智能",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Zhiming",
+        "name": "Zhiming · CN 京味胡同闲聊",
+        "language": "zh",
+        "dialect": "北京口音"
+      },
+      {
+        "id": "Weiguo",
+        "name": "Weiguo · CN 说书",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Xiaoyu",
+        "name": "Xiaoyu · CN 明星",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Yuewen",
+        "name": "Yuewen · CN 机车",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Lingyu",
+        "name": "Lingyu · CN 深夜电台",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "Trump",
+        "name": "Trump · EN Trump",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Ava",
+        "name": "Ava · EN The Bitter Lesson",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Bella",
+        "name": "Bella · EN A Gentle Reminder",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Adam",
+        "name": "Adam · EN English News",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Nathan",
+        "name": "Nathan · EN The Quiet Motion of the World",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "Soyo",
+        "name": "Soyo · JP Soyo",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Saki",
+        "name": "Saki · JP Saki",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Mortis",
+        "name": "Mortis · JP Mortis",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Umiri",
+        "name": "Umiri · JP Umiri",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Mei",
+        "name": "Mei · JP Togawa",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Anon",
+        "name": "Anon · JP Anon",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "Arisa",
+        "name": "Arisa · JP Arisa",
+        "language": "ja",
+        "dialect": ""
+      }
+    ],
+    "controls": [
+      {
+        "id": "do_sample",
+        "label": "启用随机采样",
+        "type": "bool",
+        "default": true
+      },
+      {
+        "id": "audio_temperature",
+        "label": "音频采样温度",
+        "type": "float",
+        "default": 0.8,
+        "step": 0.05,
+        "min": 0.1,
+        "max": 1.5
+      },
+      {
+        "id": "audio_top_k",
+        "label": "音频 Top K",
+        "type": "int",
+        "default": 25,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "id": "audio_top_p",
+        "label": "音频 Top P",
+        "type": "float",
+        "default": 0.95,
+        "step": 0.05,
+        "min": 0.05,
+        "max": 1
+      },
+      {
+        "id": "audio_repetition_penalty",
+        "label": "音频重复惩罚",
+        "type": "float",
+        "default": 1.2,
+        "step": 0.05,
+        "min": 1,
+        "max": 2
+      },
+      {
+        "id": "max_new_frames",
+        "label": "最长音频帧数",
+        "type": "int",
+        "default": 1125,
+        "min": 12,
+        "max": 1125
+      },
+      {
+        "id": "chunk_frames",
+        "label": "每次流式解码帧数",
+        "type": "int",
+        "default": 2,
+        "min": 1,
+        "max": 8
+      }
+    ],
+    "languages": [
+      "zh",
+      "en",
+      "de",
+      "es",
+      "fr",
+      "ja",
+      "it",
+      "hu",
+      "ko",
+      "ru",
+      "fa",
+      "ar",
+      "pl",
+      "pt",
+      "cs",
+      "da",
+      "sv",
+      "el",
+      "tr"
+    ],
+    "dialectNote": "Zhiming 为内置京味参考音色；其他方言未验证。多语言质量请先试听。",
+    "parameterNote": "修改采样温度、Top K/P 或重复惩罚时，会使用完整采样路径，生成可能变慢。恢复默认可回到快速路径。"
+  },
+  {
+    "id": "edge-tts",
+    "name": "Edge-TTS（在线服务）",
+    "official": "https://github.com/rany2/edge-tts",
+    "downloadUrl": "https://github.com/rany2/edge-tts",
+    "engine": "edge",
+    "format": "开源客户端 · 在线语音",
+    "features": "使用微软在线语音服务，无需下载模型权重。逐包解码并流式播放；启用后朗读文本会发送到微软。",
+    "hardware": "需要联网；首次启用下载客户端和音频解码依赖。保持原离线默认，只有点击启用后才使用。",
+    "downloadBytes": 0,
+    "diskBytes": 300000000,
+    "files": [],
+    "voices": [
+      {
+        "id": "af-ZA-AdriNeural",
+        "name": "af-ZA-AdriNeural · Female",
+        "language": "af",
+        "dialect": ""
+      },
+      {
+        "id": "af-ZA-WillemNeural",
+        "name": "af-ZA-WillemNeural · Male",
+        "language": "af",
+        "dialect": ""
+      },
+      {
+        "id": "sq-AL-AnilaNeural",
+        "name": "sq-AL-AnilaNeural · Female",
+        "language": "sq",
+        "dialect": ""
+      },
+      {
+        "id": "sq-AL-IlirNeural",
+        "name": "sq-AL-IlirNeural · Male",
+        "language": "sq",
+        "dialect": ""
+      },
+      {
+        "id": "am-ET-AmehaNeural",
+        "name": "am-ET-AmehaNeural · Male",
+        "language": "am",
+        "dialect": ""
+      },
+      {
+        "id": "am-ET-MekdesNeural",
+        "name": "am-ET-MekdesNeural · Female",
+        "language": "am",
+        "dialect": ""
+      },
+      {
+        "id": "ar-DZ-AminaNeural",
+        "name": "ar-DZ-AminaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-DZ-IsmaelNeural",
+        "name": "ar-DZ-IsmaelNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-BH-AliNeural",
+        "name": "ar-BH-AliNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-BH-LailaNeural",
+        "name": "ar-BH-LailaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-EG-SalmaNeural",
+        "name": "ar-EG-SalmaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-EG-ShakirNeural",
+        "name": "ar-EG-ShakirNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-IQ-BasselNeural",
+        "name": "ar-IQ-BasselNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-IQ-RanaNeural",
+        "name": "ar-IQ-RanaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-JO-SanaNeural",
+        "name": "ar-JO-SanaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-JO-TaimNeural",
+        "name": "ar-JO-TaimNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-KW-FahedNeural",
+        "name": "ar-KW-FahedNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-KW-NouraNeural",
+        "name": "ar-KW-NouraNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-LB-LaylaNeural",
+        "name": "ar-LB-LaylaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-LB-RamiNeural",
+        "name": "ar-LB-RamiNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-LY-ImanNeural",
+        "name": "ar-LY-ImanNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-LY-OmarNeural",
+        "name": "ar-LY-OmarNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-MA-JamalNeural",
+        "name": "ar-MA-JamalNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-MA-MounaNeural",
+        "name": "ar-MA-MounaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-OM-AbdullahNeural",
+        "name": "ar-OM-AbdullahNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-OM-AyshaNeural",
+        "name": "ar-OM-AyshaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-QA-AmalNeural",
+        "name": "ar-QA-AmalNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-QA-MoazNeural",
+        "name": "ar-QA-MoazNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-SA-HamedNeural",
+        "name": "ar-SA-HamedNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-SA-ZariyahNeural",
+        "name": "ar-SA-ZariyahNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-SY-AmanyNeural",
+        "name": "ar-SY-AmanyNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-SY-LaithNeural",
+        "name": "ar-SY-LaithNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-TN-HediNeural",
+        "name": "ar-TN-HediNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-TN-ReemNeural",
+        "name": "ar-TN-ReemNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-AE-FatimaNeural",
+        "name": "ar-AE-FatimaNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-AE-HamdanNeural",
+        "name": "ar-AE-HamdanNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-YE-MaryamNeural",
+        "name": "ar-YE-MaryamNeural · Female",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "ar-YE-SalehNeural",
+        "name": "ar-YE-SalehNeural · Male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "az-AZ-BabekNeural",
+        "name": "az-AZ-BabekNeural · Male",
+        "language": "az",
+        "dialect": ""
+      },
+      {
+        "id": "az-AZ-BanuNeural",
+        "name": "az-AZ-BanuNeural · Female",
+        "language": "az",
+        "dialect": ""
+      },
+      {
+        "id": "bn-BD-NabanitaNeural",
+        "name": "bn-BD-NabanitaNeural · Female",
+        "language": "bn",
+        "dialect": ""
+      },
+      {
+        "id": "bn-BD-PradeepNeural",
+        "name": "bn-BD-PradeepNeural · Male",
+        "language": "bn",
+        "dialect": ""
+      },
+      {
+        "id": "bn-IN-BashkarNeural",
+        "name": "bn-IN-BashkarNeural · Male",
+        "language": "bn",
+        "dialect": ""
+      },
+      {
+        "id": "bn-IN-TanishaaNeural",
+        "name": "bn-IN-TanishaaNeural · Female",
+        "language": "bn",
+        "dialect": ""
+      },
+      {
+        "id": "bs-BA-VesnaNeural",
+        "name": "bs-BA-VesnaNeural · Female",
+        "language": "bs",
+        "dialect": ""
+      },
+      {
+        "id": "bs-BA-GoranNeural",
+        "name": "bs-BA-GoranNeural · Male",
+        "language": "bs",
+        "dialect": ""
+      },
+      {
+        "id": "bg-BG-BorislavNeural",
+        "name": "bg-BG-BorislavNeural · Male",
+        "language": "bg",
+        "dialect": ""
+      },
+      {
+        "id": "bg-BG-KalinaNeural",
+        "name": "bg-BG-KalinaNeural · Female",
+        "language": "bg",
+        "dialect": ""
+      },
+      {
+        "id": "my-MM-NilarNeural",
+        "name": "my-MM-NilarNeural · Female",
+        "language": "my",
+        "dialect": ""
+      },
+      {
+        "id": "my-MM-ThihaNeural",
+        "name": "my-MM-ThihaNeural · Male",
+        "language": "my",
+        "dialect": ""
+      },
+      {
+        "id": "ca-ES-EnricNeural",
+        "name": "ca-ES-EnricNeural · Male",
+        "language": "ca",
+        "dialect": ""
+      },
+      {
+        "id": "ca-ES-JoanaNeural",
+        "name": "ca-ES-JoanaNeural · Female",
+        "language": "ca",
+        "dialect": ""
+      },
+      {
+        "id": "zh-HK-HiuGaaiNeural",
+        "name": "zh-HK-HiuGaaiNeural · Female",
+        "language": "zh",
+        "dialect": "粤语"
+      },
+      {
+        "id": "zh-HK-HiuMaanNeural",
+        "name": "zh-HK-HiuMaanNeural · Female",
+        "language": "zh",
+        "dialect": "粤语"
+      },
+      {
+        "id": "zh-HK-WanLungNeural",
+        "name": "zh-HK-WanLungNeural · Male",
+        "language": "zh",
+        "dialect": "粤语"
+      },
+      {
+        "id": "zh-CN-XiaoxiaoNeural",
+        "name": "zh-CN-XiaoxiaoNeural · Female",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zh-CN-XiaoyiNeural",
+        "name": "zh-CN-XiaoyiNeural · Female",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zh-CN-YunjianNeural",
+        "name": "zh-CN-YunjianNeural · Male",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zh-CN-YunxiNeural",
+        "name": "zh-CN-YunxiNeural · Male",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zh-CN-YunxiaNeural",
+        "name": "zh-CN-YunxiaNeural · Male",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zh-CN-YunyangNeural",
+        "name": "zh-CN-YunyangNeural · Male",
+        "language": "zh",
+        "dialect": ""
+      },
+      {
+        "id": "zh-CN-liaoning-XiaobeiNeural",
+        "name": "zh-CN-liaoning-XiaobeiNeural · Female",
+        "language": "zh",
+        "dialect": "东北话"
+      },
+      {
+        "id": "zh-TW-HsiaoChenNeural",
+        "name": "zh-TW-HsiaoChenNeural · Female",
+        "language": "zh",
+        "dialect": "台湾普通话"
+      },
+      {
+        "id": "zh-TW-YunJheNeural",
+        "name": "zh-TW-YunJheNeural · Male",
+        "language": "zh",
+        "dialect": "台湾普通话"
+      },
+      {
+        "id": "zh-TW-HsiaoYuNeural",
+        "name": "zh-TW-HsiaoYuNeural · Female",
+        "language": "zh",
+        "dialect": "台湾普通话"
+      },
+      {
+        "id": "zh-CN-shaanxi-XiaoniNeural",
+        "name": "zh-CN-shaanxi-XiaoniNeural · Female",
+        "language": "zh",
+        "dialect": "陕西话"
+      },
+      {
+        "id": "hr-HR-GabrijelaNeural",
+        "name": "hr-HR-GabrijelaNeural · Female",
+        "language": "hr",
+        "dialect": ""
+      },
+      {
+        "id": "hr-HR-SreckoNeural",
+        "name": "hr-HR-SreckoNeural · Male",
+        "language": "hr",
+        "dialect": ""
+      },
+      {
+        "id": "cs-CZ-AntoninNeural",
+        "name": "cs-CZ-AntoninNeural · Male",
+        "language": "cs",
+        "dialect": ""
+      },
+      {
+        "id": "cs-CZ-VlastaNeural",
+        "name": "cs-CZ-VlastaNeural · Female",
+        "language": "cs",
+        "dialect": ""
+      },
+      {
+        "id": "da-DK-ChristelNeural",
+        "name": "da-DK-ChristelNeural · Female",
+        "language": "da",
+        "dialect": ""
+      },
+      {
+        "id": "da-DK-JeppeNeural",
+        "name": "da-DK-JeppeNeural · Male",
+        "language": "da",
+        "dialect": ""
+      },
+      {
+        "id": "nl-BE-ArnaudNeural",
+        "name": "nl-BE-ArnaudNeural · Male",
+        "language": "nl",
+        "dialect": ""
+      },
+      {
+        "id": "nl-BE-DenaNeural",
+        "name": "nl-BE-DenaNeural · Female",
+        "language": "nl",
+        "dialect": ""
+      },
+      {
+        "id": "nl-NL-ColetteNeural",
+        "name": "nl-NL-ColetteNeural · Female",
+        "language": "nl",
+        "dialect": ""
+      },
+      {
+        "id": "nl-NL-FennaNeural",
+        "name": "nl-NL-FennaNeural · Female",
+        "language": "nl",
+        "dialect": ""
+      },
+      {
+        "id": "nl-NL-MaartenNeural",
+        "name": "nl-NL-MaartenNeural · Male",
+        "language": "nl",
+        "dialect": ""
+      },
+      {
+        "id": "en-AU-WilliamMultilingualNeural",
+        "name": "en-AU-WilliamMultilingualNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-AU-NatashaNeural",
+        "name": "en-AU-NatashaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-CA-ClaraNeural",
+        "name": "en-CA-ClaraNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-CA-LiamNeural",
+        "name": "en-CA-LiamNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-HK-YanNeural",
+        "name": "en-HK-YanNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-HK-SamNeural",
+        "name": "en-HK-SamNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-IN-NeerjaExpressiveNeural",
+        "name": "en-IN-NeerjaExpressiveNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-IN-NeerjaNeural",
+        "name": "en-IN-NeerjaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-IN-PrabhatNeural",
+        "name": "en-IN-PrabhatNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-IE-ConnorNeural",
+        "name": "en-IE-ConnorNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-IE-EmilyNeural",
+        "name": "en-IE-EmilyNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-KE-AsiliaNeural",
+        "name": "en-KE-AsiliaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-KE-ChilembaNeural",
+        "name": "en-KE-ChilembaNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-NZ-MitchellNeural",
+        "name": "en-NZ-MitchellNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-NZ-MollyNeural",
+        "name": "en-NZ-MollyNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-NG-AbeoNeural",
+        "name": "en-NG-AbeoNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-NG-EzinneNeural",
+        "name": "en-NG-EzinneNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-PH-JamesNeural",
+        "name": "en-PH-JamesNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-PH-RosaNeural",
+        "name": "en-PH-RosaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-AvaNeural",
+        "name": "en-US-AvaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-AndrewNeural",
+        "name": "en-US-AndrewNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-EmmaNeural",
+        "name": "en-US-EmmaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-BrianNeural",
+        "name": "en-US-BrianNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-SG-LunaNeural",
+        "name": "en-SG-LunaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-SG-WayneNeural",
+        "name": "en-SG-WayneNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-ZA-LeahNeural",
+        "name": "en-ZA-LeahNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-ZA-LukeNeural",
+        "name": "en-ZA-LukeNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-TZ-ElimuNeural",
+        "name": "en-TZ-ElimuNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-TZ-ImaniNeural",
+        "name": "en-TZ-ImaniNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-GB-LibbyNeural",
+        "name": "en-GB-LibbyNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-GB-MaisieNeural",
+        "name": "en-GB-MaisieNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-GB-RyanNeural",
+        "name": "en-GB-RyanNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-GB-SoniaNeural",
+        "name": "en-GB-SoniaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-GB-ThomasNeural",
+        "name": "en-GB-ThomasNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-AnaNeural",
+        "name": "en-US-AnaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-AndrewMultilingualNeural",
+        "name": "en-US-AndrewMultilingualNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-AriaNeural",
+        "name": "en-US-AriaNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-AvaMultilingualNeural",
+        "name": "en-US-AvaMultilingualNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-BrianMultilingualNeural",
+        "name": "en-US-BrianMultilingualNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-ChristopherNeural",
+        "name": "en-US-ChristopherNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-EmmaMultilingualNeural",
+        "name": "en-US-EmmaMultilingualNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-EricNeural",
+        "name": "en-US-EricNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-GuyNeural",
+        "name": "en-US-GuyNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-JennyNeural",
+        "name": "en-US-JennyNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-MichelleNeural",
+        "name": "en-US-MichelleNeural · Female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-RogerNeural",
+        "name": "en-US-RogerNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "en-US-SteffanNeural",
+        "name": "en-US-SteffanNeural · Male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "et-EE-AnuNeural",
+        "name": "et-EE-AnuNeural · Female",
+        "language": "et",
+        "dialect": ""
+      },
+      {
+        "id": "et-EE-KertNeural",
+        "name": "et-EE-KertNeural · Male",
+        "language": "et",
+        "dialect": ""
+      },
+      {
+        "id": "fil-PH-AngeloNeural",
+        "name": "fil-PH-AngeloNeural · Male",
+        "language": "fil",
+        "dialect": ""
+      },
+      {
+        "id": "fil-PH-BlessicaNeural",
+        "name": "fil-PH-BlessicaNeural · Female",
+        "language": "fil",
+        "dialect": ""
+      },
+      {
+        "id": "fi-FI-HarriNeural",
+        "name": "fi-FI-HarriNeural · Male",
+        "language": "fi",
+        "dialect": ""
+      },
+      {
+        "id": "fi-FI-NooraNeural",
+        "name": "fi-FI-NooraNeural · Female",
+        "language": "fi",
+        "dialect": ""
+      },
+      {
+        "id": "fr-BE-CharlineNeural",
+        "name": "fr-BE-CharlineNeural · Female",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-BE-GerardNeural",
+        "name": "fr-BE-GerardNeural · Male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-CA-ThierryNeural",
+        "name": "fr-CA-ThierryNeural · Male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-CA-AntoineNeural",
+        "name": "fr-CA-AntoineNeural · Male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-CA-JeanNeural",
+        "name": "fr-CA-JeanNeural · Male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-CA-SylvieNeural",
+        "name": "fr-CA-SylvieNeural · Female",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-FR-VivienneMultilingualNeural",
+        "name": "fr-FR-VivienneMultilingualNeural · Female",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-FR-RemyMultilingualNeural",
+        "name": "fr-FR-RemyMultilingualNeural · Male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-FR-DeniseNeural",
+        "name": "fr-FR-DeniseNeural · Female",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-FR-EloiseNeural",
+        "name": "fr-FR-EloiseNeural · Female",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-FR-HenriNeural",
+        "name": "fr-FR-HenriNeural · Male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-CH-ArianeNeural",
+        "name": "fr-CH-ArianeNeural · Female",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr-CH-FabriceNeural",
+        "name": "fr-CH-FabriceNeural · Male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "gl-ES-RoiNeural",
+        "name": "gl-ES-RoiNeural · Male",
+        "language": "gl",
+        "dialect": ""
+      },
+      {
+        "id": "gl-ES-SabelaNeural",
+        "name": "gl-ES-SabelaNeural · Female",
+        "language": "gl",
+        "dialect": ""
+      },
+      {
+        "id": "ka-GE-EkaNeural",
+        "name": "ka-GE-EkaNeural · Female",
+        "language": "ka",
+        "dialect": ""
+      },
+      {
+        "id": "ka-GE-GiorgiNeural",
+        "name": "ka-GE-GiorgiNeural · Male",
+        "language": "ka",
+        "dialect": ""
+      },
+      {
+        "id": "de-AT-IngridNeural",
+        "name": "de-AT-IngridNeural · Female",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-AT-JonasNeural",
+        "name": "de-AT-JonasNeural · Male",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-DE-SeraphinaMultilingualNeural",
+        "name": "de-DE-SeraphinaMultilingualNeural · Female",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-DE-FlorianMultilingualNeural",
+        "name": "de-DE-FlorianMultilingualNeural · Male",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-DE-AmalaNeural",
+        "name": "de-DE-AmalaNeural · Female",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-DE-ConradNeural",
+        "name": "de-DE-ConradNeural · Male",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-DE-KatjaNeural",
+        "name": "de-DE-KatjaNeural · Female",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-DE-KillianNeural",
+        "name": "de-DE-KillianNeural · Male",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-CH-JanNeural",
+        "name": "de-CH-JanNeural · Male",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de-CH-LeniNeural",
+        "name": "de-CH-LeniNeural · Female",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "el-GR-AthinaNeural",
+        "name": "el-GR-AthinaNeural · Female",
+        "language": "el",
+        "dialect": ""
+      },
+      {
+        "id": "el-GR-NestorasNeural",
+        "name": "el-GR-NestorasNeural · Male",
+        "language": "el",
+        "dialect": ""
+      },
+      {
+        "id": "gu-IN-DhwaniNeural",
+        "name": "gu-IN-DhwaniNeural · Female",
+        "language": "gu",
+        "dialect": ""
+      },
+      {
+        "id": "gu-IN-NiranjanNeural",
+        "name": "gu-IN-NiranjanNeural · Male",
+        "language": "gu",
+        "dialect": ""
+      },
+      {
+        "id": "he-IL-AvriNeural",
+        "name": "he-IL-AvriNeural · Male",
+        "language": "he",
+        "dialect": ""
+      },
+      {
+        "id": "he-IL-HilaNeural",
+        "name": "he-IL-HilaNeural · Female",
+        "language": "he",
+        "dialect": ""
+      },
+      {
+        "id": "hi-IN-MadhurNeural",
+        "name": "hi-IN-MadhurNeural · Male",
+        "language": "hi",
+        "dialect": ""
+      },
+      {
+        "id": "hi-IN-SwaraNeural",
+        "name": "hi-IN-SwaraNeural · Female",
+        "language": "hi",
+        "dialect": ""
+      },
+      {
+        "id": "hu-HU-NoemiNeural",
+        "name": "hu-HU-NoemiNeural · Female",
+        "language": "hu",
+        "dialect": ""
+      },
+      {
+        "id": "hu-HU-TamasNeural",
+        "name": "hu-HU-TamasNeural · Male",
+        "language": "hu",
+        "dialect": ""
+      },
+      {
+        "id": "is-IS-GudrunNeural",
+        "name": "is-IS-GudrunNeural · Female",
+        "language": "is",
+        "dialect": ""
+      },
+      {
+        "id": "is-IS-GunnarNeural",
+        "name": "is-IS-GunnarNeural · Male",
+        "language": "is",
+        "dialect": ""
+      },
+      {
+        "id": "id-ID-ArdiNeural",
+        "name": "id-ID-ArdiNeural · Male",
+        "language": "id",
+        "dialect": ""
+      },
+      {
+        "id": "id-ID-GadisNeural",
+        "name": "id-ID-GadisNeural · Female",
+        "language": "id",
+        "dialect": ""
+      },
+      {
+        "id": "iu-Latn-CA-SiqiniqNeural",
+        "name": "iu-Latn-CA-SiqiniqNeural · Female",
+        "language": "iu",
+        "dialect": ""
+      },
+      {
+        "id": "iu-Latn-CA-TaqqiqNeural",
+        "name": "iu-Latn-CA-TaqqiqNeural · Male",
+        "language": "iu",
+        "dialect": ""
+      },
+      {
+        "id": "iu-Cans-CA-SiqiniqNeural",
+        "name": "iu-Cans-CA-SiqiniqNeural · Female",
+        "language": "iu",
+        "dialect": ""
+      },
+      {
+        "id": "iu-Cans-CA-TaqqiqNeural",
+        "name": "iu-Cans-CA-TaqqiqNeural · Male",
+        "language": "iu",
+        "dialect": ""
+      },
+      {
+        "id": "ga-IE-ColmNeural",
+        "name": "ga-IE-ColmNeural · Male",
+        "language": "ga",
+        "dialect": ""
+      },
+      {
+        "id": "ga-IE-OrlaNeural",
+        "name": "ga-IE-OrlaNeural · Female",
+        "language": "ga",
+        "dialect": ""
+      },
+      {
+        "id": "it-IT-GiuseppeMultilingualNeural",
+        "name": "it-IT-GiuseppeMultilingualNeural · Male",
+        "language": "it",
+        "dialect": ""
+      },
+      {
+        "id": "it-IT-DiegoNeural",
+        "name": "it-IT-DiegoNeural · Male",
+        "language": "it",
+        "dialect": ""
+      },
+      {
+        "id": "it-IT-ElsaNeural",
+        "name": "it-IT-ElsaNeural · Female",
+        "language": "it",
+        "dialect": ""
+      },
+      {
+        "id": "it-IT-IsabellaNeural",
+        "name": "it-IT-IsabellaNeural · Female",
+        "language": "it",
+        "dialect": ""
+      },
+      {
+        "id": "ja-JP-KeitaNeural",
+        "name": "ja-JP-KeitaNeural · Male",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "ja-JP-NanamiNeural",
+        "name": "ja-JP-NanamiNeural · Female",
+        "language": "ja",
+        "dialect": ""
+      },
+      {
+        "id": "jv-ID-DimasNeural",
+        "name": "jv-ID-DimasNeural · Male",
+        "language": "jv",
+        "dialect": ""
+      },
+      {
+        "id": "jv-ID-SitiNeural",
+        "name": "jv-ID-SitiNeural · Female",
+        "language": "jv",
+        "dialect": ""
+      },
+      {
+        "id": "kn-IN-GaganNeural",
+        "name": "kn-IN-GaganNeural · Male",
+        "language": "kn",
+        "dialect": ""
+      },
+      {
+        "id": "kn-IN-SapnaNeural",
+        "name": "kn-IN-SapnaNeural · Female",
+        "language": "kn",
+        "dialect": ""
+      },
+      {
+        "id": "kk-KZ-AigulNeural",
+        "name": "kk-KZ-AigulNeural · Female",
+        "language": "kk",
+        "dialect": ""
+      },
+      {
+        "id": "kk-KZ-DauletNeural",
+        "name": "kk-KZ-DauletNeural · Male",
+        "language": "kk",
+        "dialect": ""
+      },
+      {
+        "id": "km-KH-PisethNeural",
+        "name": "km-KH-PisethNeural · Male",
+        "language": "km",
+        "dialect": ""
+      },
+      {
+        "id": "km-KH-SreymomNeural",
+        "name": "km-KH-SreymomNeural · Female",
+        "language": "km",
+        "dialect": ""
+      },
+      {
+        "id": "ko-KR-HyunsuMultilingualNeural",
+        "name": "ko-KR-HyunsuMultilingualNeural · Male",
+        "language": "ko",
+        "dialect": ""
+      },
+      {
+        "id": "ko-KR-InJoonNeural",
+        "name": "ko-KR-InJoonNeural · Male",
+        "language": "ko",
+        "dialect": ""
+      },
+      {
+        "id": "ko-KR-SunHiNeural",
+        "name": "ko-KR-SunHiNeural · Female",
+        "language": "ko",
+        "dialect": ""
+      },
+      {
+        "id": "lo-LA-ChanthavongNeural",
+        "name": "lo-LA-ChanthavongNeural · Male",
+        "language": "lo",
+        "dialect": ""
+      },
+      {
+        "id": "lo-LA-KeomanyNeural",
+        "name": "lo-LA-KeomanyNeural · Female",
+        "language": "lo",
+        "dialect": ""
+      },
+      {
+        "id": "lv-LV-EveritaNeural",
+        "name": "lv-LV-EveritaNeural · Female",
+        "language": "lv",
+        "dialect": ""
+      },
+      {
+        "id": "lv-LV-NilsNeural",
+        "name": "lv-LV-NilsNeural · Male",
+        "language": "lv",
+        "dialect": ""
+      },
+      {
+        "id": "lt-LT-LeonasNeural",
+        "name": "lt-LT-LeonasNeural · Male",
+        "language": "lt",
+        "dialect": ""
+      },
+      {
+        "id": "lt-LT-OnaNeural",
+        "name": "lt-LT-OnaNeural · Female",
+        "language": "lt",
+        "dialect": ""
+      },
+      {
+        "id": "mk-MK-AleksandarNeural",
+        "name": "mk-MK-AleksandarNeural · Male",
+        "language": "mk",
+        "dialect": ""
+      },
+      {
+        "id": "mk-MK-MarijaNeural",
+        "name": "mk-MK-MarijaNeural · Female",
+        "language": "mk",
+        "dialect": ""
+      },
+      {
+        "id": "ms-MY-OsmanNeural",
+        "name": "ms-MY-OsmanNeural · Male",
+        "language": "ms",
+        "dialect": ""
+      },
+      {
+        "id": "ms-MY-YasminNeural",
+        "name": "ms-MY-YasminNeural · Female",
+        "language": "ms",
+        "dialect": ""
+      },
+      {
+        "id": "ml-IN-MidhunNeural",
+        "name": "ml-IN-MidhunNeural · Male",
+        "language": "ml",
+        "dialect": ""
+      },
+      {
+        "id": "ml-IN-SobhanaNeural",
+        "name": "ml-IN-SobhanaNeural · Female",
+        "language": "ml",
+        "dialect": ""
+      },
+      {
+        "id": "mt-MT-GraceNeural",
+        "name": "mt-MT-GraceNeural · Female",
+        "language": "mt",
+        "dialect": ""
+      },
+      {
+        "id": "mt-MT-JosephNeural",
+        "name": "mt-MT-JosephNeural · Male",
+        "language": "mt",
+        "dialect": ""
+      },
+      {
+        "id": "mr-IN-AarohiNeural",
+        "name": "mr-IN-AarohiNeural · Female",
+        "language": "mr",
+        "dialect": ""
+      },
+      {
+        "id": "mr-IN-ManoharNeural",
+        "name": "mr-IN-ManoharNeural · Male",
+        "language": "mr",
+        "dialect": ""
+      },
+      {
+        "id": "mn-MN-BataaNeural",
+        "name": "mn-MN-BataaNeural · Male",
+        "language": "mn",
+        "dialect": ""
+      },
+      {
+        "id": "mn-MN-YesuiNeural",
+        "name": "mn-MN-YesuiNeural · Female",
+        "language": "mn",
+        "dialect": ""
+      },
+      {
+        "id": "ne-NP-HemkalaNeural",
+        "name": "ne-NP-HemkalaNeural · Female",
+        "language": "ne",
+        "dialect": ""
+      },
+      {
+        "id": "ne-NP-SagarNeural",
+        "name": "ne-NP-SagarNeural · Male",
+        "language": "ne",
+        "dialect": ""
+      },
+      {
+        "id": "nb-NO-FinnNeural",
+        "name": "nb-NO-FinnNeural · Male",
+        "language": "nb",
+        "dialect": ""
+      },
+      {
+        "id": "nb-NO-PernilleNeural",
+        "name": "nb-NO-PernilleNeural · Female",
+        "language": "nb",
+        "dialect": ""
+      },
+      {
+        "id": "ps-AF-GulNawazNeural",
+        "name": "ps-AF-GulNawazNeural · Male",
+        "language": "ps",
+        "dialect": ""
+      },
+      {
+        "id": "ps-AF-LatifaNeural",
+        "name": "ps-AF-LatifaNeural · Female",
+        "language": "ps",
+        "dialect": ""
+      },
+      {
+        "id": "fa-IR-DilaraNeural",
+        "name": "fa-IR-DilaraNeural · Female",
+        "language": "fa",
+        "dialect": ""
+      },
+      {
+        "id": "fa-IR-FaridNeural",
+        "name": "fa-IR-FaridNeural · Male",
+        "language": "fa",
+        "dialect": ""
+      },
+      {
+        "id": "pl-PL-MarekNeural",
+        "name": "pl-PL-MarekNeural · Male",
+        "language": "pl",
+        "dialect": ""
+      },
+      {
+        "id": "pl-PL-ZofiaNeural",
+        "name": "pl-PL-ZofiaNeural · Female",
+        "language": "pl",
+        "dialect": ""
+      },
+      {
+        "id": "pt-BR-ThalitaMultilingualNeural",
+        "name": "pt-BR-ThalitaMultilingualNeural · Female",
+        "language": "pt",
+        "dialect": ""
+      },
+      {
+        "id": "pt-BR-AntonioNeural",
+        "name": "pt-BR-AntonioNeural · Male",
+        "language": "pt",
+        "dialect": ""
+      },
+      {
+        "id": "pt-BR-FranciscaNeural",
+        "name": "pt-BR-FranciscaNeural · Female",
+        "language": "pt",
+        "dialect": ""
+      },
+      {
+        "id": "pt-PT-DuarteNeural",
+        "name": "pt-PT-DuarteNeural · Male",
+        "language": "pt",
+        "dialect": ""
+      },
+      {
+        "id": "pt-PT-RaquelNeural",
+        "name": "pt-PT-RaquelNeural · Female",
+        "language": "pt",
+        "dialect": ""
+      },
+      {
+        "id": "ro-RO-AlinaNeural",
+        "name": "ro-RO-AlinaNeural · Female",
+        "language": "ro",
+        "dialect": ""
+      },
+      {
+        "id": "ro-RO-EmilNeural",
+        "name": "ro-RO-EmilNeural · Male",
+        "language": "ro",
+        "dialect": ""
+      },
+      {
+        "id": "ru-RU-DmitryNeural",
+        "name": "ru-RU-DmitryNeural · Male",
+        "language": "ru",
+        "dialect": ""
+      },
+      {
+        "id": "ru-RU-SvetlanaNeural",
+        "name": "ru-RU-SvetlanaNeural · Female",
+        "language": "ru",
+        "dialect": ""
+      },
+      {
+        "id": "sr-RS-NicholasNeural",
+        "name": "sr-RS-NicholasNeural · Male",
+        "language": "sr",
+        "dialect": ""
+      },
+      {
+        "id": "sr-RS-SophieNeural",
+        "name": "sr-RS-SophieNeural · Female",
+        "language": "sr",
+        "dialect": ""
+      },
+      {
+        "id": "si-LK-SameeraNeural",
+        "name": "si-LK-SameeraNeural · Male",
+        "language": "si",
+        "dialect": ""
+      },
+      {
+        "id": "si-LK-ThiliniNeural",
+        "name": "si-LK-ThiliniNeural · Female",
+        "language": "si",
+        "dialect": ""
+      },
+      {
+        "id": "sk-SK-LukasNeural",
+        "name": "sk-SK-LukasNeural · Male",
+        "language": "sk",
+        "dialect": ""
+      },
+      {
+        "id": "sk-SK-ViktoriaNeural",
+        "name": "sk-SK-ViktoriaNeural · Female",
+        "language": "sk",
+        "dialect": ""
+      },
+      {
+        "id": "sl-SI-PetraNeural",
+        "name": "sl-SI-PetraNeural · Female",
+        "language": "sl",
+        "dialect": ""
+      },
+      {
+        "id": "sl-SI-RokNeural",
+        "name": "sl-SI-RokNeural · Male",
+        "language": "sl",
+        "dialect": ""
+      },
+      {
+        "id": "so-SO-MuuseNeural",
+        "name": "so-SO-MuuseNeural · Male",
+        "language": "so",
+        "dialect": ""
+      },
+      {
+        "id": "so-SO-UbaxNeural",
+        "name": "so-SO-UbaxNeural · Female",
+        "language": "so",
+        "dialect": ""
+      },
+      {
+        "id": "es-AR-ElenaNeural",
+        "name": "es-AR-ElenaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-AR-TomasNeural",
+        "name": "es-AR-TomasNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-BO-MarceloNeural",
+        "name": "es-BO-MarceloNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-BO-SofiaNeural",
+        "name": "es-BO-SofiaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CL-CatalinaNeural",
+        "name": "es-CL-CatalinaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CL-LorenzoNeural",
+        "name": "es-CL-LorenzoNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CO-GonzaloNeural",
+        "name": "es-CO-GonzaloNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CO-SalomeNeural",
+        "name": "es-CO-SalomeNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-ES-XimenaNeural",
+        "name": "es-ES-XimenaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CR-JuanNeural",
+        "name": "es-CR-JuanNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CR-MariaNeural",
+        "name": "es-CR-MariaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CU-BelkysNeural",
+        "name": "es-CU-BelkysNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-CU-ManuelNeural",
+        "name": "es-CU-ManuelNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-DO-EmilioNeural",
+        "name": "es-DO-EmilioNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-DO-RamonaNeural",
+        "name": "es-DO-RamonaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-EC-AndreaNeural",
+        "name": "es-EC-AndreaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-EC-LuisNeural",
+        "name": "es-EC-LuisNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-SV-LorenaNeural",
+        "name": "es-SV-LorenaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-SV-RodrigoNeural",
+        "name": "es-SV-RodrigoNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-GQ-JavierNeural",
+        "name": "es-GQ-JavierNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-GQ-TeresaNeural",
+        "name": "es-GQ-TeresaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-GT-AndresNeural",
+        "name": "es-GT-AndresNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-GT-MartaNeural",
+        "name": "es-GT-MartaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-HN-CarlosNeural",
+        "name": "es-HN-CarlosNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-HN-KarlaNeural",
+        "name": "es-HN-KarlaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-MX-DaliaNeural",
+        "name": "es-MX-DaliaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-MX-JorgeNeural",
+        "name": "es-MX-JorgeNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-NI-FedericoNeural",
+        "name": "es-NI-FedericoNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-NI-YolandaNeural",
+        "name": "es-NI-YolandaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PA-MargaritaNeural",
+        "name": "es-PA-MargaritaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PA-RobertoNeural",
+        "name": "es-PA-RobertoNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PY-MarioNeural",
+        "name": "es-PY-MarioNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PY-TaniaNeural",
+        "name": "es-PY-TaniaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PE-AlexNeural",
+        "name": "es-PE-AlexNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PE-CamilaNeural",
+        "name": "es-PE-CamilaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PR-KarinaNeural",
+        "name": "es-PR-KarinaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-PR-VictorNeural",
+        "name": "es-PR-VictorNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-ES-AlvaroNeural",
+        "name": "es-ES-AlvaroNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-ES-ElviraNeural",
+        "name": "es-ES-ElviraNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-US-AlonsoNeural",
+        "name": "es-US-AlonsoNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-US-PalomaNeural",
+        "name": "es-US-PalomaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-UY-MateoNeural",
+        "name": "es-UY-MateoNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-UY-ValentinaNeural",
+        "name": "es-UY-ValentinaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-VE-PaolaNeural",
+        "name": "es-VE-PaolaNeural · Female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es-VE-SebastianNeural",
+        "name": "es-VE-SebastianNeural · Male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "su-ID-JajangNeural",
+        "name": "su-ID-JajangNeural · Male",
+        "language": "su",
+        "dialect": ""
+      },
+      {
+        "id": "su-ID-TutiNeural",
+        "name": "su-ID-TutiNeural · Female",
+        "language": "su",
+        "dialect": ""
+      },
+      {
+        "id": "sw-KE-RafikiNeural",
+        "name": "sw-KE-RafikiNeural · Male",
+        "language": "sw",
+        "dialect": ""
+      },
+      {
+        "id": "sw-KE-ZuriNeural",
+        "name": "sw-KE-ZuriNeural · Female",
+        "language": "sw",
+        "dialect": ""
+      },
+      {
+        "id": "sw-TZ-DaudiNeural",
+        "name": "sw-TZ-DaudiNeural · Male",
+        "language": "sw",
+        "dialect": ""
+      },
+      {
+        "id": "sw-TZ-RehemaNeural",
+        "name": "sw-TZ-RehemaNeural · Female",
+        "language": "sw",
+        "dialect": ""
+      },
+      {
+        "id": "sv-SE-MattiasNeural",
+        "name": "sv-SE-MattiasNeural · Male",
+        "language": "sv",
+        "dialect": ""
+      },
+      {
+        "id": "sv-SE-SofieNeural",
+        "name": "sv-SE-SofieNeural · Female",
+        "language": "sv",
+        "dialect": ""
+      },
+      {
+        "id": "ta-IN-PallaviNeural",
+        "name": "ta-IN-PallaviNeural · Female",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "ta-IN-ValluvarNeural",
+        "name": "ta-IN-ValluvarNeural · Male",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "ta-MY-KaniNeural",
+        "name": "ta-MY-KaniNeural · Female",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "ta-MY-SuryaNeural",
+        "name": "ta-MY-SuryaNeural · Male",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "ta-SG-AnbuNeural",
+        "name": "ta-SG-AnbuNeural · Male",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "ta-SG-VenbaNeural",
+        "name": "ta-SG-VenbaNeural · Female",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "ta-LK-KumarNeural",
+        "name": "ta-LK-KumarNeural · Male",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "ta-LK-SaranyaNeural",
+        "name": "ta-LK-SaranyaNeural · Female",
+        "language": "ta",
+        "dialect": ""
+      },
+      {
+        "id": "te-IN-MohanNeural",
+        "name": "te-IN-MohanNeural · Male",
+        "language": "te",
+        "dialect": ""
+      },
+      {
+        "id": "te-IN-ShrutiNeural",
+        "name": "te-IN-ShrutiNeural · Female",
+        "language": "te",
+        "dialect": ""
+      },
+      {
+        "id": "th-TH-NiwatNeural",
+        "name": "th-TH-NiwatNeural · Male",
+        "language": "th",
+        "dialect": ""
+      },
+      {
+        "id": "th-TH-PremwadeeNeural",
+        "name": "th-TH-PremwadeeNeural · Female",
+        "language": "th",
+        "dialect": ""
+      },
+      {
+        "id": "tr-TR-EmelNeural",
+        "name": "tr-TR-EmelNeural · Female",
+        "language": "tr",
+        "dialect": ""
+      },
+      {
+        "id": "tr-TR-AhmetNeural",
+        "name": "tr-TR-AhmetNeural · Male",
+        "language": "tr",
+        "dialect": ""
+      },
+      {
+        "id": "uk-UA-OstapNeural",
+        "name": "uk-UA-OstapNeural · Male",
+        "language": "uk",
+        "dialect": ""
+      },
+      {
+        "id": "uk-UA-PolinaNeural",
+        "name": "uk-UA-PolinaNeural · Female",
+        "language": "uk",
+        "dialect": ""
+      },
+      {
+        "id": "ur-IN-GulNeural",
+        "name": "ur-IN-GulNeural · Female",
+        "language": "ur",
+        "dialect": ""
+      },
+      {
+        "id": "ur-IN-SalmanNeural",
+        "name": "ur-IN-SalmanNeural · Male",
+        "language": "ur",
+        "dialect": ""
+      },
+      {
+        "id": "ur-PK-AsadNeural",
+        "name": "ur-PK-AsadNeural · Male",
+        "language": "ur",
+        "dialect": ""
+      },
+      {
+        "id": "ur-PK-UzmaNeural",
+        "name": "ur-PK-UzmaNeural · Female",
+        "language": "ur",
+        "dialect": ""
+      },
+      {
+        "id": "uz-UZ-MadinaNeural",
+        "name": "uz-UZ-MadinaNeural · Female",
+        "language": "uz",
+        "dialect": ""
+      },
+      {
+        "id": "uz-UZ-SardorNeural",
+        "name": "uz-UZ-SardorNeural · Male",
+        "language": "uz",
+        "dialect": ""
+      },
+      {
+        "id": "vi-VN-HoaiMyNeural",
+        "name": "vi-VN-HoaiMyNeural · Female",
+        "language": "vi",
+        "dialect": ""
+      },
+      {
+        "id": "vi-VN-NamMinhNeural",
+        "name": "vi-VN-NamMinhNeural · Male",
+        "language": "vi",
+        "dialect": ""
+      },
+      {
+        "id": "cy-GB-AledNeural",
+        "name": "cy-GB-AledNeural · Male",
+        "language": "cy",
+        "dialect": ""
+      },
+      {
+        "id": "cy-GB-NiaNeural",
+        "name": "cy-GB-NiaNeural · Female",
+        "language": "cy",
+        "dialect": ""
+      },
+      {
+        "id": "zu-ZA-ThandoNeural",
+        "name": "zu-ZA-ThandoNeural · Female",
+        "language": "zu",
+        "dialect": ""
+      },
+      {
+        "id": "zu-ZA-ThembaNeural",
+        "name": "zu-ZA-ThembaNeural · Male",
+        "language": "zu",
+        "dialect": ""
+      }
+    ],
+    "controls": [
+      {
+        "id": "pitch",
+        "label": "音高偏移（Hz）",
+        "type": "int",
+        "default": 0,
+        "min": -100,
+        "max": 100
+      }
+    ],
+    "languages": [
+      "af",
+      "am",
+      "ar",
+      "az",
+      "bg",
+      "bn",
+      "bs",
+      "ca",
+      "cs",
+      "cy",
+      "da",
+      "de",
+      "el",
+      "en",
+      "es",
+      "et",
+      "fa",
+      "fi",
+      "fil",
+      "fr",
+      "ga",
+      "gl",
+      "gu",
+      "he",
+      "hi",
+      "hr",
+      "hu",
+      "id",
+      "is",
+      "it",
+      "iu",
+      "ja",
+      "jv",
+      "ka",
+      "kk",
+      "km",
+      "kn",
+      "ko",
+      "lo",
+      "lt",
+      "lv",
+      "mk",
+      "ml",
+      "mn",
+      "mr",
+      "ms",
+      "mt",
+      "my",
+      "nb",
+      "ne",
+      "nl",
+      "pl",
+      "ps",
+      "pt",
+      "ro",
+      "ru",
+      "si",
+      "sk",
+      "sl",
+      "so",
+      "sq",
+      "sr",
+      "su",
+      "sv",
+      "sw",
+      "ta",
+      "te",
+      "th",
+      "tr",
+      "uk",
+      "ur",
+      "uz",
+      "vi",
+      "zh",
+      "zu"
+    ],
+    "dialectNote": "在线音色：粤语、东北话、陕西话及台湾普通话。只有显式选择 Edge 后才发送朗读文字。"
+  },
+  {
+    "id": "voxtral-tts",
+    "name": "Voxtral TTS · 4B",
+    "official": "https://docs.mistral.ai/models/voxtral-tts-26-03",
+    "downloadUrl": "https://modelscope.cn/models/mistralai/Voxtral-4B-TTS-2603",
+    "engine": "voxtral",
+    "format": "官方 BF16 权重 · 本地转换 Q8_0 · Vulkan GPU / CPU 流式",
+    "features": "9 种语言、20 个内置音色，真正增量生成。此版本不支持中文、方言或参考录音克隆。权重 CC BY-NC 4.0；audio.cpp 为社区运行实现。",
+    "hardware": "优先使用 Vulkan 独显，初始化失败或生成前显存不足时回退 CPU。建议至少 16 GB 内存、26 GB 可用磁盘；首次启动需本地 Q8_0 转换。未自动下载权重进行本机音质/速度验证。",
+    "downloadBytes": 8037629039,
+    "diskBytes": 26000000000,
+    "files": [
+      {
+        "name": "voice_embedding/ar_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/ar_male.pt",
+        "bytes": 413253,
+        "sha256": "f44603f6433cbb4b2abc7f496a382632171118557a175cb385df168a0dc20464"
+      },
+      {
+        "name": "voice_embedding/casual_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/casual_female.pt",
+        "bytes": 1316421,
+        "sha256": "780637984644064ee22e60b3152e0cd43fa64b2dcd39d9cab6cd2c62f2ce0342"
+      },
+      {
+        "name": "voice_embedding/casual_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/casual_male.pt",
+        "bytes": 904773,
+        "sha256": "7a056c9156ad0058e9d1368363bf3a25a9fcd8fe53e211ffac97de0bbffb3504"
+      },
+      {
+        "name": "voice_embedding/cheerful_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/cheerful_female.pt",
+        "bytes": 812613,
+        "sha256": "75fe69c8fcb5a0883a3d0bc1215b28f28cc0586aff5732eeebd2b254e8288253"
+      },
+      {
+        "name": "consolidated.safetensors",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=consolidated.safetensors",
+        "bytes": 8004752248,
+        "sha256": "66c4fd998db10e1a6d9cc5baa10e6264bf10701ec22ccdc0822c7dcc45dbe55b"
+      },
+      {
+        "name": "voice_embedding/de_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/de_female.pt",
+        "bytes": 904773,
+        "sha256": "282fc191fda496de2ebf2c809acb44056dde6fbe2f1cb99e85e67985bc6f6619"
+      },
+      {
+        "name": "voice_embedding/de_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/de_male.pt",
+        "bytes": 1003077,
+        "sha256": "bd75d9fd3ffb9df0481668ce8781287a58f552e2388c5bbc0efdd4ebff0421bf"
+      },
+      {
+        "name": "voice_embedding/es_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/es_female.pt",
+        "bytes": 849477,
+        "sha256": "90e01ad34f231cc881987c3b1c0728853fd9b904e52c296a07c71a132949d8a6"
+      },
+      {
+        "name": "voice_embedding/es_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/es_male.pt",
+        "bytes": 1279557,
+        "sha256": "ec116d8f4a102291bae3d9156d7c3222d9e1056020bf5894a7504bfc09640fdf"
+      },
+      {
+        "name": "voice_embedding/fr_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/fr_female.pt",
+        "bytes": 597573,
+        "sha256": "82628d963670f919aa302f9c8a7336c745418a145934edb211810b07d9c8b852"
+      },
+      {
+        "name": "voice_embedding/fr_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/fr_male.pt",
+        "bytes": 597573,
+        "sha256": "73395073472be3fb586b487705ac4ebf35f99db664f56400137e8bfcfe4cd8a8"
+      },
+      {
+        "name": "voice_embedding/hi_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/hi_female.pt",
+        "bytes": 529989,
+        "sha256": "aa7718cdd6f65735226bcc701379fdec64f36d0207ca79fc4c61b445ca7bde82"
+      },
+      {
+        "name": "voice_embedding/hi_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/hi_male.pt",
+        "bytes": 579141,
+        "sha256": "c3cde36ab9a336f67fd33b46435cdf645cff9e10117f13bcbcb67b44b80a11b0"
+      },
+      {
+        "name": "voice_embedding/it_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/it_female.pt",
+        "bytes": 1058373,
+        "sha256": "29e1714bdb3ce0726e590ce1862fbe953c168ba51a05bc7daa8cb35cddc312b4"
+      },
+      {
+        "name": "voice_embedding/it_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/it_male.pt",
+        "bytes": 1033797,
+        "sha256": "b98ba2253e2a0b872e20d33d29cab32263cc81062c01e3f5a8696de89e6f47b1"
+      },
+      {
+        "name": "voice_embedding/neutral_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/neutral_female.pt",
+        "bytes": 1340997,
+        "sha256": "2a03f4008614da7b1505a360a6b0d58d94dd72b0b0f49bf216e39de5eb733c61"
+      },
+      {
+        "name": "voice_embedding/neutral_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/neutral_male.pt",
+        "bytes": 1039941,
+        "sha256": "439df812990e6e4bcc6010ca12f12df90916e862bc1e1b56036d6433b892834e"
+      },
+      {
+        "name": "voice_embedding/nl_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/nl_female.pt",
+        "bytes": 898629,
+        "sha256": "b1bad34c22e0563f05c1f13c1db96680778c297aea6a5c0bb202950648b796b6"
+      },
+      {
+        "name": "voice_embedding/nl_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/nl_male.pt",
+        "bytes": 849477,
+        "sha256": "43fd2de89dc08503f37ae3107273eeb3f2a6195d705ff58d2228b3b5642ff7de"
+      },
+      {
+        "name": "params.json",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=params.json",
+        "bytes": 3482,
+        "sha256": "f6408ee76dea8da16ce40ac66729d59406019ea71cdb9d656709a38d2e58691e"
+      },
+      {
+        "name": "voice_embedding/pt_female.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/pt_female.pt",
+        "bytes": 1076805,
+        "sha256": "82f1006b2cd69118cba67085daa1795d9dab90b9bc70e1392e77f82cb616c9ce"
+      },
+      {
+        "name": "voice_embedding/pt_male.pt",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=voice_embedding/pt_male.pt",
+        "bytes": 886341,
+        "sha256": "7b30dca6c5d16c7b10a1c09c53e971c1bb1fab65692d7244876fbdc4ad52ba18"
+      },
+      {
+        "name": "README.md",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=4aaafdccdf8fc0bfd26a69941976bd4744b72604&FilePath=README.md",
+        "bytes": 5998,
+        "sha256": "33b56cf6987186fe7ccc5057027af5132186974d9e726d1fd8c926795674da00"
+      },
+      {
+        "name": "tekken.json",
+        "url": "https://modelscope.cn/api/v1/models/mistralai/Voxtral-4B-TTS-2603/repo?Revision=ef44561f65557842ce419de8b0982aae5abc9d75&FilePath=tekken.json",
+        "bytes": 14894731,
+        "sha256": "587989c9f56676b35e7d16d6fc61461301e402d908392a8ce16f0349f61b56d7"
+      }
+    ],
+    "voices": [
+      {
+        "id": "casual_female",
+        "name": "casual · female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "casual_male",
+        "name": "casual · male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "cheerful_female",
+        "name": "cheerful · female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "neutral_female",
+        "name": "neutral · female",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "neutral_male",
+        "name": "neutral · male",
+        "language": "en",
+        "dialect": ""
+      },
+      {
+        "id": "pt_male",
+        "name": "pt · male",
+        "language": "pt",
+        "dialect": ""
+      },
+      {
+        "id": "pt_female",
+        "name": "pt · female",
+        "language": "pt",
+        "dialect": ""
+      },
+      {
+        "id": "nl_male",
+        "name": "nl · male",
+        "language": "nl",
+        "dialect": ""
+      },
+      {
+        "id": "nl_female",
+        "name": "nl · female",
+        "language": "nl",
+        "dialect": ""
+      },
+      {
+        "id": "it_male",
+        "name": "it · male",
+        "language": "it",
+        "dialect": ""
+      },
+      {
+        "id": "it_female",
+        "name": "it · female",
+        "language": "it",
+        "dialect": ""
+      },
+      {
+        "id": "fr_male",
+        "name": "fr · male",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "fr_female",
+        "name": "fr · female",
+        "language": "fr",
+        "dialect": ""
+      },
+      {
+        "id": "es_male",
+        "name": "es · male",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "es_female",
+        "name": "es · female",
+        "language": "es",
+        "dialect": ""
+      },
+      {
+        "id": "de_male",
+        "name": "de · male",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "de_female",
+        "name": "de · female",
+        "language": "de",
+        "dialect": ""
+      },
+      {
+        "id": "ar_male",
+        "name": "ar · male",
+        "language": "ar",
+        "dialect": ""
+      },
+      {
+        "id": "hi_male",
+        "name": "hi · male",
+        "language": "hi",
+        "dialect": ""
+      },
+      {
+        "id": "hi_female",
+        "name": "hi · female",
+        "language": "hi",
+        "dialect": ""
+      }
+    ],
+    "controls": [
+      {
+        "id": "num_inference_steps",
+        "label": "声学积分步数",
+        "type": "int",
+        "default": 7,
+        "min": 1,
+        "max": 20
+      },
+      {
+        "id": "guidance_scale",
+        "label": "声学引导强度",
+        "type": "float",
+        "default": 1.2,
+        "step": 0.1,
+        "min": 0,
+        "max": 4
+      },
+      {
+        "id": "max_tokens",
+        "label": "最长音频帧数",
+        "type": "int",
+        "default": 1125,
+        "min": 12,
+        "max": 1125
+      },
+      {
+        "id": "seed",
+        "label": "随机种子（-1 为随机）",
+        "type": "int",
+        "default": -1,
+        "min": -1,
+        "max": 2147483647
+      },
+      {
+        "id": "text_chunk_size",
+        "label": "分段文字长度",
+        "type": "int",
+        "default": 300,
+        "min": 30,
+        "max": 500
+      }
+    ],
+    "languages": [
+      "en",
+      "fr",
+      "es",
+      "de",
+      "it",
+      "pt",
+      "nl",
+      "ar",
+      "hi"
+    ],
+    "dialectNote": "不支持中文和中文方言；请选择支持的 9 种语言。"
+  },
+  {
+    "id": "flashtts",
+    "name": "FlashTTS · 2026 论文版",
+    "official": "https://github.com/ASLP-lab/FlashTTS",
+    "downloadUrl": "https://github.com/ASLP-lab/FlashTTS#-quick-start",
+    "engine": "external",
+    "format": "ASLP-lab · MTP / X-pred Mean Flow",
+    "features": "原生多轨流式输入输出，MTP 加速与两步声学解码；论文首包 325 ms 为特定实验结果，不代表本机承诺。",
+    "hardware": "等待官方公开权重下载地址；源码与 Issue #6 均未提供可核实的完整运行包。暂不提供伪装可用的下载/启动按钮。",
+    "downloadBytes": -1,
+    "diskBytes": -1,
+    "files": [],
+    "voices": [],
+    "controls": [],
+    "languages": [],
+    "availability": "awaiting_weights"
+  },
+  {
+    "id": "mms-bod",
+    "name": "MMS · 藏语（中部藏语）",
+    "official": "https://huggingface.co/facebook/mms-tts-bod",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-bod/tree/e5767a90abf2293827ca6f467a9b964c0dc35fc5",
+    "engine": "mms",
+    "directory": "mms-bod",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生 藏语（中部藏语） 语音合成；需输入该语言文字，不会把中文自动翻译。单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145247158,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/config.json",
+        "bytes": 1641,
+        "sha256": "469fadd8556d44b2d0c08c951d244613390507aa0a02144a9af508017f37531d"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/model.safetensors",
+        "bytes": 145244408,
+        "sha256": "a9e0e46983219fc3ac1a2d2ae6e63b72d78f34864072c68a3c0f7aaa04ace348"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/special_tokens_map.json",
+        "bytes": 49,
+        "sha256": "63112498ee16782157bf3fd9fef68319cd9392188d294d1bfadd2a7900fc777e"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/tokenizer_config.json",
+        "bytes": 289,
+        "sha256": "ac90d06c3635d69e38400526a5d2c534f7ff3d03125895bb993012c350fa4b76"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-bod/resolve/e5767a90abf2293827ca6f467a9b964c0dc35fc5/vocab.json",
+        "bytes": 771,
+        "sha256": "75e6152acf762295a2b04f8d3e7fe1195ed391431cad2e9f4ea6c79c7a3788ae"
+      }
+    ],
+    "voices": [
+      {
+        "id": "bod",
+        "name": "藏语（中部藏语） · 官方单音色",
+        "language": "bo",
+        "dialect": "藏语（中部藏语）"
+      }
+    ],
+    "languages": [
+      "bo"
+    ],
+    "defaultVoiceZh": "bod",
+    "defaultVoiceEn": "bod",
+    "dialectNote": "支持 藏语（中部藏语） 原生文本；不是普通话变声。模型许可 CC-BY-NC-4.0，仅限非商业用途。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  },
+  {
+    "id": "mms-kaz",
+    "name": "MMS · 哈萨克语",
+    "official": "https://huggingface.co/facebook/mms-tts-kaz",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-kaz/tree/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63",
+    "engine": "mms",
+    "directory": "mms-kaz",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生 哈萨克语 语音合成；需输入该语言文字，不会把中文自动翻译。单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145233836,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/config.json",
+        "bytes": 1641,
+        "sha256": "d0378ee0c78342b0e6ccaa43a2c7d93949ca93cd6e74ea5ede0937533c8d9b2a"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/model.safetensors",
+        "bytes": 145231352,
+        "sha256": "8fb53826f6c098615b00dc6966790987a3dd02e691ba8c109febee00d6ef2449"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/special_tokens_map.json",
+        "bytes": 48,
+        "sha256": "ae51f82546e75763a54b7d41f79b1f4b82364a3a7c517eaff79d78dff23c7721"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/tokenizer_config.json",
+        "bytes": 288,
+        "sha256": "519af6d00d68718330130c4665458c7d05723e01fb2efa93a5b82368617c9ff0"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-kaz/resolve/5c8a1d86e6a952f78f9c5b0f5d3090c19d00ad63/vocab.json",
+        "bytes": 507,
+        "sha256": "398cdac95e9c7b8a4e0db84b53fe86986dd498392bc26b7af1ddad0474be1478"
+      }
+    ],
+    "voices": [
+      {
+        "id": "kaz",
+        "name": "哈萨克语 · 官方单音色",
+        "language": "kk",
+        "dialect": "哈萨克语"
+      }
+    ],
+    "languages": [
+      "kk"
+    ],
+    "defaultVoiceZh": "kaz",
+    "defaultVoiceEn": "kaz",
+    "dialectNote": "支持 哈萨克语 原生文本；不是普通话变声。模型许可 CC-BY-NC-4.0，仅限非商业用途。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  },
+  {
+    "id": "mms-mon",
+    "name": "MMS · 蒙古语（西里尔文字）",
+    "official": "https://huggingface.co/facebook/mms-tts-mon",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-mon/tree/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d",
+    "engine": "mms",
+    "directory": "mms-mon",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生蒙古语（西里尔文字）语音合成；需输入该语言对应文字，不会把中文自动翻译。官方单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145250188,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/config.json",
+        "bytes": 1641,
+        "sha256": "6a6693ead8338f60cf5889109843756d9ce6633acc9c48dabe100e1b18cdaf6f"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/model.safetensors",
+        "bytes": 145247480,
+        "sha256": "e93d285d4a143e0bfa95115f934b6aa35afb51bb3f986c76a8951ac26ed167f1"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/special_tokens_map.json",
+        "bytes": 47,
+        "sha256": "845f635933c404f060a1d7a2f4c4494bf4a91f8ebec99a41108778d026426dfc"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/tokenizer_config.json",
+        "bytes": 287,
+        "sha256": "6b0db79c703d0b6d4b261efa0aba8f853e522582219e80709f26557e784fe9e1"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-mon/resolve/4079cfbea1b6c96b53316bfd20aa93f8a50dfc9d/vocab.json",
+        "bytes": 733,
+        "sha256": "049762139e9cb5f9ed6600c04ffd01e53b7ddc8702536344b0a75e81dc6ab5fb"
+      }
+    ],
+    "voices": [
+      {
+        "id": "mon",
+        "name": "蒙古语（西里尔文字） · 官方单音色",
+        "language": "mn",
+        "dialect": "蒙古语（西里尔文字）"
+      }
+    ],
+    "languages": [
+      "mn"
+    ],
+    "defaultVoiceZh": "mon",
+    "defaultVoiceEn": "mon",
+    "dialectNote": "支持蒙古语（西里尔文字）原生文本；不是普通话变声。CC-BY-NC-4.0，仅限非商业用途。未下载权重，真实音质待用户试听。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  },
+  {
+    "id": "mms-uig-script_arabic",
+    "name": "MMS · 维吾尔语（阿拉伯文字）",
+    "official": "https://huggingface.co/facebook/mms-tts-uig-script_arabic",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/tree/841e7f1ecaf58844f45c9025ba0e05c241781923",
+    "engine": "mms",
+    "directory": "mms-uig-script_arabic",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生维吾尔语（阿拉伯文字）语音合成；需输入该语言对应文字，不会把中文自动翻译。官方单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145232283,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/config.json",
+        "bytes": 1641,
+        "sha256": "e7dbd6e0ec39b90fd3b0a58e8d6604110efbaf189b84e876f9c86b124944fd69"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/model.safetensors",
+        "bytes": 145229816,
+        "sha256": "60e5a59c178fa010860ec48c46ee843153ed9f9ea1bf09fb506986b844bb8e28"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/special_tokens_map.json",
+        "bytes": 48,
+        "sha256": "f92ea9306cfd4e78fb484e06b1ca9fff9818fb5e7b66c87a441e9af14ed3289b"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/tokenizer_config.json",
+        "bytes": 302,
+        "sha256": "a94c75de9ae421ea8110cc17766e940dc23d60bd96120d351eb7f2879ca9b200"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-uig-script_arabic/resolve/841e7f1ecaf58844f45c9025ba0e05c241781923/vocab.json",
+        "bytes": 476,
+        "sha256": "9841286a37eeb98ef323aab2a188fbe09bef91ff9897556e9c90805ee83455bb"
+      }
+    ],
+    "voices": [
+      {
+        "id": "uig-script_arabic",
+        "name": "维吾尔语（阿拉伯文字） · 官方单音色",
+        "language": "ug",
+        "dialect": "维吾尔语（阿拉伯文字）"
+      }
+    ],
+    "languages": [
+      "ug"
+    ],
+    "defaultVoiceZh": "uig-script_arabic",
+    "defaultVoiceEn": "uig-script_arabic",
+    "dialectNote": "支持维吾尔语（阿拉伯文字）原生文本；不是普通话变声。CC-BY-NC-4.0，仅限非商业用途。未下载权重，真实音质待用户试听。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  },
+  {
+    "id": "mms-adx",
+    "name": "MMS · 藏语（安多藏语）",
+    "official": "https://huggingface.co/facebook/mms-tts-adx",
+    "downloadUrl": "https://huggingface.co/facebook/mms-tts-adx/tree/420733a96cd1ce5d560a45ffd634b67904042a19",
+    "engine": "mms",
+    "directory": "mms-adx",
+    "format": "Transformers VITS · 约 36M 参数",
+    "features": "原生藏语（安多藏语）语音合成；需输入该语言对应文字，不会把中文自动翻译。官方单音色，按短句逐段生成与播放。",
+    "hardware": "GPU 优先，CUDA 不可用时使用 CPU；模型约 145 MB，首次启动另需运行依赖。",
+    "downloadBytes": 145246375,
+    "diskBytes": 4000000000,
+    "files": [
+      {
+        "name": "config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/config.json",
+        "bytes": 1641,
+        "sha256": "6ddfc6a127aaacaf66f30a60d2802f1f7fda486ed03b8ba9e2928691c9e6fb73"
+      },
+      {
+        "name": "model.safetensors",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/model.safetensors",
+        "bytes": 145243640,
+        "sha256": "cf9cc18b1e71a6ee40f6b9ee63b8bd01209302854d1d49621e43e2a844473746"
+      },
+      {
+        "name": "special_tokens_map.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/special_tokens_map.json",
+        "bytes": 49,
+        "sha256": "58391abac4223e90090b7059a4a8b15775123ba529c0cd8de973553e8983394d"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/tokenizer_config.json",
+        "bytes": 289,
+        "sha256": "3ebb993e876b54ac617667f9407357bdef63e870b55fe1f88da6d007c53b5023"
+      },
+      {
+        "name": "vocab.json",
+        "url": "https://huggingface.co/facebook/mms-tts-adx/resolve/420733a96cd1ce5d560a45ffd634b67904042a19/vocab.json",
+        "bytes": 756,
+        "sha256": "bc42e812675c177daf8d27a226ea68f5eeffa39ad4f840c6cd9aaeac1133a097"
+      }
+    ],
+    "voices": [
+      {
+        "id": "adx",
+        "name": "藏语（安多藏语） · 官方单音色",
+        "language": "bo",
+        "dialect": "藏语（安多藏语）"
+      }
+    ],
+    "languages": [
+      "bo"
+    ],
+    "defaultVoiceZh": "adx",
+    "defaultVoiceEn": "adx",
+    "dialectNote": "支持藏语（安多藏语）原生文本；不是普通话变声。CC-BY-NC-4.0，仅限非商业用途。未下载权重，真实音质待用户试听。",
+    "parameterNote": "VITS 按短句生成，非句内流式；语速、随机性可调整。",
+    "controls": [
+      {
+        "id": "noise_scale",
+        "label": "音色随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.001,
+        "default": 0.667
+      },
+      {
+        "id": "noise_scale_duration",
+        "label": "节奏随机性",
+        "type": "float",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "default": 0.8
+      }
+    ]
+  }
+]

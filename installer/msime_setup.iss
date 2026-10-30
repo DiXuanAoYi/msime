@@ -18,9 +18,9 @@
 ; 上面两条都不把 PDB 打进包；要带符号用 .\test-symbols.ps1。
 ; 本仓库不包含任何预置代码签名证书。
 
-#define MyAppName      "Metasequoia IME 水杉输入法"
-#define MyAppVersion   "0.0.1"
-#define MyAppPublisher "Metasequoia"
+#define MyAppName      "知语输入法 Zhiyu IME"
+#define MyAppVersion   "0.10.4"
+#define MyAppPublisher "DiXuanAoYi"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
 ; 与 settings_app.cpp / settings_launcher.cpp 的 kQuitSettings 保持一致：WM_APP + 5。
@@ -47,6 +47,7 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\metasequoiaime
 DefaultGroupName={#MyAppName}
+UsePreviousGroup=no
 DisableDirPage=yes
 ; DisableDirPage=yes 时就绪页默认不显示目标目录，显式打开以便用户确认装到哪。
 AlwaysShowDirOnReadyPage=yes
@@ -70,13 +71,18 @@ VersionInfoVersion={#MyAppVersion}
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[Messages]
+chinesesimplified.FinishedLabel=知语输入法已安装完成。%n%n请保存正在编辑的内容，将安装或升级前已经打开的软件完整退出后重新打开（部分聊天软件需从托盘退出），以加载新版输入法及英文候选。仅关闭窗口或切换中英文可能不会生效。%n%n若仍未生效，可保存工作后注销 Windows 再登录。无需卸载或清空原有配置。
+english.FinishedLabel=Zhiyu IME has been installed.%n%nSave your work, then fully quit and reopen apps that were running before installation or upgrade. Some chat apps must be exited from the system tray. This loads the new IME and English candidates. Closing a window or switching input modes may not reload it.%n%nIf needed, save your work and sign out of Windows, then sign in again. Your existing settings can be kept.
+
 [Dirs]
 Name: "{commonpf32}\metasequoiaime\{code:GetVersionDir}"
 Name: "{commonpf64}\metasequoiaime\{code:GetVersionDir}"
 Name: "{commonpf64}\metasequoiaime\server"
 ; 用户数据（词库、配置、皮肤、前端资源）。默认在 LocalAppData，安装时可以改到别的盘，
 ; 选择写进 HKLM 的 DataDir，Server / TSF DLL / 引擎三方都从那里读。
-Name: "{code:GetDataDir}"; Permissions: users-modify
+; Permissions are repaired after install, without traversing user model caches.
+Name: "{code:GetDataDir}"
 ; 用户自己的辅助码方案放这里，Server 扫描后列进设置页，升级时保留。
 Name: "{code:GetDataDir}\helpcodes\custom"
 ; 用户自己的双拼方案（.toml）放这里，同样由 Server 扫描、升级时保留。
@@ -87,6 +93,9 @@ Name: "{commonappdata}\metasequoiaime\webview2"; Permissions: users-modify
 Name: "{commonappdata}\metasequoiaime\webview2-settings"; Permissions: users-modify
 
 [Files]
+; Profile icon lives outside version directories, so upgrades never invalidate its path.
+Source: "{#MySourceRoot}\MetasequoiaImeTip.ico"; DestDir: "{commonpf64}\metasequoiaime"; Flags: ignoreversion
+Source: "{#MySourceRoot}\MetasequoiaImeTip.ico"; DestDir: "{commonpf32}\metasequoiaime"; Flags: ignoreversion
 ; 独立安装应用图标，供 Windows“已安装的应用”列表稳定显示。
 Source: "{#MySourceRoot}\MetasequoiaIME.ico"; \
     DestDir: "{commonpf64}\metasequoiaime"; Flags: ignoreversion
@@ -147,7 +156,7 @@ Source: "{#MySourceRoot}\app_data\html\*"; \
 #else
 ; 包内故意不带 config.toml。通配复制再排除一次，防止以后又把用户配置打进包内。
 Source: "{#MySourceRoot}\app_data\*"; DestDir: "{code:GetDataDir}"; \
-    Excludes: "\config.toml,\config.base.toml,\config.default.toml"; \
+    Excludes: "\config.toml,\config.base.toml,\config.default.toml,\sentence-model.safetensors"; \
     Flags: ignoreversion recursesubdirs createallsubdirs uninsneveruninstall
 
 ; 用户配置只在首次安装时从出厂模板生成。升级时绝不覆盖已有 config.toml；
@@ -158,6 +167,8 @@ Source: "{#MySourceRoot}\app_data\config.default.toml"; \
 Source: "{#MySourceRoot}\app_data\config.default.toml"; \
     DestDir: "{code:GetDataDir}"; DestName: "config.default.toml"; \
     Flags: ignoreversion uninsneveruninstall
+Source: "{#MySourceRoot}\app_data\sentence-model.safetensors"; DestDir: "{code:GetDataDir}"; \
+    Flags: onlyifdoesntexist uninsneveruninstall
 #endif
 
 [Icons]
@@ -165,6 +176,14 @@ Name: "{group}\{#MyAppName}"; \
     Filename: "{commonpf64}\metasequoiaime\server\{#MySettingsExeName}"; \
     WorkingDir: "{commonpf64}\metasequoiaime\server"
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
+
+[InstallDelete]
+; Rename only this product's old shortcuts; preserve custom files and the persisted installation identity.
+Type: files; Name: "{group}\Metasequoia IME 水杉输入法.lnk"
+Type: files; Name: "{group}\卸载 Metasequoia IME 水杉输入法.lnk"
+Type: files; Name: "{commonprograms}\Metasequoia IME 水杉输入法\Metasequoia IME 水杉输入法.lnk"
+Type: files; Name: "{commonprograms}\Metasequoia IME 水杉输入法\卸载 Metasequoia IME 水杉输入法.lnk"
+Type: dirifempty; Name: "{commonprograms}\Metasequoia IME 水杉输入法"
 
 [Registry]
 Root: HKLM; Subkey: "Software\Metasequoia\MetasequoiaIME"; \
@@ -199,10 +218,10 @@ const
   { 安装器界面本身就是中文（InitializeSetup 在选语言对话框之前跑，拿不到用户选的语言），
     下载页也统一给简体中文版，省得用户落到英文页上再自己切。}
   WebView2DownloadUrl =
-    'https://developer.microsoft.com/zh-cn/microsoft-edge/webview2';
+    'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
   VCRuntimeKey = 'Software\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
   VCRuntimeDownloadUrl =
-    'https://learn.microsoft.com/zh-cn/cpp/windows/latest-supported-vc-redist?view=msvc-170';
+    'https://aka.ms/vs/17/release/vc_redist.x64.exe';
 
 var
   VersionDirName: String;
@@ -244,7 +263,7 @@ end;
 // {sysnative} 对 64 位安装器又不可用。注册表访问没有这个问题，HKLM32 / HKLM64
 // 两个视图都是显式指定的。
 //
-// x64 redist 的安装状态就记在这个键里。要求 14.20 以上（VC++ 2019 起）：server_exe
+// x64 redist 的安装状态就记在这个键里。要求 14.40 以上（本版编译工具最低匹配版本）：server_exe
 // 里每个 exe 都导入了 vcruntime140_1.dll，而它是从那一版才开始随 redist 分发的，
 // 只装了 2015/2017 版的机器同样有 Installed=1，却照样起不来。
 // 32 位 TSF DLL 用的是静态 CRT（windows/CMakeLists.txt 里的
@@ -262,7 +281,7 @@ begin
     (Installed = 1) and
     RegQueryDWordValue(RootKey, VCRuntimeKey, 'Major', Major) and
     RegQueryDWordValue(RootKey, VCRuntimeKey, 'Minor', Minor) and
-    ((Major > 14) or ((Major = 14) and (Minor >= 20)));
+    ((Major > 14) or ((Major = 14) and (Minor >= 40)));
 end;
 
 { redist 的安装包是 32 位的，键通常落在 WOW6432Node 下，但较新的版本两个视图都写，
@@ -794,6 +813,15 @@ begin
   { 输入统计库和用户词库同一条理由：Server 打开它时会留下 sidecar，只搬主库会丢掉
     最后一次写入。这个库默认不建（统计开关关闭），建了之后就只有用户自己能重建它的内容。}
   Result :=
+    (CompareText(FileName, 'user_dict.dat') = 0) or
+    (CompareText(FileName, 'clipboard_history.json') = 0) or
+    (CompareText(FileName, 'personal-library.json') = 0) or
+    (CompareText(FileName, 'reply-contexts.dat') = 0) or
+    (CompareText(FileName, 'chat-records.dat') = 0) or
+    (CompareText(FileName, 'vocabulary.db') = 0) or
+    (CompareText(FileName, 'vocabulary.db-wal') = 0) or
+    (CompareText(FileName, 'vocabulary.db-shm') = 0) or
+    (CompareText(FileName, 'vocabulary.db-journal') = 0) or
     (CompareText(FileName, 'stats.db') = 0) or
     (CompareText(FileName, 'stats.db-wal') = 0) or
     (CompareText(FileName, 'stats.db-shm') = 0) or
@@ -843,6 +871,9 @@ begin
     IsUserSkinDirectory(FileName) or
     IsUserShuangpinDirectory(FileName) or
     IsCollocationModelDirectory(FileName) or
+    (CompareText(FileName, 'voice-outbox') = 0) or
+    (CompareText(FileName, 'sentence-model-desktop.safetensors') = 0) or
+    (CompareText(FileName, 'sentence-model.safetensors') = 0) or
     (CompareText(FileName, DataDirMarkerName) = 0);
 end;
 
@@ -858,11 +889,15 @@ begin
     (CompareText(FileName, 'dict_japanese.dat') = 0) or
     (CompareText(FileName, 'MOZC_DICTIONARY_LICENSE.txt') = 0) or
     (CompareText(FileName, 'english.db') = 0) or
+    (CompareText(FileName, 'qingjian-glossary.db') = 0) or
+    (CompareText(FileName, 'industry-learning.db') = 0) or
+    (CompareText(FileName, 'translation-library') = 0) or
+    (CompareText(FileName, 'qingjian-glossary-sources') = 0) or
+    (CompareText(FileName, 'domain-input.db') = 0) or
+    (CompareText(FileName, 'domain-input-sources') = 0) or
     (CompareText(FileName, 'others.db') = 0) or
     (CompareText(FileName, 'sc.lm') = 0) or
     (CompareText(FileName, 'libime-lm-NOTICE.md') = 0) or
-    (CompareText(FileName, 'sentence-model-desktop.safetensors') = 0) or
-    (CompareText(FileName, 'sentence-model.safetensors') = 0) or
     (CompareText(FileName, 'chinese-ime-lm-NOTICE.md') = 0) or
     (CompareText(FileName, 'config.default.toml') = 0) or
     (CompareText(FileName, 'helpcodes') = 0) or
@@ -884,6 +919,7 @@ begin
     (CompareText(FileName, 'others.db-journal') = 0) or
     (CompareText(FileName, 'user_dict.dat') = 0) or
     (CompareText(FileName, 'clipboard_history.json') = 0) or
+    (CompareText(FileName, 'personal-library.json') = 0) or
     (CompareText(FileName, 'voice_system_audio_mute_state.txt') = 0) or
     (CompareText(FileName, 'config.toml.tmp') = 0) or
     (CompareText(FileName, 'config.base.toml.tmp') = 0) or
@@ -957,6 +993,10 @@ begin
   StopProcess('{#MyWatchdogName}');
   StopProcess('{#MyAppExeName}');
   StopSettingsProcess;
+  { ASR / TTS / OCR supervisors can outlive Server. Stop their own process trees
+    after the UI and watchdog, before replacing the frozen runtime.
+    Do not kill generic python.exe or uv.exe used by other programs. }
+  StopProcess('MetasequoiaLocalASR.exe');
   { 面板通常是 Server 的子进程、随 /T 一起走；Server 若已崩溃它们会变成孤儿，
     同样占着 server 目录里的 exe，所以显式再收一遍。}
   StopProcess('{#MyEmojiPanelExeName}');
@@ -979,36 +1019,66 @@ begin
   );
 end;
 
-procedure EnsureImeUserDataDir;
+procedure EnsureWritableImePath(Path: String; Recursive: Boolean);
 var
-  AppDataPath: String;
+  RecurseArg, InheritArg: String;
   ResultCode: Integer;
 begin
-  // Elevated setup writes {localappdata} as high integrity. Medium-IL Server
-  // and Settings cannot replace those files. Users who never rewrote config.toml
-  // at the real path (the non-ASCII path bug) keep that leftover and cannot save.
-  // Note: brace comments do not nest in Inno Setup, so a constant like the one
-  // above would close a { } comment early -- keep these as line comments.
-  // Also required when the data directory sits on another volume: files the elevated setup
-  // copied there inherit the parent's ACL, which may not let a Medium-IL Server write them.
+  RecurseArg := '';
+  InheritArg := '';
+  if DirExists(Path) then InheritArg := '(OI)(CI)';
+  if Recursive then RecurseArg := ' /T';
+  Exec(
+    ExpandConstant('{sys}\icacls.exe'),
+    '"' + Path + '" /grant *S-1-5-32-545:' + InheritArg + 'M' + RecurseArg + ' /C /Q',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  Exec(
+    ExpandConstant('{sys}\icacls.exe'),
+    '"' + Path + '" /setintegritylevel ' + InheritArg + 'M' + RecurseArg + ' /C /Q',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+end;
+
+procedure EnsureImeUserDataDir;
+var
+  AppDataPath, ItemPath: String;
+  FindRec: TFindRec;
+begin
+  // Setup-created resources must remain writable by the medium-integrity IME.
+  // Model runtimes are downloaded by the user's worker, never installed here.
+  // Rewalking tens of thousands of Python/CUDA cache files twice made upgrades
+  // take over twenty minutes. Keep inherited root permissions, but repair only
+  // the actual user data/resources, excluding separately managed model caches.
   AppDataPath := GetDataDir('');
   ForceDirectories(AppDataPath);
-  Exec(
-    ExpandConstant('{sys}\icacls.exe'),
-    '"' + AppDataPath + '" /grant *S-1-5-32-545:(OI)(CI)M /T /C /Q',
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode
-  );
-  Exec(
-    ExpandConstant('{sys}\icacls.exe'),
-    '"' + AppDataPath + '" /setintegritylevel (OI)(CI)M /T /C /Q',
-    '',
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode
-  );
+  // A model directory is created by the unelevated runtime: its existing root
+  // already supports user writes. Even non-recursive ACL updates on that root
+  // propagate inheritable entries through Windows to every model cache file.
+  // New installations still need the initial writable root ACL.
+  if not DirExists(AddBackslash(AppDataPath) + 'models') then
+    EnsureWritableImePath(AppDataPath, False);
+  if FindFirst(AddBackslash(AppDataPath) + '*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') and
+           (CompareText(FindRec.Name, 'models') <> 0) then
+        begin
+          ItemPath := AddBackslash(AppDataPath) + FindRec.Name;
+          EnsureWritableImePath(ItemPath, (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0);
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
 end;
 
 procedure EnsureSharedWebView2DataDir;
@@ -1351,8 +1421,9 @@ begin
     ExpandConstant('{sys}\robocopy.exe'),
     '"' + RemoveBackslashUnlessRoot(OldDir) + '" "' + RemoveBackslashUnlessRoot(NewDir) + '" ' +
     'msime_user.db msime_user.db-wal msime_user.db-shm msime_user.db-journal ' +
+    'user_dict.dat clipboard_history.json personal-library.json reply-contexts.dat chat-records.dat vocabulary.db vocabulary.db-wal vocabulary.db-shm vocabulary.db-journal ' +
     'stats.db stats.db-wal stats.db-shm stats.db-journal ' +
-    'config.toml config.base.toml /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
+    'config.toml config.base.toml sentence-model.safetensors sentence-model-desktop.safetensors /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
     '',
     SW_HIDE,
     ewWaitUntilTerminated,
@@ -1409,6 +1480,16 @@ begin
         SW_HIDE,
         ewWaitUntilTerminated,
         ResultCode
+      ) and (ResultCode < 8) and Moved;
+
+  { Generated voice drafts are user data, including files still on the clipboard. }
+  if DirExists(AddBackslash(OldDir) + 'voice-outbox') then
+    Moved :=
+      Exec(
+        ExpandConstant('{sys}\robocopy.exe'),
+        '"' + AddBackslash(OldDir) + 'voice-outbox" "' + AddBackslash(NewDir) + 'voice-outbox" ' +
+        '/E /MOVE /R:2 /W:1 /NJH /NJS /NP /NFL /NDL',
+        '', SW_HIDE, ewWaitUntilTerminated, ResultCode
       ) and (ResultCode < 8) and Moved;
 
   if not Moved then

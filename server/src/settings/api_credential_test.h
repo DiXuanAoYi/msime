@@ -18,13 +18,20 @@ struct Result
     std::string message;
 };
 
+Result Run(const Request &request);
 struct ModelListResult
 {
     bool ok = false;
     std::string message;
     std::vector<std::string> models;
+    struct Detail
+    {
+        std::string id;
+        std::string name;
+    };
+    std::vector<Detail> details;
 };
-
-Result Run(const Request &request);
+ModelListResult ParseModelList(const std::string &body);
+std::string ModelListEndpoint(const std::string &endpoint);
 ModelListResult FetchModels(const Request &request);
 } // namespace ApiCredentialTest

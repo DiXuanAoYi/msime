@@ -87,8 +87,6 @@ enum KEYSTROKE_FUNCTION
     // every function above.
     FUNCTION_MOVE_LEFT_SEGMENT,
     FUNCTION_MOVE_RIGHT_SEGMENT,
-
-    // Server-authoritative composition text and language destination.
     FUNCTION_CYCLE_INPUT_MODE
 };
 

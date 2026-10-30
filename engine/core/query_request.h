@@ -47,14 +47,19 @@ struct QueryRequest
     // 直接辅助码在句中用什么结束四码：补 /（uiab/），或第二位辅码大写（uiaB），见 direct_helpcode/spelling_graph.h。
     bool direct_helpcode_slash_marker = true;
     bool direct_helpcode_uppercase_marker = false;
-    // Autocorrection is type-gated (bit0 transposition, bit1 neighbor in the session-level
-    // mask); both default off, so a fresh install never rewrites the user's spelling.
+    // Autocorrection is type-gated (bit0 transposition, bit1 neighbor, bit2 deletion,
+    // bit3 insertion in the session-level mask). One bool per switch, no linkage
+    // between them; all default off, so a fresh install never rewrites the user's
+    // spelling.
     bool enable_quanpin_autocorrect_transposition = false;
     bool enable_quanpin_autocorrect_neighbor = false;
+    bool enable_quanpin_autocorrect_deletion = false;
+    bool enable_quanpin_autocorrect_insertion = false;
     std::vector<KeyStroke> key_strokes;
     metasequoia::FuzzyPinyinOptions fuzzy_pinyin;
     // 整句候选来源与去重补位选项，默认全关。
     SentenceAssociationOptions sentence_association;
+    std::string enabled_domain_dictionaries;
     // 给神经重排看的前文：本会话最近上屏的文本。空着也能重排，只是模型看不到语境，「shanghai」
     // 到底是上海还是伤害就只能靠词格自己的静态分。词典层只取末尾若干字（RerankOptions::
     // context_chars），所以这里给多了也无妨。

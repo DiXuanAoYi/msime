@@ -374,7 +374,6 @@ bool CMetasequoiaIME::_PostAsyncKeyRequest(UINT message, UINT code, WCHAR wch, u
     switch (message)
     {
     case WM_AsyncServerCandidateKey:
-    case WM_AsyncCycleInputMode:
     case WM_AsyncFinalizeCandidate:
     case WM_AsyncPunctuationCommit:
     case WM_AsyncNumberCandidateCommit:
@@ -384,8 +383,6 @@ bool CMetasequoiaIME::_PostAsyncKeyRequest(UINT message, UINT code, WCHAR wch, u
         return false;
     }
 
-    const DeferredKeyFailureKind resetKind =
-        message == WM_AsyncCycleInputMode ? DeferredKeyFailureKind::Transport : DeferredKeyFailureKind::Resync;
     constexpr size_t maxPendingAsyncKeys = 64;
     const uint64_t focusToken = expectedFocusToken != 0 ? expectedFocusToken : _CaptureFocusSessionToken();
     const uint64_t compositionEpoch =
@@ -399,7 +396,7 @@ bool CMetasequoiaIME::_PostAsyncKeyRequest(UINT message, UINT code, WCHAR wch, u
         }
         else
         {
-            _ResetSessionAfterFailure(resetKind);
+            _ResetSessionAfterFailure(DeferredKeyFailureKind::Resync);
         }
         return false;
     }
@@ -426,7 +423,7 @@ bool CMetasequoiaIME::_PostAsyncKeyRequest(UINT message, UINT code, WCHAR wch, u
         }
         else
         {
-            _ResetSessionAfterFailure(resetKind);
+            _ResetSessionAfterFailure(DeferredKeyFailureKind::Resync);
         }
         return false;
     }
@@ -442,7 +439,7 @@ bool CMetasequoiaIME::_PostAsyncKeyRequest(UINT message, UINT code, WCHAR wch, u
         }
         else
         {
-            _ResetSessionAfterFailure(resetKind);
+            _ResetSessionAfterFailure(DeferredKeyFailureKind::Resync);
         }
         return false;
     }

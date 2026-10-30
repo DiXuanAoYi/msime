@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,7 +34,23 @@ inline std::vector<std::string> SplitTranslationGloss(std::string_view gloss)
         if (first == std::string_view::npos)
             return;
         const size_t last = sense.find_last_not_of(" \t\r\n");
-        senses.emplace_back(sense.substr(first, last - first + 1));
+        sense = sense.substr(first, last - first + 1);
+        // POS and Japanese readings are display annotations, not output text.
+        for (const auto pos : {"n. ", "v. ", "adj. ", "adv. ", "prep. ", "pron. ", "conj. ", "int. ", "num. ", "aux. ",
+                               "phr. ", "m. ", "det. ", "part. "})
+            if (sense.substr(0, std::char_traits<char>::length(pos)) == pos)
+            {
+                sense.remove_prefix(std::char_traits<char>::length(pos));
+                break;
+            }
+        const auto reading = sense.rfind(" (");
+        if (reading != std::string_view::npos && sense.back() == ')' &&
+            (sense.substr(reading).find("\xE3\x81") != std::string_view::npos ||
+             sense.substr(reading).find("\xE3\x82") != std::string_view::npos ||
+             sense.substr(reading).find("\xE3\x83") != std::string_view::npos))
+            sense = sense.substr(0, reading);
+        if (!sense.empty())
+            senses.emplace_back(sense);
     };
     while (start <= gloss.size())
     {

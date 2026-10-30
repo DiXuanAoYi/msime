@@ -1,0 +1,274 @@
+[
+  [
+    "抽象",
+    "Abstraction"
+  ],
+  [
+    "敏捷软件开发",
+    "Agile Software Development"
+  ],
+  [
+    "API 网关",
+    "API Gateway"
+  ],
+  [
+    "应用程序接口 (API)",
+    "Application Programming Interface (API)"
+  ],
+  [
+    "自动伸缩",
+    "Autoscaling"
+  ],
+  [
+    "裸机",
+    "Bare Metal Machine"
+  ],
+  [
+    "蓝绿部署",
+    "Blue Green Deployment"
+  ],
+  [
+    "金丝雀部署",
+    "Canary Deployment"
+  ],
+  [
+    "混沌工程",
+    "Chaos Engineering"
+  ],
+  [
+    "主从式架构",
+    "Client-Server Architecture"
+  ],
+  [
+    "云计算",
+    "Cloud Computing"
+  ],
+  [
+    "云原生应用程序",
+    "Cloud Native Apps"
+  ],
+  [
+    "云原生安全",
+    "Cloud Native Security"
+  ],
+  [
+    "云原生技术",
+    "Cloud Native Technology"
+  ],
+  [
+    "集群",
+    "Cluster"
+  ],
+  [
+    "容器镜像",
+    "Container Image"
+  ],
+  [
+    "容器编排",
+    "Container Orchestration"
+  ],
+  [
+    "容器",
+    "Containers"
+  ],
+  [
+    "容器化",
+    "Containerization"
+  ],
+  [
+    "容器即服务 (CaaS)",
+    "Containers as a Service"
+  ],
+  [
+    "持续交付 (CD)",
+    "Continuous Delivery (CD)"
+  ],
+  [
+    "持续部署 (CD)",
+    "Continuous Deployment (CD)"
+  ],
+  [
+    "持续集成 (CI)",
+    "Continuous integration (CI)"
+  ],
+  [
+    "数据中心",
+    "Datacenter"
+  ],
+  [
+    "数据库即服务 (DBaaS)",
+    "Database as a Service (DBaaS)"
+  ],
+  [
+    "调试",
+    "Debugging"
+  ],
+  [
+    "开发运维 (DevOps)",
+    "DevOps"
+  ],
+  [
+    "分布式应用",
+    "Distributed Apps"
+  ],
+  [
+    "分布式系统",
+    "Distributed System"
+  ],
+  [
+    "边缘计算",
+    "Edge Computing"
+  ],
+  [
+    "事件驱动架构",
+    "Event-Driven Architecture"
+  ],
+  [
+    "防火墙",
+    "Firewall"
+  ],
+  [
+    "水平伸缩",
+    "Horizontal Scaling"
+  ],
+  [
+    "幂等性",
+    "Idempotence"
+  ],
+  [
+    "不可变基础设施",
+    "Immutable Infrastructure"
+  ],
+  [
+    "基础设施即服务 (IaaS)",
+    "Infrastructure as a Service (IaaS)"
+  ],
+  [
+    "基础设施即代码 (IaC)",
+    "Infrastructure as Code (IaC)"
+  ],
+  [
+    "Kubernetes",
+    "Kubernetes"
+  ],
+  [
+    "负载均衡器",
+    "Load Balancer"
+  ],
+  [
+    "松耦合架构",
+    "Loosely Coupled Architecture"
+  ],
+  [
+    "托管服务",
+    "Managed services"
+  ],
+  [
+    "单体应用",
+    "Monolithic Apps"
+  ],
+  [
+    "多租户模式",
+    "Multitenancy"
+  ],
+  [
+    "双向传输层安全性协议（mTLS）",
+    "Mutual Transport Layer Security (mTLS)"
+  ],
+  [
+    "节点",
+    "Nodes"
+  ],
+  [
+    "可观测性",
+    "Observability"
+  ],
+  [
+    "平台即服务 (PaaS)",
+    "Platform as a Service (PaaS)"
+  ],
+  [
+    "Pod",
+    "Pod"
+  ],
+  [
+    "策略即代码 (PaC)",
+    "Policy as Code (PaC)"
+  ],
+  [
+    "可移植性",
+    "Portability"
+  ],
+  [
+    "可靠性",
+    "Reliability"
+  ],
+  [
+    "可伸缩性",
+    "Scalability"
+  ],
+  [
+    "Search Results",
+    "Search Results"
+  ],
+  [
+    "安全混沌工程",
+    "Security Chaos Engineering"
+  ],
+  [
+    "自愈",
+    "Self Healing"
+  ],
+  [
+    "服务发现",
+    "Service Discovery"
+  ],
+  [
+    "服务网格",
+    "Service Mesh"
+  ],
+  [
+    "服务代理",
+    "Service Proxy"
+  ],
+  [
+    "服务",
+    "Service"
+  ],
+  [
+    "左移 (Shift Left)",
+    "Shift Left"
+  ],
+  [
+    "网站可靠性工程（SRE)",
+    "Site Reliability Engineering"
+  ],
+  [
+    "有状态应用",
+    "Stateful Apps"
+  ],
+  [
+    "传输层安全性协议（TLS)",
+    "Transport Layer Security (TLS)"
+  ],
+  [
+    "版本控制",
+    "Version Control"
+  ],
+  [
+    "垂直伸缩",
+    "Vertical Scaling"
+  ],
+  [
+    "虚拟机",
+    "Virtual Machine"
+  ],
+  [
+    "虚拟化",
+    "Virtualization"
+  ],
+  [
+    "零信任架构",
+    "Zero Trust Architecture"
+  ]
+]

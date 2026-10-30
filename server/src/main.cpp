@@ -1,5 +1,8 @@
+#include "companion/companion_feed.h"
 #include "ipc/event_listener.h"
 #include "log/fanylog.h"
+#include "quick/quick_actions.h"
+#include "quick/quick_thread.h"
 #include "window/ime_windows.h"
 #include <commctrl.h>
 #include <cstring>
@@ -117,6 +120,7 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
     // Initialize config
     InitImeConfig();
     VoiceInput::Initialize();
+    Companion::Start();
     Global::candidate_ui.page_size = GetConfiguredCandidatePageSize();
 
     ::InitIpc();
@@ -173,9 +177,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
     CloudIme::Start([](const std::string &candidate, const std::string &pinyin, uint64_t generation) {
         FanyNamedPipe::EnqueueCloudCandidate(candidate, pinyin, generation);
     });
-    AiAssistant::Start([](const std::string &candidate, const std::string &identity, uint64_t generation) {
-        FanyNamedPipe::EnqueueAiCandidate(candidate, identity, generation);
-    });
+    AiAssistant::Start([](const std::string &candidate, const std::string &identity,
+                          uint64_t generation) { FanyNamedPipe::EnqueueAiCandidate(candidate, identity, generation); },
+                       [](const AiAssistant::Result &result) { FanyNamedPipe::EnqueueAiTaskResult(result); });
     // 神经整句重排：打分在引擎自己的后台线程上跑，算完通过这个回调回到任务队列，由队列去重查候选。
     // 不 Start 什么线程——没开这个开关的用户不会平白多一条。
     neural::RescoreWorker::instance().set_ready_callback([] { FanyNamedPipe::EnqueueRescoredCandidates(); });
@@ -187,15 +191,19 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
         [](std::vector<EnglishIme::TranslationResult> results, uint64_t generation) {
             FanyNamedPipe::EnqueueCandidateTranslations(std::move(results), generation);
         });
-    CloudTranslation::Start(CommonUtils::get_ime_data_path() + "\\english.db",
-                            [](std::vector<EnglishIme::TranslationResult> results, uint64_t generation) {
-                                FanyNamedPipe::EnqueueCandidateTranslations(std::move(results), generation, true);
-                            });
+    CloudTranslation::Start(
+        CommonUtils::get_ime_data_path() + "\\english.db",
+        [](std::vector<EnglishIme::TranslationResult> results, uint64_t generation, const std::string &scope) {
+            FanyNamedPipe::EnqueueCandidateTranslations(std::move(results), generation, true, scope);
+        });
     MixedCandidates::Start(CommonUtils::get_ime_data_path() + "\\english.db",
                            CommonUtils::get_ime_data_path() + "\\others.db",
                            [](MixedCandidates::Result result, const std::string &input, uint64_t generation) {
                                FanyNamedPipe::EnqueueMixedCandidates(std::move(result), input, generation);
                            });
+
+    Quick::Actions::EnableHotkeys(true);
+    Quick::Start();
 
     int ret = CreateCandidateWindow(hInstance);
 
@@ -207,7 +215,9 @@ int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE /*hPrevInstance*/,
     MixedCandidates::Stop();
     AiAssistant::Stop();
     CloudIme::Stop();
+    Quick::Stop();
     ClipboardMonitor::Stop();
+    Companion::Stop();
     VoiceInput::Shutdown();
 
     pipe_running = false;

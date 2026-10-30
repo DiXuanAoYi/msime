@@ -1,0 +1,13 @@
+.domain-input-section > summary { cursor: pointer; font-weight: 600; }
+.domain-input-section > p { margin: 12px 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.domain-input-section :is(input:not([type=checkbox]), select) { min-width: 0; padding: 8px 10px; background: var(--control-bg); color: var(--text-color); border: 1px solid var(--control-border); border-radius: 6px; }
+.domain-input-section > label { display: grid; gap: 6px; margin: 12px 0; color: var(--text-secondary); font-size: 13px; }
+.domain-input-section button { padding: 7px 12px; border: 1px solid var(--control-border); border-radius: 6px; background: var(--control-bg); color: var(--text-color); cursor: pointer; }
+.domain-catalog { display: grid; grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); gap: 10px; }
+.domain-pack-card { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 14px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--section-bg); }
+.domain-pack-card label { font-size: 14px; font-weight: 600; }
+.domain-pack-card small { color: var(--text-secondary); overflow-wrap: anywhere; }
+.domain-pack-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; padding-top: 5px; }
+.domain-pack-actions a { color: var(--accent-color); font-size: 12px; }
+.domain-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; font-size: 13px; }
+.domain-input-section input[type=checkbox] { accent-color: var(--accent-color); margin-right: 6px; }

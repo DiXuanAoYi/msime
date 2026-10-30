@@ -239,6 +239,13 @@
       <div class="icon" id="screen-keyboard" data-toolbar-item="screen_keyboard" style="display: none">
         <span class="icon-glyph" data-fallback="键">&#xE765;</span>
       </div>
+      <div class="icon" id="voice-input" data-toolbar-item="voice" title="语音输入 · 点击开始 / 停止录音" aria-label="语音输入">
+        <span class="icon-glyph" data-fallback="音">&#xE720;</span>
+      </div>
+      <div class="icon" id="clipboard-library" data-toolbar-item="clipboard" title="剪贴板与分组资料" aria-label="剪贴板"><span class="icon-glyph" data-fallback="剪">&#xE77F;</span></div>
+      <div class="icon" id="reply-studio" data-toolbar-item="reply" title="嘴替 · 回复工作台" aria-label="嘴替">
+        <span class="icon-glyph" data-fallback="嘴">&#xE8F2;</span>
+      </div>
       <div class="icon" id="settings" data-toolbar-item="settings">
         <span class="icon-glyph" data-fallback="设">&#xE713;</span>
       </div>
@@ -363,6 +370,13 @@
   //
   // 设置按钮
   //
+  document.getElementById('voice-input').addEventListener('click', () => {
+    window.chrome.webview.postMessage(serializeHostMessage({ type: 'voiceInput' }));
+  });
+  document.getElementById('clipboard-library').addEventListener('click', () => { window.chrome.webview.postMessage(serializeHostMessage({type:'openPersonalLibrary'})); });
+  document.getElementById('reply-studio').addEventListener('click', () => {
+    window.chrome.webview.postMessage(serializeHostMessage({ type: 'openReplyStudio' }));
+  });
   document.getElementById('settings').addEventListener('click', () => {
     window.chrome.webview.postMessage(serializeHostMessage({ type: 'openSettings' }));
   });

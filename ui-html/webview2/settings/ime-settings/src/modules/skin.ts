@@ -13,6 +13,7 @@ type CandidateColors = {
   border?: string; text?: string; number?: string; translation?: string; showSelectedBar?: boolean;
   candidateText?: string; preeditText?: string; preeditCaret?: string; selectedText?: string;
   selectedNumber?: string; selectedTranslation?: string; selectedBar?: string;
+  translationPos?:string;translationSeparator?:string;selectedTranslationPos?:string;selectedTranslationSeparator?:string;
   preeditBackground?: string; preeditDivider?: string;
   menu?: { background?: string; border?: string; text?: string; hover?: string };
 };
@@ -29,7 +30,7 @@ type ExternalSkin = {
   toolbar?: { dark?: ToolbarColors; light?: ToolbarColors }; toolbarCornerRadiusDip?: number | null;
   borderWidthDip?: number | null; itemCornerRadiusDip?: number | null; shadow?: string; fontFamily?: string;
   // Already resolved host-side, including the fallback to the base skin's skins/default manifest.
-  pageArrows?: boolean;
+  pageArrows?: boolean;fitContent?:boolean;
 };
 type SkinScanIssue = { folder: string; reason: string };
 
@@ -52,6 +53,11 @@ let previewVerticalHtml = '';
 const SKIN_PREVIEW_PAGE_SIZE = 6;
 // page_arrows of the built-in skins, read host-side from skins/default/<id>/skin.toml. Off unless a manifest says so.
 let builtinPageArrows: Record<string, boolean> = {};
+let builtinFitContent:Record<string,boolean>={};
+let fitMode: "follow"|"enabled"|"disabled"="follow";
+export function applyBuiltinSkinFitContent(raw:unknown):void {if(raw&&typeof raw==="object")builtinFitContent=raw as Record<string,boolean>;syncAppearancePreviews();}
+export function applyCandidateFitContentMode(mode:string|undefined):void {fitMode=mode==="enabled"||mode==="disabled"?mode:"follow";syncAppearancePreviews();}
+export function skinFitsContent(id:string):boolean {return fitMode==="enabled"||(fitMode==="follow"&&(findExternalSkin(id)?.fitContent??builtinFitContent[id])===true);}
 
 function normalizeCandidateSkin(value: unknown): CandidateSkin {
   return typeof value === 'string' && /^[a-z0-9][a-z0-9._-]{0,63}$/.test(value) ? value : 'fluent';
@@ -316,6 +322,9 @@ function candidatePreviewCss(skin: ExternalSkin): string {
     if (selectedTranslation) {
       css += `${prefix}.cand.first .cand-translation { color: ${selectedTranslation}; opacity: 1; }\n`;
     }
+    for (const [key, selector] of [['translationPos','.cand-translation .cand-pos'],['translationSeparator','.cand-translation .cand-sep'],['selectedTranslationPos','.cand.first .cand-translation .cand-pos'],['selectedTranslationSeparator','.cand.first .cand-translation .cand-sep']] as const) {
+      const color=skinColor(colors[key]);if(color)css+=`${prefix}${selector} {color:${color};opacity:1;}\n`;
+    }
     css += geometryPreviewCss(skin, colors, prefix);
     return css;
   };
@@ -480,6 +489,7 @@ export function syncAppearancePreviews(): void {
     if (!caretPreview) {
       ensureContainerParent(element);
       setPreviewPageArrows(element, activeSkin);
+      element.dataset.fitContent=skinFitsContent(activeSkin)?"on":"off";
     }
     if (external) {
       if (caretPreview) {

@@ -86,6 +86,11 @@
   color: var(--text-color);
 }
 
+.help-topic-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+.help-topic-links button { padding:8px 12px; border:1px solid var(--control-border); border-radius:6px; color:var(--text-color); background:var(--surface-raised); cursor:pointer; font:inherit; font-size:13px; }
+.help-topic-links button:hover { border-color:var(--accent-color); background:var(--accent-soft); }
+.help-topic-links button:focus-visible { outline:2px solid var(--accent-color); outline-offset:2px; }
+
 .document-index {
   flex: 0 0 auto;
   color: var(--accent-color);

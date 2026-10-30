@@ -17,11 +17,12 @@ vi.mock('./credential-test', () => ({ setupCredentialTest: vi.fn() }));
 
 import { updateConfig } from './config-sync';
 import { setSmartPunctuationOptionsDisabled } from './shared';
-import { setupInput } from './input';
+import { setupInput, applyTranslationCloudEnabled } from './input';
 
 class StubElement extends EventTarget {
   classes = new Set<string>();
   attributes = new Map<string, string>();
+  hidden=false;
   classList = {
     toggle: (name: string, force?: boolean) => {
       const next = force ?? !this.classes.has(name);
@@ -85,4 +86,14 @@ it('toggles the details container from the section header', () => {
   expand.dispatchEvent(new Event('click'));
   expect(expand.getAttribute('aria-expanded')).toBe('false');
   expect(details.classes.has('open')).toBe(false);
+});
+
+it('allows provider discovery while keeping automatic network translation disabled',()=>{
+  const provider=new StubElement(),credentials=new StubElement();
+  const lookup=document.getElementById;
+  document.getElementById=((id:string)=>id==='translationOnlineProvider'?provider:id==='translationOnlineCredentials'?credentials:lookup(id)) as typeof document.getElementById;
+  provider.hidden=true;
+  applyTranslationCloudEnabled(false);
+  expect(provider.hidden).toBe(false);expect(credentials.hidden).toBe(true);
+  expect(updateConfig).not.toHaveBeenCalled();
 });

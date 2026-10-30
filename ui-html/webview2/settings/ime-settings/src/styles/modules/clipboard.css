@@ -1,0 +1,71 @@
+#personalLibraryPanel .clipboard-heading { display:flex; align-items:start; justify-content:space-between; gap:16px; margin-bottom:12px; }
+#personalLibraryPanel .clipboard-heading-description { min-width:0; }
+#personalLibraryPanel .clipboard-title-row { display:flex; align-items:center; gap:10px; margin-bottom:7px; }
+#personalLibraryPanel .clipboard-heading h2 { margin:0; font-size:16px; }
+#personalLibraryPanel .clipboard-heading-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+#personalLibraryPanel .clipboard-heading p { color:var(--text-secondary); font-size:13px; margin:0; line-height:1.6; }
+#personalLibraryPanel .clipboard-workspace { display:grid; grid-template-columns:112px minmax(0,1fr); align-items:start; gap:14px; }
+#personalLibraryPanel .clipboard-panel-content { min-width:0; container-type:inline-size; }
+#personalLibraryPanel .clipboard-tabs { display:flex; flex-direction:column; gap:4px; padding:5px; background:var(--surface-subtle); border:1px solid var(--control-border); border-radius:8px; position:sticky; top:0; }
+#personalLibraryPanel .clipboard-tabs button { width:100%; min-height:36px; padding:9px 6px; border:1px solid transparent; border-radius:6px; text-align:left; font-size:13px; line-height:1.45; cursor:pointer; background:transparent; color:var(--text-secondary); }
+#personalLibraryPanel .clipboard-tabs button:hover { background:var(--sidebar-hover); color:var(--text-color); }
+#personalLibraryPanel .clipboard-tabs button[aria-pressed="true"],
+#personalLibraryPanel .clipboard-tabs button[aria-pressed="true"]:hover { background:var(--accent-strong); color:#fff; border-color:var(--accent-strong); box-shadow:inset 3px 0 var(--accent-color); font-weight:600; }
+#personalLibraryPanel .clipboard-tabs button:focus-visible { outline:2px solid var(--accent-color); outline-offset:2px; }
+#personalLibraryPanel .clipboard-browser { display:grid; grid-template-columns:minmax(0,1fr); min-height:340px; border:1px solid var(--control-border); border-radius:8px; overflow:hidden; background:var(--surface-raised); }
+#personalLibraryPanel .clipboard-browser #libraryRows { display:flex; flex-direction:column; gap:0; min-width:0; max-height:520px; overflow:auto; background:var(--surface-subtle); }
+/* Rows must not shrink their text tracks to zero inside the bounded scroll area. */
+#personalLibraryPanel #libraryRows .clipboard-item { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; flex:0 0 auto; width:100%; min-width:0; height:auto; min-height:70px; text-align:left; padding:12px; border:0; border-bottom:1px solid var(--control-border); border-radius:0; background:transparent; color:var(--text-color); font-size:13px; line-height:1.55; }
+#personalLibraryPanel #libraryRows .clipboard-item[aria-selected=true] { background:color-mix(in srgb,var(--accent-color) 14%,var(--surface-raised)); box-shadow:inset 3px 0 var(--accent-color); }
+#personalLibraryPanel .clipboard-item-main { display:grid; gap:4px; min-width:0; }
+#personalLibraryPanel .clipboard-item-main strong { color:var(--text-color); overflow-wrap:anywhere; }
+#personalLibraryPanel .clipboard-item-text { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; min-height:1.55em; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--text-color); font-size:13px; line-height:1.55; }
+#personalLibraryPanel .clipboard-item-main small { color:var(--text-secondary); font-size:11px; }
+#personalLibraryPanel .clipboard-copy-count { align-self:center; color:var(--text-secondary); font:600 12px/1.4 Consolas,monospace; white-space:nowrap; }
+#libraryContextMenu.clipboard-context-menu { position:fixed; z-index:10000; min-width:170px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto; padding:5px; border:1px solid var(--control-border); border-radius:8px; color:var(--text-color); background:var(--surface-raised); box-shadow:0 6px 20px #0003; }
+#libraryContextMenu.clipboard-context-menu button { display:block; width:100%; min-height:36px; height:auto; padding:8px 12px; line-height:1.45; border:0; border-radius:4px; text-align:left; background:transparent; color:var(--text-color); font:13px 'Microsoft YaHei',sans-serif; cursor:pointer; }
+#libraryContextMenu.clipboard-context-menu button:hover { background:color-mix(in srgb,var(--accent-color) 15%,var(--surface-raised)); }
+#libraryContextMenu.clipboard-context-menu button:focus-visible { outline:2px solid var(--accent-color)!important; outline-offset:-2px; }
+#personalLibraryPanel #libraryGroups { margin-top:14px; }
+#personalLibraryPanel .clipboard-tabs { max-height:calc(100vh - 220px); overflow:auto; overscroll-behavior:contain; }
+#personalLibraryPanel .clipboard-custom-groups { display:flex; flex-direction:column; gap:3px; }
+#personalLibraryPanel .clipboard-custom-groups:empty { display:none; }
+#personalLibraryPanel .clipboard-custom-groups button { padding-left:14px; font-size:12px; }
+#personalLibraryPanel .clipboard-quote-sources { margin:0 0 14px; }
+#personalLibraryPanel .clipboard-quote-tabs { display:flex; flex-wrap:wrap; gap:6px; }
+#personalLibraryPanel .clipboard-quote-tabs button { min-height:34px; padding:8px 12px; border:1px solid var(--control-border); border-radius:7px; background:var(--surface-raised); color:var(--text-color); cursor:pointer; }
+#personalLibraryPanel .clipboard-quote-tabs button[aria-pressed=true] { border-color:var(--accent-color); background:var(--accent-soft); color:var(--text-color); font-weight:600; }
+#personalLibraryPanel .clipboard-error { display:flex; gap:10px; align-items:center; color:var(--text-color); border:1px solid var(--control-border); border-left:3px solid #cf6b6b; padding:10px; margin-bottom:12px; }
+#personalLibraryPanel .clipboard-error span { flex:1; }
+#personalLibraryPanel .clipboard-error[hidden] { display:none; }
+#libraryEditor.library-editor-overlay { display:none; position:fixed; inset:0; z-index:11000; background:#0006; align-items:center; justify-content:center; padding:20px; }
+#libraryEditor.library-editor-overlay.open { display:flex; }
+#libraryEditor .library-editor-dialog { width:min(570px,100%); max-height:calc(100vh - 40px); overflow:auto; box-sizing:border-box; padding:22px; border:1px solid var(--control-border); border-radius:12px; color:var(--text-color); background:var(--surface-raised); }
+#libraryEditor h3 { margin:0 0 16px; }
+#libraryEditor label { display:flex; flex-direction:column; gap:6px; margin:12px 0; font-size:13px; }
+#libraryEditor input,#libraryEditor textarea { width:100%; box-sizing:border-box; background:var(--control-bg); color:var(--text-color); border:1px solid var(--control-border); border-radius:5px; padding:9px; font:14px/1.6 'Microsoft YaHei',sans-serif; }
+#libraryEditor textarea { min-height:150px; max-height:45vh; resize:vertical; }
+#libraryEditor input[type=checkbox] { width:auto; align-self:flex-start; }
+#libraryEditor button { background:var(--button-bg); border:1px solid var(--control-border); color:var(--text-color); border-radius:5px; padding:9px 16px; cursor:pointer; }
+#libraryEditor button:disabled { opacity:.55; cursor:default; }
+#libraryEditor [hidden] { display:none; }
+#libraryEditor #libraryEditorError { font-size:13px; color:var(--text-color); border-left:3px solid #cf6b6b; padding:8px 12px; }
+#personalLibraryPanel #libraryRows > p { padding:20px; font-size:13px; color:var(--text-secondary); }
+/* The full extent stays scrollable; only the viewport and a small buffer have DOM rows. */
+#personalLibraryPanel .clipboard-browser #libraryRows.is-virtual { display:block; position:relative; height:520px; overflow-anchor:none; }
+#personalLibraryPanel #libraryRows.is-virtual .clipboard-item { position:absolute; left:0; box-sizing:border-box; height:var(--library-row-height,136px); min-height:var(--library-row-height,136px); max-height:var(--library-row-height,136px); overflow:hidden; }
+#personalLibraryPanel #libraryRows.is-virtual .clipboard-item-main strong { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Saved library categories share one compact title/text layout. */
+#personalLibraryPanel #libraryRows.is-compact .clipboard-item { box-sizing:border-box; height:var(--library-row-height,70px); min-height:var(--library-row-height,70px); max-height:var(--library-row-height,70px); overflow:hidden; }
+#personalLibraryPanel #libraryRows.is-compact .clipboard-item-main strong { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#personalLibraryPanel #libraryRows.is-compact .clipboard-item-text { -webkit-line-clamp:1; }
+#personalLibraryPanel .clipboard-item-heading { display:flex; align-items:baseline; gap:8px; min-width:0; }
+#personalLibraryPanel .clipboard-item-heading strong { flex:1; min-width:0; }
+#personalLibraryPanel .clipboard-item-heading small { flex:0 1 auto; max-width:60%; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+#personalLibraryPanel .clipboard-scroll-extent { width:1px; pointer-events:none; }
+@media(max-width:650px) { #personalLibraryPanel .clipboard-browser #libraryRows { max-height:350px; } }
+
+#personalLibraryPanel .library-search-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+#personalLibraryPanel .library-search-row input { flex:1; min-width:0; }
+#personalLibraryPanel #libraryGroups { margin-top:10px; }
+#personalLibraryPanel #libraryNewTop { flex:0 0 auto; width:auto; }

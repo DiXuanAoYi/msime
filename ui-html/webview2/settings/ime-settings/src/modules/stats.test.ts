@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calendarScrollAfterResize,
+  calendarMonthLabel,
   addDays,
   calendarLevel,
   calendarStart,
   computeCalendarCellSize,
-  computeCalendarMonthLabels,
   computeCalendarWeeks,
   dateToDayKey,
   dayKeyToDate,
   detailRows,
+  detailDateKey,
+  detailPageOf,
   formatDayKey,
   formatDuration,
   formatNumber,
@@ -178,41 +181,6 @@ describe('热力图窗口', () => {
       expect(columns).toBeLessThanOrEqual(54);
     }
   });
-
-  const weeksFrom = (monday: Date, count: number) => Array.from({ length: count }, (_, i) => addDays(monday, i * 7));
-
-  it('首列含 1 日时标注那个月，而不是周一所在的上个月', () => {
-    // 2025-09-29（周一）这一列含 10 月 1 日，下一个边界是 10-27 那列的 11 月 1 日。
-    const labels = computeCalendarMonthLabels(weeksFrom(new Date(2025, 8, 29), 6));
-    expect(labels).toEqual(['10月', '', '', '', '11月', '']);
-  });
-
-  it('首列不含 1 日且离第一个边界足够远时补标起始月份', () => {
-    // 2025-01-06 起：2 月 1 日落在第 3 列（01-27 那周）。
-    const labels = computeCalendarMonthLabels(weeksFrom(new Date(2025, 0, 6), 5));
-    expect(labels).toEqual(['1月', '', '', '2月', '']);
-  });
-
-  it('首列离第一个边界太近时留空，不挤掉真正的月份标签', () => {
-    // 2025-01-20 起：2 月 1 日落在第 1 列。
-    const labels = computeCalendarMonthLabels(weeksFrom(new Date(2025, 0, 20), 5));
-    expect(labels).toEqual(['', '2月', '', '', '']);
-  });
-
-  it('整段都不含 1 日时首列仍标注起始月份', () => {
-    const labels = computeCalendarMonthLabels(weeksFrom(new Date(2025, 0, 6), 3));
-    expect(labels).toEqual(['1月', '', '']);
-  });
-
-  it('真实窗口里每个月份边界都有标签', () => {
-    const today = new Date(2026, 9, 8);
-    const weekStarts: Date[] = [];
-    for (let start = calendarStart(today, 53); start.getTime() <= today.getTime(); start = addDays(start, 7)) {
-      weekStarts.push(start);
-    }
-    const labels = computeCalendarMonthLabels(weekStarts).filter((label) => label !== '');
-    expect(labels).toEqual(['10月', '11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月']);
-  });
 });
 
 describe('按日明细', () => {
@@ -245,3 +213,30 @@ describe('保留策略回填', () => {
     expect(retentionValueOf('30')).toBeNull();
   });
 });
+
+describe('全历史明细筛选与分页', () => {
+  it('校验真实日期并接受空的范围边界', () => {
+    expect(detailDateKey('')).toBe(0);
+    expect(detailDateKey('2024-02-29')).toBe(20240229);
+    expect(detailDateKey('2025-02-29')).toBeNull();
+    expect(detailDateKey('2026-13-01')).toBeNull();
+    expect(detailDateKey('2026-1-1')).toBeNull();
+  });
+  it('默认最近30条，范围两端包含，末页和越界页安全收敛且不修改原历史', () => {
+    const history = Array.from({length: 75}, (_, index) => row(dateToDayKey(addDays(new Date(2026, 0, 1), index)), index));
+    const copy = [...history];
+    const first = detailPageOf(history, 0);
+    expect(first.rows).toHaveLength(30);
+    expect(first.rows[0]).toEqual(history[74]);
+    expect(first.pages).toBe(3);
+    expect(detailPageOf(history, 99).rows).toHaveLength(15);
+    expect(detailPageOf(history, -1).page).toBe(0);
+    const range = detailPageOf(history, 0, 20260201, 20260203);
+    expect(range.rows.map(item => item.dayKey)).toEqual([20260203, 20260202, 20260201]);
+    expect(detailPageOf(history, 0, 20270101).total).toBe(0);
+    expect(history).toEqual(copy);
+  });
+});
+
+it('keeps the latest day visible until the user scrolls back and preserves a historical week on resize',()=>{expect(calendarScrollAfterResize(0,13,9,0,300,false)).toBe(300);expect(calendarScrollAfterResize(150,13,9,0,300,true)).toBe(110);expect(calendarScrollAfterResize(150,13,13,4,500,true)).toBe(210);expect(calendarScrollAfterResize(800,13,9,0,100,true)).toBe(100);});
+it('spaces calendar month labels and includes January year',()=>{expect(calendarMonthLabel(new Date(2027,0,1),10,0,9)).toBe('2027/1');expect(calendarMonthLabel(new Date(2027,1,1),11,10,9)).toBe('');expect(calendarMonthLabel(new Date(2027,1,1),15,10,9)).toBe('2月');expect(calendarMonthLabel(new Date(2027,1,2),15,10,9)).toBe('');});

@@ -1,6 +1,8 @@
 // 候选页的构建与发布：按输入模式查候选（PrepareCandidateList）、组页并发布给候选窗，
 // 以及调频用的排序键和翻页时的候选扩展。
 #include "ipc/event_listener_internal.h"
+#include "settings/dictionary_manager.h"
+#include "settings/personal_library.h"
 #include <Windows.h>
 #include <string>
 #include <algorithm>
@@ -9,7 +11,6 @@
 #include <cstdint>
 #include <utility>
 #include "ipc.h"
-#include "ipc/candidate_expansion_policy.h"
 #include "ipc/candidate_ui_owner.h"
 #include "ipc/input_key_policy.h"
 #include "utils/common_utils.h"
@@ -21,6 +22,7 @@
 #include "engine/user_dictionary/user_dictionary_journal.h"
 #include "cloud/cloud_translation.h"
 #include "english/english_ime.h"
+#include "english/vocabulary_service.h"
 #include "config/ime_config.h"
 #include "settings/collocation_model.h"
 #include "engine/local_modes/quick_phrase_query.h"
@@ -140,6 +142,22 @@ void PlaceQuickPhrases(std::vector<WordItem> &items, const std::string &current_
         slot = static_cast<std::size_t>(std::clamp(stored, 0, max_slot));
     }
     metasequoia::local_modes::place_quick_phrases(items, std::move(phrases), slot);
+}
+
+void PlaceApplicationWords(std::vector<WordItem> &items, const std::string &input)
+{
+    if (GlobalIme::composition.creating_word.active || g_inputSession->prefix_end() != input.size())
+        return;
+    const auto application =
+        PersonalLibrary::ProcessApplication(static_cast<uint32_t>(GetActivePipeClient().client_id >> 32));
+    const auto words = PersonalLibrary::AppWords(application, input);
+    for (auto it = words.rbegin(); it != words.rend(); ++it)
+    {
+        items.erase(std::remove_if(items.begin(), items.end(), [&](const WordItem &x) { return x.word == *it; }),
+                    items.end());
+        items.insert(items.begin(), WordItem(input, *it, 1, CandidateSource::AppDictionary));
+    }
+    PersonalLibrary::ApplyApplicationCandidates(application, input, items, false, g_inputSession->get_quanpin());
 }
 
 // 日期时间混入普通候选的唤醒词，与 Shift+T 模式同一套（rq / riqi / date、sj / shijian / time、
@@ -273,6 +291,9 @@ std::string BuildCurrentCandidatePage()
 
         CandidateViewItem view;
         view.text = word;
+        view.input_domains = item.input_domains;
+        if (GetConfiguredCandidateShowPinyin())
+            view.reading = SettingsDictionary::CandidateReading(word);
         if (show_autocorrect_marker && !item.corrected_from.empty())
         {
             // Correction-sourced candidates carry a light visible marker (PRD R5/AC7),
@@ -301,6 +322,14 @@ std::string BuildCurrentCandidatePage()
             view.badge = " ☁️";
         else if (item.source == CandidateSource::AiSuggestion)
             view.badge = " 🤖";
+        else if (item.source == CandidateSource::AiCompletion)
+            view.badge = " 〔续写〕";
+        else if (item.source == CandidateSource::AiQuestion)
+        {
+            view.badge = " 〔问字〕";
+            if (GetConfiguredCandidateShowPinyin() && !item.canonical_pinyin.empty())
+                view.reading = item.canonical_pinyin;
+        }
         // 整句来源标签与设置页名称保持一致，方便同时比较四个来源。两家选中同一句时只剩一行，
         // 标签归先保留下来的来源；开启去重补位后，其余来源会改为显示自己的下一条不同结果。
         // Generated/Fallback 也被原样上屏、英文、日期等合成候选借用，只有引擎标了整句联想的才挂标签。
@@ -319,6 +348,7 @@ std::string BuildCurrentCandidatePage()
                 view.badge = collocation_badge;
         }
         view.fixed_position = item.fixed_position > 0;
+        ApplyInputDomainBadge(view);
         ApplyFixedPositionBadge(view, show_fixed_badge, fixed_badge_style);
         EnglishIme::TranslationQuery translation_query;
         if (!translation_page && BuildTranslationQuery(item, translation_query))
@@ -327,6 +357,11 @@ std::string BuildCurrentCandidatePage()
             if (gloss != g_candidate_translation_glosses.end())
                 view.translation = gloss->second;
         }
+        if (!view.translation.empty())
+            DecorateCandidateTranslation(view, [&](const std::string &word) {
+                return translation_query.direction == EnglishIme::TranslationDirection::EnglishToChinese ||
+                       Vocabulary::IsFamiliar(GetConfiguredTencentTmt().target_language, word);
+            });
         const std::string visible = view.text + view.annotation + view.badge;
         const int display_length = static_cast<int>(utf8::distance(visible.begin(), visible.end()));
         candidate_string += CandidateViewHtml(view);
@@ -356,7 +391,8 @@ std::string BuildCurrentCandidatePage()
 void PrepareCandidateTranslationRequest()
 {
     const bool japanese = g_inputSession && g_inputSession->current_scheme_type() == SchemeType::JapaneseRomaji;
-    const bool enabled = GetConfiguredCandidateTranslationsEnabled() && !IsUiLessMode() && !japanese;
+    const bool enabled = GetConfiguredCandidateTranslationsEnabled() && !IsUiLessMode() && !japanese &&
+                         FanyImeIpc::InputLearningAllowed();
     auto &ui = Global::candidate_ui;
     if (IsCandidateSubPageActive())
     {
@@ -380,12 +416,18 @@ void PrepareCandidateTranslationRequest()
         }
         return;
     }
-    const std::string scope = fmt::format("{}|{}|{}", GetConfiguredTencentTmt().enabled,
-                                          GetConfiguredCustomTranslation().enabled, GetConfiguredNiuTrans().enabled);
+    const std::string scope =
+        fmt::format("{}|{}|{}|{}|{}|{}|{}", GetConfiguredTencentTmt().enabled, GetConfiguredCustomTranslation().enabled,
+                    GetConfiguredNiuTrans().enabled, GetConfiguredTencentTmt().target_language,
+                    GetConfiguredCandidateTranslationCloudEnabled() && FanyImeIpc::AutomaticInputNetworkAllowed(),
+                    GetConfiguredPersonalTranslationGlossaryRevision(), CloudTranslation::ConfigurationScope());
     if (scope != g_candidate_translation_scope)
     {
         g_candidate_translation_scope = scope;
         g_candidate_translation_glosses.clear();
+        g_candidate_translation_signature.clear();
+        EnglishIme::ClearTranslations();
+        CloudTranslation::Clear();
     }
 
     std::vector<EnglishIme::TranslationQuery> queries;
@@ -409,7 +451,8 @@ void PrepareCandidateTranslationRequest()
         return;
     g_candidate_translation_signature = std::move(signature);
     CloudTranslation::Clear();
-    EnglishIme::RequestTranslations(std::move(queries), GetConfiguredTencentTmt().target_language == "en");
+    EnglishIme::RequestTranslations(std::move(queries), GetConfiguredTencentTmt().target_language,
+                                    GetConfiguredPersonalTranslationGlossary());
 }
 
 // Copy the page the worker just finished into an immutable snapshot for the UI thread. This is the single publish
@@ -419,9 +462,20 @@ void PublishBuiltCandidatePage(const std::wstring &candidate_string)
 {
     const auto &ui = Global::candidate_ui;
     auto snapshot = std::make_shared<Global::CandidatePageSnapshot>();
+    snapshot->task_status = Global::candidate_task_status;
     snapshot->page_views = ui.page_views;
     snapshot->page_words = ui.page_words;
     snapshot->candidate_string = candidate_string;
+    snapshot->page_index = ui.page_index;
+    snapshot->html_items.reserve(ui.page_views.size());
+    for (const auto &view : ui.page_views)
+    {
+        auto html = string_to_wstring(CandidateViewHtml(view));
+        // Only legacy transport commas remain literal PUA here; real user PUA
+        // text was escaped to an HTML entity by EscapeCandidateViewHtml.
+        std::replace(html.begin(), html.end(), static_cast<wchar_t>(0xF000), L',');
+        snapshot->html_items.push_back(std::move(html));
+    }
     snapshot->selected_index_in_page = ui.selected_index_in_page;
     snapshot->page_count = ui.current_page_count();
     snapshot->page_item_count = ui.cur_page_item_cnt;
@@ -473,7 +527,12 @@ std::string CurrentRankingContextKey()
         return converted;
     std::string plain = converted;
     plain.erase(std::remove(plain.begin(), plain.end(), '\''), plain.end());
-    const auto cuts = quanpin::cut_pinyin_by_mode(plain, "correction");
+    // 与引擎侧 InputSession::position_context 同一规则（quanpin::correction_aliases_enabled 只看
+    // 换位、邻键两个开关）：全拼跟纠错开关走，双拼保持原样。
+    const bool correction_aliases = g_inputSession->current_scheme_type() == SchemeType::Shuangpin ||
+                                    GetConfiguredQuanpinAutocorrectTransposition() ||
+                                    GetConfiguredQuanpinAutocorrectNeighbor();
+    const auto cuts = quanpin::cut_pinyin_by_mode(plain, "correction", correction_aliases);
     return cuts.empty() ? converted : quanpin::join_segments(cuts.front());
 }
 
@@ -529,13 +588,19 @@ bool ExpandCandidatesKeepingPagePosition()
     {
         return false;
     }
+    const int current_page = ui.page_index;
+    const int current_selection = ui.selected_index_in_page;
     auto expanded = g_inputSession->get_candidates();
     user_dictionary::apply_fixed_positions(
         user_dictionary::default_user_db_path(), CurrentRankingContextKey(), expanded, true,
         [](const std::string &key, const std::string &value) { return g_inputSession->find_candidate(key, value); },
         g_inputSession->has_active_helpcode());
     PlaceQuickPhrases(expanded, g_inputSession->get_pinyin_sequence_with_cases());
-    FanyImeIpc::SetExpandedCandidatesKeepingPagePosition(ui, std::move(expanded), CurrentEnglishPlacement(ui.items));
+    PlaceApplicationWords(expanded, g_inputSession->get_pinyin_sequence_with_cases());
+    ApplyActiveAiRerank(expanded);
+    ui.set_items(std::move(expanded));
+    ui.page_index = current_page;
+    ui.selected_index_in_page = current_selection;
     return true;
 }
 
@@ -716,6 +781,8 @@ void PrepareCandidateList(uint64_t client_id, uint64_t activation_epoch)
             [](const std::string &key, const std::string &value) { return g_inputSession->find_candidate(key, value); },
             g_inputSession->has_active_helpcode());
         PlaceQuickPhrases(items, current_input);
+        PlaceApplicationWords(items, current_input);
+        ApplyActiveAiRerank(items);
         fixedPosMs = segment.Split();
         if (g_inputSession->get_pinyin_sequence().size() == 1 && items.size() > 24)
             items.resize(24);

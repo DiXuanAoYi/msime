@@ -103,6 +103,12 @@ HRESULT OnControllerCreatedMenuWnd(     //
     ICoreWebView2Controller *controller //
 )
 {
+    if (UseD2dSmallWindowUi())
+    {
+        if (controller)
+            controller->Close();
+        return S_OK;
+    }
     if (!controller || FAILED(result))
     {
         FTB_DIAG_LOGF(L"menu controller creation failed hr={:#x}", static_cast<unsigned>(result));
@@ -246,7 +252,6 @@ HRESULT OnControllerCreatedMenuWnd(     //
                         if (SetConfiguredFloatingToolbarEnabled(needShown))
                         {
                             ApplyConfiguredFloatingToolbarVisibility(L"tray-menu-toggle");
-                            PostSettingsConfig();
                         }
                     }
                     else if (type == "settings")
@@ -298,7 +303,6 @@ HRESULT OnControllerCreatedMenuWnd(     //
                         if (scheme != GetConfiguredInputSchemeName() && SetConfiguredInputScheme(scheme))
                         {
                             ApplyConfiguredInputScheme();
-                            PostSettingsConfig();
                         }
                     }
                     else if (type == "contentTruncated")

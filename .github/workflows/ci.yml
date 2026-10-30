@@ -51,21 +51,32 @@ jobs:
     name: Windows ${{ matrix.name }}
     runs-on: windows-2025
     timeout-minutes: 60
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: x64
             architecture: x64
+            msvc_arch: x64
             triplet: x64-windows-static
           - name: Win32
             architecture: Win32
+            msvc_arch: amd64_x86
             triplet: x86-windows-static
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+      - name: Set up installed MSVC
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: ${{ matrix.msvc_arch }}
+      - name: Set up optional compiler cache
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Restore dependency binaries
         id: vcpkg-cache
         uses: ./.github/actions/vcpkg-cache
@@ -83,10 +94,12 @@ jobs:
           key: ${{ steps.vcpkg-cache.outputs.key }}-complete
       - name: Configure
         shell: pwsh
-        run: >
-          cmake -S windows -B windows/build -A ${{ matrix.architecture }}
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+        run: |
+          . ./scripts/ci/compiler-cache.ps1
+          $cache = @(Get-MsimeCompilerCacheArguments -BuildDirectory windows/build -Enable)
+          cmake -S windows -B windows/build -G "Ninja Multi-Config" `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} @cache
       - name: Build
         shell: pwsh
         run: cmake --build windows/build --config Release --parallel
@@ -155,6 +168,7 @@ jobs:
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: Set up sccache
+        continue-on-error: true
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Install Boost
         shell: pwsh
@@ -173,12 +187,12 @@ jobs:
       # (check-server-binaries.ps1, ctest -C Release) already depend on.
       - name: Configure
         shell: pwsh
-        run: >
-          cmake -S server -B server/build-release -G "Ninja Multi-Config"
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-windows
-          -DCMAKE_C_COMPILER_LAUNCHER=sccache
-          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        run: |
+          . ./scripts/ci/compiler-cache.ps1
+          $cache = @(Get-MsimeCompilerCacheArguments -BuildDirectory server/build-release -Enable)
+          cmake -S server -B server/build-release -G "Ninja Multi-Config" `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows @cache
       - name: Save dependency binaries before compiling
         if: steps.vcpkg-cache.outputs.matched-key != format('{0}-complete', steps.vcpkg-cache.outputs.key)
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -191,7 +205,9 @@ jobs:
       - name: Report sccache hit rate
         if: always()
         shell: pwsh
-        run: sccache --show-stats
+        run: |
+          . ./scripts/ci/compiler-cache.ps1
+          Show-MsimeCompilerCacheStats
       - name: Check the Release binaries and symbols
         shell: pwsh
         run: ./scripts/ci/check-server-binaries.ps1 -BuildDir server/build-release/bin/Release
@@ -211,11 +227,26 @@ jobs:
     needs: lock
     runs-on: windows-2025
     timeout-minutes: 60
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Set up installed MSVC
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Set up optional compiler cache
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Test optional cache recovery
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p test_compile_cache_launcher.py -v
+          if ($LASTEXITCODE) { throw 'Compiler cache launcher tests failed.' }
+          ./tests/Test-CompilerCache.ps1
+          ./tests/Test-RunnerVcpkg.ps1
+          ./tests/Test-CompileCacheNative.ps1
       - name: Restore dependency binaries
         id: vcpkg-cache
         uses: ./.github/actions/vcpkg-cache
@@ -223,11 +254,12 @@ jobs:
           scope: engine-x64-windows
       - name: Configure
         shell: pwsh
-        run: >
-          cmake -S engine -B engine/build -A x64
-          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-windows
-          -DBUILD_TESTING=ON
+        run: |
+          . ./scripts/ci/compiler-cache.ps1
+          $cache = @(Get-MsimeCompilerCacheArguments -BuildDirectory engine/build -Enable)
+          cmake -S engine -B engine/build -G "Ninja Multi-Config" `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows -DBUILD_TESTING=ON @cache
       - name: Save dependency binaries before compiling
         if: steps.vcpkg-cache.outputs.matched-key != format('{0}-complete', steps.vcpkg-cache.outputs.key)
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -247,14 +279,24 @@ jobs:
     name: GUI framework
     runs-on: windows-2025
     timeout-minutes: 30
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up installed MSVC
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Set up optional compiler cache
+        continue-on-error: true
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Check library ownership
         run: python ui/scripts/check-boundary.py
       - name: Configure
         shell: pwsh
-        run: cmake -S ui -B ui/build -A x64
+        run: |
+          . ./scripts/ci/compiler-cache.ps1
+          $cache = @(Get-MsimeCompilerCacheArguments -BuildDirectory ui/build -Enable)
+          cmake -S ui -B ui/build -G "Ninja Multi-Config" @cache
       - name: Build
         shell: pwsh
         run: cmake --build ui/build --config Release --parallel
@@ -277,7 +319,9 @@ jobs:
       # a directory of this repository, the copy is checked against engine/contracts/webview
       # directly and a plain checkout is enough to do it.
       - name: Check the bundled contract against the engine
-        run: python3 ui-html/scripts/sync-contracts.py --check
+        run: |
+          python3 ui-html/scripts/sync-contracts.py --check
+          python3 scripts/sync-tts-contract.py --check
 
       - name: Set up pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0

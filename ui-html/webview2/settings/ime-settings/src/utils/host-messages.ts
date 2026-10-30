@@ -19,7 +19,16 @@ export function onHostMessage<T extends ServerMessage['type']>(
         try { payload = JSON.parse(payload); } catch { return; }
       }
       if (!isServerMessage(payload)) return;
-      subscribers.forEach(subscriber => subscriber(payload));
+      const message = payload;
+      for (const subscriber of [...subscribers]) {
+        try {
+          subscriber(message);
+        } catch {
+          // One lazy module must not prevent unrelated modules receiving the same snapshot.
+          // Report a fixed schema message type only, never an exception or message payload.
+          window.dispatchEvent(new CustomEvent('settings-handler-error', { detail: { type: message.type } }));
+        }
+      }
     });
     listening = true;
   }

@@ -4,7 +4,8 @@
 #include "MetasequoiaIMEBaseStructure.h"
 #include "Ipc.h"
 #include "DeferredKeyFailurePolicy.h"
-#include "char_classify.h"
+#include "../Composition/NativeCommitUndo.h"
+#include "../../../engine/contracts/field_privacy.h"
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -51,7 +52,8 @@ const DWORD WM_CommitVoiceComposition = WM_USER + 25;
 const DWORD WM_CancelVoiceComposition = WM_USER + 26;
 const DWORD WM_ApplyPunctuationLock = WM_USER + 27;
 const DWORD WM_CommitCandidateAndContinue = WM_USER + 28;
-const DWORD WM_AsyncCycleInputMode = WM_USER + 29;
+const DWORD WM_ApplyRuntimeSettings = WM_USER + 29;
+const DWORD WM_AsyncCycleInputMode = WM_USER + 30;
 constexpr ULONG_PTR SMART_PUNCTUATION_SENDINPUT_EXTRA_INFO = 0x4D535050u;
 constexpr ULONG_PTR PAIRED_PUNCTUATION_SENDINPUT_EXTRA_INFO = 0x4D535051u;
 // Synthetic input that this tip generates carries a marker meaning "this tip
@@ -254,18 +256,13 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
 
     // functions for the composition object.
     void _SetComposition(_In_ ITfComposition *pComposition);
-    // A result output requests strict cycle handling: retain a refused composition
-    // for the existing failure reset instead of relinquishing its ownership.
     void _TerminateComposition(TfEditCookie ec, _In_ ITfContext *pContext, BOOL isCalledFromDeactivate = FALSE,
-                               _Out_opt_ HRESULT *endResult = nullptr);
+                               _Out_opt_ HRESULT *endStatus = nullptr);
     void _SaveCompositionContext(_In_ ITfContext *pContext);
     // Reads the committed text of a terminating composition and queues one
     // statistics event for it. Safe to call from both composition exits; only
-    // the first observer captures, and any failure is silent. With deferredCounts
-    // the event is not queued: the caller queues it once the end succeeded, and
-    // the return value says whether anything was captured.
-    bool _CaptureCompositionStats(TfEditCookie ec, _In_ ITfComposition *pComposition,
-                                  _Out_opt_ MsimeStats::CharClassCounts *deferredCounts = nullptr);
+    // the first observer captures, and any failure is silent.
+    void _CaptureCompositionStats(TfEditCookie ec, _In_ ITfComposition *pComposition);
 
     // key event handlers for composition/candidate/phrase common objects.
     HRESULT _HandleComplete(TfEditCookie ec, _In_ ITfContext *pContext);
@@ -276,6 +273,9 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     void _ClearCreatingWordState();
     HRESULT _HandleInsertText(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &text);
     HRESULT _HandleCycleInputMode(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &payload);
+    bool _IsTrilingualCycleEnabled() const;
+    bool _IsAiTaskShortcut(UINT code, UINT modifiers, bool composition) const;
+    void _ApplyVimModeEscape(WPARAM key, LPARAM flags, bool eaten);
     HRESULT _HandleCommitCandidateAndContinue(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &payload);
     HRESULT _HandleUpdateVoiceComposition(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &text);
     HRESULT _HandleCommitVoiceComposition(TfEditCookie ec, _In_ ITfContext *pContext, const std::wstring &text);
@@ -453,7 +453,28 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     void _ScheduleCandidatePresenterCleanup(_In_ CCandidateListUIPresenter *pPresenter);
     void _DrainPendingCandidatePresenterCleanup();
 
+    void _ClearLastCommit();
+    void _RememberLastCommit(TfEditCookie ec, ITfComposition *composition);
+    void _CaptureNativeLastCommit(uint64_t serial);
+    bool _IsUndoCommitKey(ITfContext *context, WPARAM key);
+    void _RequestUndoCommit(ITfContext *context);
+    HRESULT _UndoLastCommit(TfEditCookie ec, ITfContext *context, uint64_t token, uint64_t serial);
+    void _RefreshInputFieldPrivacy(ITfContext *context);
+
   private:
+    ITfRange *_undoRange = nullptr;
+    ITfContext *_undoContext = nullptr;
+    std::wstring _undoText;
+    uint64_t _undoFocus = 0;
+    uint64_t _undoSerial = 0;
+    bool _undoKeyHeld = false;
+    FanyImeFieldPrivacy::State _fieldPrivacy = FanyImeFieldPrivacy::State::Unknown;
+    ITfContext *_fieldPrivacyContext = nullptr; // identity only; never dereferenced
+    uint64_t _fieldPrivacyFocusGeneration = UINT64_MAX;
+    bool _fieldPrivacyAnnounced = false;
+    std::atomic<uint64_t> _runtimeSettingsRevision{0};
+    std::atomic<UINT> _runtimeSettingsPipeGeneration{0};
+    std::atomic<uint32_t> _runtimeSettingsFlags{1};
     // functions for the composition object.
     HRESULT _HandleCompositionInputWorker(_In_ CCompositionProcessorEngine *pCompositionProcessorEngine,
                                           TfEditCookie ec, _In_ ITfContext *pContext, uint64_t requestId);
@@ -482,11 +503,12 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
         std::wstring text;
         uint64_t focusToken = 0;
         uint64_t compositionEpoch = 0;
+        uint64_t vocabularyRequestId = 0;
     };
     bool _PostServerCandidateCommit(_In_z_ const WCHAR *candidateText);
     bool _PostServerCandidateCommitAndContinue(_In_z_ const WCHAR *payload);
     bool _PostServerInsertText(_In_z_ const WCHAR *text);
-    bool _PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text);
+    bool _PostServerTextDelivery(UINT windowMessage, _In_z_ const WCHAR *text, uint64_t vocabularyRequestId = 0);
     bool _TakeServerCandidateCommit(UINT token, _Out_ WorkerCandidateCommit &request);
     void _ResetVoiceCompositionAssemble();
     void _AssembleVoiceCompositionFrame(const FanyImeNamedpipeDataToTsfWorkerThread &buf);
@@ -612,8 +634,7 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     BOOL _IsKeyboardDisabled();
 
     HRESULT _AddComposingAndChar(TfEditCookie ec, _In_ ITfContext *pContext, _In_ CStringRange *pstrAddString);
-    HRESULT _AddCharAndFinalize(TfEditCookie ec, _In_ ITfContext *pContext, _In_ CStringRange *pstrAddString,
-                                bool requireSelection = false);
+    HRESULT _AddCharAndFinalize(TfEditCookie ec, _In_ ITfContext *pContext, _In_ CStringRange *pstrAddString);
     HRESULT _InsertTextToComposition(TfEditCookie ec, _In_ ITfContext *pContext, _In_ CStringRange *pstrAddString);
     HRESULT _SetCompositionTextAndSelection(TfEditCookie ec, _In_ ITfContext *pContext,
                                             _In_ CStringRange *pstrAddString);
@@ -865,7 +886,7 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
     uint64_t _nextDeferredKeyReplayToken;
     bool _deferredKeyProjectionValid;
     bool _deferredProjectedImeOpen;
-    bool _deferredProjectedJapaneseMode;
+    bool _deferredProjectedJapaneseMode = false;
     bool _deferredProjectedPunctuationOpen;
     bool _deferredProjectedDoubleSingleByteOpen;
     size_t _deferredProjectedInputLength;
@@ -915,4 +936,5 @@ class CMetasequoiaIME : public ITfTextInputProcessorEx,
 
     // Support the search integration
     ITfFnSearchCandidateProvider *_pITfFnSearchCandidateProvider;
+    NativeCommitUndo::Snapshot _nativeUndo;
 };

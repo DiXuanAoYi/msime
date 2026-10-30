@@ -1,4 +1,5 @@
 #pragma once
+#include "../domain_dictionary/domain_dictionary.h"
 #include "../core/runtime_paths.h"
 #include "../core/pinyin_decoder.h"
 #include "../core/data_path.h"
@@ -56,6 +57,9 @@ struct SeriesQueryResolution
     // 用户敲出的合法切分，这些读法与它按整句打分争领衔，见 arbitrate_legal_corrections。
     std::vector<quanpin::AutocorrectCut> legal_corrected_cuts;
     bool corrected_input = false;
+    // 容错槽位仲裁胜出时的分段显示（大小写原样，槽界插分隔符）。随 resolution 缓存复用：
+    // series_cache_ 命中的重复查询不会重跑仲裁，靠它把显示带回来。
+    std::string fault_preedit;
 };
 
 class QuanpinDictionary
@@ -89,6 +93,7 @@ class QuanpinDictionary
 
     // 设置整句候选来源与去重补位选项。值发生变化时清一次缓存，避免旧候选被继续复用。
     void set_sentence_association(const SentenceAssociationOptions &options);
+    void set_enabled_domain_dictionaries(const std::string &csv);
 
     // 光标前已上屏的文本，作为神经重排给模型看的上下文。宿主能拿到应用里的前文就给它，
     // 拿不到就不设——空上下文照样能排，只是模型只看句子本身、看不到上文。
@@ -111,6 +116,12 @@ class QuanpinDictionary
         return pinyin_segmentation_;
     }
 
+    // 容错仲裁选中读音后的分段显示（大小写原样）。空表示没有容错布局，调用方照旧重建。
+    const std::string &fault_segmentation_with_cases() const
+    {
+        return fault_preedit_with_cases_;
+    }
+
     const std::vector<WordItem> &get_current_candidate_list() const
     {
         return current_candidate_list_;
@@ -126,8 +137,9 @@ class QuanpinDictionary
     // query_series 的非完整前缀：只取词库里真有的词，不解 query_single_path 那条注定被丢掉的 Google 兜底整句。
     std::vector<WordItem> query_prefix_path(const std::string &raw_input, const std::string &segmentation,
                                             const quanpin::Segments &segments);
-    quanpin::Segments resolve_segments(const std::string &raw_input, const std::string &segmentation);
-    quanpin::Segments get_or_compute_segments(const std::string &raw_input);
+    quanpin::Segments resolve_segments(const std::string &raw_input, const std::string &segmentation,
+                                       bool include_correction_aliases);
+    quanpin::Segments get_or_compute_segments(const std::string &raw_input, bool include_correction_aliases);
     std::vector<WordItem> query_database(const quanpin::Segments &segments, const std::string &segmentation);
     std::vector<WordItem> query_initial(const std::string &code, int limit);
     std::vector<WordItem> append_ime_fallback(const std::string &raw_input, const std::string &segmentation,
@@ -138,13 +150,36 @@ class QuanpinDictionary
         const std::string &raw_input, const std::string &primary_segmentation,
         const quanpin::Segments &primary_segments, const std::vector<quanpin::Segments> &alternative_segmentations,
         std::vector<WordItem> result);
+    // 合法输入的等音节数字面切分（yi'ba'nan'zhao / yi'ban'an'zhao）按整句打分争领衔。
+    // leading_segments 返回领衔的字面切分，交给 arbitrate_legal_corrections 当原读法。
+    std::vector<WordItem> arbitrate_literal_segmentations(const std::string &raw_input,
+                                                          const quanpin::Segments &segments,
+                                                          std::vector<WordItem> result,
+                                                          quanpin::Segments &leading_segments);
     std::vector<WordItem> arbitrate_legal_corrections(const std::string &raw_input,
                                                       const quanpin::Segments &plain_segments,
                                                       const std::vector<quanpin::AutocorrectCut> &corrected_cuts,
                                                       std::vector<WordItem> result);
+    // 长句容错仲裁（方案 C）：字面切分含非法槽、槽多于短串上限且 k-best 被预算卡死的
+    // 输入，按容错槽位建词格（合法槽固定、单字母槽简拼展开、Fault 槽纠错表目标），由
+    // decode_fault_lattice（kenlm，不装配 scorer）解 n-best，路径分扣手误代价后把胜出
+    // 读音的整键块顶到 result 最前（字面候选留在其后）。winning_segments / winning_display
+    // 返回胜出读音与其分段显示（显示为空表示读音不能逐字母对回原串，预编辑保持原切分）；
+    // 不接管或词格解不出路径时返回原候选、两者置空。
+    std::vector<WordItem> arbitrate_fault_slots(const std::string &raw_input, unsigned autocorrect_types,
+                                                std::vector<WordItem> result, quanpin::Segments &winning_segments,
+                                                std::string &winning_display);
     // 词格对一条完整切分的最佳路径分（加载了 sc.lm 时是 log10，否则是启发式的 ln）。
     // 与整句候选开关无关；单音节也能打分。不是全合法音节或解不出路径时为空。
     std::optional<double> lattice_best_path_score(const quanpin::Segments &cut);
+    // 同上，返回整条最佳路径。按切分缓存：一次按键里同一条切分会被字面切分与纠错两轮裁决各打一次分。
+    std::optional<quanpin::LatticePath> lattice_best_path(const quanpin::Segments &cut);
+    // 词格的跨度查询，套一层按（跨度, limit）的缓存：每多敲一个字母整句都要重解，同一输入的
+    // 几种字面切分、主切与纠错读法之间也大量共用跨度，不缓存就一遍遍打同样的 SQL。结果与
+    // 直查逐行相同；随 reset_cache 清空（词库被写或换了开关时）。with_fuzzy 为假时不收模糊读音，
+    // 见 lattice_best_path。
+    quanpin::WordLatticeLookup lattice_lookup(int limit, bool with_fuzzy = true);
+    void set_fuzzy_pinyin(metasequoia::FuzzyPinyinOptions options);
     bool user_prefers_reading(const std::string &key);
     static void append_unique_words(std::vector<WordItem> &result, const std::vector<WordItem> &extra);
     void mark_autocorrect_candidates(std::vector<WordItem> &candidates, const std::string &raw_input);
@@ -163,6 +198,10 @@ class QuanpinDictionary
     std::string build_sql_for_updating_word(std::string pinyin, const std::string &word);
     std::string build_sql_for_deleting_word(std::string pinyin, const std::string &word);
     bool do_validate(const std::string &key, const std::string &jp, const std::string &value);
+    // 写回路径（调频、造词、删词、写整句缓存、建 SQL、校验）去掉分隔符后的重切。按最近一次
+    // query 的纠错状态切，写回才会落在查询出的同一个键上：开关关掉时查询按字面切
+    // hao'yong'a，这里若仍跑别名层会切成 hao'yong'ga，UPDATE 匹配不到任何行。
+    std::vector<quanpin::Segments> cut_for_write(const std::string &pinyin) const;
     void reset_cache_if_database_changed();
     int insert_word_to_series_cache_key(const std::string &cache_key, const std::string &pinyin,
                                         const std::string &word, CandidateSource source);
@@ -179,9 +218,17 @@ class QuanpinDictionary
     // cleared with the dictionary caches: its value depends only on the input
     // and the static correction tables, never on dictionary rows.
     CircularBuffer<std::string, SeriesQueryResolution> resolution_cache_;
+    // 见 lattice_best_path。随 reset_cache 清空：分数取决于词库行和整句选项（搭配模型）。
+    CircularBuffer<std::string, std::optional<quanpin::LatticePath>> lattice_best_path_cache_;
+    // 见 lattice_lookup。
+    std::unordered_map<std::string, std::vector<quanpin::LatticeLexeme>> lattice_span_cache_;
+    // 多音单字各读音的权重和，词格第一次查跨度时载入，此后不随 reset_cache 重载。
+    // 见 quanpin::load_char_reading_totals。
+    std::shared_ptr<const quanpin::CharReadingTotals> char_reading_totals_;
     sqlite3 *db_ = nullptr;
     sqlite3_int64 data_version_ = -1;
     metasequoia::RuntimePaths paths_;
+    domain_dictionary::Dictionary domain_;
     metasequoia::PinyinDecoder decoder_;
     // 词格整句的打分模型（kenlm 三元），按资源路径进程内共享、只读。缺模型时
     // valid() 为假，word_lattice 退回旧的启发式打分：整句候选只是变差，不会消失。
@@ -191,13 +238,19 @@ class QuanpinDictionary
     // shared_ptr 持有：设置侧删除模型包 evict 缓存并清掉这里的引用后，映射即可
     // 释放，被删的文件能被物理清扫。
     std::shared_ptr<const gram::GramDb> collocation_db_ = nullptr;
-    // 神经整句模型（chinese-ime-lm），按资源路径进程内共享、只读。两档可同时参与打分；
+    // 神经整句模型（chinese-ime-lm），按路径进程内共享、只读。两档可同时参与打分；
     // 缺文件时对应的整句候选不出，不影响其它候选。对应开关第一次生效时才载入，
-    // 关着的那档不占内存。
+    // 关着的那档不占内存。快速档随安装包在资源目录；高精度档按需下载，路径由
+    // set_sentence_association 下发，未下载时为空。
     neural::LazySentenceModel neural_desktop_model_;
     neural::LazySentenceModel neural_keyboard_model_;
     // 整句候选来源与去重补位选项，默认全关；由 set_sentence_association 随请求更新。
     SentenceAssociationOptions sentence_association_;
+    // 词格跨度查询带的模糊音规则，由 query 随请求更新，变化时清缓存（整句与裁决都按它算）。
+    metasequoia::FuzzyPinyinOptions fuzzy_pinyin_;
+    // 手误别名层是否参与切分，由 query 按请求的纠错掩码更新，写回路径据此重切（见 cut_for_write）。
+    // 还没查询过时保持历史行为（开）。
+    bool correction_aliases_enabled_ = true;
     // 神经重排的上下文（光标前已上屏的文本）。宿主没给就是空串。
     std::string rescoring_context_;
     std::unordered_map<std::string, sqlite3_stmt *> statement_cache_;
@@ -205,6 +258,8 @@ class QuanpinDictionary
 
     std::string pinyin_sequence_;
     std::string pinyin_segmentation_;
+    // 容错仲裁选中读音后的分段显示（原串大小写、含分隔符）。空表示当前串没有容错布局。
+    std::string fault_preedit_with_cases_;
     // Joined alternative correction cuts (k-best readings after the primary)
     // backing mark_autocorrect_candidates on every query, cached or not.
     std::vector<std::string> pinyin_alternative_segmentations_;

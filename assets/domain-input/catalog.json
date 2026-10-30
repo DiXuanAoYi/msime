@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "kind": "msime-domain-input",
+  "books": [
+    {
+      "id": "animals",
+      "name": "动物",
+      "entries": 17127,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 670280,
+      "sha256": "41dc760e201569e619ac7aa4f5ad2960a1ba78324ddd02f7c3a08f853daa0ade",
+      "exportable": true
+    },
+    {
+      "id": "automotive",
+      "name": "汽车",
+      "entries": 1642,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 60627,
+      "sha256": "a72d87d106d3299789f693ab5b24f3e1162638c66c4c39671aba434db0d0c5d9",
+      "exportable": true
+    },
+    {
+      "id": "finance",
+      "name": "财经",
+      "entries": 2414,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 67843,
+      "sha256": "a8bc12189e622797b8adeaed00cda6bc7f3824f17a87687965d1d4fe6c441c97",
+      "exportable": true
+    },
+    {
+      "id": "food",
+      "name": "饮食",
+      "entries": 8249,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 264892,
+      "sha256": "44b563b200add437a490d2741e04cc0600d39c57d8f83f4fc356e292d794b0f4",
+      "exportable": true
+    },
+    {
+      "id": "historical",
+      "name": "历史人物",
+      "entries": 11162,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 257375,
+      "sha256": "6f701af8f31ed9ced453770f8b2f40aea2dc47dbfb1b4a3a7f3a4d6979922911",
+      "exportable": true
+    },
+    {
+      "id": "idioms",
+      "name": "成语",
+      "entries": 3693,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 125382,
+      "sha256": "1c1482ef8f28d30c2d6e7ef1a4e28836c40f640baf600cff8898209f60eac652",
+      "exportable": true
+    },
+    {
+      "id": "it",
+      "name": "计算机与信息技术",
+      "entries": 11901,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 390880,
+      "sha256": "49a76776ea6889e32e1d1cf1a5dea43bb457f43bf429e31fdbfd0bfed4e26130",
+      "exportable": true
+    },
+    {
+      "id": "law",
+      "name": "法律",
+      "entries": 7081,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 336710,
+      "sha256": "08d26235277a1c25018c4e93287d51b19e0bf1c70dbd5cf04886001bf65e720e",
+      "exportable": true
+    },
+    {
+      "id": "medicine",
+      "name": "医学",
+      "entries": 16402,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 570725,
+      "sha256": "b507951439b789585da640da98afba4b0c48f04cb1333d48af535b5818101f33",
+      "exportable": true
+    },
+    {
+      "id": "places",
+      "name": "地名",
+      "entries": 39799,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 1158914,
+      "sha256": "ddb6c6826efd35e84d95f11bbeeb70409f4627073cc7ad68296ff43b0158dafe",
+      "exportable": true
+    },
+    {
+      "id": "poetry",
+      "name": "诗词",
+      "entries": 13446,
+      "license": "MIT AND Unicode-3.0",
+      "source": "qingjian/THUOCL + Unihan",
+      "version": "dd9c471766e117c1f8c557042560776179fe9bfe",
+      "bytes": 618779,
+      "sha256": "ae24efff4e6d1d301b64ce576f56e5abb9570aee83252ffc51ac6912ceeaaf1d",
+      "exportable": true
+    }
+  ]
+}

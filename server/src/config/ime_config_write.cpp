@@ -1,6 +1,8 @@
 // 把设置写回 config.toml（批量、保留格式、先校验再原子替换），并通知 Server 重新加载配置或切换输入方案。
 #include "config/ime_config_internal.h"
 #include <Windows.h>
+#include <cstdio>
+#include <cstdlib>
 #include <cwchar>
 #include <filesystem>
 #include <string>
@@ -11,13 +13,43 @@
 
 using namespace ime_config_detail;
 
+namespace
+{
+// This opt-in diagnostic deliberately records metadata only: never log setting values or credentials.
+void TraceConfigWrite(const char *stage, const std::vector<ConfigValueUpdate> &updates, DWORD error = ERROR_SUCCESS)
+{
+    unsigned long dos_error = 0;
+    _get_doserrno(&dos_error);
+    wchar_t enabled[8]{};
+    if (!GetEnvironmentVariableW(L"METASEQUOIA_IME_SETTINGS_TRACE", enabled, 8) || enabled[0] != L'1')
+        return;
+    wchar_t temp[MAX_PATH]{};
+    if (!GetTempPathW(MAX_PATH, temp))
+        return;
+    FILE *file = nullptr;
+    const auto log = std::filesystem::path(temp) / L"metasequoia-config-write.log";
+    if (_wfopen_s(&file, log.c_str(), L"a") != 0 || !file)
+        return;
+    const auto path = g_config_path.u8string();
+    fprintf(file, "pid=%lu stage=%s win32=%lu dos=%lu path=%s", GetCurrentProcessId(), stage, error, dos_error,
+            reinterpret_cast<const char *>(path.c_str()));
+    for (const auto &update : updates)
+        fprintf(file, " key=%s.%s", update.section.c_str(), update.key.c_str());
+    fprintf(file, "\n");
+    fclose(file);
+}
+} // namespace
+
 namespace ime_config_detail
 {
 bool WriteConfiguredValues(const std::vector<ConfigValueUpdate> &updates)
 {
     ConfigFileLock lock;
     if (!lock)
+    {
+        TraceConfigWrite("lock-failed", updates, lock.error());
         return false;
+    }
     std::error_code exists_error;
     const bool config_exists = std::filesystem::is_regular_file(g_config_path, exists_error);
     const auto config_size =
@@ -25,22 +57,32 @@ bool WriteConfiguredValues(const std::vector<ConfigValueUpdate> &updates)
     std::string text = ReadFileText(g_config_path);
     if (!TomlTextIsParseable(text))
     {
-        if (config_exists && config_size > 0 && text.empty())
+        if (config_exists && config_size > 0)
         {
+            // Startup salvage archives damaged files. A setting write cannot silently replace user data.
+            TraceConfigWrite("existing-config-invalid", updates, GetLastError());
             return false;
         }
         text = ReadFileText(g_config_path.parent_path() / kConfigTemplateFileName);
         if (!TomlTextIsParseable(text))
         {
+            TraceConfigWrite("template-invalid", updates);
             return false;
         }
     }
 
     for (const auto &update : updates)
     {
-        if (!ReplaceTomlValuePreservingFormatting(text, update.section, update.key, update.value) &&
-            !InsertTomlValuePreservingFormatting(text, update.section, update.key, update.value))
+        const auto protected_value = ProtectCredentialLiteral(update.key, update.value);
+        if (!protected_value)
         {
+            TraceConfigWrite("credential-protection-failed", updates);
+            return false;
+        }
+        if (!ReplaceTomlValuePreservingFormatting(text, update.section, update.key, *protected_value) &&
+            !InsertTomlValuePreservingFormatting(text, update.section, update.key, *protected_value))
+        {
+            TraceConfigWrite("replace-failed", updates);
             return false;
         }
     }
@@ -51,18 +93,23 @@ bool WriteConfiguredValues(const std::vector<ConfigValueUpdate> &updates)
     }
     catch (const toml::parse_error &)
     {
+        TraceConfigWrite("updated-toml-invalid", updates);
         return false;
     }
 
     // Write a temp file and rename it so a crash can never leave the user with a truncated config. This only makes the
     // directory entry swap atomic: there is no FlushFileBuffers, so a power loss can still lose the contents.
+    SetLastError(ERROR_SUCCESS);
+    _set_doserrno(0);
     if (!WriteFileTextAtomically(g_config_path, text))
     {
+        TraceConfigWrite("write-failed", updates, GetLastError());
         return false;
     }
 
     RememberConfigWriteTime();
     NotifyImeServerConfigChanged();
+    TraceConfigWrite("saved", updates);
     return true;
 }
 

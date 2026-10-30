@@ -45,6 +45,8 @@ try {
         }
     }
 
+    & (Join-Path $repoRoot 'scripts/EnsureBuildDeps.ps1')
+
     Push-Location (Join-Path $repoRoot 'windows')
     try { & $tsfCompile -Reconfigure:$Reconfigure } finally { Pop-Location }
 

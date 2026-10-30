@@ -203,6 +203,7 @@ def main() -> None:
     verify.add_argument("directory", type=Path)
     manifest = commands.add_parser("manifest")
     manifest.add_argument("--windows-commit", required=True)
+    manifest.add_argument("--windows-repository", default="metasequoiaime/MSIME-Windows")
     manifest.add_argument("--output", type=Path, required=True)
     update = commands.add_parser("refresh")
     update.add_argument("--dictionary-tag", required=True)
@@ -227,7 +228,9 @@ def main() -> None:
     elif args.command == "manifest":
         if not SHA.fullmatch(args.windows_commit):
             raise ValueError("Windows commit must be a full SHA")
-        data["repositories"]["windows"] = {"repository": "metasequoiaime/MSIME-Windows",
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.windows_repository):
+            raise SystemExit("Invalid Windows repository: expected owner/repo")
+        data["repositories"]["windows"] = {"repository": args.windows_repository,
                                            "commit": args.windows_commit}
         data["lock_sha256"] = sha256(args.lock)
         write_json(args.output, data)

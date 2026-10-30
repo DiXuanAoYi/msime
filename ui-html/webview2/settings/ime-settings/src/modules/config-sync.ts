@@ -1,3 +1,5 @@
+import {applyThemeConfig} from './theme';
+import {applySettingsEnvironment} from './settings-environment';
 import { onHostMessage } from '../utils/host-messages';
 import { serializeHostMessage } from '../../../../shared/messages';
 import { applyCollocationModelStatus, applyCandidateArrange, applyDropdownValue as applyDropdown, applyToggleState as applyToggle, setFuzzyRuleOptionsDisabled, setMixedCandidateOptionsDisabled, setSmartPunctuationOptionsDisabled } from './shared';
@@ -21,6 +23,9 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
     if (findElement(id)) applyDropdown(id, menu, value);
   };
   lastSnapshot = data;
+  if (!target) applySettingsEnvironment(data?.environment);
+  // Apply the shell theme immediately; lazy-loaded appearance controls are not a prerequisite.
+  if (!target && data?.appearance && typeof data.appearance === 'object') applyThemeConfig(data.appearance);
 
   if (!target || target === 'appearance' || target === 'skin') applyCandidateArrange(data?.appearance?.candidate_window_layout);
 
@@ -41,28 +46,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
           theme_handwriting: data?.appearance?.theme_handwriting,
           theme_voice: data?.appearance?.theme_voice
         },
-        {
-          font: data?.appearance?.font,
-          fallback_fonts: data?.appearance?.fallback_fonts,
-          fallback_font_css_families: data?.appearance?.fallback_font_css_families,
-          font_css_family: data?.appearance?.font_css_family,
-          english_font: data?.appearance?.english_font,
-          english_font_css_family: data?.appearance?.english_font_css_family,
-          default_font: data?.appearance?.default_font,
-          default_font_css_family: data?.appearance?.default_font_css_family,
-          font_size: data?.appearance?.font_size,
-          candidate_window_preedit_font_size: data?.appearance?.candidate_window_preedit_font_size,
-          cand_text_color: data?.appearance?.cand_text_color,
-          page_size: data?.appearance?.page_size,
-          candidate_window_follow_cursor: data?.appearance?.candidate_window_follow_cursor,
-          candidate_fixed_badge: data?.appearance?.candidate_fixed_badge,
-          candidate_fixed_badge_style: data?.appearance?.candidate_fixed_badge_style,
-          candidate_window_preedit_shuangpin_quanpin: data?.appearance?.candidate_window_preedit_shuangpin_quanpin,
-          tsf_preedit_shuangpin_quanpin: data?.appearance?.tsf_preedit_shuangpin_quanpin,
-          ui_backend: data?.appearance?.ui_backend,
-          settings_window_linger: data?.appearance?.settings_window_linger,
-          system_fonts: data?.appearance?.system_fonts
-        }
+        data?.appearance
       );
       module.updateCandidatePreviewHelpcode({
         input_schema: data?.input?.schema,
@@ -78,6 +62,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
     void import('./skin').then((module) => {
       if (data !== lastSnapshot) return;
       module.applyBuiltinSkinPageArrows(data?.appearance?.builtin_skin_page_arrows);
+      module.applyBuiltinSkinFitContent(data?.appearance?.builtin_skin_fit_content);
       module.applyCandidateSkinCatalog(
         data?.appearance?.external_candidate_skins,
         data?.appearance?.candidate_skin_scan_issues,
@@ -151,6 +136,12 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
   if (typeof data?.quanpin?.autocorrect_neighbor === 'boolean') {
     applyToggleState('autocorrectNeighborToggleBtn', data.quanpin.autocorrect_neighbor);
   }
+  if (typeof data?.quanpin?.autocorrect_deletion === 'boolean') {
+    applyToggleState('autocorrectDeletionToggleBtn', data.quanpin.autocorrect_deletion);
+  }
+  if (typeof data?.quanpin?.autocorrect_insertion === 'boolean') {
+    applyToggleState('autocorrectInsertionToggleBtn', data.quanpin.autocorrect_insertion);
+  }
   if (typeof data?.quanpin?.autocorrect_marker === 'boolean') {
     applyToggleState('autocorrectMarkerToggleBtn', data.quanpin.autocorrect_marker);
   }
@@ -185,6 +176,9 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
     document.querySelectorAll<HTMLInputElement>('input[name="punctuation-lock"]').forEach((radio) => {
       radio.checked = radio.value === lock;
     });
+  }
+  if (typeof data?.general?.candidate_translation_cloud === 'boolean') {
+    applyToggleState('candidateTranslationCloudToggleBtn', data.general.candidate_translation_cloud);
   }
   if (typeof data?.general?.candidate_translations === 'boolean') {
     applyToggleState('candidateTranslationsToggleBtn', data.general.candidate_translations);
@@ -415,16 +409,19 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
         data?.input?.wubi_schema,
         data?.input?.wubi_mixed_pinyin,
         data?.input?.wubi_z_mode,
-        data?.input?.wubi_four_code_auto_commit,
-        data?.input?.wubi_fifth_code_top_commit,
         data?.input?.default_ime_mode,
         data?.input?.ime_mode_scope,
         data?.input?.japanese_schema
       );
+      void import('./input-advanced').then(m=>{if(data===lastSnapshot)m.applyInputAdvanced(data?.input??{});});
       module.applyFrequencyConfig(data?.frequency_adjustment);
       module.applyTencentTmtConfig(data?.tencent_tmt);
+      module.applyTranslationCloudEnabled(data?.general?.candidate_translation_cloud === true);
+      module.applyVocabularyConfig(data?.vocabulary);
+      module.applyPersonalGlossaryConfig(data?.general?.personal_translation_glossary, data?.tencent_tmt?.target_language);
       module.applyNiuTransConfig(data?.niutrans);
       module.applyCustomTranslationConfig(data?.custom_translation);
+      module.applyCandidateTranslationConfig(data?.candidate_translation);
     });
   }
   if (applies('tools-settings')) {
@@ -436,6 +433,7 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
       );
     });
   }
+  if (applies('voice') && data?.speech) void import('./speech').then(m => { if (data === lastSnapshot) m.applySpeechConfig(data.speech); });
   if (applies('voice') && data?.voice_input && typeof data.voice_input === 'object') {
     void import('./voice').then((module) => { if (data === lastSnapshot) module.applyVoiceConfig(data.voice_input); });
   }
@@ -454,9 +452,13 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
         character_set: data?.general?.floating_toolbar_character_set,
         emoji: data?.general?.floating_toolbar_emoji,
         screen_keyboard: data?.general?.floating_toolbar_screen_keyboard,
+        voice: data?.general?.floating_toolbar_voice,
+        reply: data?.general?.floating_toolbar_reply,
+        clipboard: data?.general?.floating_toolbar_clipboard,
         settings: data?.general?.floating_toolbar_settings
       });
       module.applyCaretStateIndicatorPosition(data?.general?.caret_state_indicator_position);
+      module.applyFloatingToolbarShadow(data?.general?.floating_toolbar_shadow);
       module.applyFloatingToolbarAppearanceConfig(
         data?.general?.floating_toolbar_scale,
         data?.general?.floating_toolbar_font_size

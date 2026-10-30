@@ -131,24 +131,6 @@
         <div class="ftb-toggle-knob"></div>
       </div>
     </div>
-    <div class="section-header section-item-row">
-      <div>
-        <div class="section-title">四码唯一时自动上屏</div>
-        <div class="input-setting-description">敲满四码且码表只给一个候选时第四键直接上屏，不必再按空格；关闭后候选窗停留，等你选</div>
-      </div>
-      <div class="ftb-toggle-btn active" id="wubiFourCodeAutoCommitToggleBtn" role="switch" aria-checked="true" tabindex="0">
-        <div class="ftb-toggle-knob"></div>
-      </div>
-    </div>
-    <div class="section-header section-item-row">
-      <div>
-        <div class="section-title">第五码将首选上屏</div>
-        <div class="input-setting-description">完整四码后再敲字母时上屏首选，并把该字母留作下一组合开头；关闭只在拼音混输开启时生效，这个字母并入混输串；混输关闭时仍按顶字上屏，不会丢字</div>
-      </div>
-      <div class="ftb-toggle-btn active" id="wubiFifthCodeTopCommitToggleBtn" role="switch" aria-checked="true" tabindex="0">
-        <div class="ftb-toggle-knob"></div>
-      </div>
-    </div>
   </div>
 
   <!-- 日语方案 -->
@@ -214,6 +196,24 @@
     </div>
     <div class="section-header section-item-row">
       <div>
+        <div class="section-title">漏字纠错</div>
+        <div class="input-setting-description">漏敲一个字母时纠正，如 shng → shang（上）；默认关闭</div>
+      </div>
+      <div class="ftb-toggle-btn" id="autocorrectDeletionToggleBtn" role="switch" aria-checked="false" tabindex="0">
+        <div class="ftb-toggle-knob"></div>
+      </div>
+    </div>
+    <div class="section-header section-item-row">
+      <div>
+        <div class="section-title">多字纠错</div>
+        <div class="input-setting-description">多敲一个相邻按键时纠正，如 sjhang → shang（上）；默认关闭</div>
+      </div>
+      <div class="ftb-toggle-btn" id="autocorrectInsertionToggleBtn" role="switch" aria-checked="false" tabindex="0">
+        <div class="ftb-toggle-knob"></div>
+      </div>
+    </div>
+    <div class="section-header section-item-row">
+      <div>
         <div class="section-title">显示纠错标记</div>
         <div class="input-setting-description">纠错得到的候选末尾显示 * 号，便于和正常候选区分；不影响上屏文字</div>
       </div>
@@ -273,7 +273,7 @@
     <div class="section-header">
       <div>
         <div class="section-title">候选词翻译</div>
-        <div class="input-setting-description">在候选窗口中显示中文与所选语种的互译，每项最多两个简短释义</div>
+        <div class="input-setting-description">仅控制输入候选旁的译义：中文显示目标语言译词，英文显示中文释义。完整词典及开关在“词库”，整段翻译和屏幕翻译在“截图 · OCR · 翻译”，对话翻译在“翻译工具”。</div>
       </div>
       <div class="ftb-toggle-btn active" id="candidateTranslationsToggleBtn" role="switch" aria-checked="true" tabindex="0">
         <div class="ftb-toggle-knob"></div>
@@ -281,27 +281,72 @@
     </div>
     <div class="translation-api-options" id="candidateTranslationApiOptions">
       <div class="input-option-divider"></div>
-      <div class="section-header translation-language-row">
+      <div class="section-header">
         <div>
-          <div class="section-title">在线翻译服务</div>
-          <div class="input-setting-description">可使用腾讯云、小牛翻译，或填写自己部署的 DeepLX 兼容接口</div>
+          <div class="section-title">允许在线补全译文</div>
+          <div class="input-setting-description">默认关闭，仅查本地词表。开启后，缺少释义的候选词会发给所选翻译服务；此开关不控制云候选或 AI 联想。</div>
+        </div>
+        <div class="ftb-toggle-btn" id="candidateTranslationCloudToggleBtn" role="switch" aria-label="允许在线补全译文" aria-checked="false" tabindex="0"><div class="ftb-toggle-knob"></div></div>
+      </div>
+      <div class="input-option-divider"></div>
+      <details class="personal-glossary-editor"><summary class="section-title">个人译词 · 编辑、导入与导出</summary>
+        <label class="section-title" for="personalGlossaryText">个人译词表</label>
+        <div class="input-setting-description" id="personalGlossaryHelp">每行用 Tab 分隔：语言代码、中文词、译词，可加第四列。译词列可用分号保存全部义项。支持 en / ja / es / fr / de / ru / ko / vi / th / it。青简单语种多列文件导入时保留所有译义，第三条以后的译义并入第四列；相同语言和中文词以最后一行为准。</div>
+        <textarea id="personalGlossaryText" rows="6" spellcheck="false" aria-describedby="personalGlossaryHelp" placeholder="en&#9;开发&#9;development&#10;ja&#9;开发&#9;開発&#10;es&#9;开发&#9;desarrollo"></textarea>
+        <div class="personal-glossary-actions">
+          <button id="personalGlossarySave" class="credential-test-button" type="button">保存词表</button>
+          <button id="personalGlossaryImport" class="credential-test-button" type="button">导入 TSV / 青简词表</button>
+          <button id="personalGlossaryExport" class="credential-test-button" type="button">导出 TSV</button>
+          <input id="personalGlossaryFile" type="file" accept=".tsv,.txt" hidden>
+        </div>
+        <div class="input-setting-description">仅保存在本机。青简单语词表按下方目标语种导入，去除词性与读音，保留全部译义。导入后需点击保存。</div>
+        <div id="personalGlossaryStatus" class="input-setting-description" role="status" aria-live="polite"></div>
+      </details>
+      <div class="input-option-divider"></div>
+        <details id="vocabularyPanel" class="personal-glossary-editor">
+          <summary class="section-title">生词熟悉度</summary>
+          <p class="input-setting-description">按成功上屏时实际展示的一页记录译词；逐键刷新、取消输入不计数。看到 3 轮记为熟悉。仅本机保存，默认关闭。</p>
+          <div class="personal-glossary-actions">
+            <label><input id="vocabularyEnabled" type="checkbox"> 开启生词统计</label>
+            <label>保留期限 <select id="vocabularyRetention"><option value="30">30 天</option><option value="90" selected>90 天</option><option value="365">365 天</option></select></label>
+          </div>
+          <p class="input-setting-description">到期未再出现的记录自动清理；关闭统计保留已有记录。统计键为“语言 + 译词”，不保存原始按键或完整句子。</p>
+          <div class="personal-glossary-actions">
+            <button id="vocabularyRefresh" class="credential-test-button" type="button">刷新记录</button>
+            <button id="vocabularyExport" class="credential-test-button" type="button">导出全部 TSV</button>
+            <button id="vocabularyClear" class="credential-test-button" type="button">清空记录</button>
+          </div>
+          <div id="vocabularyConfirm" hidden><p>确定删除本机全部生词记录？此操作无法撤销。</p><button id="vocabularyConfirmClear" type="button">确认清空</button> <button id="vocabularyCancelClear" type="button">取消</button></div>
+          <p id="vocabularySummary" class="input-setting-description">点击“刷新记录”查看。</p>
+          <div class="vocabulary-table"><table><thead><tr><th>语言</th><th>译词</th><th>熟悉度</th><th>选过</th><th>直接用过</th></tr></thead><tbody id="vocabularyRows"></tbody></table></div>
+          <p id="vocabularyStatus" class="input-setting-description" role="status" aria-live="polite"></p>
+        </details>
+        <div class="input-option-divider"></div>
+      <div class="section-header translation-language-row" id="translationOnlineProvider">
+        <div>
+          <div class="section-title">候选译文补全服务</div>
+          <div class="input-setting-description">可以先选择服务、查看注册网址；选择本身不会开启在线翻译。允许在线补全后只用所选一种服务，本地词典始终优先。</div>
         </div>
         <div class="dropdown">
           <button class="dropdown-toggle translation-language-toggle" id="translationProviderBtn">
             <span>腾讯云</span><img src="./assets/arrow.svg" alt="▼">
           </button>
           <div class="dropdown-menu translation-language-menu" id="translationProviderMenu">
+            <div class="dropdown-item" data-value="legacy">沿用原选择 · 升级保留</div>
+            <div class="dropdown-item" data-value="dictionary">仅本地词典和个人译词</div>
             <div class="dropdown-item" data-value="tencent">腾讯云</div>
             <div class="dropdown-item" data-value="niutrans">小牛翻译</div>
             <div class="dropdown-item" data-value="custom">自定义 DeepLX</div>
+            <div class="dropdown-item" data-value="ai">AI 翻译 · 独立配置</div>
           </div>
         </div>
       </div>
+      <div id="candidateTranslationProviderLinks" class="translation-provider-links" aria-label="当前翻译服务网址"></div>
       <div class="input-option-divider"></div>
       <div class="section-header translation-language-row">
         <div>
           <div class="section-title">目标语种</div>
-          <div class="input-setting-description">英语优先使用本地词库；本地未命中时使用所选在线服务</div>
+          <div class="input-setting-description">优先查询个人译词表，再查青简本地释义：英 23.2 万、日 24.8 万、西 19.3 万、越 9.2 万条。机器生成可能有误，可用个人译词纠正。开启在线补全后，未命中的词才会发送给所选服务</div>
         </div>
         <div class="dropdown">
           <button class="dropdown-toggle translation-language-toggle" id="translationTargetLanguageBtn">
@@ -312,17 +357,28 @@
             <div class="dropdown-item" data-value="fr">法语</div>
             <div class="dropdown-item" data-value="ja">日语</div>
             <div class="dropdown-item" data-value="es">西班牙语</div>
+            <div class="dropdown-item" data-value="vi">越南语</div>
             <div class="dropdown-item" data-value="ru">俄语</div>
             <div class="dropdown-item" data-value="de">德语</div>
             <div class="dropdown-item" data-value="ko">韩语</div>
             <div class="dropdown-item" data-value="th">泰语</div>
-            <div class="dropdown-item" data-value="vi">越南语</div>
             <div class="dropdown-item" data-value="it">意大利语</div>
           </div>
         </div>
       </div>
       <div class="input-option-divider"></div>
-      <div id="tencentTranslationFields">
+      <div id="translationOnlineCredentials" hidden>
+      <div id="candidateAiTranslationFields" class="ai-section" hidden>
+        <h3 class="section-title">AI 候选翻译 · 独立配置</h3>
+        <p class="input-setting-description">和 AI 联想、语音润色分别保存；截图翻译和嘴替默认沿用语音润色的文本模型。本地/个人释义优先，未命中才请求；仍受“在线补全”总开关控制。译文不会覆盖词典。DeepSeek 思考关闭以降低延迟。</p>
+        <div class="ai-grid">
+          <label><span>AI 提供商</span><select id="candidateAiProvider"><option value="deepseek">DeepSeek</option><option value="openai">OpenAI</option><option value="siliconflow">SiliconFlow</option><option value="groq">Groq</option><option value="custom">Custom · 独立槽</option><option value="local">本地文本模型 · Token 可选</option></select></label>
+          <label class="ai-wide"><span>接口地址</span><input id="candidateAiEndpoint" type="url" autocomplete="off" spellcheck="false"></label>
+          <label><span>API Token</span><input id="candidateAiToken" type="password" autocomplete="off" spellcheck="false"></label>
+          <div class="ai-field"><label for="candidateAiModel">模型 · 可直接输入</label><div class="model-combo"><input id="candidateAiModel" type="text" autocomplete="off" spellcheck="false"><button id="candidateAiModelArrow" type="button" aria-label="展开或查询模型">⌄</button><div id="candidateAiModelMenu" class="model-menu"></div></div><button id="candidateAiModelFetch" type="button">查询模型</button><span id="candidateAiModelStatus" role="status"></span></div>
+        </div>
+      </div>
+<div id="tencentTranslationFields">
         <div class="translation-api-heading">
           <div class="section-title">腾讯云 API 凭据</div>
           <div class="input-setting-description">用于在线机器翻译，凭据仅保存在本机配置文件中</div>
@@ -417,6 +473,7 @@
       <div class="credential-test-row">
         <button id="candidateTranslationTestButton" class="credential-test-button" type="button">测试配置</button>
         <span id="candidateTranslationTestStatus" class="credential-test-status" role="status" aria-live="polite"></span>
+      </div>
       </div>
     </div>
   </div>
@@ -731,4 +788,7 @@
       </div>
     </div>
   </div>
+  <div class="section"><div class="section-header"><div><div class="section-title">英文状态候选</div><p class="input-setting-description">知语切到“英”时显示单词、句子和释义。按软件的规则可覆盖全局开关。</p></div><div id="englishCandidatesToggle" class="ftb-toggle-btn" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div><div class="input-app-rule"><input id="englishRuleApp" placeholder="软件进程名，如 code.exe"><button id="englishRuleAdd" type="button">添加软件</button></div><p id="englishRuleStatus" role="status"></p><div id="englishRules"></div><p class="input-setting-description">首次安装或 TSF DLL 更新后，完整退出并重开已运行的软件以加载新版；日常中英切换无需重启。</p></div>
+  <div class="section chinese-scheme-settings"><div class="section-header"><span class="section-title">五笔四码唯一自动上屏</span><div id="wubiFourAutoToggle" class="ftb-toggle-btn" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div><div class="section-header"><span>第五码顶屏</span><div id="wubiFifthTopToggle" class="ftb-toggle-btn" role="switch" aria-checked="true" tabindex="0"><div class="ftb-toggle-knob"></div></div></div><p class="input-setting-description">仅五笔编码生效；通配与混输按候选引擎的安全条件判断。</p></div>
+  <div class="section"><h3 class="section-title">Vim 软件</h3><p class="input-setting-description">每行填写一个软件进程名，Esc 后切换英文便于命令模式；只影响列出的软件。</p><textarea id="vimModeApps" class="advanced-text" rows="3" placeholder="例如 neovim.exe"></textarea></div>
 </div>

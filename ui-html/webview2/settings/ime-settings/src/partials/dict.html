@@ -1,5 +1,17 @@
 <div class="content" id="dict-settings">
   <div class="content-header"><span>词库</span></div>
+  <section class="dict-card" id="translationLibrary">
+    <h3>离线翻译与学习词典</h3>
+    <p>按需开启通用、行业和学习词典。源词条与反向检索条目分开计数；词典之间可能重叠。导出的 TSV 可用文本编辑器或表格软件保存、整理。</p>
+    <div class="dict-toolbar"><input data-search class="dict-input" placeholder="搜索：青简、四级、医学…" aria-label="搜索离线词典"><select data-category aria-label="词典分类"><option value="all">全部词典</option><option>通用</option><option>学习</option><option>行业</option></select><button data-refresh type="button">刷新列表</button></div>
+    <p>按住 Ctrl 点击候选中文朗读原词，点击译文朗读释义；使用本机已安装的语音。</p>
+    <p data-status role="status">正在读取词典…</p><div data-books class="library-books"></div>
+  </section>
+  <div class="qp" id="dictLearningLinks"><div class="card">
+    <div class="card-h"><h2>学习与按软件词库</h2><p>原来放在“剪贴板与资料库”里，和剪贴板无关，现在从词库进入。数据没有变。</p></div>
+    <div class="row"><div class="row-l"><b>生词复习、学习记录</b><small>按间隔复习已记录的生词，逐条删除学习记录</small></div><div class="row-r"><button class="btn sm" type="button" data-lib-jump="study">生词复习</button><button class="btn sm" type="button" data-lib-jump="learning">学习记录</button></div></div>
+    <div class="row"><div class="row-l"><b>软件词库</b><small>给指定软件单独开关学习、排序和触发编码</small></div><div class="row-r"><button class="btn sm" type="button" data-lib-jump="rules">打开</button></div></div>
+  </div></div>
   <div class="dict-card">
     <div class="dict-tabs" role="tablist">
       <button class="dict-tab active" data-dictionary="quanpin">全拼词库</button>
@@ -65,4 +77,5 @@
     <div id="dictToastMessage" class="dict-toast-message"></div>
     <button id="dictToastClose" class="dict-toast-close" type="button" aria-label="关闭通知">×</button>
   </div>
+<details class="section domain-input-section"><summary class="section-title">领域输入词库 · 独立开关与导出</summary><p>参与中文输入候选，与用于显示释义的翻译词典分别管理。每个领域可独立开关、导出，也可按软件限定范围；关闭只停用，不删除文件。</p><button id="domainRefresh" type="button">刷新领域词库</button><p id="domainStatus" role="status"></p><div id="domainCatalog" class="domain-catalog"></div><h3>按软件选择领域</h3><label>软件进程名<input id="domainApplication" placeholder="例如 Code.exe"></label><label>使用范围<select id="domainApplicationMode"><option value="inherit">跟随全局开关</option><option value="replace">仅使用下面所选包</option></select></label><p>独立范围未选任何包时，该软件关闭全部领域输入包。选项默认自动保存。</p><div id="domainApplicationPacks" class="domain-checks"></div></details>
 </div>

@@ -2,7 +2,6 @@
 #include "Globals.h"
 #include "EditSession.h"
 #include "MetasequoiaIME.h"
-#include "stats_collector.h"
 #include <debugapi.h>
 #include <fmt/xchar.h>
 
@@ -88,13 +87,11 @@ class CEndCompositionEditSession : public CEditSessionBase
 //----------------------------------------------------------------------------
 
 void CMetasequoiaIME::_TerminateComposition(TfEditCookie ec, _In_ ITfContext *pContext, BOOL isCalledFromDeactivate,
-                                            _Out_opt_ HRESULT *result)
+                                            HRESULT *endStatus)
 {
     isCalledFromDeactivate;
-    if (result)
-    {
-        *result = S_OK;
-    }
+    if (endStatus)
+        *endStatus = S_OK;
 
     if (_pComposition != nullptr)
     {
@@ -112,39 +109,29 @@ void CMetasequoiaIME::_TerminateComposition(TfEditCookie ec, _In_ ITfContext *pC
 
         // Read the committed text before any COM call below can change or end
         // the composition. The cancel path has already wiped the range, so a
-        // cancelled composition classifies to zero and does not count. The
-        // strict path counts only once the host has accepted the end: a refused
-        // end is cancelled by the failure reset and never reaches the document.
-        MsimeStats::CharClassCounts deferredStats;
-        const bool statsDeferred =
-            _CaptureCompositionStats(ec, terminatingComposition, result ? &deferredStats : nullptr);
+        // cancelled composition classifies to zero and does not count.
+        _CaptureCompositionStats(ec, terminatingComposition);
+        _RememberLastCommit(ec, terminatingComposition);
 
         // remove the display attribute from the composition range.
         _ClearCompositionDisplayAttributes(ec, pContext, terminatingComposition);
 
         const HRESULT endResult = SafeEndComposition(terminatingComposition, ec);
-        if (result)
+        if (endStatus)
         {
-            *result = endResult;
+            *endStatus = endResult;
             if (endResult != S_OK)
             {
-                // Cycle must not change modes after a refused end. Keep the
-                // current composition owned so the normal failure reset can
-                // cancel it; a re-entrant termination already owns its cleanup.
+                _ClearLastCommit();
                 if (ownerContext)
-                {
                     ownerContext->Release();
-                }
                 terminatingComposition->Release();
                 return;
-            }
-            if (statsDeferred)
-            {
-                MsimeStats::QueueStatisticsEvent(deferredStats);
             }
         }
         if (FAILED(endResult) && _pComposition == terminatingComposition)
         {
+            _ClearLastCommit();
             // if we fail to EndComposition, then we need to close the reverse reading window.
             _DeleteCandidateList(TRUE, pContext);
         }

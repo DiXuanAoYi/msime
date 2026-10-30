@@ -19,7 +19,76 @@ bool IsEnglishInputModeToggle(UINT code, UINT modifiers);
 bool IsTranslationCommitShortcut(UINT code, UINT modifiers);
 bool IsPinyinCommitShortcut(UINT code, UINT modifiers);
 bool IsCharacterSetInputModeToggle(UINT code, UINT modifiers);
-bool IsTrilingualCycleEnabled();
+// Shared by immediate and deferred classification: English candidates use the
+// same edit-session dispatch and never replay letters into the application.
+inline bool ClassifyEnglishCandidateKey(UINT code, WCHAR ch, bool active, bool /*candidate*/, bool caps,
+                                        _KEYSTROKE_STATE *state)
+{
+    KEYSTROKE_CATEGORY category = CATEGORY_COMPOSING;
+    KEYSTROKE_FUNCTION function = FUNCTION_NONE;
+    if ((ch >= L'a' && ch <= L'z') || (ch >= L'A' && ch <= L'Z'))
+    {
+        if (caps && !active)
+            return false;
+        // Visible suggestions do not end an English word. Finalize-and-input
+        // commits the previous preedit and starts over for every next letter.
+        function = FUNCTION_INPUT;
+    }
+    else if (active)
+    {
+        switch (code)
+        {
+        case VK_BACK:
+            function = FUNCTION_BACKSPACE;
+            break;
+        case VK_DELETE:
+            function = FUNCTION_DELETE;
+            break;
+        case VK_LEFT:
+            function = FUNCTION_MOVE_LEFT;
+            break;
+        case VK_RIGHT:
+            function = FUNCTION_MOVE_RIGHT;
+            break;
+        case VK_ESCAPE:
+            category = CATEGORY_CANDIDATE;
+            function = FUNCTION_CANCEL;
+            break;
+        case VK_RETURN:
+            category = CATEGORY_CANDIDATE;
+            function = FUNCTION_FINALIZE_CANDIDATELISTForVKReturn;
+            break;
+        case VK_SPACE:
+            category = CATEGORY_CANDIDATE;
+            function = FUNCTION_CONVERT;
+            break;
+        case VK_TAB:
+        case VK_PRIOR:
+        case VK_NEXT:
+        case VK_UP:
+        case VK_DOWN:
+            category = CATEGORY_CANDIDATE;
+            function = FUNCTION_SERVER_CANDIDATE_KEY;
+            break;
+        default:
+            if (code >= L'1' && code <= L'9')
+            {
+                category = CATEGORY_CANDIDATE;
+                function = FUNCTION_SELECT_BY_NUMBER;
+            }
+            else if (ch >= 0x20 && ch < 0x7f)
+                function = FUNCTION_PUNCTUATION;
+        }
+    }
+    if (function == FUNCTION_NONE)
+        return false;
+    if (state)
+    {
+        state->Category = category;
+        state->Function = function;
+    }
+    return true;
+}
 void PostOwnerMessageWithSyncFallback(HWND window, UINT message, WPARAM wParam = 0, LPARAM lParam = 0);
 bool IsShiftVk(UINT code);
 } // namespace key_event_sink_detail

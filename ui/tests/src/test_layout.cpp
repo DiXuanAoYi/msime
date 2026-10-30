@@ -244,6 +244,24 @@ TEST_CASE(horizontal_candidate_translation_uses_a_second_line)
     REQUIRE_NEAR(list.MeasureInLayout({1000.0f, 1000.0f}).height, plain.height);
 }
 
+TEST_CASE(candidate_fit_content_releases_minimum_but_keeps_pinyin_and_translation_width)
+{
+    CandidateList list(28.0f);
+    CandidateList::Appearance normal;
+    list.SetAppearance(normal);
+    list.SetItems({{L"1", L"你", L"", L"", {}, L"nǐ"}});
+    const auto oldWidth = list.MeasureInLayout({1000.0f, 1000.0f}).width;
+    auto compact = normal;
+    compact.fitContent = true;
+    list.SetAppearance(compact);
+    const auto shortWidth = list.MeasureInLayout({1000.0f, 1000.0f}).width;
+    REQUIRE(shortWidth < oldWidth);
+    list.SetItems({{L"1", L"你", L"", L"n. a long translation that must remain visible", {}, L"nǐ"}});
+    REQUIRE(list.MeasureInLayout({1000.0f, 1000.0f}).width > shortWidth);
+    list.SetItems({{L"1", L"你", L"", L"", {}, L"a long tonal pinyin overline"}});
+    REQUIRE(list.MeasureInLayout({1000.0f, 1000.0f}).width > shortWidth);
+}
+
 TEST_CASE(horizontal_candidate_translation_keeps_the_row_bottom_padding_below_it)
 {
     // 行高里的底部内边距挪到翻译下面，而不是夹在候选与翻译之间；挪动不应让整行变高。
@@ -501,4 +519,77 @@ TEST_CASE(candidate_arrangement_reflows_when_the_final_slot_is_narrower)
     REQUIRE(list.OnMouseDown({20, 44}, MK_LBUTTON));
     REQUIRE(list.OnMouseUp({20, 44}, 0));
     REQUIRE(activated == 1);
+}
+
+TEST_CASE(candidate_modified_click_is_consumed_without_selection_or_commit_at_each_dpi)
+{
+    Window window(L"candidate-modifier-test", L"", 1000, 1000);
+    CandidateList list(28.0f);
+    list.Attach(&window);
+    list.SetItems({{L"1", L"中文", L"", L"English"}, {L"2", L"第二", L"", L"second"}});
+    auto size = list.MeasureInLayout({1000.0f, 1000.0f});
+    list.ArrangeInLayout({10.0f, 20.0f, size.width, size.height});
+    int commits = 0, modified = 0;
+    list.SetOnItemActivated([&](size_t) { ++commits; });
+    list.SetOnModifiedItemActivated([&](size_t index, WPARAM keys, bool) {
+        if (!(keys & MK_CONTROL))
+            return false;
+        REQUIRE(index == 1);
+        ++modified;
+        return true;
+    });
+    for (float dpi : {96.0f, 120.0f, 144.0f, 192.0f})
+    {
+        window.SetDpiOverride(dpi);
+        list.SetSelectedIndex(0);
+        const auto row = list.GetItemBounds(1);
+        POINT point{static_cast<LONG>(DipsToPixels(row.x + 10, dpi)), static_cast<LONG>(DipsToPixels(row.y + 10, dpi))};
+        REQUIRE(list.OnMouseDown(point, MK_LBUTTON | MK_CONTROL));
+        REQUIRE(list.OnMouseUp(point, 0)); // Ctrl released before the mouse must still consume.
+        REQUIRE(commits == 0);
+        REQUIRE(list.GetSelectedIndex() == 0);
+    }
+    REQUIRE(modified == 4);
+    window.SetDpiOverride(96);
+    const auto row = list.GetItemBounds(1);
+    POINT point{static_cast<LONG>(row.x + 10), static_cast<LONG>(row.y + 10)};
+    REQUIRE(list.OnMouseDown(point, MK_LBUTTON));
+    REQUIRE(list.OnMouseUp(point, 0));
+    REQUIRE(commits == 1);
+    REQUIRE(list.GetSelectedIndex() == 1);
+}
+TEST_CASE(candidate_modified_click_distinguishes_text_from_translation_at_each_dpi)
+{
+    Window window(L"candidate-speech-region", L"", 1000, 1000);
+    CandidateList list(28.0f);
+    list.Attach(&window);
+    list.SetItems({{L"1", L"你好", L"", L"hello; hi"}});
+    int spokenSource = 0, spokenTranslation = 0;
+    list.SetOnModifiedItemActivated([&](size_t, WPARAM, bool translation) {
+        translation ? ++spokenTranslation : ++spokenSource;
+        return true;
+    });
+    for (auto orientation : {CandidateList::Orientation::Horizontal, CandidateList::Orientation::Vertical})
+    {
+        list.SetOrientation(orientation);
+        auto size = list.MeasureInLayout({1000, 1000});
+        list.ArrangeInLayout({30, 40, size.width, size.height});
+        for (float dpi : {96.0f, 120.0f, 144.0f, 192.0f})
+        {
+            window.SetDpiOverride(dpi);
+            spokenSource = 0;
+            spokenTranslation = 0;
+            const auto row = list.GetItemBounds(0);
+            for (float y = 3; y < row.height - 2; y += 5)
+                for (float x = 3; x < row.width - 2; x += 5)
+                {
+                    POINT point{static_cast<LONG>(DipsToPixels(row.x + x, dpi)),
+                                static_cast<LONG>(DipsToPixels(row.y + y, dpi))};
+                    REQUIRE(list.OnMouseDown(point, MK_LBUTTON | MK_CONTROL));
+                    REQUIRE(list.OnMouseUp(point, MK_CONTROL));
+                }
+            REQUIRE(spokenSource > 0);
+            REQUIRE(spokenTranslation > 0);
+        }
+    }
 }

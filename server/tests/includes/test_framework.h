@@ -22,6 +22,14 @@ struct Registrar
 {
     Registrar(const char *name, std::function<void()> fn);
 };
+
+template <typename Left, typename Right> void RequireEqual(const Left &left, const Right &right, const char *expression)
+{
+    // Compare inside the same full expression as both arguments. A reference
+    // returned by make_vector().at(0) otherwise dangles before a later statement.
+    if (!(left == right))
+        throw std::runtime_error(std::string("Requirement failed: ") + expression);
+}
 } // namespace test
 
 #define TEST_CASE(name)                                                                                                \
@@ -41,10 +49,5 @@ struct Registrar
 #define REQUIRE_EQ(lhs, rhs)                                                                                           \
     do                                                                                                                 \
     {                                                                                                                  \
-        const auto &_lhs = (lhs);                                                                                      \
-        const auto &_rhs = (rhs);                                                                                      \
-        if (!(_lhs == _rhs))                                                                                           \
-        {                                                                                                              \
-            throw std::runtime_error("Requirement failed: " #lhs " == " #rhs);                                         \
-        }                                                                                                              \
+        test::RequireEqual((lhs), (rhs), #lhs " == " #rhs);                                                            \
     } while (false)

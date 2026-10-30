@@ -166,9 +166,6 @@ export function setupToolsSettings(): void {
   hoistOverlay(document.getElementById('quickPhraseModal'));
   const table = document.getElementById('quickPhraseTableWrap');
   if (table) pager = createDictionaryPager(table, offset => query(offset));
-  setupToggleButton('clipboardHistoryToggleBtn', (active) => {
-    updateConfig('utility.clipboard_history', active);
-  });
   setupMixedCandidatesSection();
   setupToggleButton('quickPhraseToggleBtn', (active) => {
     updateConfig('utility.quick_phrase', active);

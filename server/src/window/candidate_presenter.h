@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <windows.h>
+#include <d2d1.h>
 
 class CandidatePresenter
 {
@@ -40,6 +41,8 @@ class CandidatePresenter
     // briefly showing the previous card.
     void PresentEmptyFrame();
     void ArmHoverIfPointerMoved();
+    bool HandleDecorationMessage(UINT message, WPARAM wParam, LPARAM lParam);
+    void ResetDecorationMotion();
     void CommitItem(size_t pageIndex);
     void ShowItemContextMenu(size_t pageIndex, POINT clientPoint);
     void CloseContextMenu(bool restoreHost);
@@ -62,6 +65,10 @@ class CandidatePresenter
     // 卡片最小宽度：默认 160，外部皮肤的 min_width_dip 与装饰图宽度可以把它撑大，
     // 装饰图因此始终落在卡片宽度之内（与 WebView2 端的 min-width 规则一致）。
     float cardMinWidthDip_ = 160.0f;
+    D2D1_COLOR_F translationPos_{};
+    D2D1_COLOR_F translationSeparator_{};
+    D2D1_COLOR_F selectedTranslationPos_{};
+    D2D1_COLOR_F selectedTranslationSeparator_{};
     std::string lastSkinFingerprint_;
     int lastHostWidthPx_ = 0;
     int lastHostHeightPx_ = 0;

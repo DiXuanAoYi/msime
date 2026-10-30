@@ -319,7 +319,14 @@ TEST_CASE(CaretPrefixFloorsInsideShuangpinGreedyUnits)
         REQUIRE_EQ(session.prefix_end(), std::size_t{6});
         REQUIRE(session.pending_suffix().empty());
 
+        // A caret inside the first unit rounds up to that unit's end; only caret == 0 is an empty prefix.
         session.set_caret(1);
+        session.recompute_candidates();
+        REQUIRE_EQ(session.prefix_end(), std::size_t{2});
+        REQUIRE_EQ(session.pending_suffix(), std::string("hkb;"));
+        REQUIRE(SameCandidateWords(session, ShuangpinCandidateWordsFor("ni", paths)));
+
+        session.set_caret(0);
         session.recompute_candidates();
         REQUIRE(session.candidates().empty());
         REQUIRE_EQ(session.prefix_end(), std::size_t{0});

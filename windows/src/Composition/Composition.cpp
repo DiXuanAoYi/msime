@@ -1175,6 +1175,7 @@ STDAPI CMetasequoiaIME::OnCompositionTerminated(TfEditCookie ecWrite, _In_ ITfCo
     // Do NOT SetText(empty) note below), so this is a real commit and must be
     // counted before any teardown runs.
     _CaptureCompositionStats(ecWrite, terminatedComposition);
+    _RememberLastCommit(ecWrite, terminatedComposition);
 
     _pComposition->Release();
     _pComposition = nullptr;
@@ -1266,29 +1267,30 @@ void CMetasequoiaIME::_SetComposition(_In_ ITfComposition *pComposition)
 // teardown ordering. Any failure is silent.
 //----------------------------------------------------------------------------
 
-bool CMetasequoiaIME::_CaptureCompositionStats(TfEditCookie ec, _In_ ITfComposition *pComposition,
-                                               _Out_opt_ MsimeStats::CharClassCounts *deferredCounts)
+void CMetasequoiaIME::_CaptureCompositionStats(TfEditCookie ec, _In_ ITfComposition *pComposition)
 {
+    if (!FanyImeFieldPrivacy::AllowsLocalHistory(_fieldPrivacy))
+        return;
     if (!Global::StatisticsEnabled.load(std::memory_order_relaxed))
     {
         // Nothing to capture while the switch is off: no range read, no
         // classification, no pipe. The capture flag stays untouched so a
         // composition that spans a settings change is simply not counted.
-        return false;
+        return;
     }
     if (_compositionStatsCaptured.exchange(true, std::memory_order_acq_rel))
     {
-        return false;
+        return;
     }
     if (pComposition == nullptr)
     {
-        return false;
+        return;
     }
 
     ITfRange *pCompositionRange = nullptr;
     if (FAILED(pComposition->GetRange(&pCompositionRange)) || pCompositionRange == nullptr)
     {
-        return false;
+        return;
     }
     // The walk below shifts the range start, so it must never touch what the
     // host handed back: a host that returns the live composition range would
@@ -1299,7 +1301,7 @@ bool CMetasequoiaIME::_CaptureCompositionStats(TfEditCookie ec, _In_ ITfComposit
     pCompositionRange->Release();
     if (FAILED(cloneResult) || pRange == nullptr)
     {
-        return false;
+        return;
     }
 
     // Hosts may hand back fewer units than requested, so read in small blocks
@@ -1344,15 +1346,7 @@ bool CMetasequoiaIME::_CaptureCompositionStats(TfEditCookie ec, _In_ ITfComposit
     }
 
     pRange->Release();
-    if (deferredCounts)
-    {
-        *deferredCounts = counts;
-    }
-    else
-    {
-        MsimeStats::QueueStatisticsEvent(counts);
-    }
-    return true;
+    MsimeStats::QueueStatisticsEvent(counts);
 }
 
 //+---------------------------------------------------------------------------
@@ -1438,7 +1432,7 @@ HRESULT CMetasequoiaIME::_AddComposingAndChar(TfEditCookie ec, _In_ ITfContext *
 //----------------------------------------------------------------------------
 
 HRESULT CMetasequoiaIME::_AddCharAndFinalize(TfEditCookie ec, _In_ ITfContext *pContext,
-                                             _In_ CStringRange *pstrAddString, bool requireSelection)
+                                             _In_ CStringRange *pstrAddString)
 {
     HRESULT hr = E_FAIL;
 
@@ -1455,7 +1449,7 @@ HRESULT CMetasequoiaIME::_AddCharAndFinalize(TfEditCookie ec, _In_ ITfContext *p
     TF_SELECTION tfSelection;
 
     if ((hr = pContext->GetSelection(ec, TF_DEFAULT_SELECTION, 1, &tfSelection, &fetched)) != S_OK || fetched != 1)
-        return requireSelection && hr == S_OK ? S_FALSE : hr;
+        return hr;
 
     // We use SetText here instead of InsertTextAtSelection because we've already started a composition
     // We don't want to the app to adjust the insertion point inside our composition
@@ -1465,7 +1459,7 @@ HRESULT CMetasequoiaIME::_AddCharAndFinalize(TfEditCookie ec, _In_ ITfContext *p
         // Direct write with no composition: this text never passes through
         // _TerminateComposition / OnCompositionTerminated, so it is the third
         // and last commit exit and must be counted here.
-        if (_pComposition == nullptr)
+        if (_pComposition == nullptr && FanyImeFieldPrivacy::AllowsLocalHistory(_fieldPrivacy))
         {
             MsimeStats::QueueStatisticsEvent(
                 MsimeStats::ClassifyText(pstrAddString->Get(), static_cast<size_t>(pstrAddString->GetLength())));

@@ -20,17 +20,6 @@ namespace
 // （token_<provider> / asr_token[_<provider>] / polish_token[_<provider>]）。这类值一旦丢失，
 // 用户就得重新去各家控制台申请再填一遍，是升级里代价最高的配置，所以单独兜底：不管模板怎么漂移、
 // 文件是否损坏，只要用户填过真值就一条都不能丢。
-bool IsCredentialKey(const std::string &key)
-{
-    static const std::set<std::string> exact = {"token",  "api_key",     "apikey",    "secret_id",   "secret_key",
-                                                "app_id", "asr_app_key", "asr_token", "polish_token"};
-    if (exact.count(key) != 0)
-    {
-        return true;
-    }
-    return key.rfind("token_", 0) == 0 || key.rfind("asr_token_", 0) == 0 || key.rfind("polish_token_", 0) == 0;
-}
-
 // 剥掉单行 TOML 字符串两侧的引号。凭证值从不跨行，够用了。
 std::string UnquoteTomlScalar(const std::string &value)
 {
@@ -76,12 +65,16 @@ std::string ReapplyRealCredentials(std::string text, const std::map<std::string,
     return text;
 }
 
-// 以新模板为骨架（注释、分节顺序、新增项都来自新版），只把用户改过的值填回去。
+// 以新模板为骨架，保留全部已有值与扩展项；历史默认值也是用户配置的一部分。
 std::string MergeTomlIntoTemplate(const std::string &template_text, std::map<std::string, std::string> user_values,
                                   const std::map<std::string, std::string> &baseline_values)
 {
+    (void)baseline_values; // Retained for the public merge API; old defaults are no longer overwritten.
     const auto fallback_id = MakeTomlAssignmentId("appearance", "fallback_fonts");
-    if (!user_values.empty() && user_values.find(fallback_id) == user_values.end())
+    const auto template_values = ParseTomlAssignments(template_text);
+    if (template_values.count(fallback_id) && user_values.find(fallback_id) == user_values.end() &&
+        (user_values.count(MakeTomlAssignmentId("appearance", "font")) ||
+         user_values.count(MakeTomlAssignmentId("appearance", "default_font"))))
     {
         const auto font = user_values.find(MakeTomlAssignmentId("appearance", "font"));
         const auto default_font = user_values.find(MakeTomlAssignmentId("appearance", "default_font"));
@@ -105,12 +98,7 @@ std::string MergeTomlIntoTemplate(const std::string &template_text, std::map<std
             {
                 return;
             }
-            // 仍等于上一版默认值，说明用户没动过这一项，让新版默认值生效。
-            const auto baseline = baseline_values.find(id);
-            if (baseline != baseline_values.end() && baseline->second == user->second)
-            {
-                return;
-            }
+            // A persisted old default can also be an intentional user choice. An upgrade only adds missing keys.
             patches.push_back({value_begin, value_end, user->second});
         });
 
@@ -118,6 +106,24 @@ std::string MergeTomlIntoTemplate(const std::string &template_text, std::map<std
     for (auto patch = patches.rbegin(); patch != patches.rend(); ++patch)
     {
         merged.replace(patch->begin, patch->end - patch->begin, patch->value);
+    }
+    for (const auto &[id, literal] : user_values)
+    {
+        if (template_values.count(id))
+            continue;
+        const size_t separator = id.find('\x01');
+        const std::string section = separator == std::string::npos ? std::string() : id.substr(0, separator);
+        const std::string key = separator == std::string::npos ? id : id.substr(separator + 1);
+        // Preserve extension/provider slots too. Ignoring an unknown setting is safer than deleting user data.
+        try
+        {
+            (void)toml::parse("value = " + literal);
+            InsertTomlValuePreservingFormatting(merged, section, key, literal);
+        }
+        catch (const toml::parse_error &)
+        {
+            // The corrupt file is archived; an incomplete unknown assignment must not defeat salvage.
+        }
     }
     return ReapplyRealCredentials(std::move(merged), user_values);
 }

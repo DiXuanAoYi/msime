@@ -10,6 +10,8 @@ theme = "dark"
 # 通用
 #
 [general]
+floating_toolbar_shadow = true
+disabled_translation_dictionaries = "" # 关闭的离线翻译词典 ID，逗号分隔
 # Server 端诊断日志（默认关闭；不记录输入内容或候选文本）
 diagnostic_log = false
 # TSF 端批量诊断日志（默认关闭；不记录输入内容或候选文本）
@@ -28,6 +30,9 @@ floating_toolbar_punctuation = true
 floating_toolbar_character_set = true
 floating_toolbar_emoji = true
 floating_toolbar_screen_keyboard = false
+floating_toolbar_voice = true
+floating_toolbar_reply = true
+floating_toolbar_clipboard = true
 floating_toolbar_settings = true
 # 悬浮工具栏用户缩放（相对系统 DPI），可选：0.75 / 1.0 / 1.25 / 1.5
 floating_toolbar_scale = 1.0
@@ -55,6 +60,10 @@ cn_en_mixed_input = true
 cn_en_mixed_input_min_chars = 2
 # 在竖排候选窗口中显示中英文互译（每项最多两个简短释义）
 candidate_translations = true
+# 本地词表优先；在线补全需明确开启，关闭不影响其他云功能。
+candidate_translation_cloud = false
+# UTF-8 TSV: 语言<Tab>中文词<Tab>译词[<Tab>第二释义]，由设置页编辑。
+personal_translation_glossary = ""
 # 中文输入状态下显示 emoji 前缀候选（排在候选项列表最后）
 emoji_mixed_input = false
 # 中文输入状态下显示颜文字前缀候选（排在 emoji 之后）
@@ -71,6 +80,12 @@ clean_mode = false
 # chinese-ime-lm 的 Transformer，还需模型文件在数据目录里，desktop 更准也更慢。
 #
 [association]
+collocation_max_length = 6
+collocation_min_length = 2
+collocation_penalty = -14.0
+non_collocation_penalty = -6.0
+weak_collocation_penalty = -100.0
+rear_penalty = -18.0
 # 词格整句联想（kenlm 三元模型打分）
 sentence_wordlattice = true
 # Google 解码器整句联想
@@ -94,7 +109,7 @@ sentence_collocation_enabled = false
 # 模型后直接填 id。
 sentence_collocation_model = ""
 # 搭配项的线性权重（log10 域），越大越信任搭配表。不进设置页，供配置文件高级调参
-sentence_collocation_weight = 0.1
+sentence_collocation_weight = 1.0
 sentence_collocation_rerank_weight = 0.05
 
 #
@@ -147,6 +162,7 @@ linear_step = 1
 # 外观
 #
 [appearance]
+candidate_fit_content = "follow"
 # 主题模式，可选："dark", "light", "system"
 theme_mode = "system"
 # 候选窗 / 悬浮工具栏 / 托盘菜单渲染，可选："d2d", "webview2"
@@ -193,6 +209,8 @@ candidate_window_preedit_style = "pinyin"
 # 双拼方案下候选窗预编辑显示转换后的全拼分词（ni'hao），关闭时显示双拼原串
 candidate_window_preedit_shuangpin_quanpin = false
 # 固定排位候选词是否显示徽标
+# 中文候选上方显示带声调拼音（不影响输入和上屏文字）
+candidate_show_pinyin = true
 candidate_fixed_badge = true
 # 固定排位候选词徽标样式，可选："paperclip", "pushpin", "dot"
 candidate_fixed_badge_style = "paperclip"
@@ -211,6 +229,14 @@ tsf_preedit_shuangpin_quanpin = false
 # 输入
 #
 [input]
+wubi_four_code_auto_commit = true
+wubi_fifth_code_top_commit = true
+vim_mode_apps = []
+# English candidate settings apply to already running compatible TSF hosts.
+english_candidates = true
+english_candidate_app_rules = "[]"
+# Additional input packs remain optional, with idioms enabled on a fresh install.
+enabled_domain_dictionaries = "idioms"
 character_set = "simplified" # 候选输出字形，可选："simplified", "traditional"
 # 启动/从其他输入法切换到本输入法时的默认中英文，可选："chinese", "english"
 default_ime_mode = "chinese"
@@ -234,9 +260,6 @@ smart_punctuation_repeat_to_chinese = false
 paired_punctuation = true
 # 标点锁定，可选："follow"（随中英文切换）, "chinese"（始终中文标点）, "english"（始终英文标点）
 punctuation_lock = "follow"
-# Vim 模式：在列出的应用里，交给应用的无修饰键 Esc 同时把输入法切到英文。按可执行文件名匹配，不区分大小写，
-# 例如 ["Code.exe", "gvim.exe"]；终端里的 Vim 需填终端宿主，同一终端内的其他程序也会受影响
-vim_mode_apps = []
 # 组合说明：
 #   legacy + shuangpin -> 使用旧版双拼会话实现（当前最稳定）
 #   legacy + quanpin   -> 自动切换为新版引擎全拼会话
@@ -268,11 +291,6 @@ wubi_mixed_pinyin = false
 #   off      -> z 不进码（默认）
 #   wildcard -> z 匹配码表中该位置的任意一个字母（含首位）
 wubi_z_mode = "off"
-# 五笔四码唯一时自动上屏：敲满四码且码表只给一个候选，第四键落下即上屏，不必再按空格
-wubi_four_code_auto_commit = true
-# 五笔顶字：完整四码后再敲一个字母时上屏首选，并把这个字母留作下一组合开头
-# 关闭只在混输开启时生效：第五个字母并入混输串；混输关闭时该字母无处容纳，仍按顶字上屏首选，不会丢字
-wubi_fifth_code_top_commit = true
 # 日语方案，当前支持："romaji"
 japanese_schema = "romaji"
 # 造词时按 Esc：true 只清掉还没选的拼音、保留已选的词，再按一次才整体取消（小狼毫风格）；false 直接整体取消
@@ -343,12 +361,17 @@ show_qp_helpcode_in_candidate_window = true
 #
 [quanpin]
 # 全拼自动纠错：遇到按键窜乱时自动按最接近的正确拼音查询候选。
-# 仅当输入串不是合法拼音组合时触发，不影响正常输入；两个类型默认关闭，
-# 可在设置页分别开启。旧的单键 autocorrect 已废弃，不再读取。
+# 仅当输入串不是合法拼音组合时触发，不影响正常输入；四种类型默认全部关闭，
+# 可在设置页分别开启。四个开关各管一类手误、互不联动：只开哪个就只纠哪种。
+# 旧的单键 autocorrect 已废弃，不再读取；漏字 / 多字两个键是新增的，缺失时按关闭处理。
 # 相邻字母顺序打错时纠正（如 sahng → shang）。
 autocorrect_transposition = false
 # 误触相邻按键时纠正（如 shabg → shang）。
 autocorrect_neighbor = false
+# 漏敲一个字母时纠正（如 shng → shang）。
+autocorrect_deletion = false
+# 多敲一个相邻按键时纠正（如 sjhang → shang）。
+autocorrect_insertion = false
 # 纠错得到的候选在末尾显示 * 标记，便于和正常候选区分；只影响显示，不影响上屏文字。
 autocorrect_marker = true
 
@@ -357,14 +380,13 @@ autocorrect_marker = true
 # 快捷键
 #
 [keybindings]
+trilingual_cycle = false
 # 中英文切换快捷键（Ctrl+Space 由 Windows 系统管理，此处不控制）
 switch_language_shift = true
 switch_language_ctrl = false
 switch_language_ctrl_alt_space = true
 # Only active in Chinese mode.
 toggle_character_set_ctrl_shift_f = true
-# 中日英循环切换：开启后上面的中英文切换快捷键按中文、日文、英文依次切换，有输入时先上屏原始字母
-trilingual_cycle = false
 
 #
 # Dictionary
@@ -387,6 +409,7 @@ skin_name = "default"
 # 语音输入
 #
 [voice_input]
+polish_thinking = "disabled"
 # 语音输入
 voice_input = true
 # 全局语音快捷键（可分别启用或关闭）
@@ -409,6 +432,12 @@ asr_token = "<YOUR_OWN_DOUBAO_ACCESS_TOKEN>"
 asr_token_doubao = "<YOUR_OWN_DOUBAO_ACCESS_TOKEN>"
 asr_token_openai = ""
 asr_token_siliconflow = ""
+tencent_secret_id = ""
+asr_token_aliyun = ""
+asr_token_tencent = ""
+asr_token_local = ""
+polish_token_aliyun = ""
+polish_token_tencent = ""
 asr_token_groq = ""
 # 豆包流式接口二选一：
 #   .../sauc/bigmodel_nostream 边录边传、返回整句结果，准确率更高，官方推荐用于输入法
@@ -437,12 +466,14 @@ polish_endpoint = "https://api.siliconflow.cn/v1/chat/completions"
 # 留空则按提供商填默认值，例如 Qwen/Qwen3-8B、gpt-4o-mini。
 polish_model = ""
 # 润色提示词: cleanup | faithful | zh2en | casual | custom_1 | custom_2 | custom_3
+# 还可选择嘴替、润色、外卖好评、恋爱军师、高情商回复、淬毒之嘴、回怼王等内置模式。
 polish_prompt_id = "cleanup"
 # 旧版单槽位提示词，升级时作为“自定义一”的回退值。
 polish_prompt = ""
 polish_prompt_custom_1 = ""
 polish_prompt_custom_2 = ""
 polish_prompt_custom_3 = ""
+prompt_library = ""
 language = "zh-cn"
 # 开始和结束录音提示音可分别关闭
 start_sound = true
@@ -494,6 +525,16 @@ v_mode = true # V 模式：V 后接数字转中文（V123 → 一百二十三，
 # AI 辅助
 #
 [ai_assistant]
+thinking = "disabled"
+task = "pinyin"
+completion_enabled = false
+question_enabled = false
+token_custom = ""
+token_local = ""
+endpoint_custom = ""
+model_custom = ""
+endpoint_local = "http://127.0.0.1:11434/v1/chat/completions"
+model_local = ""
 enabled = true
 provider = "deepseek"
 token = "<YOUR_OWN_DEEPSEEK_TOKEN>"
@@ -501,7 +542,6 @@ token_deepseek = "<YOUR_OWN_DEEPSEEK_TOKEN>"
 token_openai = ""
 token_siliconflow = ""
 token_groq = ""
-token_custom = ""
 endpoint = "https://api.deepseek.com/chat/completions"
 model = "deepseek-v4-flash"
 # 空槽位使用提供商默认值，旧版 endpoint/model 只归属于当前提供商
@@ -509,12 +549,10 @@ endpoint_deepseek = ""
 endpoint_openai = ""
 endpoint_siliconflow = ""
 endpoint_groq = ""
-endpoint_custom = ""
 model_deepseek = ""
 model_openai = ""
 model_siliconflow = ""
 model_groq = ""
-model_custom = ""
 candidate_limit = 3
 prompt_id = "custom_1"
 prompt = """你是一个中文全拼输入法联想引擎。输入为已经切分好的拼音数组、前文上下文和候选数量。
@@ -540,6 +578,7 @@ prompt = """你是一个中文全拼输入法联想引擎。输入为已经切�
 prompt_custom_1 = ""
 prompt_custom_2 = ""
 prompt_custom_3 = ""
+prompt_library = ""
 
 #
 # Input Statistics
@@ -556,3 +595,137 @@ enabled = false
 # 统计保留策略：forever | 30d | 90d | 180d | 365d；Server 每天首次写入时删除
 # 超出保留窗口的记录，forever 表示永久保留、不自动删除。非法值按 forever 处理。
 retention = "forever"
+
+# 生词熟悉度：仅保存译词，默认关闭；超过保留天数未出现的记录自动清理。
+[vocabulary]
+enabled = false
+retention_days = 90
+
+# Candidate pronunciation; cloud providers are opt-in.
+[speech]
+enabled = "true"
+provider = "sapi"
+rate = "1.0"
+volume = "100"
+sapi_voice_zh = ""
+sapi_voice_en = ""
+azure_key = ""
+azure_region = "eastasia"
+azure_voice_zh = "zh-CN-XiaoxiaoNeural"
+azure_voice_en = "en-US-JennyNeural"
+volcengine_app_id = ""
+volcengine_key = ""
+volcengine_resource = "seed-tts-2.0"
+volcengine_voice_zh = "zh_female_vv_uranus_bigtts"
+volcengine_voice_en = "en_female_amanda_mars_bigtts"
+tencent_secret_id = ""
+tencent_secret_key = ""
+tencent_region = "ap-guangzhou"
+tencent_voice_zh = "101001"
+tencent_voice_en = "101050"
+elevenlabs_key = ""
+elevenlabs_model = "eleven_flash_v2_5"
+elevenlabs_voice_zh = ""
+elevenlabs_voice_en = ""
+local_endpoint = "http://127.0.0.1:18767/v1/audio/speech"
+local_model = "kokoro"
+local_voice_zh = "zf_xiaobei"
+local_voice_en = "af_heart"
+local_options = "{}"
+local_voices = "{}"
+
+[vision]
+provider = "smart"
+local_model = "glm-ocr"
+task = "document"
+max_tokens = "4096"
+shiliu_appcode = ""
+tencent_secret_id = ""
+tencent_secret_key = ""
+tencent_region = "ap-guangzhou"
+baidu_api_key = ""
+baidu_secret_key = ""
+translation_provider = "text_model"
+source_language = "auto"
+target_language = "en"
+capture_x = "false"
+capture_y = "true"
+screen_interval_ms = "2000"
+# 快捷操作：截图后的行为、识字排版、翻译显示方式、历史记录。
+after_ocr_copy = "true"
+after_ocr_card = "true"
+line_mode = "smart"
+cjk_space = "false"
+table_format = "excel"
+auto_swap = "true"
+zh_target = "en"
+overlay_style = "cover"
+hold_alt_original = "true"
+skip_code = "true"
+live_refresh = "change"
+use_glossary = "true"
+enter_action = "copy"
+magnifier = "true"
+hide_toolbar = "true"
+history_enabled = "true"
+history_days = "30"
+text_provider = ""
+
+# 全局快捷键。留空表示不启用该动作；至少包含 Ctrl、Alt 或 Win 之一。
+[hotkeys]
+enabled = "true"
+shot = "Ctrl+Alt+X"
+ocr = "Ctrl+Alt+O"
+translate = "Ctrl+Alt+T"
+selection = "Ctrl+Alt+Y"
+live = "Ctrl+Alt+Shift+T"
+reply = "Ctrl+Alt+R"
+rewrite = "Ctrl+Alt+G"
+clip = "Ctrl+Alt+V"
+
+# 嘴替 · 回复：面板行为。语气、说话习惯与联系人记忆单独加密保存在数据目录。
+[reply]
+count = "3"
+length = "medium"
+source = "auto"
+context = "6"
+fill_mode = "insert"
+confirm_payload = "false"
+provider = ""
+reader_enabled = "false"
+
+# 剪贴板历史：排序、容量与隐私。是否记录由 [utility] clipboard_history 控制。
+[clipboard]
+sort = "recent"
+max_items = "200"
+retention_days = "30"
+respect_privacy_flag = "true"
+exclude_apps = "KeePass.exe;1Password.exe"
+pause_on_lock = "true"
+
+
+# Independent candidate translation; legacy preserves previous provider flags and the existing cloud master switch.
+[candidate_translation]
+provider = "legacy"
+ai_provider = "deepseek"
+endpoint = "https://api.deepseek.com/chat/completions"
+model = "deepseek-v4-flash"
+token = ""
+token_deepseek = ""
+endpoint_deepseek = "https://api.deepseek.com/chat/completions"
+model_deepseek = "deepseek-v4-flash"
+token_openai = ""
+endpoint_openai = "https://api.openai.com/v1/chat/completions"
+model_openai = "gpt-4o-mini"
+token_siliconflow = ""
+endpoint_siliconflow = "https://api.siliconflow.cn/v1/chat/completions"
+model_siliconflow = "Qwen/Qwen3-8B"
+token_groq = ""
+endpoint_groq = "https://api.groq.com/openai/v1/chat/completions"
+model_groq = "llama-3.3-70b-versatile"
+token_custom = ""
+endpoint_custom = ""
+model_custom = ""
+token_local = ""
+endpoint_local = "http://127.0.0.1:11434/v1/chat/completions"
+model_local = ""

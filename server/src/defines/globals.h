@@ -59,7 +59,6 @@ inline bool is_global_wnd_menu_shown = false;
 inline int SETTINGS_WINDOW_WIDTH = 900;
 inline int SETTINGS_WINDOW_HEIGHT = 680;
 
-inline HWND global_hwnd_settings = NULL;
 inline bool is_global_wnd_settings_shown = false;
 
 //
@@ -73,6 +72,8 @@ inline int FTB_WND_SHADOW_WIDTH = 8;
 // Last measured .status-bar size in CSS DIPs (0 until first successful measure).
 inline double FTB_CONTENT_WIDTH_DIP = 0.0;
 inline double FTB_CONTENT_HEIGHT_DIP = 0.0;
+inline RECT FTB_HOST_INSETS_PX{};
+inline bool FTB_HOST_INSETS_VALID = false;
 
 inline HWND global_hwnd_ftb = NULL;
 inline bool is_global_wnd_ftb_shown = false;

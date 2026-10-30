@@ -1,7 +1,10 @@
+import {setupNeuralModels} from './neural-models';
+import { setupPromptLibrary, applyPromptLibrary } from './prompt-library';
 import { applyDropdownValue, applyToggleState, setupDropdownMenu, setupToggleButton } from './shared';
 import { updateConfig } from './config-sync';
 import { setupCredentialTest } from './credential-test';
 import { setupModelFetch } from './model-fetch';
+import { setupAiWorkbench, applyAiTaskConfig } from './ai-workbench';
 
 type ProviderDefaults = { endpoint: string; model: string };
 
@@ -12,7 +15,7 @@ const fields: Record<string, string> = {
 const PROVIDER_DEFAULTS: Record<string, ProviderDefaults> = {
   deepseek: {
     endpoint: 'https://api.deepseek.com/chat/completions',
-    model: 'deepseek-v4-flash'
+    model: 'deepseek-flash'
   },
   openai: {
     endpoint: 'https://api.openai.com/v1/chat/completions',
@@ -24,21 +27,25 @@ const PROVIDER_DEFAULTS: Record<string, ProviderDefaults> = {
   },
   groq: {
     endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'qwen/qwen3.8-27b'
+    model: 'llama-3.3-70b-versatile'
   },
-  custom: {
-    endpoint: '',
-    model: ''
+  custom: {endpoint:'',model:''},
+  local: {endpoint:'http://127.0.0.1:11434/v1/chat/completions',model:''
   }
 };
 
-const PROVIDERS = ['deepseek', 'openai', 'siliconflow', 'groq', 'custom'] as const;
+const PROVIDERS = ['deepseek', 'openai', 'siliconflow', 'groq','custom','local'] as const;
 let tokens: Record<string, string> = {};
 let endpoints: Record<string, string> = {};
 let models: Record<string, string> = {};
 let currentProvider = 'deepseek';
-let currentPromptId = 'custom_1';
-let customPrompts: Record<string, string> = { custom_1: '', custom_2: '', custom_3: '' };
+let resetModels=()=>{};
+function applyProviderVisibility():void {
+  document.getElementById('aiThinkingField')?.classList.toggle('is-hidden',currentProvider!=='deepseek');
+  const token=document.getElementById('aiToken') as HTMLInputElement|null;
+  if(token)token.placeholder=currentProvider==='local'?'本地服务可留空':'';
+  const note=document.getElementById('aiConnectionNote');if(note)note.textContent=currentProvider==='local'?'仅连接回环地址；本机文本服务需要提前启动。':'模型列表失败时仍可手动填写模型名。';
+}
 
 function applyProviderFields(provider: string): void {
   const defaults = PROVIDER_DEFAULTS[provider];
@@ -83,59 +90,34 @@ function switchProvider(provider: string): void {
   if (token) token.value = tokens[provider] ?? '';
   updateConfig('ai_assistant.provider', provider);
   applyProviderFields(provider);
-  clearModelMenu();
+  applyProviderVisibility();resetModels();
 }
-
-function switchPrompt(id: string): void {
-  const prompt = document.getElementById('aiPrompt') as HTMLTextAreaElement | null;
-  if (prompt) {
-    customPrompts[currentPromptId] = prompt.value;
-    updateConfig(`ai_assistant.prompt_${currentPromptId}`, prompt.value);
-  }
-  currentPromptId = id;
-  if (prompt) prompt.value = customPrompts[id] ?? '';
-}
-
-// 凭据测试和模型列表共用同一份请求配置，空值按服务商默认值补全。
-function currentAiConfig(): Record<string, string> {
-  const defaults = PROVIDER_DEFAULTS[currentProvider];
-  const value = (id: string) =>
-    (document.getElementById(id) as HTMLInputElement | null)?.value.trim() ?? '';
-  return {
-    provider: currentProvider,
-    token: value('aiToken'),
-    endpoint: value('aiEndpoint') || defaults?.endpoint || '',
-    model: value('aiModel') || defaults?.model || ''
-  };
-}
-
-// 切换服务商后旧的模型列表和在途请求都不再适用，清空等待重新获取。
-let clearModelMenu: () => void = () => {};
 
 export function setupAiSettings(): void {
+  setupPromptLibrary('association','aiPromptLibrary','aiPrompt');
+  setupAiWorkbench();
+  setupNeuralModels();
   setupToggleButton('aiEnabled', value => updateConfig('ai_assistant.enabled', value));
   setupTokenVisibilityToggle();
-  setupCredentialTest('aiCredentialTestButton', 'aiCredentialTestStatus', () => 'ai.assistant', currentAiConfig);
-  clearModelMenu = setupModelFetch({
-    buttonId: 'aiModelFetchButton',
-    statusId: 'aiModelFetchStatus',
-    menuId: 'aiModelMenu',
-    service: () => 'ai.assistant',
-    readConfig: currentAiConfig
-  });
+  const connectionConfig=():Record<string,string>=>{
+    const defaults = PROVIDER_DEFAULTS[currentProvider];
+    const value = (id: string) =>
+      (document.getElementById(id) as HTMLInputElement | null)?.value.trim() ?? '';
+    return {
+      provider: currentProvider,
+      token: value('aiToken'),
+      endpoint: value('aiEndpoint') || defaults?.endpoint || '',
+      model: value('aiModel') || defaults?.model || ''
+    };
+  };
+  setupCredentialTest('aiCredentialTestButton','aiCredentialTestStatus',()=> 'ai.assistant',connectionConfig);
+  resetModels=setupModelFetch({inputId:'aiModel',arrowId:'aiModelArrow',menuId:'aiModelMenu',buttonId:'aiModelFetchButton',statusId:'aiModelFetchStatus',service:()=> 'ai.assistant',readConfig:connectionConfig});
+  setupDropdownMenu('aiThinkingBtn','aiThinkingMenu','',true,'ai_assistant.thinking');
   setupDropdownMenu('aiProviderBtn', 'aiProviderMenu', 'changeAiProvider', true);
-  setupDropdownMenu('aiModelBtn', 'aiModelMenu', '', true, 'ai_assistant.model');
-  setupDropdownMenu('aiPromptSlotBtn', 'aiPromptSlotMenu', 'changeAiPromptSlot', true,
-    'ai_assistant.prompt_id');
   document.getElementById('aiProviderMenu')?.addEventListener('click', (event) => {
     const item = (event.target as HTMLElement | null)?.closest('.dropdown-item') as HTMLElement | null;
     const provider = item?.dataset.value;
     if (provider) switchProvider(provider);
-  });
-  document.getElementById('aiPromptSlotMenu')?.addEventListener('click', (event) => {
-    const item = (event.target as HTMLElement | null)?.closest('.dropdown-item') as HTMLElement | null;
-    const id = item?.dataset.value;
-    if (id) switchPrompt(id);
   });
   Object.entries(fields).forEach(([id, key]) => {
     const element = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null;
@@ -143,9 +125,11 @@ export function setupAiSettings(): void {
       if (id === 'aiToken') {
         tokens[currentProvider] = element.value.trim();
         updateConfig(`ai_assistant.token_${currentProvider}`, tokens[currentProvider]);
+        resetModels();
         return;
       }
       updateConfig(`ai_assistant.${key}`, element.value);
+      if(id==='aiEndpoint')resetModels();
       if (!element.value) {
         const defaults = PROVIDER_DEFAULTS[currentProvider];
         if (defaults) element.value = defaults[key as keyof ProviderDefaults];
@@ -157,11 +141,6 @@ export function setupAiSettings(): void {
     const value = Math.max(1, Math.min(10, Number.parseInt(limit.value, 10) || 3));
     limit.value = String(value);
     updateConfig('ai_assistant.candidate_limit', value);
-  });
-  const prompt = document.getElementById('aiPrompt') as HTMLTextAreaElement | null;
-  prompt?.addEventListener('change', () => {
-    customPrompts[currentPromptId] = prompt.value;
-    updateConfig(`ai_assistant.prompt_${currentPromptId}`, prompt.value);
   });
 }
 
@@ -203,15 +182,7 @@ export function applyAiConfig(config: Record<string, unknown>): void {
   const defaults = PROVIDER_DEFAULTS[currentProvider];
   const model = document.getElementById('aiModel') as HTMLInputElement | null;
   if (model && defaults) model.placeholder = defaults.model;
-  currentPromptId = typeof config.prompt_id === 'string' ? config.prompt_id : 'custom_1';
-  customPrompts = {
-    custom_1: typeof config.prompt_custom_1 === 'string'
-      ? config.prompt_custom_1
-      : (typeof config.prompt === 'string' ? config.prompt : ''),
-    custom_2: typeof config.prompt_custom_2 === 'string' ? config.prompt_custom_2 : '',
-    custom_3: typeof config.prompt_custom_3 === 'string' ? config.prompt_custom_3 : ''
-  };
-  applyDropdownValue('aiPromptSlotBtn', 'aiPromptSlotMenu', currentPromptId);
-  const prompt = document.getElementById('aiPrompt') as HTMLTextAreaElement | null;
-  if (prompt) prompt.value = customPrompts[currentPromptId] ?? '';
+  applyPromptLibrary('association', config);
+  if(typeof config.thinking==='string')applyDropdownValue('aiThinkingBtn','aiThinkingMenu',config.thinking);
+  applyProviderVisibility();applyAiTaskConfig(config);
 }
