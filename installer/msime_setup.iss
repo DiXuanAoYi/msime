@@ -19,7 +19,7 @@
 ; 本仓库不包含任何预置代码签名证书。
 
 #define MyAppName      "知语输入法 Zhiyu IME"
-#define MyAppVersion   "0.10.4"
+#define MyAppVersion   "0.11.0"
 #define MyAppPublisher "DiXuanAoYi"
 #define MyAppExeName   "MetasequoiaImeServer.exe"
 #define MySettingsExeName "MetasequoiaImeSettings.exe"
