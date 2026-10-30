@@ -1,0 +1,74 @@
+name: Package macOS
+
+# macOS 目前只有桌面伴侣和 Rust 引擎库（libmsime_capi.dylib），还没有输入法前端
+# （InputMethodKit），所以这里产出的是未签名的伴侣 .app 压缩包，不是输入法安装包。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 版本号，如 0.11.0-chat.2
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the engine and the companion
+        run: |
+          cargo test --release --locked --manifest-path engine-rs/Cargo.toml --workspace
+          cargo test --release --locked --manifest-path companion/Cargo.toml
+      - name: Build
+        run: |
+          cargo build --release --locked --manifest-path engine-rs/Cargo.toml -p msime-capi
+          cargo build --release --locked --manifest-path companion/Cargo.toml
+      - name: Assemble the app bundle
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          app="dist/知语桌面伴侣.app"
+          mkdir -p "$app/Contents/MacOS" dist/pkg
+          cp companion/target/release/zhiyu-companion "$app/Contents/MacOS/zhiyu-companion"
+          cat > "$app/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleName</key><string>知语桌面伴侣</string>
+            <key>CFBundleIdentifier</key><string>io.github.dixuanaoyi.zhiyu-companion</string>
+            <key>CFBundleExecutable</key><string>zhiyu-companion</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION%%-*}</string>
+            <key>CFBundleVersion</key><string>${VERSION%%-*}</string>
+            <key>LSUIElement</key><true/>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
+          PLIST
+          # 未做开发者签名；ad-hoc 签名让 Apple 芯片肯运行，首次打开仍需右键“打开”。
+          codesign --force --deep --sign - "$app"
+          cp -R "$app" dist/pkg/
+          cp engine-rs/target/release/libmsime_capi.dylib dist/pkg/
+          cp LICENSE THIRD_PARTY_NOTICES.txt dist/pkg/
+          printf '%s\n' '未签名。首次打开：在 Finder 里右键“知语桌面伴侣” → 打开。' \
+            'libmsime_capi.dylib 是 Rust 引擎的 C 接口，macOS 输入法前端尚未提供。' > dist/pkg/README.txt
+          ditto -c -k --keepParent dist/pkg "dist/zhiyu-companion-macos-${{ matrix.arch }}-${VERSION}.zip"
+          shasum -a 256 "dist/zhiyu-companion-macos-${{ matrix.arch }}-${VERSION}.zip" \
+            > "dist/SHA256SUMS-macos-${{ matrix.arch }}-${VERSION}.txt"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS-*.txt

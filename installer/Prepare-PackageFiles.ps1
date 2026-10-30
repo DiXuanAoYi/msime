@@ -334,6 +334,15 @@ Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter '*Tests.exe' |
     Remove-Item -Force
 Get-ChildItem -LiteralPath $targetServer -Recurse -File -Filter 'test_*.exe' |
     Remove-Item -Force
+
+# 桌面伴侣（companion/，cargo build --release）是独立的单文件程序，缺失时只跳过，不影响输入法安装。
+$companionExe = Join-Path $RepoRoot 'companion\target\release\zhiyu-companion.exe'
+if (Test-Path -LiteralPath $companionExe) {
+    Copy-Item -LiteralPath $companionExe -Destination (Join-Path $targetServer 'ZhiyuCompanion.exe') -Force
+}
+else {
+    Write-Warning "未找到桌面伴侣：$companionExe（安装包将不含桌面伴侣）"
+}
 foreach ($probeName in @('MetasequoiaTtsStreamProbe.exe', 'MetasequoiaTtsStreamProbe.pdb', 'MetasequoiaVisionLiveProbe.exe', 'MetasequoiaVisionLiveProbe.pdb')) {
     $probePath = Join-Path $targetServer $probeName
     if (Test-Path -LiteralPath $probePath) { Remove-Item -LiteralPath $probePath -Force }

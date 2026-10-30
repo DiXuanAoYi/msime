@@ -175,6 +175,8 @@ Source: "{#MySourceRoot}\app_data\sentence-model.safetensors"; DestDir: "{code:G
 Name: "{group}\{#MyAppName}"; \
     Filename: "{commonpf64}\metasequoiaime\server\{#MySettingsExeName}"; \
     WorkingDir: "{commonpf64}\metasequoiaime\server"
+; 桌面伴侣随 server\ 一起安装；没有打进包时这个入口会指向不存在的文件，所以带 Check。
+Name: "{group}\知语桌面伴侣"; Filename: "{commonpf64}\metasequoiaime\server\ZhiyuCompanion.exe"; Check: CompanionInstalled
 Name: "{group}\卸载 {#MyAppName}"; Filename: "{uninstallexe}"
 
 [InstallDelete]
@@ -253,6 +255,11 @@ begin
   Result := Trim(Result);
   if Result = '0.0.0.0' then
     Result := '';
+end;
+
+function CompanionInstalled: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{commonpf64}\metasequoiaime\server\ZhiyuCompanion.exe'));
 end;
 
 // 用注册表判定，而不是去 System32 里找 vcruntime140.dll：Setup.exe 是 32 位进程，
