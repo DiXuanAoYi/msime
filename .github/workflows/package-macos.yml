@@ -27,9 +27,9 @@ jobs:
             arch: x86_64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test the engine and the companion
+      # 引擎的 golden 测试要读完整词库（installer/app_data，不在仓库里），在本机与 WSL 跑，这里只测伴侣。
+      - name: Test the companion
         run: |
-          cargo test --release --locked --manifest-path engine-rs/Cargo.toml --workspace
           cargo test --release --locked --manifest-path companion/Cargo.toml
       - name: Build
         run: |
