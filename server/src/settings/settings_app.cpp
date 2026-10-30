@@ -559,6 +559,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"escape_keeps_selected_word", GetConfiguredEscapeKeepsSelectedWord()},
             {"enter_learns_english_word", GetConfiguredEnterLearnsEnglishWord()},
             {"wubi_z_mode", GetConfiguredWubiZMode()},
+            {"wubi_four_code_auto_commit", GetConfiguredWubiFourCodeAutoCommit()},
+            {"wubi_fifth_code_top_commit", GetConfiguredWubiFifthCodeTopCommit()},
             {"word_to_character", GetConfiguredWordToCharacterEnabled()},
             {"word_to_character_keys", GetConfiguredWordToCharacterKeys()},
             {"smart_punctuation", GetConfiguredSmartPunctuationEnabled()},
@@ -652,7 +654,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
             {"switch_language_shift", GetConfiguredSwitchLanguageShiftEnabled()},
             {"switch_language_ctrl", GetConfiguredSwitchLanguageCtrlEnabled()},
             {"switch_language_ctrl_alt_space", GetConfiguredSwitchLanguageCtrlAltSpaceEnabled()},
-            {"toggle_character_set_ctrl_shift_f", GetConfiguredCharacterSetShortcutEnabled()}}},
+            {"toggle_character_set_ctrl_shift_f", GetConfiguredCharacterSetShortcutEnabled()},
+            {"trilingual_cycle", GetConfiguredTrilingualCycleEnabled()}}},
           {"frequency_adjustment",
            {{"mode", frequency.mode},
             {"trigger_count", frequency.trigger_count},
@@ -1385,6 +1388,45 @@ void HandleWebMessage(HWND hwnd, ICoreWebView2WebMessageReceivedEventArgs *args)
                                         {"protocolVersion", metasequoia::webview::Version}};
                 if (!metasequoia::webview::Validate(response, "server"))
                     throw std::runtime_error("Invalid API credential test response");
+                auto message = string_to_wstring(json::serialize(response));
+                return [message = std::move(message)] {
+                    if (g_webview)
+                        g_webview->PostWebMessageAsJson(message.c_str());
+                };
+            });
+        }
+        else if (type == "apiModelList")
+        {
+            const auto &data = value.at("data").as_object();
+            const std::string request_id = json::value_to<std::string>(data.at("requestId"));
+            ApiCredentialTest::Request request;
+            request.service = json::value_to<std::string>(data.at("service"));
+            for (const auto &[key, item] : data.at("config").as_object())
+            {
+                if (item.is_string())
+                    request.config.emplace(std::string(key), json::value_to<std::string>(item));
+            }
+            g_worker->Submit([request_id, request = std::move(request)]() -> SerialTaskQueue::Completion {
+                ApiCredentialTest::ModelListResult result;
+                try
+                {
+                    result = ApiCredentialTest::FetchModels(request);
+                }
+                catch (...)
+                {
+                    result = {false, "获取模型列表失败：内部错误。", {}};
+                }
+                json::array models_array;
+                for (const auto &m : result.models)
+                    models_array.push_back(json::value(m));
+                json::value response = {{"type", "apiModelListResult"},
+                                        {"requestId", request_id},
+                                        {"ok", result.ok},
+                                        {"message", result.message},
+                                        {"models", std::move(models_array)},
+                                        {"protocolVersion", metasequoia::webview::Version}};
+                if (!metasequoia::webview::Validate(response, "server"))
+                    throw std::runtime_error("Invalid API model list response");
                 auto message = string_to_wstring(json::serialize(response));
                 return [message = std::move(message)] {
                     if (g_webview)

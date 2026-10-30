@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import shutil
 import sqlite3
 import time
-import tempfile
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
@@ -112,15 +110,6 @@ def build_english(source: inputs.Inputs, path: Path, msime: Path, stage: Stages)
             return f"{len(en_zh)} English-to-Chinese, {len(zh_en)} Chinese-to-English"
 
         stage("english-glosses", glosses)
-
-        def cn_en():
-            name = "sources/cn-en/machine-translations.txt"
-            entries = english_db.parse_cn_en_translations(textutil.read(source.source(name)), name)
-            replaced, added = english_db.apply_cn_en_translations(connection, entries)
-            return f"{len(entries)} Chinese-to-English: {replaced} replacing an ECDICT gloss, {added} added"
-
-        # 排在 ECDICT 释义之后、custom/translations.txt 之前：覆盖前者，再被后者覆盖。
-        stage("cn-en-translations", cn_en)
 
         def translations():
             entries = english_db.parse_custom_translations(textutil.read(source.source("custom/translations.txt")),
@@ -240,37 +229,10 @@ def write_manifests(directory: Path, commit: str, dirty: bool, msime_commit: str
         "custom_dictionary_commit": commit,
         "dirty": dirty,
         "msime_commit": msime_commit,
-        "builder": builder_digest(),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "files": {name: inputs.sha256(directory / name) for name in outputs + ["SHA256SUMS.txt"]},
     }
     (directory / MARKER).write_text(json.dumps(marker, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
-
-def builder_digest() -> str:
-    """构建器自身（本目录的 .py 与 inputs.lock.json，加上入口脚本）的摘要：构建规则变了，同一份源数据也要重建。"""
-    digest = hashlib.sha256()
-    here = Path(__file__).resolve().parent
-    for path in sorted([*here.glob("*.py"), here / "inputs.lock.json", ROOT / "scripts" / "build-dictionary.py"]):
-        digest.update(path.name.encode("utf-8") + b"\0" + path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
-    return digest.hexdigest()
-
-
-def stale_reason(commit: str, dirty: bool) -> str | None:
-    """out/ 不是由这份 msime-dictionary 提交和当前构建器构建的就返回原因；工作区有未提交改动时总是重建。"""
-    try:
-        marker = verify_out()
-    except ValueError as error:
-        return str(error)
-    if dirty or not commit:
-        return "msime-dictionary 有未提交的改动"
-    if marker.get("dirty"):
-        return "上次构建时 msime-dictionary 有未提交的改动"
-    if marker.get("custom_dictionary_commit") != commit:
-        return f"msime-dictionary 已从 {marker.get('custom_dictionary_commit', '')[:12]} 变为 {commit[:12]}"
-    if marker.get("builder") != builder_digest():
-        return "构建脚本有改动"
-    return None
 
 
 def verify_out() -> dict:
@@ -288,23 +250,12 @@ def verify_out() -> dict:
 
 
 def install(staging: Path) -> None:
-    root = DICT_ROOT.resolve()
-    target = OUT.resolve()
-    if target == root or not target.is_relative_to(root) or OUT.is_symlink():
-        raise ValueError("词典输出目录必须是构建根下的独立目录")
-    previous = OUT.with_name(OUT.name + '.previous-' + str(time.time_ns()))
-    incoming = Path(tempfile.mkdtemp(prefix='validated-', dir=root)) / 'out'
-    shutil.copytree(staging, incoming)
-    moved = False
-    try:
-        if OUT.exists():
-            OUT.rename(previous)
-            moved = True
-        incoming.rename(OUT)
-    except OSError:
-        if moved and not OUT.exists(): previous.rename(OUT)
-        raise
-    # Keep the previous valid product for rollback; no recursive deletion or overwrite of a backup.
-    if moved: print(f"原词典保留于 {previous}")
+    if OUT.exists():
+        if not (OUT / MARKER).is_file() and not BACKUP.exists():
+            # 产品锁的旧词库只备份一次，之后再构建不会把备份覆盖掉。
+            print(f"备份旧词库到 {BACKUP}")
+            shutil.copytree(OUT, BACKUP)
+        shutil.rmtree(OUT)
+    shutil.copytree(staging, OUT)
     NOTICE.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(OUT / "mozc_dictionary_oss_README.txt", NOTICE)

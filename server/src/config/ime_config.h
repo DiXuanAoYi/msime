@@ -70,7 +70,7 @@ struct VoiceInputConfig
 struct AiAssistantConfig
 {
     bool enabled = false;
-    // deepseek | openai | siliconflow | groq (all use Chat Completions)
+    // deepseek | openai | siliconflow | groq | custom (all use Chat Completions)
     std::string provider = "deepseek";
     std::string token;
     std::map<std::string, std::string> tokens;
@@ -89,7 +89,7 @@ struct AiAssistantConfig
     std::map<std::string, std::string> models{{"deepseek", "deepseek-v4-flash"},
                                               {"openai", "gpt-4o-mini"},
                                               {"siliconflow", "Qwen/Qwen3-8B"},
-                                              {"groq", "llama-3.3-70b-versatile"},
+                                              {"groq", "qwen/qwen3.8-27b"},
                                               {"custom", ""},
                                               {"local", ""}};
     int candidate_limit = 3;
@@ -129,7 +129,7 @@ struct TencentTmtConfig
     std::string secret_key;
     std::string region = "ap-guangzhou";
     // Language shown beside Chinese candidates. Tencent TMT language codes:
-    // en / fr / ja / es / ru / de / ko.
+    // en / fr / ja / es / ru / de / ko / th / vi / it.
     std::string target_language = "en";
 };
 
@@ -255,6 +255,12 @@ std::shared_ptr<const std::string> GetConfiguredVimModeApps();
 bool SetConfiguredVimModeApps(const std::string &apps);
 gram::GrammarConfig GetConfiguredCollocationGrammar();
 bool SetConfiguredCollocationGrammar(const gram::GrammarConfig &config);
+bool GetConfiguredTrilingualCycleEnabled();
+bool SetConfiguredTrilingualCycleEnabled(bool enabled);
+// Runtime language during cycling; the saved preference remains GetConfiguredInputMode().
+const std::string &GetActiveInputMode();
+// Changes memory only. The key handler applies the session and publishes in request order.
+bool SetActiveInputMode(const std::string &mode);
 const std::string &GetConfiguredJapaneseSchema();
 bool SetConfiguredJapaneseSchema(const std::string &schema);
 const std::string &GetConfiguredCharacterSet();
@@ -313,6 +319,13 @@ bool SetConfiguredEnterLearnsEnglishWord(bool enabled);
 // 五笔 z 键角色："off" | "wildcard"。混输已拆成独立开关，这里只剩通配两态。
 const std::string &GetConfiguredWubiZMode();
 bool SetConfiguredWubiZMode(const std::string &mode);
+// 四码唯一时第四键落下即上屏。关闭后候选窗停留，与顶字开关互不依赖。
+bool GetConfiguredWubiFourCodeAutoCommit();
+bool SetConfiguredWubiFourCodeAutoCommit(bool enabled);
+// 完整四码后再敲字母时上屏首选并把字母留作下一组合开头。关闭只在混输开启时生效
+// （字母并入混输串）；混输关闭时字母无处容纳，仍按顶字上屏，保证多敲的键不丢。
+bool GetConfiguredWubiFifthCodeTopCommit();
+bool SetConfiguredWubiFifthCodeTopCommit(bool enabled);
 const std::string &GetConfiguredShuangpinPreeditMode();
 const std::string &GetConfiguredTsfPreeditStyle();
 bool SetConfiguredTsfPreeditStyle(const std::string &style);

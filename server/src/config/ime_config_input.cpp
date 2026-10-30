@@ -794,6 +794,10 @@ bool SetConfiguredInputMode(const std::string &mode)
     g_input_mode = mode;
     g_configured_input_mode_japanese.store(mode == "japanese");
     g_active_input_mode.store(ActiveInputMode::Configured);
+    g_configured_input_mode_japanese.store(mode == "japanese", std::memory_order_relaxed);
+    // Choosing a language in settings is where the next cycle starts from;
+    // the cycle switch itself is independent of it.
+    g_active_input_mode.store(ActiveInputMode::Configured, std::memory_order_relaxed);
     RefreshEffectiveTsfPreeditStyle();
     NotifyImeServerInputSchemeChanged();
     return true;

@@ -1,8 +1,4 @@
 {
-  "dictionary": {
-    "repository": "metasequoiaime/msime-dictionary",
-    "commit": "4909582a8ce345c23809750e675e3d9e5f9516df"
-  },
   "msime": {
     "repository": "metasequoiaime/msime",
     "commit": "e12279943acca455583326030a214af02c323625",

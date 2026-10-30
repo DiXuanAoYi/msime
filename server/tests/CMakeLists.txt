@@ -99,6 +99,7 @@ set(TEST_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/src/english/english_ime.cpp"
     "${CMAKE_SOURCE_DIR}/src/english/personal_glossary.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_ui_state.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_expansion_policy.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_composition_selection_history.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_candidate_render_sync.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/test_selection_replay_guard.cpp"

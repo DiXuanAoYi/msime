@@ -7,7 +7,6 @@
 #include "ipc/ipc.h"
 #include "log/ftb_diag_log.h"
 #include "settings/settings_launcher.h"
-#include "voice-input/voice_input_service.h"
 #include "skin/candidate_skin_catalog.h"
 #include "utils/common_utils.h"
 #include "utils/window_utils.h"
@@ -43,18 +42,10 @@ D2D1_COLOR_F ColorFromRgb(UINT rgb, float alpha = 1.0f)
     return D2D1::ColorF(((rgb >> 16) & 0xFF) / 255.0f, ((rgb >> 8) & 0xFF) / 255.0f, (rgb & 0xFF) / 255.0f, alpha);
 }
 
-// Same reserve as the WebView2 candidate host (CANDIDATE_SHADOW_PAD_*): about 2σ
-// of the candidate shadow below, biased to the lower right like the shadow is.
-constexpr float kShadowPadLeft = 16.0f;
-constexpr float kShadowPadTop = 14.0f;
-constexpr float kShadowPadRight = 32.0f;
-constexpr float kShadowPadBottom = 34.0f;
-constexpr float kToolbarStrokeWidth = 1.4f;
-// D2D centres the stroke on the card edge, so half of it lies outside the card.
-// Without the shadow margin the host still needs that half plus its antialiased
-// fringe, or the window edge clips the border.
-constexpr float kNoShadowPad = 1.0f;
-static_assert(kNoShadowPad >= kToolbarStrokeWidth * 0.5f);
+constexpr float kShadowPadLeft = 18.0f;
+constexpr float kShadowPadTop = 16.0f;
+constexpr float kShadowPadRight = 18.0f;
+constexpr float kShadowPadBottom = 20.0f;
 constexpr float kToolbarGlyphFontSizeFactor = 0.82f;
 constexpr float kToolbarUnderlinedTextFontSizeFactor = 0.58f;
 // Every toolbar icon carries a text fallback: "Segoe Fluent Icons" ships with
@@ -79,9 +70,6 @@ constexpr ToolbarIcon kIconSimplified = {0xE88D, L"简"};
 constexpr ToolbarIcon kIconTraditional = {0xE88C, L"繁"};
 constexpr ToolbarIcon kIconEmoji = {0xE76E, L"表"};
 constexpr ToolbarIcon kIconKeyboard = {0xE765, L"键"};
-constexpr ToolbarIcon kIconVoice = {0xE720, L"音"};
-constexpr ToolbarIcon kIconReply = {0xE8F2, L"嘴"};
-constexpr ToolbarIcon kIconClipboard = {0xE77F, L"剪"};
 constexpr ToolbarIcon kIconSettings = {0xE713, L"设"};
 
 float ToolbarUserScale()
@@ -368,9 +356,6 @@ struct FloatingToolbarPresenter::Impl
     D2D1_COLOR_F handle = ColorFromRgb(0x8E8CD8);
     float radius = 8.0f;
     float iconRadius = 6.0f;
-    bool light = false;
-    bool shadow = false;
-    float cardHeightDip = 0.0f;
     int cnEn = 1;
     int doubleSingleByte = 0;
     int punctuation = 1;
@@ -472,15 +457,19 @@ void FloatingToolbarPresenter::RebuildScene()
             {
                 FanyNamedPipe::EnqueueExitEnglishInputModeTask();
             }
+            else if (impl_->cnEn == 1)
+            {
+                SendWorker(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToEn);
+            }
             else
             {
-                FanyNamedPipe::EnqueueToolbarLanguageToggleTask(impl_->cnEn == 1);
+                SendWorker(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToCn);
             }
         });
     }
     else if (impl_->cnEn != 1)
     {
-        addGlyph(kIconEn, []() { FanyNamedPipe::EnqueueToolbarLanguageToggleTask(false); });
+        addGlyph(kIconEn, []() { SendWorker(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToCn); });
     }
     else if (impl_->englishInputMode == 1)
     {
@@ -488,11 +477,11 @@ void FloatingToolbarPresenter::RebuildScene()
     }
     else if (impl_->japaneseInputMode == 1)
     {
-        addGlyph(kIconJa, []() { FanyNamedPipe::EnqueueToolbarLanguageToggleTask(true); });
+        addGlyph(kIconJa, []() { SendWorker(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToEn); });
     }
     else
     {
-        addGlyph(kIconCn, []() { FanyNamedPipe::EnqueueToolbarLanguageToggleTask(true); });
+        addGlyph(kIconCn, []() { SendWorker(Global::DataFromServerMsgTypeToTsfWorkerThread::SwitchToEn); });
     }
 
     const FloatingToolbarItemsConfig &items = GetConfiguredFloatingToolbarItems();
@@ -536,12 +525,6 @@ void FloatingToolbarPresenter::RebuildScene()
     {
         addGlyph(kIconKeyboard, []() { OpenKeyboardPanelApplication(); });
     }
-    if (items.voice)
-        addGlyph(kIconVoice, []() { VoiceInput::ToggleRecording(); });
-    if (items.reply)
-        addGlyph(kIconReply, []() { OpenReplyStudioApplication(); });
-    if (items.clipboard)
-        addGlyph(kIconClipboard, []() { OpenPersonalLibraryApplication(); });
     if (items.settings)
     {
         addGlyph(kIconSettings, []() { OpenSettingsApplication(); });
@@ -553,33 +536,14 @@ void FloatingToolbarPresenter::RebuildScene()
     msimeui::Brush brush;
     brush.fill = impl_->fill;
     brush.stroke = impl_->border;
-    brush.strokeWidth = kToolbarStrokeWidth;
+    brush.strokeWidth = 1.4f;
     brush.radiusX = radius;
     brush.radiusY = radius;
     impl_->card = std::make_shared<msimeui::Card>(brush, 0.0f);
-    // 与候选窗同一对柔和阴影（candidate_presenter.cpp）：light α .18/.10，dark α .34/.22。
-    // 阴影边距可以伸出屏幕（ShadowInsetsPx），开着阴影工具栏本体也能贴住屏幕边缘；
-    // 关掉阴影时透明边距只留描边外沿。
-    const bool shadow = GetConfiguredFloatingToolbarShadow();
-    impl_->shadow = shadow;
-    impl_->card->SetShadowEnabled(shadow);
-    if (shadow)
-    {
-        impl_->card->SetShadowPasses({
-            {12.0f, impl_->light ? 0.18f : 0.34f, 8.0f, 10.0f},
-            {4.0f, impl_->light ? 0.10f : 0.22f, 2.0f, 3.0f},
-        });
-    }
+    impl_->card->SetShadowScale(0.45f);
     impl_->card->AddChild(row);
     impl_->frame = std::make_shared<msimeui::Container>();
-    if (shadow)
-    {
-        impl_->frame->SetPadding({kShadowPadLeft, kShadowPadTop, kShadowPadRight, kShadowPadBottom});
-    }
-    else
-    {
-        impl_->frame->SetPadding(kNoShadowPad);
-    }
+    impl_->frame->SetPadding({kShadowPadLeft, kShadowPadTop, kShadowPadRight, kShadowPadBottom});
     impl_->frame->SetChild(impl_->card);
     impl_->root = std::make_shared<msimeui::StackPanel>(0.0f);
     impl_->root->AddChild(impl_->frame);
@@ -617,7 +581,6 @@ void FloatingToolbarPresenter::ApplyTheme()
     impl_->handle = skin.handle;
     impl_->radius = skin.radius;
     impl_->iconRadius = skin.iconRadius;
-    impl_->light = light;
     ApplyAppearance();
 }
 
@@ -641,7 +604,6 @@ void FloatingToolbarPresenter::RelayoutHost(FLOAT scaleOverride, const RECT *sug
     ::FTB_CONTENT_HEIGHT_DIP = measured.height;
     ::FTB_WND_WIDTH = static_cast<int>(std::ceil(measured.width));
     ::FTB_WND_HEIGHT = static_cast<int>(std::ceil(measured.height));
-    impl_->cardHeightDip = impl_->card ? impl_->card->GetBounds().height : 0.0f;
 
     FLOAT scale = scaleOverride > 0.0f ? scaleOverride : GetWindowScale(hwnd_);
     if (scale <= 0.0f)
@@ -665,13 +627,8 @@ void FloatingToolbarPresenter::RelayoutHost(FLOAT scaleOverride, const RECT *sug
         static_cast<float>(ClampHeightDipToHalfScreen(static_cast<double>(measured.height), limits));
     const int widthPx = (std::max)(1, static_cast<int>(std::ceil(widthDip * scale)));
     const int heightPx = (std::max)(1, static_cast<int>(std::ceil(heightDip * scale)));
-    const RECT insets = ShadowInsetsPx(widthPx, heightPx, scale);
-    const POINT pos = PlaceResizedHost(hwnd_, widthPx, heightPx, suggestedRect, insets,
-                                       ::FTB_HOST_INSETS_VALID ? &::FTB_HOST_INSETS_PX : nullptr);
+    const POINT pos = PlaceResizedHost(hwnd_, widthPx, heightPx, suggestedRect);
     SetWindowPos(hwnd_, nullptr, pos.x, pos.y, widthPx, heightPx, SWP_NOZORDER | SWP_NOACTIVATE);
-    ::FTB_HOST_INSETS_PX = insets;
-    ::FTB_HOST_INSETS_VALID = true;
-    ClipWindowToVisibleScreens(hwnd_, ScreenArea::WorkArea);
     impl_->resources.EnsureForComposition(hwnd_);
     if (impl_->card && impl_->dragLimit)
     {
@@ -691,34 +648,6 @@ bool FloatingToolbarPresenter::HitCaptionDrag(POINT clientPoint) const
     const PointF dip = impl_->window->ClientPixelsToDips(clientPoint);
     return dip.x >= impl_->captionRect.x && dip.x < impl_->captionRect.x + impl_->captionRect.width &&
            dip.y >= impl_->captionRect.y && dip.y < impl_->captionRect.y + impl_->captionRect.height;
-}
-
-RECT FloatingToolbarPresenter::ShadowInsetsPx(int hostWidthPx, int hostHeightPx, FLOAT scale) const
-{
-    if (!impl_ || scale <= 0.0f)
-    {
-        return {};
-    }
-    // Where the border's outer edge lands in the host, as Present lays it out:
-    // the frame stretches the card to the host width, while the root stack keeps
-    // the measured height, so the rounded-up host height is spare room below.
-    // Fixed pads alone left that rounding (1-3 px) between the bar and the edge.
-    // Without the shadow this trims the kNoShadowPad slack the same way.
-    const float padLeft = impl_->shadow ? kShadowPadLeft : kNoShadowPad;
-    const float padTop = impl_->shadow ? kShadowPadTop : kNoShadowPad;
-    const float padRight = impl_->shadow ? kShadowPadRight : kNoShadowPad;
-    const float s = static_cast<float>(scale);
-    const float half = kToolbarStrokeWidth * 0.5f;
-    const float hostWidthDip = static_cast<float>(hostWidthPx) / s;
-    const float left = padLeft - half;
-    const float top = padTop - half;
-    const float right = hostWidthDip - padRight + half;
-    const float bottom = padTop + impl_->cardHeightDip + half;
-    // Floor / ceil keep the antialiased edge pixel of the border on screen.
-    const auto clamp = [](float px) { return (std::max)(0L, static_cast<LONG>(px)); };
-    return {clamp(std::floor(left * s)), clamp(std::floor(top * s)),
-            clamp(static_cast<float>(hostWidthPx) - std::ceil(right * s)),
-            clamp(static_cast<float>(hostHeightPx) - std::ceil(bottom * s))};
 }
 
 void FloatingToolbarPresenter::SyncUi(int cnEn, int doubleSingleByte, int punctuation, int englishInputMode,

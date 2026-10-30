@@ -65,8 +65,7 @@ candidate_translations = true
 candidate_translation_cloud = false
 # UTF-8 TSV: 语言<Tab>中文词<Tab>译词[<Tab>第二释义]，由设置页编辑。
 personal_translation_glossary = ""
-# 中文输入状态下显示 emoji 前缀候选（第三个候选项，随云候选/AI 联想顺移）
-emoji_mixed_input = true
+# 中文输入状态下显示 emoji 前缀候选（排在候选项列表最后）
 # 中文输入状态下显示颜文字前缀候选（排在 emoji 之后）
 kaomoji_mixed_input = false
 # 云候选
@@ -122,7 +121,7 @@ enabled = true
 secret_id = "<YOUR_TENCENT_SECRET_ID>"
 secret_key = "<YOUR_TENCENT_SECRET_KEY>"
 region = "ap-guangzhou"
-# 候选词翻译/背单词目标语种：en / fr / ja / es / ru / de / ko
+# 候选词翻译/背单词目标语种：en / fr / ja / es / ru / de / ko / th / vi / it
 target_language = "en"
 
 #
@@ -233,7 +232,7 @@ tsf_preedit_shuangpin_quanpin = false
 [input]
 wubi_four_code_auto_commit = true
 wubi_fifth_code_top_commit = true
-vim_mode_apps = "[]"
+vim_mode_apps = []
 # English candidate settings apply to already running compatible TSF hosts.
 english_candidates = true
 english_candidate_app_rules = "[]"

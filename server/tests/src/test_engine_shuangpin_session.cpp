@@ -349,18 +349,8 @@ TEST_CASE(LearnedEnglishSlotMovesEnglishBehindItsDefaultPosition)
     REQUIRE_EQ(items[5].source, CandidateSource::Emoji);
     REQUIRE_EQ(*FanyImeIpc::SlottedEnglishIndex(items), size_t{3});
 
-    // 有页容量信息时，首页末位留给首个 emoji；学到的英文位置最多退到倒数第二位。
-    placement.page_size = 5;
+    placement.page_size = 0;
     placement.slot = 20;
-    items = {local("你"), local("呢"), local("泥"), local("尼"), english(), emoji()};
-    FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
-    REQUIRE_EQ(items[0].word, std::string("你"));
-    REQUIRE_EQ(items[1].word, std::string("呢"));
-    REQUIRE_EQ(items[2].word, std::string("泥"));
-    REQUIRE_EQ(items[3].word, std::string("nice"));
-    REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
-    REQUIRE_EQ(items[5].word, std::string("尼"));
-    REQUIRE_EQ(*FanyImeIpc::SlottedEnglishIndex(items), size_t{3});
 
     // 用户显式固定位置优先于自动学到的位置，元数据与其余词条均保留。
     auto pinned = english();
@@ -372,8 +362,8 @@ TEST_CASE(LearnedEnglishSlotMovesEnglishBehindItsDefaultPosition)
     REQUIRE_EQ(items[1].fixed_position, 2);
     REQUIRE_EQ(items[2].word, std::string("呢"));
     REQUIRE_EQ(items[3].word, std::string("泥"));
-    REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
-    REQUIRE_EQ(items[5].word, std::string("尼"));
+    REQUIRE_EQ(items[4].word, std::string("尼"));
+    REQUIRE_EQ(items[5].source, CandidateSource::Emoji);
     REQUIRE(!FanyImeIpc::SlottedEnglishIndex(items));
 }
 
@@ -457,7 +447,7 @@ TEST_CASE(FixedEnglishCandidateKeepsItsMixedCandidatePosition)
     REQUIRE_EQ(items[2].word, std::string("GitHub"));
 }
 
-TEST_CASE(EmojiMixedCandidateFollowsEnglishAndShiftsWithCloudAndAi)
+TEST_CASE(EmojiMixedCandidatesStayAtTheEndWithCloudAndAi)
 {
     const auto local = [](std::string word) { return WordItem("ni", std::move(word), 100); };
     const auto english = [] { return WordItem("ni", "nice", 1, CandidateSource::EnglishDictionary); };
@@ -468,11 +458,20 @@ TEST_CASE(EmojiMixedCandidateFollowsEnglishAndShiftsWithCloudAndAi)
     // Without page size metadata the emoji stays after ordinary candidates.
     std::vector<WordItem> items = {local("你"), emoji(), local("呢"), english()};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
+    REQUIRE_EQ(items[0].word, std::string("你"));
     REQUIRE_EQ(items[1].source, CandidateSource::EnglishDictionary);
     REQUIRE_EQ(items[2].word, std::string("呢"));
     REQUIRE_EQ(items[3].source, CandidateSource::Emoji);
 
-    // Cloud + AI occupy slots 2/3; English and emoji shift to slots 4/5.
+    // 纯中文候选 + emoji：emoji 追加在末尾，不挤占任何中文候选。
+    items = {local("你"), local("呢"), local("泥"), emoji()};
+    FanyImeIpc::NormalizeMixedCandidateOrder(items);
+    REQUIRE_EQ(items[0].word, std::string("你"));
+    REQUIRE_EQ(items[1].word, std::string("呢"));
+    REQUIRE_EQ(items[2].word, std::string("泥"));
+    REQUIRE_EQ(items[3].source, CandidateSource::Emoji);
+
+    // 云候选 + AI 联想占第 2/3 位，英文占第 4 位，emoji 落在末尾。
     items = {local("你"), emoji(), english(), ai(), cloud()};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
     REQUIRE_EQ(items[1].source, CandidateSource::CloudSuggestion);
@@ -480,7 +479,7 @@ TEST_CASE(EmojiMixedCandidateFollowsEnglishAndShiftsWithCloudAndAi)
     REQUIRE_EQ(items[3].source, CandidateSource::EnglishDictionary);
     REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
 
-    // Cloud only: English slot 3, emoji slot 4.
+    // 仅云候选：云占第 2 位，英文占第 3 位，后续中文候选不被挤占，emoji 落在末尾。
     items = {local("你"), emoji(), local("呢"), english(), cloud()};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
     REQUIRE_EQ(items[1].source, CandidateSource::CloudSuggestion);
@@ -489,7 +488,7 @@ TEST_CASE(EmojiMixedCandidateFollowsEnglishAndShiftsWithCloudAndAi)
     REQUIRE_EQ(items[4].source, CandidateSource::Emoji);
 }
 
-TEST_CASE(KaomojiMixedCandidateSitsRightAfterEmoji)
+TEST_CASE(KaomojiMixedCandidatesFollowEmojiAtTheEnd)
 {
     const auto local = [](std::string word) { return WordItem("ni", std::move(word), 100); };
     const auto english = [] { return WordItem("ni", "nice", 1, CandidateSource::EnglishDictionary); };
@@ -498,7 +497,7 @@ TEST_CASE(KaomojiMixedCandidateSitsRightAfterEmoji)
     const auto cloud = [] { return WordItem("ni", "云候选", 1, CandidateSource::CloudSuggestion); };
     const auto ai = [] { return WordItem("ni", "AI联想", 1, CandidateSource::AiSuggestion); };
 
-    // Base case: English slot 2, emoji slot 3, kaomoji slot 4.
+    // 基础情况：英文在第 2 位，中文候选正常排列，emoji 和颜文字追加在末尾且颜文字紧随 emoji。
     std::vector<WordItem> items = {local("你"), kaomoji(), emoji(), local("呢"), english()};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
     REQUIRE_EQ(items[1].source, CandidateSource::EnglishDictionary);
@@ -506,7 +505,7 @@ TEST_CASE(KaomojiMixedCandidateSitsRightAfterEmoji)
     REQUIRE_EQ(items[3].source, CandidateSource::Emoji);
     REQUIRE_EQ(items[4].source, CandidateSource::Kaomoji);
 
-    // Cloud + AI occupy slots 2/3; emoji/kaomoji shift to slots 5/6.
+    // 云候选 + AI 联想占第 2/3 位，英文占第 4 位，emoji 和颜文字排在末尾。
     items = {local("你"), kaomoji(), emoji(), english(), ai(), cloud()};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
     REQUIRE_EQ(items[1].source, CandidateSource::CloudSuggestion);
@@ -524,7 +523,7 @@ TEST_CASE(DateTimeMixedCandidateLeadsAsyncCandidates)
     const auto emoji = [] { return WordItem("rq", "\xF0\x9F\x98\x80", 1, CandidateSource::Emoji); };
     const auto cloud = [] { return WordItem("rq", "云候选", 1, CandidateSource::CloudSuggestion); };
 
-    // 日期紧跟首个中文候选，排在云、英文、emoji 前面；其余日期格式追加在末尾。
+    // 日期紧跟首个中文候选，排在云、英文前面；中文候选不被 emoji 挤占；emoji 与其余日期格式在末尾。
     std::vector<WordItem> items = {local("人群"), emoji(),       english(),         date("2026年10月2日"),
                                    cloud(),       local("日期"), date("2026-10-02")};
     FanyImeIpc::NormalizeMixedCandidateOrder(items);
@@ -1378,6 +1377,9 @@ TEST_CASE(SegmentBoundariesFollowTheDisplayedQuanpinSyllables)
     // A correction display that rewrites letters stays one unit when the cut
     // reports one syllable, and an incomplete tail is a unit of its own so only
     // the tail is deleted.
+    ScopedConfigRoot corrected_config;
+    InitImeConfig();
+    REQUIRE(SetConfiguredQuanpinAutocorrectTransposition(true));
     EngineInputSession corrected(SchemeType::Quanpin);
     InputLetters(corrected, "sahng");
     REQUIRE_EQ(corrected.segment_raw_boundaries(), std::vector<std::size_t>({0, 5}));
@@ -1778,32 +1780,6 @@ TEST_CASE(EngineShuangpinMidSentenceUppercaseTriggerActsAsBacktick)
     REQUIRE(!IsConfiguredMidSentenceHelpcodeUppercaseTrigger());
     REQUIRE_EQ(FormatMidSentenceHelpcodeUppercaseWorkerPayload(), std::wstring(L"0"));
 }
-TEST_CASE(EmojiHomepageTailPreservesAiBatchAndEnglishCompletion)
-{
-    std::vector<WordItem> items;
-    for (int i = 0; i < 12; ++i)
-        items.emplace_back("ni", "local" + std::to_string(i), 100);
-    items.emplace_back("nice", "nice", 10, CandidateSource::EnglishDictionary);
-    items.emplace_back("ni", "best-emoji", 10, CandidateSource::Emoji);
-    items.emplace_back("ni", "second-emoji", 9, CandidateSource::Emoji);
-    items.emplace_back("ni", "first-ai", 10, CandidateSource::AiSuggestion);
-    items.emplace_back("ni", "second-ai", 9, CandidateSource::AiSuggestion);
-    FanyImeIpc::EnglishPlacement placement;
-    placement.page_size = 9;
-    placement.require_exact = true;
-    placement.input = "ni";
-    FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
-    REQUIRE_EQ(items[8].word, std::string("best-emoji"));
-    REQUIRE_EQ(items[7].word, std::string("nice"));
-    REQUIRE_EQ(items.back().word, std::string("second-emoji"));
-    REQUIRE_EQ(std::count_if(items.begin(), items.end(),
-                             [](const auto &item) { return item.source == CandidateSource::AiSuggestion; }),
-               2);
-    FanyImeIpc::NormalizeMixedCandidateOrder(items, 1, placement);
-    REQUIRE_EQ(items[8].word, std::string("best-emoji"));
-    REQUIRE_EQ(items[7].word, std::string("nice"));
-}
-
 TEST_CASE(LocalAiRerankPreservesOriginalRowsPinsAndInterveningCandidates)
 {
     WordItem first("shi'shi", "事实", 100, CandidateSource::Database);

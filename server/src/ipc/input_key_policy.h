@@ -78,11 +78,12 @@ constexpr bool ShouldResetCompositionForImeMode(int previous_snapshot, bool chin
 }
 
 // A complete four-letter wubi code the table answered with exactly one candidate is committed as
-// soon as the fourth letter lands, so the user never has to press space. The switch defaults on.
-// The wubi engine's own
-// report that the code is complete, table-answered and unique is the only gate. A word being
-// created keeps the composition open: the raw belongs to the prefix the user is still assembling,
-// and committing it would end that word early.
+// soon as the fourth letter lands, so the user never has to press space. The switch defaults on
+// (industry wubi IMEs default this on), so leaving it alone keeps that behavior; turning it off is
+// the only exit a user who keeps hitting the wrong commit has. On top of the switch, the wubi
+// engine's own report that the code is complete, table-answered and unique is the only other gate.
+// A word being created keeps the composition open: the raw belongs to the prefix the user is still
+// assembling, and committing it would end that word early.
 constexpr bool ShouldAutoCommitCompleteWubiCode(bool auto_commit_enabled, bool unique_four_code,
                                                 bool creating_word_active)
 {
@@ -91,9 +92,13 @@ constexpr bool ShouldAutoCommitCompleteWubiCode(bool auto_commit_enabled, bool u
 
 // The user is typing past a complete four-letter wubi code (a letter key with the caret at the end
 // of a four-letter table-answered code). The first candidate is committed and the key that was just
-// typed starts the next composition instead of being dropped. Turning the independent fifth-code
-// switch off only has somewhere to put that letter when mixed pinyin is enabled. Otherwise the
-// engine clips to four letters, so safe top-commit takes priority over the switch to preserve input.
+// typed starts the next composition instead of being dropped. Committing the first candidate matches
+// the user, who is already typing the next word and is not looking at the candidate window. Its own
+// switch defaults on and is independent of the auto-commit switch above. Turning it off only has
+// somewhere to put the letter when mixed input is on: the composition then grows into a mixed
+// spelling. With mixed input off the engine clips the code back to four letters, which drops the
+// key on the Server while a raw-preedit client already shows it, so the switch yields to the top
+// commit there: an extra key never loses input, whatever the setting says.
 constexpr bool ShouldCommitCompleteWubiCodeOnNextKey(bool top_commit_enabled, bool mixed_pinyin_enabled,
                                                      bool four_code_is_complete, bool key_is_letter, bool caret_at_end,
                                                      bool creating_word_active)

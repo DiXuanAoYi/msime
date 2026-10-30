@@ -42,7 +42,7 @@ bool IsShiftLetterSpecialModeTriggered()
 // 两侧必须用同一个判据，否则按键分类会不一致、预编辑会错位。
 bool IsJapaneseInputMode()
 {
-    return GetConfiguredInputMode() == "japanese";
+    return GetActiveInputMode() == "japanese";
 }
 
 // 日语模式下 '-' 不翻页，而是长音符（ー）的输入键。空编码时也要起头组合，

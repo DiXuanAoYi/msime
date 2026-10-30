@@ -1,6 +1,7 @@
 #include "HandwritingPanel.h"
 
 #include "msimeui/DeviceResources.h"
+#include "msimeui/Fonts.h"
 #include "msimeui/Window.h"
 
 #include <algorithm>
@@ -78,27 +79,35 @@ void DrawCloseIcon(DeviceResources &resources, const RectF &rect, D2D1_COLOR_F c
     target->DrawLine({cx + half, cy - half}, {cx - half, cy + half}, brush, 1.5f);
 }
 
-void DrawUndoIcon(DeviceResources &resources, const RectF &rect, D2D1_COLOR_F color)
+// 按钮图标取自图标字体：Windows 11 用 Segoe Fluent Icons，Windows 10 回退 Segoe MDL2 Assets。
+// 不能把 ↶ 之类的符号直接写进文字，Noto Sans SC 没有这些字形，会画成缺字方框。
+// 两种字体都没有该字形时只画文字标签，和悬浮工具栏的降级方式一致。
+void IconButtonContent(DeviceResources &resources, const RectF &rect, wchar_t iconCodepoint, const std::wstring &label,
+                       D2D1_COLOR_F color)
 {
+    const IconGlyph icon = ResolveIconGlyph(iconCodepoint);
+    if (!icon.family)
+    {
+        Text(resources, label, rect, 15.0f, color);
+        return;
+    }
+
+    const float fontSize = 15.0f;
+    const float iconSize = 14.0f;
+    const float gap = 8.0f;
+    // 标签只有两个汉字，宽度按字号估算即可。
+    const float labelWidth = fontSize * static_cast<float>(label.size()) + 2.0f;
+    const float left = rect.x + (rect.width - (iconSize + gap + labelWidth)) * 0.5f;
     auto *target = resources.GetRenderTarget();
+    // 图标字体只有一种字重，请求 SemiBold 由 DirectWrite 模拟加粗，线条和旁边的文字更协调。
+    auto *format =
+        resources.GetTextFormat(icon.family, iconSize, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_TEXT_ALIGNMENT_CENTER,
+                                DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_WORD_WRAPPING_NO_WRAP);
     auto *brush = resources.GetSolidColorBrush(color);
-    if (!target || !brush)
-        return;
-    Microsoft::WRL::ComPtr<ID2D1Factory> factory;
-    target->GetFactory(factory.GetAddressOf());
-    Microsoft::WRL::ComPtr<ID2D1PathGeometry> path;
-    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
-    if (!factory || FAILED(factory->CreatePathGeometry(path.GetAddressOf())) || FAILED(path->Open(sink.GetAddressOf())))
-        return;
-    const float x = rect.x + rect.width * 0.5f, y = rect.y + rect.height * 0.5f;
-    sink->BeginFigure({x + 6.0f, y + 3.0f}, D2D1_FIGURE_BEGIN_HOLLOW);
-    sink->AddBezier({{x + 10.0f, y - 9.0f}, {x - 8.0f, y - 9.0f}, {x - 7.0f, y}});
-    sink->EndFigure(D2D1_FIGURE_END_OPEN);
-    if (FAILED(sink->Close()))
-        return;
-    target->DrawGeometry(path.Get(), brush, 1.7f);
-    target->DrawLine({x - 7.0f, y}, {x - 7.0f, y - 5.0f}, brush, 1.7f);
-    target->DrawLine({x - 7.0f, y}, {x - 2.0f, y}, brush, 1.7f);
+    if (target && format && brush)
+        target->DrawTextW(&icon.codepoint, 1, format, D2DRect({left, rect.y, iconSize, rect.height}), brush);
+    Text(resources, label, {left + iconSize + gap, rect.y, labelWidth, rect.height}, fontSize, color,
+         DWRITE_TEXT_ALIGNMENT_LEADING);
 }
 
 void DrawInkStroke(DeviceResources &resources, const std::vector<PointF> &points, ID2D1Brush *brush)
@@ -250,13 +259,8 @@ void HandwritingPanel::Render(DeviceResources &resources)
     Fill(resources, clearRect_, surface, 6.0f);
     Outline(resources, undoRect_, border, 1.0f, 6.0f);
     Outline(resources, clearRect_, border, 1.0f, 6.0f);
-    // Vector symbols do not depend on the CJK font having ↶/✕ glyphs.
-    DrawUndoIcon(resources, {undoRect_.x + 8.0f, undoRect_.y, 24.0f, undoRect_.height}, text);
-    DrawCloseIcon(resources, {clearRect_.x + 8.0f, clearRect_.y, 24.0f, clearRect_.height}, text);
-    Text(resources, L"\u64a4\u9500", {undoRect_.x + 30.0f, undoRect_.y, undoRect_.width - 36.0f, undoRect_.height},
-         15.0f, text);
-    Text(resources, L"\u91cd\u5199", {clearRect_.x + 30.0f, clearRect_.y, clearRect_.width - 36.0f, clearRect_.height},
-         15.0f, text);
+    IconButtonContent(resources, undoRect_, 0xE7A7, L"\u64a4\u9500", text);
+    IconButtonContent(resources, clearRect_, 0xE711, L"\u91cd\u5199", text);
 }
 
 bool HandwritingPanel::HitTest(const PointF &point) const

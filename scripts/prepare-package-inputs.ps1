@@ -27,12 +27,24 @@ $dictOut = Join-Path $dictRoot 'out'
 $notice = Join-Path $dictRoot 'source\mozc_dictionary_oss\README.txt'
 
 $ready = $false
-if (-not $Force -and (Test-Path -LiteralPath $dictOut)) {
+# out\ 若是 build-dictionary.py 从 msime-dictionary 文本源数据构建的（有 local-dictionary.json），
+# 它本来就对不上产品锁的摘要；这里只校验或重新构建它，不拿产品锁的旧词库覆盖。
+$localBuild = Test-Path -LiteralPath (Join-Path $dictOut 'local-dictionary.json')
+if ($localBuild) {
+    $buildDictionary = Join-Path $PSScriptRoot 'build-dictionary.py'
+    if ($Force) { python $buildDictionary } else { python $buildDictionary --verify }
+    if ($LASTEXITCODE -ne 0) { throw "本地构建的词库校验失败（$LASTEXITCODE），运行 python scripts\build-dictionary.py 重新构建" }
+    $ready = $true
+}
+elseif (-not $Force -and (Test-Path -LiteralPath $dictOut)) {
     python $productLock verify-dictionaries $dictOut 2>$null | Out-Null
     $ready = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $notice)
 }
 
-if ($ready) {
+if ($localBuild) {
+    # build-dictionary.py 已经输出了就绪信息。
+}
+elseif ($ready) {
     Write-Host "词库已就绪：$dictOut"
 }
 else {

@@ -1,7 +1,6 @@
-"""english.db：英文前缀候选表、由 ECDICT 推出的中英双向释义、sources/cn-en/ 的中译英释义、custom/translations.txt 的人工覆盖。
+"""english.db：英文前缀候选表、由 ECDICT 推出的中英双向释义、custom/translations.txt 的人工覆盖。
 
-对应 Rust 构建器 english.rs / english_supplement.rs 的 english / english-glosses / custom-translations 阶段；
-cn-en-translations 是 Rust 构建器还没有的阶段，排在 english-glosses 与 custom-translations 之间。
+对应 Rust 构建器 english.rs / english_supplement.rs 的 english / english-glosses / custom-translations 阶段。
 """
 
 from __future__ import annotations
@@ -498,41 +497,6 @@ def write_glosses(connection: sqlite3.Connection, en_zh: dict[str, str], zh_en: 
         connection.executemany("INSERT INTO zh_en_glosses_new(chinese,english_gloss) VALUES(?1,?2)", sorted(zh_en.items()))
     connection.executescript(_SWAP_GLOSS_TABLES)
     textutil.integrity_check(connection)
-
-
-def parse_cn_en_translations(text: str, name: str) -> dict[str, str]:
-    """sources/cn-en/machine-translations.txt：`源词<TAB>译文`，每个源词一行，源词不能是纯 ASCII。
-    译文原样保留：词性前缀（n.、proper n. 等）和用 `; ` 分隔的全部义项都进库，不像 ECDICT 推出的那样截到两个。"""
-    entries: dict[str, str] = {}
-    for number, line in enumerate(textutil.without_bom(text).splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        fields = stripped.split("\t")
-        if len(fields) != 2:
-            raise ValueError(f"{name}:{number}: expected source<TAB>gloss, got {line!r}")
-        source, gloss = fields[0].strip(), fields[1].strip()
-        if not source or not gloss:
-            raise ValueError(f"{name}:{number}: empty source or gloss")
-        # 〇（U+3007）这类源词不在 U+3400 以上，只拦纯 ASCII 的英文源词。
-        if source.isascii():
-            raise ValueError(f"{name}:{number}: {source!r} is not a Chinese source word")
-        if source in entries:
-            raise ValueError(f"{name}:{number}: duplicate source word {source!r}")
-        entries[source] = gloss
-    if not entries:
-        raise ValueError(f"{name}: no translations found")
-    return entries
-
-
-def apply_cn_en_translations(connection: sqlite3.Connection, entries: dict[str, str]) -> tuple[int, int]:
-    """覆盖或补充中译英释义。返回 (替换 ECDICT 释义的条数, 新增的条数)。"""
-    with connection:
-        existing = {row[0] for row in connection.execute("SELECT chinese FROM zh_en_glosses")}
-        connection.executemany("INSERT OR REPLACE INTO zh_en_glosses(chinese,english_gloss) VALUES(?1,?2)",
-                               sorted(entries.items()))
-    replaced = sum(1 for source in entries if source in existing)
-    return replaced, len(entries) - replaced
 
 
 @dataclass

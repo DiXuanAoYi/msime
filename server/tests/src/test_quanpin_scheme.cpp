@@ -697,12 +697,12 @@ TEST_CASE(QuanpinAutocorrectCutTypeBitSwitchMatrix)
     REQUIRE_EQ(quanpin::join_segments(quanpin::autocorrect_cut("shabg", neighbor_only)), std::string("shang"));
     REQUIRE_EQ(quanpin::join_segments(quanpin::autocorrect_cut("shabg", both)), std::string("shang"));
 
-    // "sshang" (doubled s) is an insertion fix; only that bit may correct it.
-    REQUIRE(quanpin::autocorrect_cut("sshang", none).empty());
-    REQUIRE(quanpin::autocorrect_cut("sshang", transposition_only).empty());
-    REQUIRE(quanpin::autocorrect_cut("sshang", neighbor_only).empty());
-    REQUIRE(quanpin::autocorrect_cut("sshang", quanpin::kAutocorrectDeletion).empty());
-    REQUIRE_EQ(quanpin::join_segments(quanpin::autocorrect_cut("sshang", quanpin::kAutocorrectInsertion)),
+    // "sjhang" (doubled s) is an insertion fix; only that bit may correct it.
+    REQUIRE(quanpin::autocorrect_cut("sjhang", none).empty());
+    REQUIRE(quanpin::autocorrect_cut("sjhang", transposition_only).empty());
+    REQUIRE(quanpin::autocorrect_cut("sjhang", neighbor_only).empty());
+    REQUIRE(quanpin::autocorrect_cut("sjhang", quanpin::kAutocorrectDeletion).empty());
+    REQUIRE_EQ(quanpin::join_segments(quanpin::autocorrect_cut("sjhang", quanpin::kAutocorrectInsertion)),
                std::string("shang"));
 }
 
@@ -1053,17 +1053,17 @@ TEST_CASE(QuanpinDictionaryAutocorrectInsertionTypo)
     // 阶段 4 生效信号：开头双打（sshang）经插入纠错键命中目标词，标记
     // corrected_from，canonical 读音落在纠错后的 shang 上（造词/调频不学习
     // 错拼）。关掉 insertion 位则回到无纠错标记的现状。
-    const auto candidates = dictionary.query("sshang", "", all);
+    const auto candidates = dictionary.query("sjhang", "", all);
     REQUIRE(!candidates.empty());
     REQUIRE_EQ(candidates.front().word, std::string("上"));
     REQUIRE_EQ(candidates.front().pinyin, std::string("shang"));
-    REQUIRE_EQ(candidates.front().corrected_from, std::string("sshang"));
+    REQUIRE_EQ(candidates.front().corrected_from, std::string("sjhang"));
 
     const unsigned legacy_bits =
         quanpin::kAutocorrectTransposition | quanpin::kAutocorrectNeighbor | quanpin::kAutocorrectDeletion;
-    const auto legacy = dictionary.query("sshang", "", legacy_bits);
+    const auto legacy = dictionary.query("sjhang", "", legacy_bits);
     REQUIRE(std::none_of(legacy.begin(), legacy.end(),
-                         [](const WordItem &item) { return item.corrected_from == "sshang"; }));
+                         [](const WordItem &item) { return item.corrected_from == "sjhang"; }));
 }
 
 TEST_CASE(QuanpinDictionaryAutocorrectAmbiguousDisambiguation)

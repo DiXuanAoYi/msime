@@ -36,3 +36,4 @@ __pycache__/
 /stage/
 # Generated, reproducible audio.cpp runtime; see scripts/local_asr/Build-Voxtral.ps1.
 scripts/local_asr/native-voxtral/
+/.tmp-test/

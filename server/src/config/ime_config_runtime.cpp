@@ -222,7 +222,12 @@ bool SetConfiguredVimModeApps(const std::string &text)
         names.insert(NormalizeApplication(value));
     }
     const std::string canonical = nlohmann::json(names).dump();
-    if (!WriteConfiguredValue("input", "vim_mode_apps", EscapeTomlBasicString(canonical)))
+    // The TSF DLL parses a TOML string array, so persist it as one rather than as a JSON string.
+    std::string literal = "[";
+    for (const auto &name : names)
+        literal += (literal.size() > 1 ? ", " : "") + EscapeTomlBasicString(name);
+    literal += "]";
+    if (!WriteConfiguredValue("input", "vim_mode_apps", literal))
         return false;
     std::atomic_store(&g_vim_mode_apps, std::make_shared<const std::string>(canonical));
     return true;

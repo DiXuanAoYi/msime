@@ -89,6 +89,9 @@ bool g_escape_keeps_selected_word = false;
 bool g_enter_learns_english_word = true;
 // 五笔 z 键角色两态：off | wildcard。非法值回落 off（升级用户零变化）。
 std::string g_wubi_z_mode = "off";
+// 四码唯一自动上屏与顶字是两个独立开关，与混输、z 键角色都无关：前者决定第四键落下即上屏，
+// 后者决定完整四码后再敲字母时是否上屏首选并把字母留作下一组合开头。两者默认都开，
+// 保持开关落地前的无条件行为，升级用户零感知。
 std::string g_shuangpin_preedit_mode = "quanpin";
 std::string g_tsf_preedit_style = "raw";
 // 双拼方案下行内 / 候选窗预编辑显示转换后的全拼（原始按键去掉分词符号），默认关闭。
@@ -298,6 +301,12 @@ bool IsValidSettingsWindowLinger(const std::string &linger)
     return linger == "off" || linger == "1m" || linger == "5m" || linger == "10m" || linger == "30m" ||
            linger == "60m" || linger == "forever";
 }
+
+bool IsValidTranslationTargetLanguage(const std::string &language)
+{
+    static constexpr std::string_view kLanguages[] = {"en", "fr", "ja", "es", "ru", "de", "ko", "th", "vi", "it"};
+    return std::find(std::begin(kLanguages), std::end(kLanguages), language) != std::end(kLanguages);
+}
 } // namespace ime_config_detail
 
 namespace
@@ -307,6 +316,12 @@ const std::vector<std::string_view> &AiAssistantProviders()
     static const std::vector<std::string_view> providers{"deepseek", "openai", "siliconflow",
                                                          "groq",     "custom", "local"};
     return providers;
+}
+
+// 服务商已下线的旧默认模型。用户配置里残留这些值时按空槽位处理，跟随当前默认值。
+bool IsRetiredAiAssistantDefaultModel(std::string_view provider, std::string_view model)
+{
+    return provider == "groq" && model == "llama-3.3-70b-versatile";
 }
 } // namespace
 
@@ -427,12 +442,15 @@ bool LoadImeConfig()
         {
             const std::string mode = tbl["input"]["mode"].value_or(std::string("chinese"));
             const std::string configured_mode = mode == "japanese" ? "japanese" : "chinese";
-            const bool cycle = tbl["keybindings"]["trilingual_cycle"].value_or(false);
-            if (!cycle || cycle != g_trilingual_cycle_enabled.load() || configured_mode != g_input_mode)
-                g_active_input_mode.store(ActiveInputMode::Configured);
+            const bool trilingual_cycle = tbl["keybindings"]["trilingual_cycle"].value_or(false);
+            // An unrelated settings reload must not undo a runtime language cycle.
+            // Explicit language/cycle preference changes start from the saved mode.
+            if (!trilingual_cycle || trilingual_cycle != g_trilingual_cycle_enabled.load(std::memory_order_relaxed) ||
+                configured_mode != g_input_mode)
+                g_active_input_mode.store(ActiveInputMode::Configured, std::memory_order_relaxed);
             g_input_mode = configured_mode;
-            g_configured_input_mode_japanese.store(configured_mode == "japanese");
-            g_trilingual_cycle_enabled.store(cycle);
+            g_configured_input_mode_japanese.store(configured_mode == "japanese", std::memory_order_relaxed);
+            g_trilingual_cycle_enabled.store(trilingual_cycle, std::memory_order_relaxed);
         }
         {
             const std::string schema = tbl["input"]["japanese_schema"].value_or(std::string("romaji"));
@@ -457,8 +475,22 @@ bool LoadImeConfig()
         g_wubi_mixed_pinyin = tbl["input"]["wubi_mixed_pinyin"].value_or(false);
         g_wubi_four_code_auto_commit.store(tbl["input"]["wubi_four_code_auto_commit"].value_or(true));
         g_wubi_fifth_code_top_commit.store(tbl["input"]["wubi_fifth_code_top_commit"].value_or(true));
-        std::atomic_store(&g_vim_mode_apps, std::make_shared<const std::string>(
-                                                tbl["input"]["vim_mode_apps"].value_or(std::string("[]"))));
+        {
+            std::string vim_apps = "[]";
+            if (const auto *array = tbl["input"]["vim_mode_apps"].as_array())
+            {
+                nlohmann::json names = nlohmann::json::array();
+                for (const auto &item : *array)
+                    if (const auto value = item.value<std::string>())
+                        names.push_back(*value);
+                vim_apps = names.dump();
+            }
+            else if (const auto legacy = tbl["input"]["vim_mode_apps"].value<std::string>())
+            {
+                vim_apps = *legacy;
+            }
+            std::atomic_store(&g_vim_mode_apps, std::make_shared<const std::string>(std::move(vim_apps)));
+        }
         g_english_runtime_candidates.store(tbl["input"]["english_candidates"].value_or(true));
         std::atomic_store(&g_english_candidate_app_rules,
                           std::make_shared<const std::string>(
@@ -927,6 +959,67 @@ bool LoadImeConfig()
         }
         LoadCandidateTranslationConfig(tbl);
         {
+            std::string &stored = g_ai_assistant.tokens[g_ai_assistant.provider];
+            if (stored.empty())
+                stored = VoiceInput::UsableToken(g_ai_assistant.token);
+            g_ai_assistant.token = stored;
+        }
+        g_ai_assistant.endpoint =
+            tbl["ai_assistant"]["endpoint"].value_or(std::string("https://api.deepseek.com/chat/completions"));
+        g_ai_assistant.model = tbl["ai_assistant"]["model"].value_or(std::string("deepseek-v4-flash"));
+        const AiAssistantConfig ai_defaults;
+        g_ai_assistant.endpoints = ai_defaults.endpoints;
+        g_ai_assistant.models = ai_defaults.models;
+        for (const auto provider : AiAssistantProviders())
+        {
+            const std::string id(provider);
+            const auto load_slot = [&](const std::string &key, const std::string &legacy, std::string &target) {
+                // 空值和服务商已下线的旧默认模型都表示「用默认值」：早于 #610 的版本会把默认值原样写盘。
+                const auto usable = [&](const std::string &value) {
+                    return !value.empty() && !(key == "model" && IsRetiredAiAssistantDefaultModel(id, value));
+                };
+                const std::string stored = tbl["ai_assistant"][key + "_" + id].value_or(std::string());
+                if (usable(stored))
+                    target = stored;
+                else if (id == g_ai_assistant.provider && usable(legacy))
+                    target = legacy;
+            };
+            load_slot("endpoint", g_ai_assistant.endpoint, g_ai_assistant.endpoints[id]);
+            load_slot("model", g_ai_assistant.model, g_ai_assistant.models[id]);
+        }
+        g_ai_assistant.endpoint = g_ai_assistant.endpoints[g_ai_assistant.provider];
+        g_ai_assistant.model = g_ai_assistant.models[g_ai_assistant.provider];
+        const int ai_limit = tbl["ai_assistant"]["candidate_limit"].value_or(3);
+        g_ai_assistant.candidate_limit = ai_limit >= 1 && ai_limit <= 10 ? ai_limit : 3;
+        const std::string legacy_ai_prompt = tbl["ai_assistant"]["prompt"].value_or(g_ai_assistant.prompt);
+        g_ai_assistant.prompt_id = tbl["ai_assistant"]["prompt_id"].value_or(std::string("custom_1"));
+        if (g_ai_assistant.prompt_id != "custom_1" && g_ai_assistant.prompt_id != "custom_2" &&
+            g_ai_assistant.prompt_id != "custom_3")
+            g_ai_assistant.prompt_id = "custom_1";
+        g_ai_assistant.prompt_custom_1 = tbl["ai_assistant"]["prompt_custom_1"].value_or(std::string());
+        if (g_ai_assistant.prompt_custom_1.empty())
+            g_ai_assistant.prompt_custom_1 = legacy_ai_prompt;
+        g_ai_assistant.prompt_custom_2 = tbl["ai_assistant"]["prompt_custom_2"].value_or(std::string());
+        g_ai_assistant.prompt_custom_3 = tbl["ai_assistant"]["prompt_custom_3"].value_or(std::string());
+        g_ai_assistant.prompt = g_ai_assistant.prompt_id == "custom_2"   ? g_ai_assistant.prompt_custom_2
+                                : g_ai_assistant.prompt_id == "custom_3" ? g_ai_assistant.prompt_custom_3
+                                                                         : g_ai_assistant.prompt_custom_1;
+        g_tencent_tmt.enabled = tbl["tencent_tmt"]["enabled"].value_or(true);
+        g_tencent_tmt.secret_id = tbl["tencent_tmt"]["secret_id"].value_or(std::string());
+        g_tencent_tmt.secret_key = tbl["tencent_tmt"]["secret_key"].value_or(std::string());
+        g_tencent_tmt.region = tbl["tencent_tmt"]["region"].value_or(std::string("ap-guangzhou"));
+        if (g_tencent_tmt.region.empty())
+            g_tencent_tmt.region = "ap-guangzhou";
+        g_tencent_tmt.target_language = tbl["tencent_tmt"]["target_language"].value_or(std::string("en"));
+        if (!IsValidTranslationTargetLanguage(g_tencent_tmt.target_language))
+            g_tencent_tmt.target_language = "en";
+        g_custom_translation.enabled = tbl["custom_translation"]["enabled"].value_or(false);
+        g_custom_translation.endpoint = tbl["custom_translation"]["endpoint"].value_or(std::string());
+        g_custom_translation.api_key = tbl["custom_translation"]["api_key"].value_or(std::string());
+        g_niutrans.enabled = tbl["niutrans"]["enabled"].value_or(false);
+        g_niutrans.app_id = tbl["niutrans"]["app_id"].value_or(std::string());
+        g_niutrans.apikey = tbl["niutrans"]["apikey"].value_or(std::string());
+        {
             NetworkProxyConfig proxy;
             proxy.mode = tbl["network"]["proxy_mode"].value_or(std::string("system"));
             if (proxy.mode != "system" && proxy.mode != "none" && proxy.mode != "custom")
@@ -1041,6 +1134,7 @@ void InvalidateImeConfigWriteTime()
 
 void InitImeConfig()
 {
+    g_active_input_mode.store(ActiveInputMode::Configured, std::memory_order_relaxed);
     // Build the path from the wide accessor: std::filesystem::path(std::string) decodes with the
     // system ANSI code page, which corrupts a non-ASCII (e.g. Chinese) user profile path on a
     // non-UTF-8 ACP machine and makes every config read/write fail ("设置保存失败").

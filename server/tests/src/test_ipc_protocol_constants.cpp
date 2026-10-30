@@ -33,6 +33,8 @@ TEST_CASE(ipc_pipe_ready_is_a_distinct_server_reply)
     REQUIRE(Global::DataFromServerMsgType::CommitExactText > Global::DataFromServerMsgType::PipeReady);
     REQUIRE_EQ(Global::DataFromServerMsgType::UiLessComposition, 11u);
     REQUIRE(Global::DataFromServerMsgType::UiLessComposition > Global::DataFromServerMsgType::CommitExactText);
+    REQUIRE_EQ(Global::DataFromServerMsgType::TrilingualCycle, 15u);
+    REQUIRE_EQ(Global::DataFromServerMsgType::MaxKnown, Global::DataFromServerMsgType::TrilingualCycle);
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::FocusSessionReady, 8u);
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::PipeReady, 9u);
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::InsertText, 10u);
@@ -60,9 +62,9 @@ TEST_CASE(ipc_pipe_ready_is_a_distinct_server_reply)
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::DirectHelpcodeChanged, 30u);
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::MidSentenceHelpcodeUppercaseChanged, 31u);
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::VModeChanged, 32u);
-    REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::VocabularyCommitCandidate, 33u);
-    REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::RuntimeSettingsSnapshot, 34u);
-    REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::TrilingualCycleChanged, 35u);
+    REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::TrilingualCycleChanged, 33u);
+    REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::VocabularyCommitCandidate, 34u);
+    REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::RuntimeSettingsSnapshot, 35u);
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::MaxKnown, 35u);
     REQUIRE(Global::DataFromServerMsgTypeToTsfWorkerThread::FocusSessionReady >
             Global::DataFromServerMsgTypeToTsfWorkerThread::PagingCommaPeriodChanged);
@@ -112,8 +114,12 @@ TEST_CASE(ipc_pipe_ready_is_a_distinct_server_reply)
             Global::DataFromServerMsgTypeToTsfWorkerThread::DirectHelpcodeChanged);
     REQUIRE(Global::DataFromServerMsgTypeToTsfWorkerThread::VModeChanged >
             Global::DataFromServerMsgTypeToTsfWorkerThread::MidSentenceHelpcodeUppercaseChanged);
+    REQUIRE(Global::DataFromServerMsgTypeToTsfWorkerThread::TrilingualCycleChanged >
+            Global::DataFromServerMsgTypeToTsfWorkerThread::VModeChanged);
+    REQUIRE(Global::DataFromServerMsgTypeToTsfWorkerThread::RuntimeSettingsSnapshot >
+            Global::DataFromServerMsgTypeToTsfWorkerThread::TrilingualCycleChanged);
     REQUIRE_EQ(Global::DataFromServerMsgTypeToTsfWorkerThread::MaxKnown,
-               Global::DataFromServerMsgTypeToTsfWorkerThread::TrilingualCycleChanged);
+               Global::DataFromServerMsgTypeToTsfWorkerThread::RuntimeSettingsSnapshot);
 }
 
 TEST_CASE(ipc_client_suspension_is_a_distinct_nonterminal_route_reset)

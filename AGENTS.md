@@ -145,6 +145,8 @@ release workflow 里的每一段 shell 都抽在 `scripts/ci/` 下，workflow �
 
 签名沿用「有证书就签、没有就发未签名版」的策略：配置了 `WINDOWS_SIGNING_CERTIFICATE_BASE64` 和 `WINDOWS_SIGNING_CERTIFICATE_PASSWORD` 两个 secret，或 runner 用户证书存储中配置的 thumbprint 可用时，用 `signtool` 签 uiAccess Server 和最终安装包；没配置时产物名带 `-unsigned` 后缀，并在 release 说明里写明 `uiAccess` 不会生效。Server 的 `uiAccess=true` manifest 必须在上传和签名之前由 `scripts/ci/embed-server-manifest.ps1` 注入并验证；`Sign-PackageBinaries-Local.ps1` 使用本机自签名证书，只用于本地验证，CI 不会调用它。
 
+改走 SignPath 要把仓库变量 `WINDOWS_SIGNING_PROVIDER` 设为 `signpath`，并配齐 `SIGNPATH_ORGANIZATION_ID`、`SIGNPATH_PROJECT_SLUG`（`msime-windows`）、`SIGNPATH_SIGNING_POLICY_SLUG` 三个变量和组织 secret `SIGNPATH_TOKEN`，缺任何一项 `detect-release-signing.ps1` 都会让发布失败，不会退回证书或未签名。SignPath 项目里还要有 slug 为 `payload` 和 `installer` 的两个 artifact configuration，内容照抄 `installer/signpath/` 下的同名 XML，那两份文件是评审过的副本，SignPath 只读它自己后台里的那份。SignPath 的开源计划只接受「签名请求之前的每个 job 都跑在 GitHub 托管 runner 上」的请求，所以设为 `signpath` 时 `tsf`、`server`、`package` 三个 job 从自托管的发布机换到 `windows-2025`，依赖和编译缓存沿用 `ci.yml` 的做法（同一个 vcpkg 缓存 scope，Server 走 Ninja Multi-Config 加 sccache）；证书路径仍跑在发布机上，那里才有证书。
+
 ## 提交
 
 本个人分支的后续交付默认只在本机修改、编译、测试和安装，保留用户配置、聊天上下文和模型。只有用户明确要求推送时，才向 GitHub 推送代码；创建或发布 Release、上传发行资产需要对应的明确授权。单纯推送代码不代表发布 Release；“继续”、本地验收或确认功能正常不代表推送授权。
