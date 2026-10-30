@@ -91,6 +91,10 @@ impl Companion {
         }
     }
 
+    pub fn set_x(&mut self, x: f32) {
+        self.pos.0 = x.clamp(40.0, (self.screen_w - 40.0).max(40.0));
+    }
+
     pub fn resize(&mut self, screen_w: f32, floor_y: f32) {
         self.screen_w = screen_w;
         self.floor_y = floor_y;
@@ -103,6 +107,17 @@ impl Companion {
     pub fn pat(&mut self) {
         self.happy = 1.6;
         self.idle = 0.0;
+    }
+
+    /// 用鼠标拖着她在地上横着走。只在地上有效；在候选窗上或跳着的时候不理。拖动算有动静，会把她叫醒。
+    pub fn drag_to(&mut self, x: f32) -> bool {
+        if !matches!(self.mode, Mode::Floor(_)) {
+            return false;
+        }
+        self.pos.0 = x.clamp(40.0, (self.screen_w - 40.0).max(40.0));
+        self.mode = Mode::Floor(FloorAction::Stand(3.0));
+        self.idle = 0.0;
+        true
     }
 
     pub fn is_asleep(&self) -> bool {
@@ -360,6 +375,29 @@ mod tests {
         assert_eq!(c.pose(false), Pose::Sleep);
         run(&mut c, 1.5, &Input { candidate: Some(window()), listening: false });
         assert_eq!(c.pose(false), Pose::Perch, "开始打字就醒了去候选窗");
+    }
+
+    #[test]
+    fn dragging_moves_her_along_the_floor_and_keeps_her_there_a_while() {
+        let mut c = Companion::new(1920.0, 1000.0, 4);
+        assert!(c.drag_to(300.0));
+        assert_eq!((c.pos.0, c.pos.1), (300.0, 1000.0));
+        run(&mut c, 2.0, &Input::default());
+        assert_eq!(c.pos.0, 300.0, "松手后先站一会儿，不立刻走开");
+        assert!(c.drag_to(-50.0));
+        assert_eq!(c.pos.0, 40.0, "不能拖出屏幕");
+        run(&mut c, SLEEP_AFTER + 5.0, &Input::default());
+        assert_eq!(c.pose(false), Pose::Sleep);
+        assert!(c.drag_to(500.0));
+        assert_ne!(c.pose(false), Pose::Sleep, "拖一下就醒");
+    }
+
+    #[test]
+    fn cannot_drag_her_off_the_candidate_window() {
+        let mut c = Companion::new(1920.0, 1000.0, 4);
+        run(&mut c, 1.5, &Input { candidate: Some(window()), listening: false });
+        assert!(!c.drag_to(100.0));
+        assert_eq!(c.pose(false), Pose::Perch);
     }
 
     #[test]
