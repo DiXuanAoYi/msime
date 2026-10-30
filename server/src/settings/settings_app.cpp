@@ -800,6 +800,8 @@ std::wstring BuildConfigMessage(bool refresh_skin_catalog)
           {"quanpin",
            {{"autocorrect_transposition", GetConfiguredQuanpinAutocorrectTransposition()},
             {"autocorrect_neighbor", GetConfiguredQuanpinAutocorrectNeighbor()},
+            {"autocorrect_deletion", GetConfiguredQuanpinAutocorrectDeletion()},
+            {"autocorrect_insertion", GetConfiguredQuanpinAutocorrectInsertion()},
             {"autocorrect_marker", GetConfiguredQuanpinAutocorrectMarker()}}},
           {"vocabulary", {{"enabled", GetConfiguredVocabularyEnabled()}, {"retention_days", GetConfiguredVocabularyRetentionDays()}}},
           {"statistics",

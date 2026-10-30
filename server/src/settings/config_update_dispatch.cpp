@@ -383,6 +383,10 @@ bool ApplyConfigUpdate(const json::object &data)
         return SetConfiguredQuanpinAutocorrectTransposition(json::value_to<bool>(data.at("value")));
     if (path == "quanpin.autocorrect_neighbor")
         return SetConfiguredQuanpinAutocorrectNeighbor(json::value_to<bool>(data.at("value")));
+    if (path == "quanpin.autocorrect_deletion")
+        return SetConfiguredQuanpinAutocorrectDeletion(json::value_to<bool>(data.at("value")));
+    if (path == "quanpin.autocorrect_insertion")
+        return SetConfiguredQuanpinAutocorrectInsertion(json::value_to<bool>(data.at("value")));
     if (path == "quanpin.autocorrect_marker")
         return SetConfiguredQuanpinAutocorrectMarker(json::value_to<bool>(data.at("value")));
     return false;

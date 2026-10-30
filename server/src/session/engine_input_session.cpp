@@ -70,12 +70,11 @@ void EngineInputSession::ApplyConfiguration()
                                          GetConfiguredShuangpinDirectHelpcodeUppercase());
     session_.set_mid_sentence_uppercase_trigger_enabled(GetConfiguredShuangpinMidSentenceHelpcodeUppercase());
     session_.set_quanpin_helpcode_enabled(GetConfiguredQuanpinHelpcodeEnabled());
-    // 引擎的开关 -> 掩码规则现在是四位互不联动（quanpin_utils.h）；设置页还只有换位、邻键两个开关，
-    // 任一打开仍连带漏字、多字两位，产品行为不变。待设置页补上漏字 / 多字开关再各走各的。
-    const bool any_correction = GetConfiguredQuanpinAutocorrectTransposition() || GetConfiguredQuanpinAutocorrectNeighbor();
+    // 每种纠错一个配置项、互不联动：会话拿到的就是引擎和预编辑重建从同一组开关推出的四位掩码
+    // （产品可达的掩码是四位的全部组合）。规则见 quanpin_utils.h。
     const unsigned autocorrect_types = quanpin::autocorrect_types_from_switches(
-        GetConfiguredQuanpinAutocorrectTransposition(), GetConfiguredQuanpinAutocorrectNeighbor(), any_correction,
-        any_correction);
+        GetConfiguredQuanpinAutocorrectTransposition(), GetConfiguredQuanpinAutocorrectNeighbor(),
+        GetConfiguredQuanpinAutocorrectDeletion(), GetConfiguredQuanpinAutocorrectInsertion());
     session_.set_quanpin_autocorrect_types(autocorrect_types);
     // Fuzzy pinyin applies to both quanpin and shuangpin; the engine fuzzes on the
     // converted quanpin syllables for shuangpin. Re-read on every key so setting

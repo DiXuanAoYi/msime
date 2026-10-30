@@ -108,9 +108,13 @@ std::string g_quanpin_helpcode_schema = "lantian";
 bool g_show_shuangpin_helpcode_in_candidate_window = true;
 bool g_show_quanpin_helpcode_in_candidate_window = true;
 // The legacy single "quanpin.autocorrect" key is deliberately not read anymore:
-// both correction types default to off and users opt in from the settings page.
+// all four correction types default to off and users opt in from the settings page.
+// The two legacy switches may still be set by users who had them on; the deletion and
+// insertion keys are new and get no inheritance from them (upgrade default: off).
 bool g_quanpin_autocorrect_transposition = false;
 bool g_quanpin_autocorrect_neighbor = false;
+bool g_quanpin_autocorrect_deletion = false;
+bool g_quanpin_autocorrect_insertion = false;
 // Whether correction-sourced candidates show the trailing "*" marker. On by default.
 bool g_quanpin_autocorrect_marker = true;
 // Bitmask of FuzzyPinyinRule bits. All off by default so upgrades never change behavior.
@@ -504,6 +508,8 @@ bool LoadImeConfig()
             tbl["helpcode"]["show_qp_helpcode_in_candidate_window"].value_or(true);
         g_quanpin_autocorrect_transposition = tbl["quanpin"]["autocorrect_transposition"].value_or(false);
         g_quanpin_autocorrect_neighbor = tbl["quanpin"]["autocorrect_neighbor"].value_or(false);
+        g_quanpin_autocorrect_deletion = tbl["quanpin"]["autocorrect_deletion"].value_or(false);
+        g_quanpin_autocorrect_insertion = tbl["quanpin"]["autocorrect_insertion"].value_or(false);
         g_quanpin_autocorrect_marker = tbl["quanpin"]["autocorrect_marker"].value_or(true);
         g_fuzzy_pinyin_enabled = tbl["input"]["fuzzy_pinyin"].value_or(false);
         g_fuzzy_seeded = tbl["input"]["fuzzy_seeded"].value_or(false);

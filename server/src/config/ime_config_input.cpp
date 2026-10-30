@@ -594,6 +594,36 @@ bool SetConfiguredQuanpinAutocorrectNeighbor(bool enabled)
     return true;
 }
 
+bool GetConfiguredQuanpinAutocorrectDeletion()
+{
+    return g_quanpin_autocorrect_deletion;
+}
+
+bool SetConfiguredQuanpinAutocorrectDeletion(bool enabled)
+{
+    if (!WriteConfiguredValue("quanpin", "autocorrect_deletion", enabled ? "true" : "false"))
+    {
+        return false;
+    }
+    g_quanpin_autocorrect_deletion = enabled;
+    return true;
+}
+
+bool GetConfiguredQuanpinAutocorrectInsertion()
+{
+    return g_quanpin_autocorrect_insertion;
+}
+
+bool SetConfiguredQuanpinAutocorrectInsertion(bool enabled)
+{
+    if (!WriteConfiguredValue("quanpin", "autocorrect_insertion", enabled ? "true" : "false"))
+    {
+        return false;
+    }
+    g_quanpin_autocorrect_insertion = enabled;
+    return true;
+}
+
 bool GetConfiguredQuanpinAutocorrectMarker()
 {
     return g_quanpin_autocorrect_marker;

@@ -366,6 +366,10 @@ bool GetConfiguredQuanpinAutocorrectTransposition();
 bool SetConfiguredQuanpinAutocorrectTransposition(bool enabled);
 bool GetConfiguredQuanpinAutocorrectNeighbor();
 bool SetConfiguredQuanpinAutocorrectNeighbor(bool enabled);
+bool GetConfiguredQuanpinAutocorrectDeletion();
+bool SetConfiguredQuanpinAutocorrectDeletion(bool enabled);
+bool GetConfiguredQuanpinAutocorrectInsertion();
+bool SetConfiguredQuanpinAutocorrectInsertion(bool enabled);
 bool GetConfiguredQuanpinAutocorrectMarker();
 bool SetConfiguredQuanpinAutocorrectMarker(bool enabled);
 // Fuzzy pinyin rules are flat [input] booleans ("fuzzy_z_zh", ...) so the settings page can

@@ -175,6 +175,8 @@ extern bool g_show_shuangpin_helpcode_in_candidate_window;
 extern bool g_show_quanpin_helpcode_in_candidate_window;
 extern bool g_quanpin_autocorrect_transposition;
 extern bool g_quanpin_autocorrect_neighbor;
+extern bool g_quanpin_autocorrect_deletion;
+extern bool g_quanpin_autocorrect_insertion;
 extern bool g_quanpin_autocorrect_marker;
 extern std::uint32_t g_fuzzy_pinyin_rules;
 extern bool g_fuzzy_pinyin_enabled;

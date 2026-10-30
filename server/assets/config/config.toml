@@ -361,12 +361,17 @@ show_qp_helpcode_in_candidate_window = true
 #
 [quanpin]
 # 全拼自动纠错：遇到按键窜乱时自动按最接近的正确拼音查询候选。
-# 仅当输入串不是合法拼音组合时触发，不影响正常输入；两个类型默认关闭，
-# 可在设置页分别开启。旧的单键 autocorrect 已废弃，不再读取。
+# 仅当输入串不是合法拼音组合时触发，不影响正常输入；四种类型默认全部关闭，
+# 可在设置页分别开启。四个开关各管一类手误、互不联动：只开哪个就只纠哪种。
+# 旧的单键 autocorrect 已废弃，不再读取；漏字 / 多字两个键是新增的，缺失时按关闭处理。
 # 相邻字母顺序打错时纠正（如 sahng → shang）。
 autocorrect_transposition = false
 # 误触相邻按键时纠正（如 shabg → shang）。
 autocorrect_neighbor = false
+# 漏敲一个字母时纠正（如 shng → shang）。
+autocorrect_deletion = false
+# 多敲一个相邻按键时纠正（如 sjhang → shang）。
+autocorrect_insertion = false
 # 纠错得到的候选在末尾显示 * 标记，便于和正常候选区分；只影响显示，不影响上屏文字。
 autocorrect_marker = true
 
