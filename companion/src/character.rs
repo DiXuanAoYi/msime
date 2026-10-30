@@ -57,6 +57,7 @@ fn motion(pose: Pose, t: f32) -> Motion {
         Pose::Perch => Motion { sx: 1.0, sy: 1.0 + 0.01 * breathe, angle: (t * 1.8).sin() * 0.03, lift: breathe * 1.5 },
         Pose::Jump => Motion { sx: 0.94, sy: 1.08, angle: 0.1, lift: 0.0 },
         Pose::Listen => Motion { sx: 1.0, sy: 1.0 + 0.008 * breathe, angle: 0.07, lift: 0.0 },
+        Pose::Sleep => Motion { sx: 1.08, sy: 0.82 + 0.015 * (t * 0.9).sin(), angle: 0.0, lift: 0.0 },
         Pose::Happy => Motion { sx: 1.0, sy: 1.0, angle: (t * 8.0).sin() * 0.06, lift: (t * 8.0).sin().abs() * 8.0 },
     }
 }
@@ -108,6 +109,19 @@ pub fn draw(painter: &Painter, sprites: &Sprites, feet: Pos2, facing: f32, pose:
                     "♥",
                     egui::FontId::proportional(16.0),
                     Color32::from_rgba_unmultiplied(255, 110, 150, (255.0 * (1.0 - p)) as u8),
+                );
+            }
+        }
+        Pose::Sleep => {
+            for k in 0..3 {
+                let p = (t * 0.35 + k as f32 / 3.0).fract();
+                let at = on_art(0.68 + p * 0.1, 0.1 - p * 0.28);
+                painter.text(
+                    at,
+                    egui::Align2::CENTER_CENTER,
+                    "z",
+                    egui::FontId::proportional(10.0 + p * 9.0),
+                    Color32::from_white_alpha((230.0 * (1.0 - p)) as u8),
                 );
             }
         }

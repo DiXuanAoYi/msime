@@ -1,4 +1,5 @@
 mod behavior;
+mod bond;
 mod character;
 mod feed;
 
@@ -27,6 +28,10 @@ struct App {
     passthrough: bool,
     screen: (f32, f32),
     sprite: character::Sprites,
+    bond: bond::Bond,
+    bond_path: Option<std::path::PathBuf>,
+    /// 摸头、喂食后飘在头上的小字和剩余秒数。
+    pop: Option<(String, f32)>,
 }
 
 impl App {
@@ -37,6 +42,8 @@ impl App {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.subsec_nanos())
             .unwrap_or(1);
+        let bond_path = bond::default_path();
+        let bond = bond_path.as_deref().map(bond::Bond::load).unwrap_or_default();
         Self {
             feed,
             companion: Companion::new(1280.0, 700.0, seed),
@@ -47,6 +54,25 @@ impl App {
             passthrough: true,
             screen: (1280.0, 720.0),
             sprite: load_sprite(&cc.egui_ctx),
+            bond,
+            bond_path,
+            pop: None,
+        }
+    }
+
+    fn save_bond(&self) {
+        if let Some(path) = &self.bond_path {
+            self.bond.save(path);
+        }
+    }
+
+    /// 摸头和喂食共用：她总会开心，涨没涨好感由冷却决定。
+    fn react(&mut self, level_before: u32, gained: Option<u32>) {
+        self.companion.pat();
+        if let Some(points) = gained {
+            let leveled = self.bond.level() > level_before;
+            self.pop = Some((if leveled { format!("+{points} 升级啦") } else { format!("+{points}") }, 1.4));
+            self.save_bond();
         }
     }
 
@@ -75,6 +101,13 @@ impl eframe::App for App {
         let now = Instant::now();
         let dt = (now - self.last).as_secs_f32().min(0.1);
         self.last = now;
+        self.bond.tick(dt);
+        if let Some((_, left)) = &mut self.pop {
+            *left -= dt;
+        }
+        if self.pop.as_ref().is_some_and(|(_, left)| *left <= 0.0) {
+            self.pop = None;
+        }
         let t = self.started.elapsed().as_secs_f32();
         let ppp = ctx.pixels_per_point();
 
@@ -112,17 +145,40 @@ impl eframe::App for App {
 
             let response = ui.interact(body, ui.id().with("companion"), Sense::click());
             if response.clicked() {
-                self.companion.pat();
+                let before = self.bond.level();
+                let gained = self.bond.pat().then_some(1);
+                self.react(before, gained);
             }
             response.context_menu(|ui| {
+                let (level, into, need) = self.bond.progress();
+                ui.label(format!("好感度 Lv.{level}（{into}/{need}）"));
+                ui.separator();
                 if ui.button("摸摸头").clicked() {
-                    self.companion.pat();
+                    let before = self.bond.level();
+                    let gained = self.bond.pat().then_some(1);
+                    self.react(before, gained);
+                    ui.close_menu();
+                }
+                if ui.add_enabled(self.bond.feed_ready(), egui::Button::new("喂小鱼干")).clicked() {
+                    let before = self.bond.level();
+                    let gained = self.bond.feed().then_some(3);
+                    self.react(before, gained);
                     ui.close_menu();
                 }
                 if ui.button("退出").clicked() {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
+            if let Some((text, left)) = &self.pop {
+                let rise = (1.4 - left) * 18.0;
+                painter.text(
+                    pos2(feet.x + 28.0, feet.y - HEIGHT - 10.0 - rise),
+                    egui::Align2::CENTER_CENTER,
+                    format!("♥ {text}"),
+                    egui::FontId::proportional(14.0),
+                    Color32::from_rgba_unmultiplied(255, 110, 150, (255.0 * (left / 1.4).clamp(0.0, 1.0)) as u8),
+                );
+            }
             if pose == Pose::Listen {
                 painter.text(
                     pos2(feet.x, feet.y - HEIGHT - 26.0),
