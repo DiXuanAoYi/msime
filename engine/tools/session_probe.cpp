@@ -116,8 +116,7 @@ std::string snapshot_json(const Session &session)
     const auto view = session.snapshot();
     return std::string("{\"scheme\":") + std::to_string(static_cast<int>(view.scheme)) + ",\"mode\":" + std::to_string(static_cast<int>(view.local_mode)) + ",\"preedit\":" + quote(view.preedit) +
            ",\"rawseg\":" + quote(view.raw_segmentation) + ",\"normseg\":" + quote(view.normalized_segmentation) + ",\"dedicated\":" + (view.dedicated_english ? "1" : "0") +
-           ",\"editing\":" + quote(view.editing_text) + ",\"caret\":" + std::to_string(view.caret_position) + ",\"spellings\":" + strings_json(view.nine_key_spellings) +
-           ",\"online\":" + online_json(session.online_query()) + ",\"candidates\":" + list_json(view.candidates) + "}";
+           ",\"editing\":" + quote(view.editing_text) + ",\"caret\":" + std::to_string(view.caret_position) + ",\"online\":" + online_json(session.online_query()) + ",\"candidates\":" + list_json(view.candidates) + "}";
 }
 
 void link_or_copy(const fs::path &from, const fs::path &to, bool force_copy)
@@ -148,12 +147,10 @@ void mirror(const fs::path &from, const fs::path &to)
     }
 }
 
-char random_character(Lcg &rng, bool &shift_only, bool nine_key_round)
+char random_character(Lcg &rng, bool &shift_only)
 {
     shift_only = false;
     const std::uint32_t pick = rng.below(100);
-    if (nine_key_round && pick < 55)
-        return static_cast<char>('2' + rng.below(8));
     if (pick < 72)
         return static_cast<char>('a' + rng.below(26));
     if (pick < 80)
@@ -184,7 +181,7 @@ int main(int argc, char **argv)
     std::ofstream out(argv[3], std::ios::binary);
     Lcg rng{0x51ab9d07ULL};
 
-    int sequences = 0, steps = 0, nine_key_steps = 0, committed = 0, nine_candidates = 0, nine_spellings = 0;
+    int sequences = 0, steps = 0, committed = 0;
     const SchemeType schemes[] = {SchemeType::Quanpin, SchemeType::Shuangpin, SchemeType::Wubi, SchemeType::JapaneseRomaji};
     const int rounds = 420;
     for (int round = 0; round < rounds; ++round)
@@ -228,19 +225,15 @@ int main(int argc, char **argv)
         options.expressive.kaomoji_candidates = r.below(4) == 0;
         options.wubi.mixed_pinyin = r.below(2) == 0;
         options.wubi.z_wildcard = r.below(2) == 0;
-        bool nine_key_round = options.scheme == SchemeType::Quanpin && r.below(4) != 0;
         if (directed)
         {
             options.scheme = SchemeType::Quanpin;
-            nine_key_round = true;
             options.learning = true;
             options.frequency.mode = static_cast<FrequencyAdjustmentMode>(1 + round % 4);
             options.frequency.trigger_count = 1;
         }
 
         Session session(options);
-        if (nine_key_round)
-            session.set_nine_key_enabled(true);
 
         out << "{\"round\":" << round << ",\"start\":" << static_cast<int>(options.scheme) << ",\"ac\":" << options.autocorrect_types << ",\"help\":" << options.helpcode
             << ",\"punct\":" << options.chinese_punctuation << ",\"learn\":" << options.learning << ",\"fuzzy\":" << options.fuzzy_pinyin.rules << ",\"freq\":["
@@ -248,7 +241,7 @@ int main(int argc, char **argv)
             << options.local_modes.quick_phrase << "," << options.local_modes.quick_phrase_candidates << "," << options.local_modes.quick_phrase_frequency << "," << options.local_modes.emoji << ","
             << options.local_modes.kaomoji << "," << options.local_modes.super_jianpin << "," << options.local_modes.temporary_english << "," << options.local_modes.temporary_japanese
             << "],\"english\":[" << options.english.mixed_candidates << "," << options.english.minimum_prefix << "],\"expressive\":[" << options.expressive.emoji_candidates << ","
-            << options.expressive.kaomoji_candidates << "],\"wubi\":[" << options.wubi.mixed_pinyin << "," << options.wubi.z_wildcard << "],\"nine\":" << nine_key_round << ",\"init\":"
+            << options.expressive.kaomoji_candidates << "],\"wubi\":[" << options.wubi.mixed_pinyin << "," << options.wubi.z_wildcard << "],\"init\":"
             << snapshot_json(session) << ",\"ops\":[";
 
         const std::uint32_t length = directed ? 40 + r.below(30) : 12 + r.below(40);
@@ -302,7 +295,7 @@ int main(int argc, char **argv)
             else if (pick < 38)
             {
                 bool shift_only = false;
-                const char c = random_character(r, shift_only, nine_key_round);
+                const char c = random_character(r, shift_only);
                 result = key_result_json(session.character(c, shift_only));
                 out << "{\"op\":\"char\",\"c\":" << static_cast<int>(c) << ",\"shift\":" << shift_only;
             }
@@ -363,18 +356,6 @@ int main(int argc, char **argv)
                 result = key_result_json(session.finish(first));
                 out << "{\"op\":\"finish\",\"i\":" << first;
             }
-            else if (pick < 86)
-            {
-                const std::size_t spelling = r.below(8);
-                result = key_result_json(session.choose_nine_key_spelling(spelling));
-                out << "{\"op\":\"spelling\",\"i\":" << spelling;
-            }
-            else if (pick < 88)
-            {
-                const bool enabled = r.below(3) != 0;
-                session.set_nine_key_enabled(enabled);
-                out << "{\"op\":\"nine\",\"v\":" << enabled;
-            }
             else if (pick < 90)
             {
                 const SchemeType next = schemes[r.below(4)];
@@ -419,15 +400,11 @@ int main(int argc, char **argv)
             const auto view = session.snapshot();
             out << ",\"result\":" << result << ",\"state\":" << snapshot_json(session) << "}";
             ++steps;
-            const bool nine_active = !view.nine_key_spellings.empty() || (view.scheme == SchemeType::Quanpin && view.editing_text.find_first_not_of("23456789") == std::string::npos && !view.editing_text.empty());
-            nine_key_steps += nine_active;
-            nine_candidates += nine_active && !view.candidates.empty();
-            nine_spellings += !view.nine_key_spellings.empty();
             committed += result.find("\"c\":\"") != std::string::npos;
         }
         out << "]}\n";
         ++sequences;
     }
-    std::cerr << "会话门面：" << sequences << " 个序列 " << steps << " 步，九键 " << nine_key_steps << "，九键有候选 " << nine_candidates << "，有拼写 " << nine_spellings << "，有上屏 " << committed << "\n";
+    std::cerr << "会话门面：" << sequences << " 个序列 " << steps << " 步，有上屏 " << committed << "\n";
     return 0;
 }
