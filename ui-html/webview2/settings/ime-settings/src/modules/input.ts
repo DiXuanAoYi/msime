@@ -386,6 +386,12 @@ export function setupInput(): void {
   setupToggleButton('autocorrectNeighborToggleBtn', (active) => {
     updateConfig('quanpin.autocorrect_neighbor', active);
   });
+  setupToggleButton('autocorrectDeletionToggleBtn', (active) => {
+    updateConfig('quanpin.autocorrect_deletion', active);
+  });
+  setupToggleButton('autocorrectInsertionToggleBtn', (active) => {
+    updateConfig('quanpin.autocorrect_insertion', active);
+  });
   setupToggleButton('autocorrectMarkerToggleBtn', (active) => {
     updateConfig('quanpin.autocorrect_marker', active);
   });

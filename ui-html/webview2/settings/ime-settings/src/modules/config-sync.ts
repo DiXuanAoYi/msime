@@ -136,6 +136,12 @@ function applyConfigData(data: Record<string, any>, target?: string): void {
   if (typeof data?.quanpin?.autocorrect_neighbor === 'boolean') {
     applyToggleState('autocorrectNeighborToggleBtn', data.quanpin.autocorrect_neighbor);
   }
+  if (typeof data?.quanpin?.autocorrect_deletion === 'boolean') {
+    applyToggleState('autocorrectDeletionToggleBtn', data.quanpin.autocorrect_deletion);
+  }
+  if (typeof data?.quanpin?.autocorrect_insertion === 'boolean') {
+    applyToggleState('autocorrectInsertionToggleBtn', data.quanpin.autocorrect_insertion);
+  }
   if (typeof data?.quanpin?.autocorrect_marker === 'boolean') {
     applyToggleState('autocorrectMarkerToggleBtn', data.quanpin.autocorrect_marker);
   }
