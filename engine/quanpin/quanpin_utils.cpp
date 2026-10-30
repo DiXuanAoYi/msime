@@ -138,42 +138,42 @@ const std::vector<SparsePinyinFallbackRule> &sparse_pinyin_fallback_rules()
 const std::vector<std::string> &intact_pinyin_list()
 {
     static const std::vector<std::string> kList = {
-        "a",     "ai",     "an",    "ang",   "ao",    "ba",    "bai",   "ban",   "bang",  "bao",    "bei",   "ben",
-        "beng",  "bi",     "bian",  "biang", "biao",  "bie",   "bin",   "bing",  "bo",    "bu",     "ca",    "cai",
-        "can",   "cang",   "cao",   "ce",    "cen",   "ceng",  "cha",   "chai",  "chan",  "chang",  "chao",  "che",
-        "chen",  "cheng",  "chi",   "chong", "chou",  "chu",   "chua",  "chuai", "chuan", "chuang", "chui",  "chun",
-        "chuo",  "ci",     "cong",  "cou",   "cu",    "cuan",  "cui",   "cun",   "cuo",   "da",     "dai",   "dan",
-        "dang",  "dao",    "de",    "dei",   "den",   "deng",  "di",    "dia",   "dian",  "diao",   "die",   "ding",
-        "diu",   "dong",   "dou",   "du",    "duan",  "dui",   "dun",   "duo",   "e",     "ei",     "en",    "er",
-        "fa",    "fan",    "fang",  "fei",   "fen",   "feng",  "fiao",  "fo",    "fou",   "fu",     "ga",    "gai",
-        "gan",   "gang",   "gao",   "ge",    "gei",   "gen",   "geng",  "gong",  "gou",   "gu",     "gua",   "guai",
-        "guan",  "guang",  "gui",   "gun",   "guo",   "ha",    "hai",   "han",   "hang",  "hao",    "he",    "hei",
-        "hen",   "heng",   "hong",  "hou",   "hu",    "hua",   "huai",  "huan",  "huang", "hui",    "hun",   "huo",
-        "ji",    "jia",    "jian",  "jiang", "jiao",  "jie",   "jin",   "jing",  "jiong", "jiu",    "ju",    "juan",
-        "jue",   "jun",    "jv",    "jve",   "ka",    "kai",   "kan",   "kang",  "kao",   "ke",     "kei",   "ken",
-        "keng",  "kong",   "kou",   "ku",    "kua",   "kuai",  "kuan",  "kuang", "kui",   "kun",    "kuo",   "la",
-        "lai",   "lan",    "lang",  "lao",   "le",    "lei",   "leng",  "li",    "lia",   "lian",   "liang", "liao",
-        "lie",   "lin",    "ling",  "liu",   "lo",    "long",  "lou",   "lu",    "luan",  "lue",    "lun",   "luo",
-        "lv",    "lve",    "ma",    "mai",   "man",   "mang",  "mao",   "me",    "mei",   "men",    "meng",  "mi",
-        "mian",  "miao",   "mie",   "min",   "ming",  "miu",   "mo",    "mou",   "mu",    "na",     "nai",   "nan",
-        "nang",  "nao",    "ne",    "nei",   "nen",   "neng",  "ni",    "nian",  "niang", "niao",   "nie",   "nin",
-        "ning",  "niu",    "nong",  "nou",   "nu",    "nuan",  "nue",   "nun",   "nuo",   "nv",     "nve",   "o",
-        "ou",    "pa",     "pai",   "pan",   "pang",  "pao",   "pei",   "pen",   "peng",  "pi",     "pian",  "piao",
-        "pie",   "pin",    "ping",  "po",    "pou",   "pu",    "qi",    "qia",   "qian",  "qiang",  "qiao",  "qie",
-        "qin",   "qing",   "qiong", "qiu",   "qu",    "quan",  "que",   "qun",   "qv",    "qve",    "ran",   "rang",
-        "rao",   "re",     "ren",   "reng",  "ri",    "rong",  "rou",   "ru",    "ruan",  "rui",    "run",   "ruo",
-        "sa",    "sai",    "san",   "sang",  "sao",   "se",    "sen",   "seng",  "sha",   "shai",   "shan",  "shang",
-        "shao",  "she",    "shei",  "shen",  "sheng", "shi",   "shou",  "shu",   "shua",  "shuai",  "shuan", "shuang",
-        "shui",  "shun",   "shuo",  "si",    "song",  "sou",   "su",    "suan",  "sui",   "sun",    "suo",   "ta",
-        "tai",   "tan",    "tang",  "tao",   "te",    "teng",  "ti",    "tian",  "tiao",  "tie",    "ting",  "tong",
-        "tou",   "tu",     "tuan",  "tui",   "tun",   "tuo",   "wa",    "wai",   "wan",   "wang",   "wei",   "wen",
-        "weng",  "wo",     "wu",    "xi",    "xia",   "xian",  "xiang", "xiao",  "xie",   "xin",    "xing",  "xiong",
-        "xiu",   "xu",     "xuan",  "xue",   "xun",   "xv",    "xve",   "ya",    "yan",   "yang",   "yao",   "ye",
-        "yi",    "yin",    "ying",  "yo",    "yong",  "you",   "yu",    "yuan",  "yue",   "yun",    "yv",    "yve",
-        "za",    "zai",    "zan",   "zang",  "zao",   "ze",    "zei",   "zen",   "zeng",  "zha",    "zhai",  "zhan",
-        "zhang", "zhao",   "zhe",   "zhei",  "zhen",  "zheng", "zhi",   "zhong", "zhou",  "zhu",    "zhua",  "zhuai",
-        "zhuan", "zhuang", "zhui",  "zhun",  "zhuo",  "zi",    "zong",  "zou",   "zu",    "zuan",   "zui",   "zun",
-        "zuo"};
+        "a",     "ai",    "an",    "ang",    "ao",    "ba",   "bai",  "ban",   "bang",  "bao",    "bei",   "ben",
+        "beng",  "bi",    "bian",  "biang",  "biao",  "bie",  "bin",  "bing",  "bo",    "bu",     "ca",    "cai",
+        "can",   "cang",  "cao",   "ce",     "cen",   "ceng", "cha",  "chai",  "chan",  "chang",  "chao",  "che",
+        "chen",  "cheng", "chi",   "chong",  "chou",  "chu",  "chua", "chuai", "chuan", "chuang", "chui",  "chun",
+        "chuo",  "ci",    "cong",  "cou",    "cu",    "cuan", "cui",  "cun",   "cuo",   "da",     "dai",   "dan",
+        "dang",  "dao",   "de",    "dei",    "den",   "deng", "di",   "dia",   "dian",  "diao",   "die",   "ding",
+        "diu",   "dong",  "dou",   "du",     "duan",  "dui",  "dun",  "duo",   "e",     "ei",     "en",    "er",
+        "fa",    "fan",   "fang",  "fei",    "fen",   "feng", "fiao", "fo",    "fou",   "fu",     "ga",    "gai",
+        "gan",   "gang",  "gao",   "ge",     "gei",   "gen",  "geng", "gong",  "gou",   "gu",     "gua",   "guai",
+        "guan",  "guang", "gui",   "gun",    "guo",   "ha",   "hai",  "han",   "hang",  "hao",    "he",    "hei",
+        "hen",   "heng",  "hong",  "hou",    "hu",    "hua",  "huai", "huan",  "huang", "hui",    "hun",   "huo",
+        "ji",    "jia",   "jian",  "jiang",  "jiao",  "jie",  "jin",  "jing",  "jiong", "jiu",    "ju",    "juan",
+        "jue",   "jun",   "jv",    "jvan",   "jve",   "jvn",  "ka",   "kai",   "kan",   "kang",   "kao",   "ke",
+        "kei",   "ken",   "keng",  "kong",   "kou",   "ku",   "kua",  "kuai",  "kuan",  "kuang",  "kui",   "kun",
+        "kuo",   "la",    "lai",   "lan",    "lang",  "lao",  "le",   "lei",   "leng",  "li",     "lia",   "lian",
+        "liang", "liao",  "lie",   "lin",    "ling",  "liu",  "lo",   "long",  "lou",   "lu",     "luan",  "lue",
+        "lun",   "luo",   "lv",    "lve",    "ma",    "mai",  "man",  "mang",  "mao",   "me",     "mei",   "men",
+        "meng",  "mi",    "mian",  "miao",   "mie",   "min",  "ming", "miu",   "mo",    "mou",    "mu",    "na",
+        "nai",   "nan",   "nang",  "nao",    "ne",    "nei",  "nen",  "neng",  "ni",    "nian",   "niang", "niao",
+        "nie",   "nin",   "ning",  "niu",    "nong",  "nou",  "nu",   "nuan",  "nue",   "nun",    "nuo",   "nv",
+        "nve",   "o",     "ou",    "pa",     "pai",   "pan",  "pang", "pao",   "pei",   "pen",    "peng",  "pi",
+        "pian",  "piao",  "pie",   "pin",    "ping",  "po",   "pou",  "pu",    "qi",    "qia",    "qian",  "qiang",
+        "qiao",  "qie",   "qin",   "qing",   "qiong", "qiu",  "qu",   "quan",  "que",   "qun",    "qv",    "qvan",
+        "qve",   "qvn",   "ran",   "rang",   "rao",   "re",   "ren",  "reng",  "ri",    "rong",   "rou",   "ru",
+        "ruan",  "rui",   "run",   "ruo",    "sa",    "sai",  "san",  "sang",  "sao",   "se",     "sen",   "seng",
+        "sha",   "shai",  "shan",  "shang",  "shao",  "she",  "shei", "shen",  "sheng", "shi",    "shou",  "shu",
+        "shua",  "shuai", "shuan", "shuang", "shui",  "shun", "shuo", "si",    "song",  "sou",    "su",    "suan",
+        "sui",   "sun",   "suo",   "ta",     "tai",   "tan",  "tang", "tao",   "te",    "teng",   "ti",    "tian",
+        "tiao",  "tie",   "ting",  "tong",   "tou",   "tu",   "tuan", "tui",   "tun",   "tuo",    "wa",    "wai",
+        "wan",   "wang",  "wei",   "wen",    "weng",  "wo",   "wu",   "xi",    "xia",   "xian",   "xiang", "xiao",
+        "xie",   "xin",   "xing",  "xiong",  "xiu",   "xu",   "xuan", "xue",   "xun",   "xv",     "xvan",  "xve",
+        "xvn",   "ya",    "yan",   "yang",   "yao",   "ye",   "yi",   "yin",   "ying",  "yo",     "yong",  "you",
+        "yu",    "yuan",  "yue",   "yun",    "yv",    "yvan", "yve",  "yvn",   "za",    "zai",    "zan",   "zang",
+        "zao",   "ze",    "zei",   "zen",    "zeng",  "zha",  "zhai", "zhan",  "zhang", "zhao",   "zhe",   "zhei",
+        "zhen",  "zheng", "zhi",   "zhong",  "zhou",  "zhu",  "zhua", "zhuai", "zhuan", "zhuang", "zhui",  "zhun",
+        "zhuo",  "zi",    "zong",  "zou",    "zu",    "zuan", "zui",  "zun",   "zuo"};
     return kList;
 }
 
@@ -541,7 +541,7 @@ std::string canonical_umlaut_spelling(std::string syllable)
 
 std::string to_google_spelling(const std::string &segmentation)
 {
-    // quanpin_query.cpp 的 canonical_syllable 把 ü 的两种写法归到词库存的那一种
+    // canonical_umlaut_spelling 把 ü 的两种写法归到词库存的那一种
     // （l/n 后面写 v：lve、nve）。Google 的两个解码器要的正好是另一种：本地
     // googlepinyinime-rev 的音节表来自 rawdict_utf16_65105_freq.txt，里面只有
     // nue/lue 和 nv/lv，没有 nve/lve，splparser 也不做 v→ü 转写；inputtools 云输入
@@ -550,10 +550,7 @@ std::string to_google_spelling(const std::string &segmentation)
     //
     // 按音节整体替换，认不出的原样透传：手打分隔符切出来的块可能不止一个音节，
     // 那种块交给解码器自己再切。
-    static const std::unordered_map<std::string, std::string> kSpellings = {
-        {"jv", "ju"},   {"qv", "qu"},   {"xv", "xu"},   {"yv", "yu"},   {"jve", "jue"},
-        {"qve", "que"}, {"xve", "xue"}, {"yve", "yue"}, {"lve", "lue"}, {"nve", "nue"},
-    };
+    const auto &valid_pinyin = intact_pinyin_set();
 
     std::string result;
     result.reserve(segmentation.size());
@@ -562,9 +559,16 @@ std::string to_google_spelling(const std::string &segmentation)
     {
         const size_t separator = segmentation.find('\'', chunk_start);
         const size_t chunk_end = separator == std::string::npos ? segmentation.size() : separator;
-        const std::string chunk = segmentation.substr(chunk_start, chunk_end - chunk_start);
-        const auto found = kSpellings.find(chunk);
-        result += found == kSpellings.end() ? chunk : found->second;
+        std::string chunk = segmentation.substr(chunk_start, chunk_end - chunk_start);
+        if (valid_pinyin.count(chunk))
+        {
+            chunk = canonical_umlaut_spelling(std::move(chunk));
+            if (chunk == "nve" || chunk == "lve")
+            {
+                chunk[1] = 'u';
+            }
+        }
+        result += chunk;
         if (separator == std::string::npos)
         {
             break;

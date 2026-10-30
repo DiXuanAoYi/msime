@@ -31,7 +31,6 @@ set(METASEQUOIA_IME_ENGINE_SOURCES
     common/string_utils.cpp
     core/session.cpp
     capi/msime_capi.cpp
-    core/nine_key_session.cpp
     core/candidate_queries.cpp
     core/punctuation_policy.cpp
     core/runtime_paths.cpp
@@ -294,9 +293,6 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME punctuation_contract COMMAND test_punctuation_contract)
 
-    add_executable(test_nine_key_session tests/src/test_nine_key_session.cpp)
-    target_link_libraries(test_nine_key_session PRIVATE MetasequoiaImeEngine)
-    add_test(NAME nine_key_session COMMAND test_nine_key_session)
 
     add_executable(test_platform_api tests/src/test_platform_api.cpp tests/src/test_public_session.cpp)
     target_link_libraries(test_platform_api PRIVATE MetasequoiaIme::Engine)

@@ -1507,8 +1507,7 @@ bool adjust_candidate_ranking(const std::string &main_db_path, const std::string
     }
 
     // One list mixes several entry keys: single-letter and jianpin contexts show
-    // 一/yi next to 有/you, nine-key digits mix whole single-char tables, and a
-    // re-segmentation shows 吉安 (ji'an) inside the jian list. All of them have to
+    // 一/yi next to 有/you, and a re-segmentation shows 吉安 (ji'an) inside the jian list. All of them have to
     // share one scale, because the user's 调频 is "move this above what I can see".
     //
     // The midpoint math below assumes this vector is sorted by weight, descending:
@@ -2009,6 +2008,23 @@ PersonalDictionaryEditResult edit_personal_dictionary(const RuntimePaths &paths,
         if (!checked.entry)
             return {false, checked.error};
         new_entry = std::move(checked.entry);
+        // 只归一新写入的词：查询会把 xvan、lue 先改成 xuan、lve 再查库，照原样存的行永远查不到。
+        // 被替换的旧词保留原键，旧版本存下的 lue、jve 行才删得掉。
+        if (new_entry->kind == PersonalDictionaryKind::Pinyin)
+        {
+            std::string key;
+            std::size_t start = 0;
+            while (true)
+            {
+                const auto end = new_entry->key.find('\'', start);
+                key += quanpin::canonical_umlaut_spelling(new_entry->key.substr(start, end - start));
+                if (end == std::string::npos)
+                    break;
+                key += '\'';
+                start = end + 1;
+            }
+            new_entry->key = std::move(key);
+        }
     }
     try
     {
